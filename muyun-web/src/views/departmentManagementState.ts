@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue';
 import type { Department, Organization } from '@muyun/web-contracts';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platform-components';
 
 export type DepartmentMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
@@ -20,7 +20,6 @@ export function createDepartmentManagementState(
   const draft = ref<Department>(emptyDepartmentDraft());
   const mode = ref<DepartmentMode>('view');
   const saving = ref(false);
-  const actionError = ref<string>();
 
   const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
   const selectedOrganizationTitle = computed(() => organizationTitleOf(selectedOrganization.value));
@@ -64,7 +63,6 @@ export function createDepartmentManagementState(
     }
     selectedOrganization.value = record;
     resetDepartmentsForOrganization();
-    clearFeedback();
   }
 
   function handleDepartmentsLoaded(records: Department[]) {
@@ -84,36 +82,20 @@ export function createDepartmentManagementState(
     selectedDepartment.value = record;
     draft.value = copyDepartment(record);
     mode.value = 'view';
-    clearFeedback();
   }
 
   function startCreateRoot() {
-    if (!selectedOrganizationId.value) {
-      presentActionMessage('请先选择机构');
-      return;
-    }
-    if (!canCreate.value) {
-      presentActionMessage('当前用户无权新增部门');
+    if (!selectedOrganizationId.value || !canCreate.value) {
       return;
     }
     selectedDepartment.value = undefined;
     draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
     mode.value = 'create-root';
-    clearFeedback();
   }
 
   function startCreateChild(parent?: Department) {
     const current = parent ?? selectedDepartment.value;
-    if (!selectedOrganizationId.value) {
-      presentActionMessage('请先选择机构');
-      return;
-    }
-    if (!current?.id) {
-      presentActionMessage('请先选择上级部门');
-      return;
-    }
-    if (!canCreate.value) {
-      presentActionMessage('当前用户无权新增部门');
+    if (!selectedOrganizationId.value || !current?.id || !canCreate.value) {
       return;
     }
     selectedDepartment.value = current;
@@ -122,20 +104,14 @@ export function createDepartmentManagementState(
       parentId: current.id,
     };
     mode.value = 'create-child';
-    clearFeedback();
   }
 
   function startEdit() {
-    if (!selectedDepartment.value) {
-      return;
-    }
-    if (!canUpdate.value) {
-      presentActionMessage('当前用户无权编辑部门');
+    if (!selectedDepartment.value || !canUpdate.value) {
       return;
     }
     draft.value = copyDepartment(selectedDepartment.value);
     mode.value = 'edit';
-    clearFeedback();
   }
 
   function cancelEdit() {
@@ -143,104 +119,81 @@ export function createDepartmentManagementState(
       ? copyDepartment(selectedDepartment.value)
       : emptyDepartmentDraft(selectedOrganizationId.value);
     mode.value = 'view';
-    clearFeedback();
   }
 
   async function save() {
-    if (saving.value || mode.value === 'view') {
-      return;
-    }
-    if (mode.value.startsWith('create') ? !canCreate.value : !canUpdate.value) {
-      presentActionMessage('当前用户无权保存部门');
-      return;
-    }
-    const validDraft = normalizeDepartmentDraft(draft.value, selectedOrganizationId.value);
-    if (!isValidDepartment(validDraft)) {
-      presentActionMessage('所属机构、部门编码和部门名称不能为空');
-      return;
-    }
-    clearFeedback();
-    saving.value = true;
-    try {
-      await departmentContext.runtime.ready;
-      const crud = departmentContext.abilities.crud();
-      const result =
-        mode.value === 'edit' && validDraft.id
-          ? await crud.update(validDraft.id, validDraft)
-          : await crud.insert(validDraft);
-      const saved = result.record;
-      selectedDepartment.value = saved;
-      draft.value = copyDepartment(saved);
-      mode.value = 'view';
-      presentActionSuccess(result.message ?? '操作成功');
-      departmentReloadKey.value += 1;
-    } catch (cause) {
-      presentActionCause(cause);
-    } finally {
-      saving.value = false;
-    }
+    await executeStaticFormSave<Department>({
+      loading: saving,
+      mode: mode.value === 'edit' ? 'edit' : 'create',
+      source: 'department-management',
+      validateContext: () => {
+        if (mode.value === 'view') {
+          return '请选择编辑或新建部门';
+        }
+        return selectedOrganizationId.value ? undefined : '请先选择机构';
+      },
+      canSave: () => (mode.value.startsWith('create') ? canCreate.value : canUpdate.value),
+      deniedMessage: '当前用户无权保存部门',
+      createRecord: () => normalizeDepartmentDraft(draft.value, selectedOrganizationId.value),
+      validateRecord: (record) =>
+        isValidDepartment(record) ? undefined : '所属机构、部门编码和部门名称不能为空',
+      save: async (record, saveMode) => {
+        await departmentContext.runtime.ready;
+        const crud = departmentContext.abilities.crud();
+        return saveMode === 'edit' && record.id ? crud.update(record.id, record) : crud.insert(record);
+      },
+      onSaved: ({ record }) => {
+        selectedDepartment.value = record;
+        draft.value = copyDepartment(record);
+        mode.value = 'view';
+        departmentReloadKey.value += 1;
+      },
+    });
   }
 
   async function toggleEnabled() {
-    if (!selectedDepartment.value?.id || saving.value) {
-      return;
-    }
-    if (!canToggle.value) {
-      presentActionMessage('当前用户无权变更部门启停状态');
-      return;
-    }
-    clearFeedback();
-    saving.value = true;
-    try {
-      await departmentContext.runtime.ready;
-      const enable = departmentContext.abilities.enable();
-      const result =
-        selectedDepartment.value.enabled === false
-          ? await enable.enable(selectedDepartment.value.id)
-          : await enable.disable(selectedDepartment.value.id);
-      const refreshed = await departmentContext.abilities.crud().view(selectedDepartment.value.id);
-      selectedDepartment.value = refreshed;
-      draft.value = copyDepartment(refreshed);
-      presentActionSuccess(result.message ?? '操作成功');
-      departmentReloadKey.value += 1;
-    } catch (cause) {
-      presentActionCause(cause);
-    } finally {
-      saving.value = false;
-    }
+    await executeStaticRecordAction({
+      loading: saving,
+      source: 'department-management',
+      record: () => (selectedDepartment.value?.id ? selectedDepartment.value : undefined),
+      canExecute: () => canToggle.value,
+      deniedMessage: '当前用户无权变更部门启停状态',
+      execute: async (department) => {
+        await departmentContext.runtime.ready;
+        const enable = departmentContext.abilities.enable();
+        return department.enabled === false ? enable.enable(department.id!) : enable.disable(department.id!);
+      },
+      onExecuted: async (_, department) => {
+        const refreshed = await departmentContext.abilities.crud().view(department.id!);
+        selectedDepartment.value = refreshed;
+        draft.value = copyDepartment(refreshed);
+        departmentReloadKey.value += 1;
+      },
+    });
   }
 
   async function removeSelected() {
-    if (!selectedDepartment.value?.id || saving.value) {
-      return;
-    }
-    if (!canDelete.value) {
-      presentActionMessage('当前用户无权删除部门');
-      return;
-    }
-    const confirmed = await confirmAction({
-      title: '删除部门',
-      content: `确认删除部门「${departmentTitleOf(selectedDepartment.value)}」？`,
-      okText: '删除',
-      danger: true,
+    await executeStaticRecordAction({
+      loading: saving,
+      source: 'department-management',
+      record: () => (selectedDepartment.value?.id ? selectedDepartment.value : undefined),
+      canExecute: () => canDelete.value,
+      deniedMessage: '当前用户无权删除部门',
+      confirm: (department) =>
+        confirmAction({
+          title: '删除部门',
+          content: `确认删除部门「${departmentTitleOf(department)}」？`,
+          okText: '删除',
+          danger: true,
+        }),
+      execute: (department) => departmentContext.abilities.crud().delete(department.id!),
+      onExecuted: () => {
+        selectedDepartment.value = undefined;
+        draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
+        mode.value = 'view';
+        departmentReloadKey.value += 1;
+      },
     });
-    if (!confirmed) {
-      return;
-    }
-    clearFeedback();
-    saving.value = true;
-    try {
-      const result = await departmentContext.abilities.crud().delete(selectedDepartment.value.id);
-      selectedDepartment.value = undefined;
-      draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
-      mode.value = 'view';
-      presentActionSuccess(result.message ?? '操作成功');
-      departmentReloadKey.value += 1;
-    } catch (cause) {
-      presentActionCause(cause);
-    } finally {
-      saving.value = false;
-    }
   }
 
   function resetDepartmentsForOrganization() {
@@ -249,29 +202,6 @@ export function createDepartmentManagementState(
     draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
     mode.value = 'view';
     departmentReloadKey.value += 1;
-  }
-
-  function clearFeedback() {
-    actionError.value = undefined;
-  }
-
-  function presentActionCause(cause: unknown) {
-    const error = normalizeError(cause);
-    actionError.value = error.message;
-    presentPlatformError(error, { source: 'department-management-action', phase: 'action' });
-  }
-
-  function presentActionMessage(message: string) {
-    actionError.value = message;
-    presentPlatformMessage(message, { source: 'department-management-action', phase: 'action' });
-  }
-
-  function presentActionSuccess(message: string) {
-    presentPlatformMessage(message, {
-      source: 'department-management-action',
-      phase: 'action',
-      tone: 'success',
-    });
   }
 
   return {
@@ -284,7 +214,6 @@ export function createDepartmentManagementState(
     draft,
     mode,
     saving,
-    actionError,
     selectedOrganizationId,
     selectedOrganizationTitle,
     selectedDepartmentTitle,

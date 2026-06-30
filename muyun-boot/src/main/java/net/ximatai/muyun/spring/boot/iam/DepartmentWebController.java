@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.boot.iam;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
@@ -16,6 +19,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,7 +37,39 @@ import java.util.List;
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,
-        EnableWeb<Department, DepartmentService> {
+        EnableWeb<Department, DepartmentService>,
+        StaticModuleUiContributor {
+    private StaticRecordReadProjectionService staticRecordReadProjectionService;
+
+    @Autowired(required = false)
+    void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
+        this.staticRecordReadProjectionService = staticRecordReadProjectionService;
+    }
+
+    @Override
+    public StaticRecordReadProjectionService staticRecordReadProjectionService() {
+        return staticRecordReadProjectionService;
+    }
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(DepartmentService.MODULE_ALIAS)
+                .listView(list -> list
+                        .title("部门列表")
+                        .field("code", field -> field.label("部门编码").width("150px"))
+                        .field("title", field -> field.label("部门名称").width("180px"))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus")
+                                .width("90px").align("center")))
+                .formView(form -> form
+                        .title("部门档案")
+                        .field("organizationId", field -> field.label("所属机构").required().readOnly())
+                        .field("parentId", field -> field.label("上级部门").uiType("recordPicker"))
+                        .field("code", field -> field.label("部门编码").required())
+                        .field("title", field -> field.label("部门名称").required())
+                        .field("enabled", field -> field.label("启用状态").uiType("enabledStatus")))
+                .build();
+    }
+
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
     public WebCountResponse sort(@PathVariable String id,

@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   ModuleActionButton,
   parentRecordConstraints,
   RecordActionBar,
   RecordDetailPanel,
   RecordExplorerPanel,
+  RecordFormFields,
   RecordMetaSection,
-  RecordPicker,
   RecordStatusSwitch,
   TreeRecordExplorer,
   type RecordActionItem,
+  type RecordFormFieldFallback,
+  type RecordFormFieldPickerConfig,
+  type RecordFormRecord,
+  presentPlatformError,
 } from '@muyun/platform-components';
 import type {
   Department,
   Organization,
+  ResolvedViewFieldDescriptor,
+  ViewFieldDefinition,
   WebListResponse,
   WebQueryRequest,
   WebTreeNode,
@@ -34,8 +40,21 @@ import {
 
 defineOptions({ name: 'DepartmentManagementView' });
 
+type DepartmentFormFieldName = 'organizationId' | 'parentId' | 'code' | 'title' | 'enabled';
+type DepartmentFormPickerFieldName = 'parentId';
+
+interface DepartmentFormFieldUi {
+  label: string;
+  required: boolean;
+  readOnly: boolean;
+  visible: boolean;
+}
+
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
+const departmentFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
+  new Map(),
+);
 const organizationSearchKeyword = ref('');
 const departmentSearchKeyword = ref('');
 const {
@@ -67,6 +86,23 @@ const {
 
 const scopedDepartmentContext = computed<ModuleContext<Department>>(() =>
   createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
+);
+const departmentFormPickerConfigs = computed<
+  Record<DepartmentFormPickerFieldName, RecordFormFieldPickerConfig>
+>(() => ({
+  parentId: {
+    context: scopedDepartmentContext.value,
+    reloadKey: departmentReloadKey.value,
+    placeholder: '根部门留空',
+    constraints: parentRecordConstraints(draft.value.id),
+    titleOf: (record) => departmentTitleOf(record as Department),
+  },
+}));
+const departmentFormDisabled = computed(() => readonly.value || saving.value);
+const departmentStandardFormFields = computed(() =>
+  Array.from(departmentFormFieldDefinitions.value.keys()).filter(
+    (fieldName) => fieldName !== 'organizationId',
+  ),
 );
 
 const departmentActions = computed<RecordActionItem[]>(() => {
@@ -101,6 +137,59 @@ const departmentActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+
+onMounted(loadDepartmentFormDefinition);
+
+async function loadDepartmentFormDefinition() {
+  try {
+    const runtimeContext = await departmentContext.runtime.ready;
+    const formView = runtimeContext.uiDescriptor?.views?.find(
+      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
+    );
+    departmentFormFieldDefinitions.value = new Map(
+      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    );
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'department-management', phase: 'load' });
+  }
+}
+
+function departmentFormField(fieldName: DepartmentFormFieldName): DepartmentFormFieldUi {
+  const field = departmentFormFieldDefinitions.value.get(fieldName);
+  return {
+    label: field?.label ?? departmentFormFieldFallback[fieldName].label,
+    required: field?.required?.constant ?? departmentFormFieldFallback[fieldName].required,
+    readOnly: field?.readOnly?.constant ?? departmentFormFieldFallback[fieldName].readOnly,
+    visible: field?.visible?.constant ?? departmentFormFieldFallback[fieldName].visible,
+  };
+}
+
+function departmentFormLabel(fieldName: DepartmentFormFieldName) {
+  return departmentFormField(fieldName).label;
+}
+
+function departmentFormRequired(fieldName: DepartmentFormFieldName) {
+  return departmentFormField(fieldName).required;
+}
+
+function departmentFormVisible(fieldName: DepartmentFormFieldName) {
+  return departmentFormField(fieldName).visible;
+}
+
+function updateDepartmentDraftField(fieldName: string, value: string | boolean | undefined) {
+  draft.value = {
+    ...draft.value,
+    [fieldName]: value,
+  };
+}
+
+function departmentFormPlaceholder(fieldName: string) {
+  const placeholders: Partial<Record<DepartmentFormFieldName, string>> = {
+    code: '请输入部门编码',
+    title: '请输入部门名称',
+  };
+  return placeholders[fieldName as DepartmentFormFieldName];
+}
 
 function departmentTreeActionsOf(record: Department): UiRecordInlineAction[] {
   const actions: UiRecordInlineAction[] = [];
@@ -234,6 +323,17 @@ async function emptyTreeResponse<TRecord>(): Promise<WebListResponse<WebTreeNode
 async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
   return { records: [] };
 }
+
+const departmentFormFieldFallback: Record<
+  DepartmentFormFieldName,
+  DepartmentFormFieldUi & RecordFormFieldFallback
+> = {
+  organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
+  parentId: { label: '上级部门', required: false, readOnly: false, visible: true },
+  code: { label: '部门编码', required: true, readOnly: false, visible: true },
+  title: { label: '部门名称', required: true, readOnly: false, visible: true },
+  enabled: { label: '启用状态', required: false, readOnly: false, visible: true },
+};
 </script>
 
 <template>
@@ -302,13 +402,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
     <RecordDetailPanel :title="cardTitle">
       <template #status>
         <RecordStatusSwitch
-          v-if="mode !== 'view'"
-          :enabled="draft.enabled"
-          :show-label="false"
-          @change="draft.enabled = $event"
-        />
-        <RecordStatusSwitch
-          v-else-if="selectedDepartment"
+          v-if="mode === 'view' && selectedDepartment"
           :enabled="selectedDepartment.enabled"
           :disabled="saving || !canToggle"
           :loading="saving"
@@ -325,30 +419,23 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
       </template>
       <UiEmpty v-if="!selectedDepartment && mode === 'view'" description="请选择或新建部门" />
       <form v-else class="department-form" @submit.prevent="save">
-        <label>
-          <span>所属机构</span>
+        <label v-if="departmentFormVisible('organizationId')">
+          <span>
+            {{ departmentFormLabel('organizationId') }}
+            <strong v-if="departmentFormRequired('organizationId')" aria-hidden="true">*</strong>
+          </span>
           <UiInput :value="selectedOrganizationTitle" disabled />
         </label>
-        <label>
-          <span>上级部门</span>
-          <RecordPicker
-            v-model:value="draft.parentId"
-            :context="scopedDepartmentContext"
-            :disabled="readonly"
-            :reload-key="departmentReloadKey"
-            :constraints="parentRecordConstraints(draft.id)"
-            :title-of="departmentTitleOf"
-            placeholder="根部门留空"
-          />
-        </label>
-        <label>
-          <span>部门编码</span>
-          <UiInput v-model:value="draft.code" :disabled="readonly" placeholder="请输入部门编码" />
-        </label>
-        <label>
-          <span>部门名称</span>
-          <UiInput v-model:value="draft.title" :disabled="readonly" placeholder="请输入部门名称" />
-        </label>
+        <RecordFormFields
+          :record="draft as RecordFormRecord"
+          :fields="departmentFormFieldDefinitions"
+          :field-names="departmentStandardFormFields"
+          :fallback="departmentFormFieldFallback"
+          :picker-configs="departmentFormPickerConfigs"
+          :disabled="departmentFormDisabled"
+          :placeholder-of="departmentFormPlaceholder"
+          @update:field="updateDepartmentDraftField"
+        />
       </form>
       <RecordMetaSection v-if="selectedDepartment || mode !== 'view'" :record="draft" show-sort-order />
     </RecordDetailPanel>

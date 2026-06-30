@@ -301,6 +301,26 @@ class IamWebControllerIT {
     }
 
     @Test
+    void shouldExposeDepartmentFormSchemaFromStaticUiDefinition() throws Exception {
+        assertThat(FormAbility.class.isAssignableFrom(DepartmentService.class)).isFalse();
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(get("/iam.department/form/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeName").value(DepartmentService.MODULE_ALIAS))
+                .andExpect(jsonPath("$.title").value("部门档案"))
+                .andExpect(jsonPath("$.fields[0].name").value("organizationId"))
+                .andExpect(jsonPath("$.fields[0].title").value("所属机构"))
+                .andExpect(jsonPath("$.fields[0].required").value(true))
+                .andExpect(jsonPath("$.fields[0].readOnly").value(true))
+                .andExpect(jsonPath("$.fields[1].name").value("parentId"))
+                .andExpect(jsonPath("$.fields[1].title").value("上级部门"))
+                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].controlType")
+                        .value(org.hamcrest.Matchers.contains("SWITCH")));
+    }
+
+    @Test
     void shouldQueryEmployeesWithDeclaredConditionsQuickSearchAndDepartmentScope() throws Exception {
         Employee employee = new Employee();
         employee.setId("employee-1");
@@ -380,6 +400,38 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.records[0].enabled").value(true))
                 .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].departmentId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].version").doesNotExist());
+    }
+
+    @Test
+    void shouldProjectDepartmentQueryResponseByResolvedListView() throws Exception {
+        Department department = new Department();
+        department.setId("dept-1");
+        department.setTenantId("tenant_a");
+        department.setVersion(3);
+        department.setOrganizationId("org-1");
+        department.setParentId(TreeAbility.ROOT_ID);
+        department.setCode("FIN");
+        department.setTitle("财务部");
+        department.setEnabled(Boolean.TRUE);
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(staticModuleDefinitionCatalog.find(DepartmentService.MODULE_ALIAS))
+                .thenReturn(Optional.of(departmentStaticModuleDefinition()));
+        when(departmentService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(department), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/iam.department/query")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("dept-1"))
+                .andExpect(jsonPath("$.records[0].code").value("FIN"))
+                .andExpect(jsonPath("$.records[0].title").value("财务部"))
+                .andExpect(jsonPath("$.records[0].enabled").value(true))
+                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].parentId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].version").doesNotExist());
     }
@@ -790,6 +842,23 @@ class IamWebControllerIT {
                 Set.of(EntityCapability.CRUD),
                 List.of(),
                 List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
+                controller.moduleUiDefinition()
+        );
+    }
+
+    private StaticModuleDefinition departmentStaticModuleDefinition() {
+        DepartmentWebController controller = new DepartmentWebController();
+        return new StaticModuleDefinition(
+                "iam",
+                DepartmentService.MODULE_ALIAS,
+                "部门管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/departments",
+                null,
+                Set.of(EntityCapability.CRUD, EntityCapability.TREE),
+                List.of(),
+                List.of(new StaticEntityDefinitionCompiler().compile("department", "部门管理", Department.class)),
                 controller.moduleUiDefinition()
         );
     }
