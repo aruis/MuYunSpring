@@ -495,12 +495,16 @@ test('employee management uses organization scope and platform query list panel'
     /validateContext: \(\) => \(selectedOrganizationId\.value \? undefined : '请先选择机构'\)/,
   );
   assert.match(employeeViewSource, /canSave: \(\) => canSaveEmployee\.value/);
-  assert.match(employeeViewSource, /validateRecord: \(draft\) =>/);
-  assert.match(employeeViewSource, /当前用户无权保存职员/);
+  assert.match(employeeViewSource, /validateRecord: validateEmployeeDraft/);
+  assert.match(employeeViewSource, /function validateEmployeeDraft\(draft: Employee\)/);
+  assert.match(employeeViewSource, /validateEmployeeRequiredFormFields/);
+  assert.match(employeeViewSource, /const employeeRequiredFormFieldNames = \[/);
+  assert.doesNotMatch(employeeViewSource, /draft\.departmentId && draft\.employeeNo && draft\.title/);
   assert.match(
     employeeViewSource,
     /onSaved: \(\{ record \}\) => \{\s*const requestSeq = commitEmployeeDetailRecord\(record\)[\s\S]*void loadEmployeeDetailDepartment\(record, requestSeq\)/,
   );
+  assert.match(employeeViewSource, /当前用户无权保存职员/);
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
   assert.match(employeeViewSource, /canExecute: \(\) => canToggleEmployee\.value/);
   assert.match(employeeViewSource, /employeeContext\.crud\.enable\(employee\.id!\)/);

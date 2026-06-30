@@ -34,6 +34,7 @@ import {
   shouldCommitEmployeeDetailRequest,
   shouldCloseEmployeeDetailOnCancel,
   shouldShowEmployeeDetailContent,
+  validateEmployeeRequiredFormFields,
   type EmployeeDetailMode,
 } from './employeeDetailStateModel';
 
@@ -49,6 +50,12 @@ type EmployeeFormFieldName =
   | 'email'
   | 'enabled';
 type EmployeeFormPickerFieldName = 'departmentId';
+
+const employeeRequiredFormFieldNames = [
+  'departmentId',
+  'employeeNo',
+  'title',
+] as const satisfies readonly EmployeeFormFieldName[];
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
@@ -447,8 +454,7 @@ async function saveEmployee() {
     canSave: () => canSaveEmployee.value,
     deniedMessage: '当前用户无权保存职员',
     createRecord: () => normalizedEmployeeDraft(employeeDraft.value, selectedOrganizationId.value ?? ''),
-    validateRecord: (draft) =>
-      draft.departmentId && draft.employeeNo && draft.title ? undefined : '请填写部门、职员编号和职员姓名',
+    validateRecord: validateEmployeeDraft,
     save: (draft, mode) =>
       mode === 'edit' && selectedEmployee.value?.id
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
@@ -538,6 +544,21 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
   } as Employee;
+}
+
+function validateEmployeeDraft(draft: Employee) {
+  return validateEmployeeRequiredFormFields(
+    employeeRequiredFormFieldNames.map((fieldName) => {
+      const field = employeeFormField(fieldName);
+      return {
+        fieldName,
+        label: field.label,
+        required: field.required,
+        visible: field.visible,
+        value: draft[fieldName],
+      };
+    }),
+  );
 }
 
 function commitEmployeeDetailRecord(record: Employee) {

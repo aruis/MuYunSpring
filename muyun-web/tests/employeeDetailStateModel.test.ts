@@ -6,6 +6,7 @@ import {
   shouldCommitEmployeeDetailRequest,
   shouldCloseEmployeeDetailOnCancel,
   shouldShowEmployeeDetailContent,
+  validateEmployeeRequiredFormFields,
 } from '../src/views/employeeDetailStateModel.ts';
 
 test('employee detail form stays disabled until edit detail record is loaded', () => {
@@ -123,5 +124,26 @@ test('employee detail cancel closes create but restores loaded edit detail', () 
       selectedEmployeeId: 'emp-1',
     }),
     false,
+  );
+});
+
+test('employee required form fields use visible required labels for validation', () => {
+  assert.equal(
+    validateEmployeeRequiredFormFields([
+      { fieldName: 'departmentId', label: '所属部门', required: true, visible: true, value: undefined },
+      { fieldName: 'employeeNo', label: '职员编号', required: true, visible: true, value: '  ' },
+      { fieldName: 'title', label: '职员姓名', required: true, visible: true, value: '张三' },
+      { fieldName: 'mobile', label: '手机号', required: true, visible: false, value: undefined },
+      { fieldName: 'email', label: '邮箱', required: false, visible: true, value: undefined },
+    ]),
+    '请填写所属部门、职员编号',
+  );
+  assert.equal(
+    validateEmployeeRequiredFormFields([
+      { fieldName: 'departmentId', label: '所属部门', required: true, visible: true, value: 'dept-1' },
+      { fieldName: 'employeeNo', label: '职员编号', required: true, visible: true, value: 'E001' },
+      { fieldName: 'title', label: '职员姓名', required: true, visible: true, value: '张三' },
+    ]),
+    undefined,
   );
 });

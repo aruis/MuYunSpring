@@ -30,6 +30,14 @@ export interface EmployeeDetailCancelState {
   selectedEmployeeId?: string;
 }
 
+export interface EmployeeRequiredFormFieldState {
+  fieldName: string;
+  label: string;
+  required: boolean;
+  visible: boolean;
+  value: unknown;
+}
+
 export function isEmployeeFormDisabled(state: EmployeeFormDisabledState) {
   if (state.mode === 'view' || state.loadingDetail || state.saving) {
     return true;
@@ -54,4 +62,18 @@ export function canSwitchEmployeeDetailContext(state: EmployeeDetailContextSwitc
 
 export function shouldCloseEmployeeDetailOnCancel(state: EmployeeDetailCancelState) {
   return state.mode !== 'edit' || !state.selectedEmployeeId;
+}
+
+export function validateEmployeeRequiredFormFields(fields: EmployeeRequiredFormFieldState[]) {
+  const missingLabels = fields
+    .filter((field) => field.visible && field.required && !hasEmployeeFormFieldValue(field.value))
+    .map((field) => field.label);
+  return missingLabels.length > 0 ? `请填写${missingLabels.join('、')}` : undefined;
+}
+
+function hasEmployeeFormFieldValue(value: unknown) {
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  return value !== undefined && value !== null;
 }
