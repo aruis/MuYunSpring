@@ -194,6 +194,14 @@ public class StaticModuleDefinitionScanner {
             target.actions().forEach(action -> merged.put(action.actionCode(), action));
             contributionActions(beanClass, contribution)
                     .forEach(action -> mergeContributionAction(target.moduleAlias(), beanClass, merged, action));
+            List<EntityDefinition> entities = mergeContributionEntities(
+                    target.moduleAlias(), beanClass, target.entities(), contributionEntities(beanClass, contribution));
+            ModuleUiDefinition uiDefinition = mergeContributionUiDefinition(
+                    target.moduleAlias(),
+                    beanClass,
+                    target.uiDefinition(),
+                    contributionUiDefinition(bean, targetModule)
+            );
             definitions.put(targetModule, new StaticModuleDefinition(
                     target.applicationAlias(),
                     target.moduleAlias(),
@@ -204,10 +212,81 @@ public class StaticModuleDefinitionScanner {
                     target.entryExternalUrl(),
                     target.capabilities(),
                     List.copyOf(merged.values()),
-                    target.entities(),
-                    target.uiDefinition()
+                    entities,
+                    uiDefinition
             ));
         }
+    }
+
+    private List<EntityDefinition> contributionEntities(Class<?> beanClass,
+                                                        PlatformStaticActionContribution contribution) {
+        Object service = service(beanClass);
+        if (!(service instanceof CrudAbility<?> ability)) {
+            return List.of();
+        }
+        Class<?> modelClass = ability.modelClass();
+        if (modelClass == null || modelClass == Object.class) {
+            return List.of();
+        }
+        return List.of(new StaticEntityDefinitionCompiler().compile(
+                contribution.resource(),
+                contribution.resourceTitle(),
+                modelClass
+        ));
+    }
+
+    private List<EntityDefinition> mergeContributionEntities(String targetModule,
+                                                             Class<?> contributor,
+                                                             List<EntityDefinition> targetEntities,
+                                                             List<EntityDefinition> contributionEntities) {
+        LinkedHashMap<String, EntityDefinition> merged = new LinkedHashMap<>();
+        for (EntityDefinition entity : targetEntities) {
+            merged.put(entity.alias(), entity);
+        }
+        for (EntityDefinition entity : contributionEntities) {
+            if (merged.containsKey(entity.alias())) {
+                throw new IllegalStateException("@PlatformStaticActionContribution entity conflicts with target module: "
+                        + targetModule + "." + entity.alias() + " <- " + contributor.getName());
+            }
+            merged.put(entity.alias(), entity);
+        }
+        return List.copyOf(merged.values());
+    }
+
+    private ModuleUiDefinition contributionUiDefinition(Object bean, String targetModule) {
+        if (!(bean instanceof StaticModuleUiContributor contributor)) {
+            return null;
+        }
+        ModuleUiDefinition uiDefinition = contributor.moduleUiDefinition();
+        if (uiDefinition == null) {
+            return null;
+        }
+        if (!targetModule.equals(uiDefinition.moduleAlias())) {
+            throw new IllegalStateException("@PlatformStaticActionContribution UI definition alias must match target module: "
+                    + targetModule + " != " + uiDefinition.moduleAlias());
+        }
+        return uiDefinition;
+    }
+
+    private ModuleUiDefinition mergeContributionUiDefinition(String targetModule,
+                                                             Class<?> contributor,
+                                                             ModuleUiDefinition targetUiDefinition,
+                                                             ModuleUiDefinition contributionUiDefinition) {
+        if (contributionUiDefinition == null) {
+            return targetUiDefinition;
+        }
+        LinkedHashMap<String, ViewDefinition> views = new LinkedHashMap<>();
+        if (targetUiDefinition != null) {
+            targetUiDefinition.views().forEach(view -> views.put(view.viewCode(), view));
+        }
+        for (ViewDefinition view : contributionUiDefinition.views()) {
+            if (views.containsKey(view.viewCode())) {
+                throw new IllegalStateException("@PlatformStaticActionContribution UI view conflicts with target module: "
+                        + targetModule + "." + view.viewCode() + " <- " + contributor.getName());
+            }
+            views.put(view.viewCode(), view);
+        }
+        return new ModuleUiDefinition(targetModule, List.copyOf(views.values()));
     }
 
     private void mergeContributionAction(String targetModule,

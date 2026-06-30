@@ -13,7 +13,8 @@
 7. `recordFormFieldModel` 已作为前端表单字段解析门面，负责 descriptor 字段顺序、fallback 顺序、字段状态和 fallback 控件类型解析。
 8. `createScopedTreeModuleContext` 已作为前端 scope/tree 组合门面，负责作用域 query、树加载、平铺树候选和排序端点组合。
 9. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
-10. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+10. 静态子资源动作贡献可同步合并子资源实体事实和 UI view，用于把父模块下的子资源表单纳入同一套 descriptor。
+11. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
 
 ## 前端样板现状
 
@@ -23,7 +24,7 @@
 4. `executeStaticRecordAction` 已承接启停和删除动作的重复提交保护、权限提示、确认后的 loading、成功反馈和异常反馈。
 5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
 6. `DepartmentManagementView` 已复用 resolved form view、`RecordFormFields`、统一保存动作、记录动作执行器和 scope/tree 组合门面；页面仍保留机构树 scope、父部门 picker 约束和树形操作编排。
-7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树，并复用 `RecordFormFields` 承接类目和条目表单；页面仍保留应用选择、类目/条目状态编排和保存 payload 归一。
+7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树，并复用 `RecordFormFields` 承接类目表单和后端 `item_default_form` 条目表单；页面仍保留应用选择、类目/条目状态编排和保存 payload 归一。
 8. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
 
 ## 仍属业务编排

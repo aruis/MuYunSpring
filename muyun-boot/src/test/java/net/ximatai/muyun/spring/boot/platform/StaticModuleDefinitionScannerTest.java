@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
@@ -38,6 +39,8 @@ import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
@@ -49,6 +52,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -255,10 +259,22 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanMenuMaintenanceModules() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(DictionaryCategoryService.class,
+                    () -> new DictionaryCategoryService(mock(BaseDao.class)));
+            context.registerBean(DictionaryItemService.class,
+                    () -> new DictionaryItemService(mock(BaseDao.class), context.getBean(DictionaryCategoryService.class)));
             context.registerBean(MenuSchemeWebController.class);
             context.registerBean(MenuManagementWebController.class);
-            context.registerBean(DictionaryCategoryWebController.class);
-            context.registerBean(DictionaryItemWebController.class);
+            context.registerBean(DictionaryCategoryWebController.class, () -> {
+                DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
+                ReflectionTestUtils.setField(controller, "service", context.getBean(DictionaryCategoryService.class));
+                return controller;
+            });
+            context.registerBean(DictionaryItemWebController.class, () -> {
+                DictionaryItemWebController controller = new DictionaryItemWebController();
+                ReflectionTestUtils.setField(controller, "service", context.getBean(DictionaryItemService.class));
+                return controller;
+            });
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -288,7 +304,13 @@ class StaticModuleDefinitionScannerTest {
                         assertThat(action.permissionActionCode()).isEqualTo("item_view");
                         assertThat(action.title()).isEqualTo("查询字典项");
                     });
+            assertThat(byAlias.get("platform.dictionary_category").entities())
+                    .extracting(EntityDefinition::alias)
+                    .containsExactly("dictionary_category", "item");
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition()).isNotNull();
+            assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
+                    .extracting(ViewDefinition::viewCode)
+                    .containsExactly("default_form", "item_default_form");
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
                     .filteredOn(view -> view.viewCode().equals("default_form"))
                     .singleElement()
@@ -299,6 +321,22 @@ class StaticModuleDefinitionScannerTest {
                         assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("categoryKind"))
                                 .singleElement()
                                 .satisfies(field -> assertThat(field.uiType()).isEqualTo("select"));
+                    });
+            assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
+                    .filteredOn(view -> view.viewCode().equals("item_default_form"))
+                    .singleElement()
+                    .satisfies(view -> {
+                        assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                        assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                .containsExactly("categoryId", "code", "title", "parentId", "enabled");
+                        assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
+                                .containsOnly("item");
+                        assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("parentId"))
+                                .singleElement()
+                                .satisfies(field -> assertThat(field.uiType()).isEqualTo("recordPicker"));
+                        assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("enabled"))
+                                .singleElement()
+                                .satisfies(field -> assertThat(field.uiType()).isEqualTo("enabledStatus"));
                     });
         }
     }

@@ -15,4 +15,8 @@ public record ViewFieldRef(String relationCode,
     public static ViewFieldRef main(String fieldName) {
         return new ViewFieldRef(null, fieldName, null);
     }
+
+    public static ViewFieldRef relation(String relationCode, String fieldName) {
+        return new ViewFieldRef(relationCode, fieldName, null);
+    }
 }

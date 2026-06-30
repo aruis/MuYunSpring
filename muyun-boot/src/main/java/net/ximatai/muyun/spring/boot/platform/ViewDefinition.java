@@ -30,6 +30,10 @@ public record ViewDefinition(String viewCode,
         return new Builder("default_form", ModuleViewKind.FORM);
     }
 
+    public static Builder form(String viewCode) {
+        return new Builder(viewCode, ModuleViewKind.FORM);
+    }
+
     public static final class Builder {
         private final String viewCode;
         private final ModuleViewKind viewKind;
@@ -54,6 +58,15 @@ public record ViewDefinition(String viewCode,
 
         public Builder field(String fieldName, Consumer<ViewFieldDefinition.Builder> customizer) {
             ViewFieldDefinition.Builder builder = ViewFieldDefinition.field(fieldName);
+            if (customizer != null) {
+                customizer.accept(builder);
+            }
+            fields.add(builder.build());
+            return this;
+        }
+
+        public Builder field(String relationCode, String fieldName, Consumer<ViewFieldDefinition.Builder> customizer) {
+            ViewFieldDefinition.Builder builder = ViewFieldDefinition.field(relationCode, fieldName);
             if (customizer != null) {
                 customizer.accept(builder);
             }
