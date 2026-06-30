@@ -47,7 +47,7 @@ export type {
   RecordFormFieldPickerConfig,
   RecordFormFieldState,
   RecordFormRecord,
-} from './RecordFormFields.vue';
+} from './recordFormFieldModel';
 export type { CrudRecordListBase } from './crudRecordListModel';
 export {
   defaultCrudRecordListMatches,
@@ -55,6 +55,7 @@ export {
   defaultCrudRecordListTitle,
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
+export { resolveRecordFormFieldNames, resolveRecordFormFieldState } from './recordFormFieldModel';
 export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { useFlatCrudManagementState } from './staticCrudManagementState';

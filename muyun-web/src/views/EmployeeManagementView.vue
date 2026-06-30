@@ -20,6 +20,7 @@ import {
   executeStaticRecordAction,
   presentPlatformError,
   presentPlatformMessage,
+  resolveRecordFormFieldState,
 } from '@muyun/platform-components';
 import { UiInput, confirmAction } from '@muyun/vue-ui-antdv';
 import type {
@@ -52,13 +53,6 @@ type EmployeeFormFieldName =
   | 'email'
   | 'enabled';
 type EmployeeFormPickerFieldName = 'departmentId';
-
-interface EmployeeFormFieldUi {
-  label: string;
-  required: boolean;
-  readOnly: boolean;
-  visible: boolean;
-}
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
@@ -112,9 +106,6 @@ const employeeDetailTitle = computed(() => {
 });
 const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
 const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
-const employeeStandardFormFields = computed(() =>
-  Array.from(employeeFormFieldDefinitions.value.keys()).filter((fieldName) => fieldName !== 'organizationId'),
-);
 const canSaveEmployee = computed(() => {
   if (employeeDetailMode.value === 'create') {
     return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
@@ -167,14 +158,11 @@ async function loadEmployeeFormDefinition() {
   }
 }
 
-function employeeFormField(fieldName: EmployeeFormFieldName): EmployeeFormFieldUi {
-  const field = employeeFormFieldDefinitions.value.get(fieldName);
-  return {
-    label: field?.label ?? employeeFormFieldFallback[fieldName].label,
-    required: field?.required?.constant ?? employeeFormFieldFallback[fieldName].required,
-    readOnly: field?.readOnly?.constant ?? employeeFormFieldFallback[fieldName].readOnly,
-    visible: field?.visible?.constant ?? employeeFormFieldFallback[fieldName].visible,
-  };
+function employeeFormField(fieldName: EmployeeFormFieldName) {
+  return resolveRecordFormFieldState(fieldName, {
+    fields: employeeFormFieldDefinitions.value,
+    fallback: employeeFormFieldFallback,
+  });
 }
 
 function employeeFormLabel(fieldName: EmployeeFormFieldName) {
@@ -194,17 +182,6 @@ function updateEmployeeDraftField(fieldName: string, value: string | boolean | u
     ...employeeDraft.value,
     [fieldName]: value,
   };
-}
-
-function employeeFormPlaceholder(fieldName: string) {
-  const placeholders: Partial<Record<EmployeeFormFieldName, string>> = {
-    employeeNo: '请输入职员编号',
-    title: '请输入职员姓名',
-    gender: '请输入性别',
-    mobile: '请输入手机号',
-    email: '请输入邮箱',
-  };
-  return placeholders[fieldName as EmployeeFormFieldName];
 }
 
 function handleOrganizationsLoaded(records: Organization[]) {
@@ -428,18 +405,45 @@ function departmentTitle(record: Department) {
   return record.title ?? record.code ?? record.id ?? '未命名部门';
 }
 
-const employeeFormFieldFallback: Record<
-  EmployeeFormFieldName,
-  EmployeeFormFieldUi & RecordFormFieldFallback
-> = {
+const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFallback> = {
   organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
-  departmentId: { label: '所属部门', required: true, readOnly: false, visible: true },
-  employeeNo: { label: '职员编号', required: true, readOnly: false, visible: true },
-  title: { label: '职员姓名', required: true, readOnly: false, visible: true },
-  gender: { label: '性别', required: false, readOnly: false, visible: true },
-  mobile: { label: '手机号', required: false, readOnly: false, visible: true },
-  email: { label: '邮箱', required: false, readOnly: false, visible: true },
-  enabled: { label: '启用状态', required: false, readOnly: false, visible: true },
+  departmentId: {
+    label: '所属部门',
+    required: true,
+    readOnly: false,
+    visible: true,
+    controlType: 'recordPicker',
+  },
+  employeeNo: {
+    label: '职员编号',
+    required: true,
+    readOnly: false,
+    visible: true,
+    placeholder: '请输入职员编号',
+  },
+  title: {
+    label: '职员姓名',
+    required: true,
+    readOnly: false,
+    visible: true,
+    placeholder: '请输入职员姓名',
+  },
+  gender: { label: '性别', required: false, readOnly: false, visible: true, placeholder: '请输入性别' },
+  mobile: {
+    label: '手机号',
+    required: false,
+    readOnly: false,
+    visible: true,
+    placeholder: '请输入手机号',
+  },
+  email: { label: '邮箱', required: false, readOnly: false, visible: true, placeholder: '请输入邮箱' },
+  enabled: {
+    label: '启用状态',
+    required: false,
+    readOnly: false,
+    visible: true,
+    controlType: 'enabledStatus',
+  },
 };
 
 function createOrganizationScopedDepartmentContext(
@@ -606,11 +610,10 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
         <RecordFormFields
           :record="employeeDraft as RecordFormRecord"
           :fields="employeeFormFieldDefinitions"
-          :field-names="employeeStandardFormFields"
+          :exclude-field-names="['organizationId']"
           :fallback="employeeFormFieldFallback"
           :picker-configs="employeeFormPickerConfigs"
           :disabled="employeeFormDisabled"
-          :placeholder-of="employeeFormPlaceholder"
           @update:field="updateEmployeeDraftField"
         />
       </form>

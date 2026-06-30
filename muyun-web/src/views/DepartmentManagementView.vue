@@ -15,6 +15,7 @@ import {
   type RecordFormFieldPickerConfig,
   type RecordFormRecord,
   presentPlatformError,
+  resolveRecordFormFieldState,
 } from '@muyun/platform-components';
 import type {
   Department,
@@ -42,13 +43,6 @@ defineOptions({ name: 'DepartmentManagementView' });
 
 type DepartmentFormFieldName = 'organizationId' | 'parentId' | 'code' | 'title' | 'enabled';
 type DepartmentFormPickerFieldName = 'parentId';
-
-interface DepartmentFormFieldUi {
-  label: string;
-  required: boolean;
-  readOnly: boolean;
-  visible: boolean;
-}
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
@@ -99,11 +93,6 @@ const departmentFormPickerConfigs = computed<
   },
 }));
 const departmentFormDisabled = computed(() => readonly.value || saving.value);
-const departmentStandardFormFields = computed(() =>
-  Array.from(departmentFormFieldDefinitions.value.keys()).filter(
-    (fieldName) => fieldName !== 'organizationId',
-  ),
-);
 
 const departmentActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -154,14 +143,11 @@ async function loadDepartmentFormDefinition() {
   }
 }
 
-function departmentFormField(fieldName: DepartmentFormFieldName): DepartmentFormFieldUi {
-  const field = departmentFormFieldDefinitions.value.get(fieldName);
-  return {
-    label: field?.label ?? departmentFormFieldFallback[fieldName].label,
-    required: field?.required?.constant ?? departmentFormFieldFallback[fieldName].required,
-    readOnly: field?.readOnly?.constant ?? departmentFormFieldFallback[fieldName].readOnly,
-    visible: field?.visible?.constant ?? departmentFormFieldFallback[fieldName].visible,
-  };
+function departmentFormField(fieldName: DepartmentFormFieldName) {
+  return resolveRecordFormFieldState(fieldName, {
+    fields: departmentFormFieldDefinitions.value,
+    fallback: departmentFormFieldFallback,
+  });
 }
 
 function departmentFormLabel(fieldName: DepartmentFormFieldName) {
@@ -181,14 +167,6 @@ function updateDepartmentDraftField(fieldName: string, value: string | boolean |
     ...draft.value,
     [fieldName]: value,
   };
-}
-
-function departmentFormPlaceholder(fieldName: string) {
-  const placeholders: Partial<Record<DepartmentFormFieldName, string>> = {
-    code: '请输入部门编码',
-    title: '请输入部门名称',
-  };
-  return placeholders[fieldName as DepartmentFormFieldName];
 }
 
 function departmentTreeActionsOf(record: Department): UiRecordInlineAction[] {
@@ -324,15 +302,36 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
   return { records: [] };
 }
 
-const departmentFormFieldFallback: Record<
-  DepartmentFormFieldName,
-  DepartmentFormFieldUi & RecordFormFieldFallback
-> = {
+const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFieldFallback> = {
   organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
-  parentId: { label: '上级部门', required: false, readOnly: false, visible: true },
-  code: { label: '部门编码', required: true, readOnly: false, visible: true },
-  title: { label: '部门名称', required: true, readOnly: false, visible: true },
-  enabled: { label: '启用状态', required: false, readOnly: false, visible: true },
+  parentId: {
+    label: '上级部门',
+    required: false,
+    readOnly: false,
+    visible: true,
+    controlType: 'recordPicker',
+  },
+  code: {
+    label: '部门编码',
+    required: true,
+    readOnly: false,
+    visible: true,
+    placeholder: '请输入部门编码',
+  },
+  title: {
+    label: '部门名称',
+    required: true,
+    readOnly: false,
+    visible: true,
+    placeholder: '请输入部门名称',
+  },
+  enabled: {
+    label: '启用状态',
+    required: false,
+    readOnly: false,
+    visible: true,
+    controlType: 'enabledStatus',
+  },
 };
 </script>
 
@@ -429,11 +428,10 @@ const departmentFormFieldFallback: Record<
         <RecordFormFields
           :record="draft as RecordFormRecord"
           :fields="departmentFormFieldDefinitions"
-          :field-names="departmentStandardFormFields"
+          :exclude-field-names="['organizationId']"
           :fallback="departmentFormFieldFallback"
           :picker-configs="departmentFormPickerConfigs"
           :disabled="departmentFormDisabled"
-          :placeholder-of="departmentFormPlaceholder"
           @update:field="updateDepartmentDraftField"
         />
       </form>
