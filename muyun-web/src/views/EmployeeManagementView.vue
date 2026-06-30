@@ -28,10 +28,14 @@ import {
 import { UiInput, confirmAction } from '@muyun/vue-ui-antdv';
 import type { Department, Employee, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import {
+  isEmployeeFormDisabled,
+  shouldCommitEmployeeDetailRequest,
+  type EmployeeDetailMode,
+} from './employeeDetailStateModel';
 
 defineOptions({ name: 'EmployeeManagementView' });
 
-type EmployeeDetailMode = 'view' | 'create' | 'edit';
 type EmployeeFormFieldName =
   | 'organizationId'
   | 'departmentId'
@@ -55,7 +59,9 @@ const selectedEmployeeKey = ref<string>();
 const selectedEmployee = ref<Employee>();
 const employeeDetailOpen = ref(false);
 const employeeDetailMode = ref<EmployeeDetailMode>('view');
+const loadingEmployeeDetail = ref(false);
 const savingEmployee = ref(false);
+const employeeDetailRequestSeq = ref(0);
 const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
 const employeeDetailDepartment = ref<Department>();
 
@@ -97,16 +103,25 @@ const employeeDetailTitle = computed(() => {
   }
   return employeeTitle(selectedEmployee.value ?? employeeDraft.value);
 });
-const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
-const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
+const employeeFormDisabled = computed(() =>
+  isEmployeeFormDisabled({
+    mode: employeeDetailMode.value,
+    loadingDetail: loadingEmployeeDetail.value,
+    saving: savingEmployee.value,
+    selectedEmployeeId: selectedEmployee.value?.id,
+  }),
+);
 const canSaveEmployee = computed(() => {
+  if (loadingEmployeeDetail.value) {
+    return false;
+  }
   if (employeeDetailMode.value === 'create') {
     return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
   }
   return Boolean(selectedEmployee.value?.id) && employeeContext.can('update') === true;
 });
 const canToggleEmployee = computed(() => {
-  if (!selectedEmployee.value?.id) {
+  if (loadingEmployeeDetail.value || !selectedEmployee.value?.id) {
     return false;
   }
   return employeeContext.can(employeeToggleActionCode(selectedEmployee.value)) === true;
@@ -199,6 +214,7 @@ function selectOrganization(record: Organization) {
   selectedOrganization.value = record;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
+  loadingEmployeeDetail.value = false;
   employeeDetailDepartment.value = undefined;
   closeEmployeeDetail();
 }
@@ -244,6 +260,8 @@ function startCreateEmployee() {
   selectedEmployee.value = undefined;
   selectedEmployeeKey.value = undefined;
   employeeDetailMode.value = 'create';
+  loadingEmployeeDetail.value = false;
+  employeeDetailRequestSeq.value += 1;
   employeeDetailDepartment.value = undefined;
   employeeDetailOpen.value = true;
 }
@@ -252,6 +270,8 @@ function closeEmployeeDetail() {
   if (savingEmployee.value) {
     return;
   }
+  employeeDetailRequestSeq.value += 1;
+  loadingEmployeeDetail.value = false;
   employeeDetailOpen.value = false;
   employeeDetailMode.value = 'view';
   employeeDetailDepartment.value = undefined;
@@ -268,15 +288,35 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
   selectedEmployeeKey.value = id;
   employeeDetailOpen.value = true;
   employeeDetailMode.value = mode;
-  selectedEmployee.value = record as Employee;
+  selectedEmployee.value = undefined;
   employeeDraft.value = copyEmployee(record as Employee);
+  employeeDetailDepartment.value = undefined;
+  loadingEmployeeDetail.value = true;
+  const requestSeq = employeeDetailRequestSeq.value + 1;
+  employeeDetailRequestSeq.value = requestSeq;
   try {
     const fullRecord = await employeeContext.crud.view(id);
+    if (
+      !shouldCommitEmployeeDetailRequest({
+        activeRequestSeq: employeeDetailRequestSeq.value,
+        requestSeq,
+        selectedEmployeeKey: selectedEmployeeKey.value,
+        recordId: id,
+      })
+    ) {
+      return;
+    }
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
-    await loadEmployeeDetailDepartment(fullRecord.departmentId);
+    await loadEmployeeDetailDepartment(fullRecord.departmentId, requestSeq);
   } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    if (employeeDetailRequestSeq.value === requestSeq) {
+      presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    }
+  } finally {
+    if (employeeDetailRequestSeq.value === requestSeq) {
+      loadingEmployeeDetail.value = false;
+    }
   }
 }
 
@@ -290,9 +330,10 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
     return;
   }
   if (action.key === 'edit') {
-    if (selectedEmployee.value) {
-      employeeDraft.value = copyEmployee(selectedEmployee.value);
+    if (!selectedEmployee.value || loadingEmployeeDetail.value) {
+      return;
     }
+    employeeDraft.value = copyEmployee(selectedEmployee.value);
     employeeDetailMode.value = 'edit';
     return;
   }
@@ -370,6 +411,8 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         selectedEmployeeKey.value = undefined;
         selectedEmployee.value = undefined;
         employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+        loadingEmployeeDetail.value = false;
+        employeeDetailRequestSeq.value += 1;
         employeeDetailDepartment.value = undefined;
         employeeDetailOpen.value = false;
         employeeDetailMode.value = 'view';
@@ -405,15 +448,23 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
   } as Employee;
 }
 
-async function loadEmployeeDetailDepartment(departmentId: string | undefined) {
+async function loadEmployeeDetailDepartment(
+  departmentId: string | undefined,
+  requestSeq = employeeDetailRequestSeq.value,
+) {
   employeeDetailDepartment.value = undefined;
   if (!departmentId) {
     return;
   }
   try {
-    employeeDetailDepartment.value = await departmentContext.crud.view(departmentId);
+    const department = await departmentContext.crud.view(departmentId);
+    if (employeeDetailRequestSeq.value === requestSeq) {
+      employeeDetailDepartment.value = department;
+    }
   } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    if (employeeDetailRequestSeq.value === requestSeq) {
+      presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    }
   }
 }
 

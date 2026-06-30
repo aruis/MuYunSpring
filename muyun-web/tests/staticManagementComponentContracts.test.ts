@@ -423,9 +423,27 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /<span>所属部门<\/span>/);
   assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
   assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
+  assert.match(employeeViewSource, /const loadingEmployeeDetail = ref\(false\)/);
+  assert.match(employeeViewSource, /const employeeDetailRequestSeq = ref\(0\)/);
+  assert.match(employeeViewSource, /isEmployeeFormDisabled/);
+  assert.match(employeeViewSource, /selectedEmployeeId: selectedEmployee\.value\?\.id/);
   assert.match(employeeViewSource, /const canSaveEmployee = computed/);
+  assert.match(employeeViewSource, /if \(loadingEmployeeDetail\.value\) \{\s*return false;\s*\}/);
   assert.match(employeeViewSource, /const canToggleEmployee = computed/);
+  assert.match(employeeViewSource, /loadingEmployeeDetail\.value \|\| !selectedEmployee\.value\?\.id/);
   assert.match(employeeViewSource, /function employeeToggleActionCode/);
+  assert.match(
+    employeeViewSource,
+    /selectedEmployee\.value = undefined;\s*employeeDraft\.value = copyEmployee/,
+  );
+  assert.doesNotMatch(employeeViewSource, /selectedEmployee\.value = record as Employee/);
+  assert.match(employeeViewSource, /const requestSeq = employeeDetailRequestSeq\.value \+ 1/);
+  assert.match(employeeViewSource, /employeeDetailRequestSeq\.value = requestSeq/);
+  assert.match(employeeViewSource, /shouldCommitEmployeeDetailRequest/);
+  assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
+  assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
+  assert.match(employeeViewSource, /employeeDetailRequestSeq\.value === requestSeq/);
+  assert.match(employeeViewSource, /if \(!selectedEmployee\.value \|\| loadingEmployeeDetail\.value\)/);
   assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
   assert.match(employeeViewSource, /executeStaticRecordAction/);
   assert.match(
