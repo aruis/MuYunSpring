@@ -1,41 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { UiInput } from '@muyun/vue-ui-antdv';
-import type { ResolvedViewFieldDescriptor, ViewFieldDefinition } from '@muyun/web-contracts';
-import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordPicker from './RecordPicker.vue';
-import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstraints';
+import {
+  resolveRecordFormFieldNames,
+  resolveRecordFormFieldState,
+  type RecordFormFieldDescriptor,
+  type RecordFormFieldFallback,
+  type RecordFormFieldPickerConfig,
+  type RecordFormFieldState,
+  type RecordFormRecord,
+} from './recordFormFieldModel';
 
 defineOptions({ name: 'RecordFormFields' });
-
-export type RecordFormFieldDescriptor = ViewFieldDefinition | ResolvedViewFieldDescriptor;
-export type RecordFormRecord = Record<string, unknown>;
-
-export interface RecordFormFieldFallback {
-  label: string;
-  required?: boolean;
-  readOnly?: boolean;
-  visible?: boolean;
-  placeholder?: string;
-}
-
-export interface RecordFormFieldPickerConfig {
-  context: ModuleContext<RecordPickerRecord>;
-  reloadKey?: number;
-  mode?: 'list' | 'tree';
-  placeholder?: string;
-  allowClear?: boolean;
-  constraints?: PickerConstraint<RecordPickerRecord>[];
-  titleOf?: (record: RecordPickerRecord) => string;
-  descriptionOf?: (record: RecordPickerRecord) => string | undefined;
-  filterOption?: (record: RecordPickerRecord, keyword: string) => boolean;
-}
 
 const props = withDefaults(
   defineProps<{
     record: RecordFormRecord;
-    fieldNames: string[];
+    fieldNames?: string[];
+    excludeFieldNames?: string[];
     fields?: Map<string, RecordFormFieldDescriptor>;
     fallback?: Record<string, RecordFormFieldFallback>;
     pickerConfigs?: Record<string, RecordFormFieldPickerConfig>;
@@ -43,7 +27,9 @@ const props = withDefaults(
     placeholderOf?: (fieldName: string, field: RecordFormFieldState) => string | undefined;
   }>(),
   {
+    fieldNames: undefined,
     fields: undefined,
+    excludeFieldNames: () => [],
     fallback: () => ({}),
     pickerConfigs: () => ({}),
     disabled: false,
@@ -55,53 +41,23 @@ const emit = defineEmits<{
   'update:field': [fieldName: string, value: string | boolean | undefined];
 }>();
 
-export interface RecordFormFieldState {
-  fieldName: string;
-  label: string;
-  required: boolean;
-  readOnly: boolean;
-  visible: boolean;
-  controlType: 'input' | 'enabledStatus' | 'recordPicker';
-  pickerConfig?: RecordFormFieldPickerConfig;
-  placeholder?: string;
-}
+const resolvedFieldNames = computed(
+  () =>
+    props.fieldNames ??
+    resolveRecordFormFieldNames(props.fields, props.fallback, { exclude: props.excludeFieldNames }),
+);
 
 const fieldStates = computed<RecordFormFieldState[]>(() =>
-  props.fieldNames.map(fieldState).filter((field) => field.visible),
+  resolvedFieldNames.value.map(fieldState).filter((field) => field.visible),
 );
 
 function fieldState(fieldName: string): RecordFormFieldState {
-  const field = props.fields?.get(fieldName);
-  const fallback = props.fallback?.[fieldName];
-  const label = field?.label ?? fallback?.label ?? fieldName;
-  const required = field?.required?.constant ?? fallback?.required ?? false;
-  const readOnly = field?.readOnly?.constant ?? fallback?.readOnly ?? false;
-  const visible = field?.visible?.constant ?? fallback?.visible ?? true;
-  const controlType = controlTypeOf(field);
-  const pickerConfig = controlType === 'recordPicker' ? props.pickerConfigs?.[fieldName] : undefined;
-  return {
-    fieldName,
-    label,
-    required,
-    readOnly,
-    visible,
-    controlType,
-    pickerConfig,
-    placeholder:
-      props.placeholderOf?.(fieldName, { fieldName, label, required, readOnly, visible, controlType }) ??
-      fallback?.placeholder ??
-      pickerConfig?.placeholder,
-  };
-}
-
-function controlTypeOf(field: RecordFormFieldDescriptor | undefined): RecordFormFieldState['controlType'] {
-  if (field?.uiType === 'enabledStatus') {
-    return 'enabledStatus';
-  }
-  if (field?.uiType === 'recordPicker') {
-    return 'recordPicker';
-  }
-  return 'input';
+  return resolveRecordFormFieldState(fieldName, {
+    fields: props.fields,
+    fallback: props.fallback,
+    pickerConfigs: props.pickerConfigs,
+    placeholderOf: props.placeholderOf,
+  });
 }
 
 function fieldValue(fieldName: string) {

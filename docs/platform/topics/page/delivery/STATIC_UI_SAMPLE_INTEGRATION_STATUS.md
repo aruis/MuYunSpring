@@ -10,12 +10,13 @@
 4. descriptor 不暴露物理列、表名、schema 名或 SQL 片段。
 5. `/iam.employee/query` 和 `/iam.department/query` 响应按 resolved list view 和 `RecordReadProjection` 输出裁剪；SQL 仍暂时读取完整实体。
 6. `StaticRecordReadProjectionService` 已作为静态模块读投影门面，负责投影编译和 Web 响应重建。
-7. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+7. `recordFormFieldModel` 已作为前端表单字段解析门面，负责 descriptor 字段顺序、fallback 顺序、字段状态和 fallback 控件类型解析。
+8. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
 
 ## 前端样板现状
 
 1. `RecordQueryListPanel` 可从 resolved list view 推导列表列，并提供标准 CRUD 顶部动作和行级动作。
-2. `RecordFormFields` 已承接普通输入字段、`enabledStatus` 和 `recordPicker` 控件。
+2. `RecordFormFields` 已承接普通输入字段、`enabledStatus` 和 `recordPicker` 控件；未显式传入字段顺序时，可按 descriptor 字段顺序和 fallback 顺序稳定推导字段。
 3. `executeStaticFormSave` 已承接保存动作的重复提交保护、权限提示、校验提示、loading、成功反馈和异常反馈。
 4. `executeStaticRecordAction` 已承接启停和删除动作的重复提交保护、权限提示、确认后的 loading、成功反馈和异常反馈。
 5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
@@ -36,20 +37,19 @@
 
 ## 后续专项
 
-1. 表单字段解析门面：`RecordFormFields` 不应要求每个页面手写 descriptor key 到 fallback order 的拼装逻辑；descriptor 缺失或加载失败时应有稳定 fallback field order。
-2. scope/tree 组合门面：组织 scope、树形 query、父子 picker 约束和刷新 key 如果在更多页面重复，应收口为平台组合能力。
-3. 字段级授权配置和角色授权存储模型。
-4. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
-5. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路。
-6. 第三个静态样板优先选择 `platform.dictionary`，验证分类、条目、树、父子选择和应用 scope 的组合能力。
-7. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
+1. scope/tree 组合门面：组织 scope、树形 query、父子 picker 约束和刷新 key 如果在更多页面重复，应收口为平台组合能力。
+2. 字段级授权配置和角色授权存储模型。
+3. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
+4. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路。
+5. 第三个静态样板优先选择 `platform.dictionary`，验证分类、条目、树、父子选择和应用 scope 的组合能力。
+6. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
 
 ## 验收证据
 
 1. 后端测试覆盖静态 UI 声明扫描、descriptor 编译、runtime context 协议、读投影计划和 `/iam.employee/query`、`/iam.department/query` 输出裁剪。
 2. 后端测试覆盖 `StaticRecordReadProjectionService`、字段保护输出策略、action 权限上下文和字段级可读策略。
 3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`。
-4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView` 和 `DepartmentManagementView` 接入契约。
+4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView` 和 `DepartmentManagementView` 接入契约。
 5. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
 
 ## 删除条件

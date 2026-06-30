@@ -192,10 +192,14 @@ test('department management uses organization as read-only scope and department 
   assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
   assert.match(departmentViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
   assert.match(departmentViewSource, /<RecordFormFields/);
+  assert.match(departmentViewSource, /resolveRecordFormFieldState/);
   assert.match(departmentViewSource, /departmentFormPickerConfigs/);
   assert.match(departmentViewSource, /constraints: parentRecordConstraints\(draft\.value\.id\)/);
+  assert.match(departmentViewSource, /:exclude-field-names="\['organizationId'\]"/);
   assert.match(departmentViewSource, /:picker-configs="departmentFormPickerConfigs"/);
   assert.match(departmentViewSource, /@update:field="updateDepartmentDraftField"/);
+  assert.doesNotMatch(departmentViewSource, /departmentStandardFormFields/);
+  assert.doesNotMatch(departmentViewSource, /Array\.from\(departmentFormFieldDefinitions\.value\.keys\(\)\)/);
   assert.doesNotMatch(departmentViewSource, /<RecordPicker\s[\s\S]*v-model:value="draft\.parentId"/);
   assert.doesNotMatch(departmentViewSource, /OrganizationManagementView/);
   assert.doesNotMatch(departmentViewSource, /EnabledSelect/);
@@ -211,6 +215,7 @@ test('employee management uses organization scope and platform query list panel'
   const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
   const formFieldsSource = readSource('src/platform-components/RecordFormFields.vue');
+  const formFieldModelSource = readSource('src/platform-components/recordFormFieldModel.ts');
   const runtimeContextSource = readSource('src/web-core/module/runtimeContext.ts');
   const dropdownSource = readSource('src/vue-ui-antdv/components/UiDropdown.vue');
   const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
@@ -218,11 +223,18 @@ test('employee management uses organization scope and platform query list panel'
 
   assert.match(indexSource, /RecordQueryListPanel/);
   assert.match(indexSource, /RecordFormFields/);
+  assert.match(indexSource, /resolveRecordFormFieldNames/);
+  assert.match(indexSource, /resolveRecordFormFieldState/);
   assert.match(formFieldsSource, /RecordStatusSwitch/);
   assert.match(formFieldsSource, /RecordPicker/);
   assert.match(formFieldsSource, /pickerConfigs\?: Record<string, RecordFormFieldPickerConfig>/);
-  assert.match(formFieldsSource, /field\?\.uiType === 'enabledStatus'/);
-  assert.match(formFieldsSource, /field\?\.uiType === 'recordPicker'/);
+  assert.match(formFieldsSource, /fieldNames\?: string\[\]/);
+  assert.match(formFieldsSource, /excludeFieldNames\?: string\[\]/);
+  assert.match(formFieldsSource, /resolveRecordFormFieldNames/);
+  assert.match(formFieldsSource, /resolveRecordFormFieldState/);
+  assert.match(formFieldModelSource, /field\?\.uiType === 'enabledStatus'/);
+  assert.match(formFieldModelSource, /field\?\.uiType === 'recordPicker'/);
+  assert.match(formFieldModelSource, /fallback\?\.controlType \?\? 'input'/);
   assert.match(formFieldsSource, /booleanFieldValue/);
   assert.match(formFieldsSource, /field\.controlType === 'recordPicker' && field\.pickerConfig/);
   assert.match(
@@ -314,16 +326,15 @@ test('employee management uses organization scope and platform query list panel'
     /employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition \| ResolvedViewFieldDescriptor>>/,
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
-  assert.match(employeeViewSource, /const employeeStandardFormFields = computed/);
-  assert.match(employeeViewSource, /Array\.from\(employeeFormFieldDefinitions\.value\.keys\(\)\)/);
-  assert.match(employeeViewSource, /fieldName !== 'organizationId'/);
-  assert.doesNotMatch(
-    employeeViewSource,
-    /const employeeStandardFormFields[\s\S]*'departmentId'[\s\S]*'enabled'/,
-  );
-  assert.match(employeeViewSource, /gender: '请输入性别'/);
+  assert.match(employeeViewSource, /resolveRecordFormFieldState/);
+  assert.match(employeeViewSource, /:exclude-field-names="\['organizationId'\]"/);
+  assert.doesNotMatch(employeeViewSource, /const employeeStandardFormFields = computed/);
+  assert.doesNotMatch(employeeViewSource, /Array\.from\(employeeFormFieldDefinitions\.value\.keys\(\)\)/);
+  assert.match(employeeViewSource, /placeholder: '请输入性别'/);
   assert.match(employeeViewSource, /gender: draft\.gender\?\.trim\(\) \|\| undefined/);
   assert.match(employeeViewSource, /gender: \{ label: '性别'/);
+  assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
+  assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
   assert.match(
     employeeViewSource,
@@ -336,7 +347,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /<RecordPicker[\s\S]*v-model:value="employeeDraft\.departmentId"/);
   assert.doesNotMatch(employeeViewSource, /employeeFormLabel\('employeeNo'\)/);
   assert.doesNotMatch(employeeViewSource, /employeeFormRequired\('employeeNo'\)/);
-  assert.match(employeeViewSource, /departmentId: \{ label: '所属部门', required: true/);
+  assert.match(employeeViewSource, /label: '所属部门'/);
   assert.doesNotMatch(employeeViewSource, /function employeeFormFieldDisabled/);
   assert.doesNotMatch(employeeViewSource, /<span>所属部门<\/span>/);
   assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
