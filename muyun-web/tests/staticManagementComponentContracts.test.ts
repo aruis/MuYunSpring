@@ -119,14 +119,33 @@ test('dictionary item parent selector uses tree-aware record picker', () => {
   const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
   const pickerSource = readSource('src/platform-components/RecordPicker.vue');
 
-  assert.match(dictionaryViewSource, /<RecordPicker[\s\S]*v-model:value="itemDraft\.parentId"/);
   assert.match(dictionaryViewSource, /:context="itemExplorerContext"/);
   assert.match(dictionaryViewSource, /:reload-key="itemReloadKey"/);
-  assert.match(dictionaryViewSource, /parentRecordConstraints\(itemDraft\.id\)/);
+  assert.match(dictionaryViewSource, /parentRecordConstraints\(itemDraft\.value\.id\)/);
+  assert.match(dictionaryViewSource, /itemFormPickerConfigs/);
+  assert.match(dictionaryViewSource, /:picker-configs="itemFormPickerConfigs"/);
   assert.doesNotMatch(dictionaryViewSource, /itemParentOptions/);
+  assert.doesNotMatch(dictionaryViewSource, /<RecordPicker[\s\S]*v-model:value="itemDraft\.parentId"/);
   assert.match(pickerSource, /reloadKey\?: number/);
   assert.match(pickerSource, /\(\) => props\.reloadKey/);
   assert.match(pickerSource, /\(\) => loadRecords\(\)/);
+});
+
+test('dictionary management uses record form fields for category and item forms', () => {
+  const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
+
+  assert.equal(matchCount(dictionaryViewSource, /<RecordFormFields/g), 2);
+  assert.match(dictionaryViewSource, /onMounted\(loadCategoryFormDefinition\)/);
+  assert.match(dictionaryViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(dictionaryViewSource, /categoryFormFieldDefinitions/);
+  assert.match(dictionaryViewSource, /categoryKind: \{[\s\S]*controlType: 'select'/);
+  assert.match(dictionaryViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
+  assert.match(dictionaryViewSource, /itemFormFieldFallback/);
+  assert.match(dictionaryViewSource, /parentId: \{[\s\S]*controlType: 'recordPicker'/);
+  assert.match(dictionaryViewSource, /:disabled-of="itemFormFieldDisabled"/);
+  assert.doesNotMatch(dictionaryViewSource, /<UiInput[\s\S]*v-model:value="categoryDraft\.alias"/);
+  assert.doesNotMatch(dictionaryViewSource, /<UiSelect[\s\S]*v-model:value="categoryDraft\.categoryKind"/);
+  assert.doesNotMatch(dictionaryViewSource, /<UiInput[\s\S]*v-model:value="itemDraft\.code"/);
 });
 
 test('three-column management pages use the platform detail panel', () => {
@@ -242,9 +261,14 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(formFieldModelSource, /fallback\?\.controlType \?\? 'input'/);
   assert.match(formFieldsSource, /booleanFieldValue/);
   assert.match(formFieldsSource, /field\.controlType === 'recordPicker' && field\.pickerConfig/);
+  assert.match(formFieldsSource, /field\.controlType === 'select' && field\.options/);
   assert.match(
     formFieldsSource,
-    /'update:field': \[fieldName: string, value: string \| boolean \| undefined\]/,
+    /disabledOf\?: \(fieldName: string, field: RecordFormFieldState\) => boolean/,
+  );
+  assert.match(
+    formFieldsSource,
+    /'update:field': \[fieldName: string, value: string \| number \| boolean \| undefined\]/,
   );
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
   assert.match(panelSource, /querySchema\(\)/);

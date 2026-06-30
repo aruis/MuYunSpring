@@ -56,6 +56,37 @@ test('record form field state resolves descriptor facts with fallback control me
   assert.equal(resolveRecordFormFieldState('parentId', { fallback }).controlType, 'recordPicker');
 });
 
+test('record form field state resolves select options from fallback metadata', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['categoryKind', field('类目类型', { required: true, uiType: 'select' })],
+  ]);
+  const fallback: Record<string, RecordFormFieldFallback> = {
+    categoryKind: {
+      label: '类目类型',
+      controlType: 'select',
+      options: [
+        { label: '字典', value: 'DICTIONARY' },
+        { label: '目录', value: 'FOLDER' },
+      ],
+    },
+  };
+
+  assert.deepEqual(resolveRecordFormFieldState('categoryKind', { fields, fallback }), {
+    fieldName: 'categoryKind',
+    label: '类目类型',
+    required: true,
+    readOnly: false,
+    visible: true,
+    controlType: 'select',
+    pickerConfig: undefined,
+    placeholder: undefined,
+    options: [
+      { label: '字典', value: 'DICTIONARY' },
+      { label: '目录', value: 'FOLDER' },
+    ],
+  });
+});
+
 function field(
   label: string,
   options: { required?: boolean; readOnly?: boolean; visible?: boolean; uiType?: string } = {},

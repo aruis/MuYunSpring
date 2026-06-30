@@ -175,7 +175,7 @@ function employeeFormVisible(fieldName: EmployeeFormFieldName) {
   return employeeFormField(fieldName).visible;
 }
 
-function updateEmployeeDraftField(fieldName: string, value: string | boolean | undefined) {
+function updateEmployeeDraftField(fieldName: string, value: string | number | boolean | undefined) {
   employeeDraft.value = {
     ...employeeDraft.value,
     [fieldName]: value,

@@ -1,30 +1,39 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Application, DictionaryCategory, DictionaryItem } from '@muyun/web-contracts';
+import type {
+  Application,
+  DictionaryCategory,
+  DictionaryItem,
+  ResolvedViewFieldDescriptor,
+  ViewFieldDefinition,
+} from '@muyun/web-contracts';
 import {
   createStaticResourceTreeClient,
   useModuleContext,
+  type ModuleContext,
   type StaticModuleTreeClient,
 } from '@muyun/web-core';
 import {
   ApplicationScopeSwitcher,
-  EnabledSelect,
   ModuleActionButton,
   RecordActionBar,
   RecordDetailPanel,
   RecordExplorerPanel,
+  RecordFormFields,
   RecordMetaSection,
-  RecordPicker,
   RecordStatusSwitch,
   TreeRecordExplorer,
   createStaticTreeResourceModuleContext,
   parentRecordConstraints,
   presentPlatformError,
   type RecordActionItem,
+  type RecordFormFieldFallback,
+  type RecordFormFieldPickerConfig,
+  type RecordFormRecord,
   type RecordPickerRecord,
   type TreeRecordBase,
 } from '@muyun/platform-components';
-import { UiEmpty, UiInput, UiSelect, confirmAction, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
+import { UiEmpty, confirmAction, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createDictionaryManagementState,
   dictionaryCategoryTitleOf,
@@ -34,6 +43,10 @@ import {
 
 defineOptions({ name: 'DictionaryManagementView' });
 
+type DictionaryCategoryFormFieldName = 'applicationAlias' | 'alias' | 'categoryKind' | 'title' | 'enabled';
+type DictionaryItemFormFieldName = 'categoryTitle' | 'code' | 'title' | 'parentId';
+type DictionaryItemFormPickerFieldName = 'parentId';
+
 const categoryContext = useModuleContext<DictionaryCategory>({ moduleAlias: 'platform.dictionary_category' });
 const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
 const categorySearchKeyword = ref('');
@@ -41,6 +54,9 @@ const itemSearchKeyword = ref('');
 const applications = ref<Application[]>([]);
 const applicationsLoading = ref(false);
 const selectedApplicationAlias = ref<string>();
+const categoryFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
+  new Map(),
+);
 
 const itemClients = new Map<string, StaticModuleTreeClient<DictionaryItem>>();
 const categoryClients = new Map<string, StaticModuleTreeClient<DictionaryCategory>>();
@@ -116,6 +132,21 @@ const itemExplorerContext = computed(() =>
 const itemListEmptyDescription = computed(() =>
   itemSearchKeyword.value.trim() ? '没有匹配的字典项' : '当前类目暂无字典项',
 );
+const itemFormRecord = computed<RecordFormRecord>(() => ({
+  ...itemDraft.value,
+  categoryTitle: selectedCategory.value ? dictionaryCategoryTitleOf(selectedCategory.value) : '',
+}));
+const itemFormPickerConfigs = computed<
+  Record<DictionaryItemFormPickerFieldName, RecordFormFieldPickerConfig>
+>(() => ({
+  parentId: {
+    context: itemExplorerContext.value as unknown as ModuleContext<RecordPickerRecord>,
+    reloadKey: itemReloadKey.value,
+    placeholder: canTreeItem.value ? '根字典项留空' : '无权查看上级字典项',
+    constraints: parentRecordConstraints(itemDraft.value.id),
+    titleOf: itemPickerTitle,
+  },
+}));
 const categoryKindOptions = [
   { label: '字典', value: 'DICTIONARY' },
   { label: '目录', value: 'FOLDER' },
@@ -180,6 +211,21 @@ watch(selectedApplicationAlias, () => {
 });
 
 onMounted(loadApplications);
+onMounted(loadCategoryFormDefinition);
+
+async function loadCategoryFormDefinition() {
+  try {
+    const runtimeContext = await categoryContext.runtime.ready;
+    const formView = runtimeContext.uiDescriptor?.views?.find(
+      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
+    );
+    categoryFormFieldDefinitions.value = new Map(
+      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    );
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'dictionary-management', phase: 'load' });
+  }
+}
 
 async function loadApplications() {
   applicationsLoading.value = true;
@@ -369,6 +415,47 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
     void deleteItem();
   }
 }
+
+function updateCategoryDraftField(fieldName: string, value: string | number | boolean | undefined) {
+  categoryDraft.value = {
+    ...categoryDraft.value,
+    [fieldName]: value,
+  };
+}
+
+function updateItemDraftField(fieldName: string, value: string | number | boolean | undefined) {
+  if (fieldName === 'categoryTitle') {
+    return;
+  }
+  itemDraft.value = {
+    ...itemDraft.value,
+    [fieldName]: value,
+  };
+}
+
+function itemFormFieldDisabled(fieldName: string) {
+  return fieldName === 'parentId' && !canTreeItem.value;
+}
+
+const categoryFormFieldFallback: Record<DictionaryCategoryFormFieldName, RecordFormFieldFallback> = {
+  applicationAlias: { label: '所属应用', required: true, readOnly: true },
+  alias: { label: '类目 alias', required: true },
+  categoryKind: {
+    label: '类目类型',
+    required: true,
+    controlType: 'select',
+    options: categoryKindOptions,
+  },
+  title: { label: '类目名称', required: true },
+  enabled: { label: '启用状态', controlType: 'enabledStatus' },
+};
+
+const itemFormFieldFallback: Record<DictionaryItemFormFieldName, RecordFormFieldFallback> = {
+  categoryTitle: { label: '所属类目', readOnly: true },
+  code: { label: '字典项编码', required: true, placeholder: '请输入字典项编码' },
+  title: { label: '字典项名称', required: true, placeholder: '请输入字典项名称' },
+  parentId: { label: '上级字典项', controlType: 'recordPicker', placeholder: '根字典项留空' },
+};
 </script>
 
 <template>
@@ -432,27 +519,14 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
               />
             </header>
             <form class="category-form" @submit.prevent="saveCategory">
-              <label>
-                <span>类目 alias</span>
-                <UiInput v-model:value="categoryDraft.alias" :disabled="categoryReadonly" />
-              </label>
-              <label>
-                <span>类目名称</span>
-                <UiInput v-model:value="categoryDraft.title" :disabled="categoryReadonly" />
-              </label>
-              <label>
-                <span>类目类型</span>
-                <UiSelect
-                  v-model:value="categoryDraft.categoryKind"
-                  :options="categoryKindOptions"
-                  :disabled="categoryReadonly"
-                  :allow-clear="false"
-                />
-              </label>
-              <label>
-                <span>启用状态</span>
-                <EnabledSelect v-model:value="categoryDraft.enabled" :disabled="categoryReadonly" />
-              </label>
+              <RecordFormFields
+                :record="categoryDraft as RecordFormRecord"
+                :fields="categoryFormFieldDefinitions"
+                :fallback="categoryFormFieldFallback"
+                :exclude-field-names="['applicationAlias']"
+                :disabled="categoryReadonly"
+                @update:field="updateCategoryDraftField"
+              />
             </form>
             <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
               <RecordStatusSwitch
@@ -531,32 +605,14 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
       </template>
       <UiEmpty v-if="!selectedItem && itemMode === 'view'" description="请选择或新建字典项" />
       <form v-else class="item-form" @submit.prevent="saveItem">
-        <label>
-          <span>所属类目</span>
-          <UiInput :value="selectedCategory ? dictionaryCategoryTitleOf(selectedCategory) : ''" disabled />
-        </label>
-        <label>
-          <span>字典项编码</span>
-          <UiInput v-model:value="itemDraft.code" :disabled="itemReadonly" placeholder="请输入字典项编码" />
-        </label>
-        <label>
-          <span>字典项名称</span>
-          <UiInput v-model:value="itemDraft.title" :disabled="itemReadonly" placeholder="请输入字典项名称" />
-        </label>
-        <label>
-          <span>上级字典项</span>
-          <RecordPicker
-            v-if="canTreeItem"
-            v-model:value="itemDraft.parentId"
-            :context="itemExplorerContext"
-            :reload-key="itemReloadKey"
-            :disabled="itemReadonly"
-            :constraints="parentRecordConstraints(itemDraft.id)"
-            :title-of="itemPickerTitle"
-            placeholder="根字典项留空"
-          />
-          <UiInput v-else :value="itemDraft.parentId ?? ''" disabled placeholder="无权查看上级字典项" />
-        </label>
+        <RecordFormFields
+          :record="itemFormRecord"
+          :fallback="itemFormFieldFallback"
+          :picker-configs="itemFormPickerConfigs"
+          :disabled="itemReadonly"
+          :disabled-of="itemFormFieldDisabled"
+          @update:field="updateItemDraftField"
+        />
       </form>
       <RecordMetaSection v-if="selectedItem || itemMode !== 'view'" :record="itemDraft" show-sort-order />
     </RecordDetailPanel>
@@ -678,8 +734,8 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.category-form label,
-.item-form label {
+.category-form :deep(.record-form-field),
+.item-form :deep(.record-form-field) {
   display: grid;
   gap: 6px;
   color: var(--muyun-text-body);

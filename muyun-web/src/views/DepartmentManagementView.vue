@@ -160,7 +160,7 @@ function departmentFormVisible(fieldName: DepartmentFormFieldName) {
   return departmentFormField(fieldName).visible;
 }
 
-function updateDepartmentDraftField(fieldName: string, value: string | boolean | undefined) {
+function updateDepartmentDraftField(fieldName: string, value: string | number | boolean | undefined) {
   draft.value = {
     ...draft.value,
     [fieldName]: value,
