@@ -250,7 +250,7 @@ service 不应因为 UI 声明新增公共 ability。确需拆分声明文件时
 
 ```java
 interface StaticModuleUiContributor {
-    void contribute(ModuleUiDefinitionBuilder builder);
+    ModuleUiDefinition moduleUiDefinition();
 }
 ```
 
@@ -327,7 +327,7 @@ Web 主协议应逐步收敛到模块或页面 bootstrap，而不是继续扩展
 
 对外 descriptor 与后端读模型分开。对外 descriptor 只表达前端需要的模块、字段、视图、动作和端点；后端 `ResolvedModuleReadModel` 是模块级、缓存级的已解析字段事实和能力事实，可包含投影规划需要的字段读模型、字段角色、存储形态和后处理线索，但不包含本次请求的输出字段、物理列集合或后处理任务，也不进入 Web 响应。
 
-旧的 `/form/schema` 不作为静态模块主入口；如果短期保留，只能作为由 resolved form view 派生的调试或兼容出口，而不是 service 上的 `FormAbility`。该出口不能只搬运 UI 声明字段，还必须合并静态模型事实，例如字段选项、选项标题输出字段、基础类型和模型字段存在性校验。前端默认路径应尽快收敛到模块 context 或页面 bootstrap。
+旧的 `/form/schema` 不作为静态模块主入口；如果短期保留，只能作为由当前模块 resolved form view 派生的调试或兼容出口，而不是 service 上的 `FormAbility`。子资源 controller 贡献给父模块的 UI view 不应被当前 controller 的 `/form/schema` 消费。该出口不能只搬运 UI 声明字段，还必须合并静态模型事实，例如字段选项、选项标题输出字段、基础类型和模型字段存在性校验。前端默认路径应尽快收敛到模块 context 或页面 bootstrap。
 
 ## 动态配置对齐
 
@@ -427,8 +427,8 @@ id, version, tenant_id, employee_no, title, organization_id
 5. 先输出最小 `ResolvedModuleUiDescriptor`，随后补齐后端内部 `ResolvedModuleReadModel`。
 6. Web bootstrap 返回 resolved views。
 7. 增加 `RecordReadProjection` 内部模型，先用于列表字段校验和输出裁剪。
-8. 补一个动态配置到 `ModuleUiDefinition` 的最小适配契约或 contract test 样例，至少覆盖 `uiConfigId`、发布快照、字段 ID 与 `ViewFieldRef` 的映射。
-9. 废弃 service 层 `FormAbility` 作为 UI schema 来源。
+8. 已补动态配置到 `ModuleUiDefinition` 的最小适配契约，覆盖 `uiConfigId`、发布快照、字段 ID、relation 与 viewCode 身份边界。
+9. 静态模块主线不再以 service 层 `FormAbility` 作为 UI schema 来源；`/form/schema` 仅作为兼容出口保留。
 
 第一阶段暂不做：
 
