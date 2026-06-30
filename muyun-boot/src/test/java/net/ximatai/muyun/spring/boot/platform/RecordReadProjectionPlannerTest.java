@@ -48,7 +48,7 @@ class RecordReadProjectionPlannerTest {
         assertThat(projection.viewCode()).isEqualTo("default_list");
         assertThat(projection.outputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "title", "enabled");
-        assertThat(projection.requiredPlatformFields()).containsExactly("id", "tenantId", "version");
+        assertThat(projection.internalReadFields()).containsExactly("id", "tenantId", "version");
         assertThat(projection.readFields()).containsExactly("id", "tenantId", "version",
                 "employeeNo", "title", "enabled");
         assertThat(projection.postReadTransforms()).isEmpty();

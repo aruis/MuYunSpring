@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.form.FormSchema;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiFormSchemaAdapter;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -46,6 +47,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             return result;
         }
         return service().pageQuery(queryCriteria(request), pageRequest, querySorts(request));
+    }
+
+    default StaticRecordReadProjectionService staticRecordReadProjectionService() {
+        return null;
     }
 
     default List<T> queryListRecords(WebQueryRequest request) {
@@ -145,12 +150,23 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
+            WebPageResponse<T> response;
             if (request != null && request.unpagedEnabled()) {
                 List<T> records = WebOutputSupport.records(service(), queryListRecords(request), FieldOutputContext.LIST);
-                return WebPageResponse.fromList(records);
+                response = WebPageResponse.fromList(records);
+            } else {
+                response = WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST));
             }
-            return WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST));
+            return projectStaticDefaultList(response);
         });
+    }
+
+    private WebPageResponse<T> projectStaticDefaultList(WebPageResponse<T> response) {
+        StaticRecordReadProjectionService projectionService = staticRecordReadProjectionService();
+        if (projectionService == null || !(this instanceof StaticModuleUiContributor contributor)) {
+            return response;
+        }
+        return projectionService.projectDefaultList(contributor.moduleUiDefinition().moduleAlias(), response, service());
     }
 
     @GetMapping("/view/{id}")

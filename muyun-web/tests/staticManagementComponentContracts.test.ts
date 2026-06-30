@@ -255,7 +255,11 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /runtimeViews\.value = await loadRuntimeViews\(\)/);
   assert.match(panelSource, /async function loadRuntimeViews/);
   assert.match(panelSource, /if \(props\.columns && props\.columns\.length > 0\)/);
-  assert.match(panelSource, /catch \{\s*return \[\];\s*\}/);
+  assert.doesNotMatch(panelSource, /catch \{\s*return \[\];\s*\}/);
+  assert.match(
+    panelSource,
+    /presentPlatformError\(cause, \{ source: 'record-query-list-panel', phase: 'load' \}\)/,
+  );
   assert.match(panelSource, /tableColumns = computed<RecordQueryListColumn\[\]>/);
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
@@ -298,7 +302,16 @@ test('employee management uses organization scope and platform query list panel'
     /employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition \| ResolvedViewFieldDescriptor>>/,
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
-  assert.match(employeeViewSource, /employeeStandardFormFields[\s\S]*'departmentId'[\s\S]*'enabled'/);
+  assert.match(employeeViewSource, /const employeeStandardFormFields = computed/);
+  assert.match(employeeViewSource, /Array\.from\(employeeFormFieldDefinitions\.value\.keys\(\)\)/);
+  assert.match(employeeViewSource, /fieldName !== 'organizationId'/);
+  assert.doesNotMatch(
+    employeeViewSource,
+    /const employeeStandardFormFields[\s\S]*'departmentId'[\s\S]*'enabled'/,
+  );
+  assert.match(employeeViewSource, /gender: '请输入性别'/);
+  assert.match(employeeViewSource, /gender: draft\.gender\?\.trim\(\) \|\| undefined/);
+  assert.match(employeeViewSource, /gender: \{ label: '性别'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
   assert.match(
     employeeViewSource,
@@ -356,6 +369,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(contractsSource, /export interface ModuleUiDefinition/);
   assert.match(contractsSource, /export interface ViewDefinition/);
   assert.match(contractsSource, /export interface ViewFieldDefinition/);
+  assert.match(contractsSource, /gender\?: string/);
   assert.match(contractsSource, /schemaVersion: string/);
   assert.doesNotMatch(runtimeContextSource, /uiDefinition\?:/);
   assert.doesNotMatch(panelSource, /uiDefinition/);

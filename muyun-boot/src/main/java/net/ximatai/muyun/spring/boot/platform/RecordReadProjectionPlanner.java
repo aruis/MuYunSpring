@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 public final class RecordReadProjectionPlanner {
-    private static final List<String> REQUIRED_PLATFORM_FIELDS = List.of(
+    private static final List<String> INTERNAL_READ_FIELDS = List.of(
             StandardEntitySchema.ID_FIELD,
             StandardEntitySchema.TENANT_ID_FIELD,
             StandardEntitySchema.VERSION_FIELD
@@ -95,7 +95,7 @@ public final class RecordReadProjectionPlanner {
                 actionContext == null ? null : actionContext.actionPolicy().permissionActionCode(),
                 fieldReadPolicies(fieldReadPolicy),
                 List.copyOf(outputFields),
-                REQUIRED_PLATFORM_FIELDS,
+                INTERNAL_READ_FIELDS,
                 postReadTransforms(recordService, outputFields)
         );
     }
@@ -163,7 +163,7 @@ public final class RecordReadProjectionPlanner {
     }
 
     private static Set<String> readableFields(ResolvedModuleReadModel readModel) {
-        LinkedHashSet<String> fields = new LinkedHashSet<>(REQUIRED_PLATFORM_FIELDS);
+        LinkedHashSet<String> fields = new LinkedHashSet<>(INTERNAL_READ_FIELDS);
         readModel.fields().stream()
                 .map(ResolvedModuleReadField::fieldName)
                 .forEach(fields::add);

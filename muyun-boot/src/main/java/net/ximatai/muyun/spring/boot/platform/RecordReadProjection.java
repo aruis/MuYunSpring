@@ -11,7 +11,7 @@ public record RecordReadProjection(String moduleAlias,
                                    String permissionActionCode,
                                    List<String> fieldReadPolicies,
                                    List<ViewFieldRef> outputFields,
-                                   List<String> requiredPlatformFields,
+                                   List<String> internalReadFields,
                                    List<String> postReadTransforms) {
     public RecordReadProjection {
         moduleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
@@ -26,21 +26,21 @@ public record RecordReadProjection(String moduleAlias,
                 : permissionActionCode.trim();
         fieldReadPolicies = fieldReadPolicies == null ? List.of() : List.copyOf(fieldReadPolicies);
         outputFields = outputFields == null ? List.of() : List.copyOf(outputFields);
-        requiredPlatformFields = requiredPlatformFields == null ? List.of() : List.copyOf(requiredPlatformFields);
+        internalReadFields = internalReadFields == null ? List.of() : List.copyOf(internalReadFields);
         postReadTransforms = postReadTransforms == null ? List.of() : List.copyOf(postReadTransforms);
     }
 
     public RecordReadProjection(String moduleAlias,
                                 String viewCode,
                                 List<ViewFieldRef> outputFields,
-                                List<String> requiredPlatformFields,
+                                List<String> internalReadFields,
                                 List<String> postReadTransforms) {
-        this(moduleAlias, viewCode, null, null, null, List.of(), outputFields, requiredPlatformFields,
+        this(moduleAlias, viewCode, null, null, null, List.of(), outputFields, internalReadFields,
                 postReadTransforms);
     }
 
     public List<String> readFields() {
-        return java.util.stream.Stream.concat(requiredPlatformFields.stream(),
+        return java.util.stream.Stream.concat(internalReadFields.stream(),
                         outputFields.stream().map(ViewFieldRef::fieldName))
                 .distinct()
                 .toList();

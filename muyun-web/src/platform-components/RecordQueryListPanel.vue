@@ -255,12 +255,8 @@ async function loadRuntimeViews(): Promise<ResolvedViewDescriptor[]> {
   if (props.columns && props.columns.length > 0) {
     return [];
   }
-  try {
-    const runtimeContext = await props.context.runtime.ready;
-    return runtimeContext.uiDescriptor?.views ?? [];
-  } catch {
-    return [];
-  }
+  const runtimeContext = await props.context.runtime.ready;
+  return runtimeContext.uiDescriptor?.views ?? [];
 }
 
 async function loadRecords(updateLoading = true) {

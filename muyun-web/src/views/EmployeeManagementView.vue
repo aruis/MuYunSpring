@@ -47,10 +47,10 @@ type EmployeeFormFieldName =
   | 'departmentId'
   | 'employeeNo'
   | 'title'
+  | 'gender'
   | 'mobile'
   | 'email'
   | 'enabled';
-type EmployeeStandardFormFieldName = 'departmentId' | 'employeeNo' | 'title' | 'mobile' | 'email' | 'enabled';
 type EmployeeFormPickerFieldName = 'departmentId';
 
 interface EmployeeFormFieldUi {
@@ -112,14 +112,9 @@ const employeeDetailTitle = computed(() => {
 });
 const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
 const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
-const employeeStandardFormFields: EmployeeStandardFormFieldName[] = [
-  'departmentId',
-  'employeeNo',
-  'title',
-  'mobile',
-  'email',
-  'enabled',
-];
+const employeeStandardFormFields = computed(() =>
+  Array.from(employeeFormFieldDefinitions.value.keys()).filter((fieldName) => fieldName !== 'organizationId'),
+);
 const canSaveEmployee = computed(() => {
   if (employeeDetailMode.value === 'create') {
     return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
@@ -202,13 +197,14 @@ function updateEmployeeDraftField(fieldName: string, value: string | boolean | u
 }
 
 function employeeFormPlaceholder(fieldName: string) {
-  const placeholders: Partial<Record<EmployeeStandardFormFieldName, string>> = {
+  const placeholders: Partial<Record<EmployeeFormFieldName, string>> = {
     employeeNo: '请输入职员编号',
     title: '请输入职员姓名',
+    gender: '请输入性别',
     mobile: '请输入手机号',
     email: '请输入邮箱',
   };
-  return placeholders[fieldName as EmployeeStandardFormFieldName];
+  return placeholders[fieldName as EmployeeFormFieldName];
 }
 
 function handleOrganizationsLoaded(records: Organization[]) {
@@ -413,6 +409,7 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     departmentId: draft.departmentId?.trim(),
     employeeNo: draft.employeeNo?.trim(),
     title: draft.title?.trim(),
+    gender: draft.gender?.trim() || undefined,
     mobile: draft.mobile?.trim() || undefined,
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
@@ -439,6 +436,7 @@ const employeeFormFieldFallback: Record<
   departmentId: { label: '所属部门', required: true, readOnly: false, visible: true },
   employeeNo: { label: '职员编号', required: true, readOnly: false, visible: true },
   title: { label: '职员姓名', required: true, readOnly: false, visible: true },
+  gender: { label: '性别', required: false, readOnly: false, visible: true },
   mobile: { label: '手机号', required: false, readOnly: false, visible: true },
   email: { label: '邮箱', required: false, readOnly: false, visible: true },
   enabled: { label: '启用状态', required: false, readOnly: false, visible: true },

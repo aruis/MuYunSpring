@@ -12,12 +12,8 @@ import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
-import net.ximatai.muyun.spring.boot.web.WebPageResponse;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
@@ -66,6 +62,11 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     }
 
     @Override
+    public StaticRecordReadProjectionService staticRecordReadProjectionService() {
+        return staticRecordReadProjectionService;
+    }
+
+    @Override
     public ModuleUiDefinition moduleUiDefinition() {
         return ModuleUiDefinition.builder(EmployeeService.MODULE_ALIAS)
                 .listView(list -> list
@@ -87,17 +88,6 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                         .field("email", field -> field.label("邮箱"))
                         .field("enabled", field -> field.label("启用状态").uiType("enabledStatus")))
                 .build();
-    }
-
-    @Override
-    @PostMapping("/query")
-    @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<Employee> query(@RequestBody(required = false) WebQueryRequest request) {
-        WebPageResponse<Employee> response = CrudWeb.super.query(request);
-        if (staticRecordReadProjectionService == null) {
-            return response;
-        }
-        return staticRecordReadProjectionService.projectDefaultList(EmployeeService.MODULE_ALIAS, response, service());
     }
 
     @GetMapping("/{employeeId}/accounts")

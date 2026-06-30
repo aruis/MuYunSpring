@@ -458,6 +458,8 @@ export interface Employee extends StandardEnabledSortableEntity {
   organizationId?: string;
   departmentId?: string;
   employeeNo?: string;
+  gender?: string;
+  genderTitle?: string;
   mobile?: string;
   email?: string;
 }

@@ -18,7 +18,7 @@
 2. `RecordFormFields` 已承接普通输入字段、`enabledStatus` 和 `recordPicker` 控件。
 3. `executeStaticFormSave` 已承接保存动作的重复提交保护、权限提示、校验提示、loading、成功反馈和异常反馈。
 4. `executeStaticRecordAction` 已承接启停和删除动作的重复提交保护、权限提示、确认后的 loading、成功反馈和异常反馈。
-5. `EmployeeManagementView` 不再硬编码职员列表列、普通表单字段、启停表单控件、部门选择器、保存流程、启停流程和删除流程的通用动作样板。
+5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
 
 ## 仍属业务编排
 
