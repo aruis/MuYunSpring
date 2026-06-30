@@ -8,7 +8,7 @@ import {
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import type { DynamicModulePageDescriptor, ResolvedViewDescriptor } from '@muyun/web-contracts';
+import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'DynamicModuleHost' });
@@ -28,10 +28,19 @@ const title = computed(
   () => props.descriptor.title ?? context.runtime.snapshot()?.title ?? context.moduleAlias,
 );
 const detailTitle = computed(() => recordTitle(selectedRecord.value) ?? '记录详情');
+const pageMode = computed<MenuPageMode>(() => props.descriptor.target.pageMode ?? 'LIST');
+const isListPage = computed(() => pageMode.value === 'LIST');
+const listUiConfigId = computed(() =>
+  isListPage.value ? props.descriptor.target.defaultUiConfigId : undefined,
+);
+const unsupportedPageModeText = computed(() => `动态${pageMode.value}入口暂未接入运行器`);
 
 onMounted(loadRuntimeForm);
 
 async function loadRuntimeForm() {
+  if (!isListPage.value) {
+    return;
+  }
   const runtimeContext = await context.runtime.ready;
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
   formViewCode.value = view?.viewCode;
@@ -72,7 +81,7 @@ function recordTitle(record: QueryListRecord | undefined) {
 </script>
 
 <template>
-  <section class="dynamic-module-workspace">
+  <section v-if="isListPage" class="dynamic-module-workspace">
     <RecordQueryListPanel
       class="dynamic-list"
       :context="context"
@@ -80,7 +89,7 @@ function recordTitle(record: QueryListRecord | undefined) {
       :selected-key="selectedRecord?.id"
       :standard-crud-actions="false"
       :standard-crud-row-actions="false"
-      :ui-config-id="descriptor.target.defaultUiConfigId"
+      :ui-config-id="listUiConfigId"
       :query-template-id="descriptor.target.defaultQueryTemplateId"
       quick-search-placeholder="搜索动态记录"
       empty-description="暂无动态记录"
@@ -103,6 +112,10 @@ function recordTitle(record: QueryListRecord | undefined) {
       />
       <p v-else class="empty-detail">请选择一条动态记录</p>
     </RecordDetailPanel>
+  </section>
+  <section v-else class="dynamic-module-unsupported">
+    <h2>{{ title }}</h2>
+    <p>{{ unsupportedPageModeText }}</p>
   </section>
 </template>
 
@@ -133,6 +146,27 @@ function recordTitle(record: QueryListRecord | undefined) {
 .empty-detail {
   margin: 0;
   color: #64748b;
+  font-size: 13px;
+}
+
+.dynamic-module-unsupported {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: calc(100vh - 116px);
+  color: #64748b;
+  text-align: center;
+}
+
+.dynamic-module-unsupported h2 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dynamic-module-unsupported p {
+  margin: 0;
   font-size: 13px;
 }
 

@@ -151,7 +151,7 @@ function runtimeCheckedTreeClient<TRecord>(context: ModuleContext<TRecord>): Sta
     return context.abilities.tree();
   };
   return {
-    querySchema: async () => (await tree()).querySchema(),
+    querySchema: async (options) => (await tree()).querySchema(options),
     query: async (request) => (await tree()).query(request),
     view: async (id) => (await tree()).view(id),
     insert: async (record) => (await tree()).insert(record),

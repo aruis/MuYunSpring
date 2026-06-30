@@ -61,10 +61,11 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     requests.push(request);
-    if (request.url.endsWith('/tree?flat=true')) {
+    const url = new URL(request.url);
+    if (url.pathname.endsWith('/tree') && url.searchParams.get('flat') === 'true') {
       return Response.json({ records: [] });
     }
-    if (request.url.endsWith('/query/schema')) {
+    if (url.pathname.endsWith('/query/schema')) {
       return Response.json({
         scopeName: 'iam.organization',
         quickSearch: { enabled: false, fields: [], fieldSchemas: [] },
@@ -86,6 +87,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
 
     await client.treeFlat();
     await client.querySchema();
+    await client.querySchema({ uiConfigId: 'org-list-v1' });
     await client.insert({ title: '总部' });
     await client.sort('org-1', { parentId: 'root' });
 
@@ -93,11 +95,13 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     assert.equal(requests[0].method, 'GET');
     assert.equal(requests[1].url, 'http://api.local/iam.organization/query/schema');
     assert.equal(requests[1].method, 'GET');
-    assert.equal(requests[2].url, 'http://api.local/iam.organization/insert');
-    assert.equal(requests[2].method, 'POST');
-    assert.deepEqual(await requests[2].json(), { title: '总部' });
-    assert.equal(requests[3].url, 'http://api.local/iam.organization/sort/org-1');
-    assert.deepEqual(await requests[3].json(), { parentId: 'root' });
+    assert.equal(requests[2].url, 'http://api.local/iam.organization/query/schema?uiConfigId=org-list-v1');
+    assert.equal(requests[2].method, 'GET');
+    assert.equal(requests[3].url, 'http://api.local/iam.organization/insert');
+    assert.equal(requests[3].method, 'POST');
+    assert.deepEqual(await requests[3].json(), { title: '总部' });
+    assert.equal(requests[4].url, 'http://api.local/iam.organization/sort/org-1');
+    assert.deepEqual(await requests[4].json(), { parentId: 'root' });
   } finally {
     globalThis.fetch = originalFetch;
   }

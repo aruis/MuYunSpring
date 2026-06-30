@@ -224,7 +224,9 @@ async function loadSchemaAndRecords() {
   descriptorLoadError.value = false;
   try {
     runtimeViews.value = await loadRuntimeViews();
-    const nextSchema = await props.context.crud.querySchema();
+    const nextSchema = await props.context.crud.querySchema({
+      uiConfigId: props.uiConfigId,
+    });
     if (requestSeq !== schemaRequestSeq) {
       return;
     }
