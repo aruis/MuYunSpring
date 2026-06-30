@@ -26,7 +26,8 @@
 5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
 6. `DepartmentManagementView` 已复用 resolved form view、`RecordFormFields`、统一保存动作、记录动作执行器和 scope/tree 组合门面；页面仍保留机构树 scope、父部门 picker 约束和树形操作编排。
 7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树，并复用 `RecordFormFields` 承接类目表单和后端 `item_default_form` 条目表单；页面仍保留应用选择、类目/条目状态编排和保存 payload 归一。
-8. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
+8. `PositionManagementView` 已复用父模块 descriptor 下的 `position_default_form` 子资源表单和 `RecordFormFields` 承接岗位表单；页面仍保留岗位分类树、岗位列表、所属分类候选和岗位状态编排。
+9. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
 
 ## 仍属业务编排
 
@@ -52,7 +53,7 @@
 1. 后端测试覆盖静态 UI 声明扫描、descriptor 编译、runtime context 协议、读投影计划和 `/iam.employee/query`、`/iam.department/query` 输出裁剪。
 2. 后端测试覆盖 `StaticRecordReadProjectionService`、字段保护输出策略、action 权限上下文和字段级可读策略。
 3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`。
-4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView`、`DepartmentManagementView` 和 `DictionaryManagementView` 接入契约。
+4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView`、`DepartmentManagementView`、`DictionaryManagementView` 和 `PositionManagementView` 接入契约。
 5. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
 
 ## 删除条件

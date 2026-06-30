@@ -155,6 +155,31 @@ test('dictionary management uses record form fields for category and item forms'
   assert.doesNotMatch(dictionaryViewSource, /<UiInput[\s\S]*v-model:value="itemDraft\.code"/);
 });
 
+test('position management uses child resource form descriptor for position form', () => {
+  const positionViewSource = readSource('src/views/PositionManagementView.vue');
+
+  assert.match(positionViewSource, /onMounted\(loadPositionFormDefinition\)/);
+  assert.match(
+    positionViewSource,
+    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*'position_default_form',?\s*\)/,
+  );
+  assert.match(
+    positionViewSource,
+    /positionFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/,
+  );
+  assert.match(positionViewSource, /<RecordFormFields/);
+  assert.match(positionViewSource, /:field-names="positionFormFieldNames"/);
+  assert.match(positionViewSource, /:fields="positionFormFieldDefinitions"/);
+  assert.match(positionViewSource, /:fallback="positionFormFieldFallback"/);
+  assert.match(positionViewSource, /@update:field="updatePositionDraftField"/);
+  assert.match(positionViewSource, /categoryId: \{[\s\S]*controlType: 'select'/);
+  assert.match(positionViewSource, /options: categoryOptions\.value/);
+  assert.doesNotMatch(positionViewSource, /<UiSelect[\s\S]*v-model:value="positionDraft\.categoryId"/);
+  assert.doesNotMatch(positionViewSource, /<UiInput[\s\S]*v-model:value="positionDraft\.code"/);
+  assert.doesNotMatch(positionViewSource, /<UiInput[\s\S]*v-model:value="positionDraft\.title"/);
+  assert.doesNotMatch(positionViewSource, /<UiInput[\s\S]*v-model:value="positionDraft\.description"/);
+});
+
 test('three-column management pages use the platform detail panel', () => {
   const indexSource = readSource('src/platform-components/index.ts');
   const panelSource = readSource('src/platform-components/RecordDetailPanel.vue');

@@ -173,6 +173,25 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.permissionActionCode()).isEqualTo("position_view");
                             assertThat(action.title()).isEqualTo("查询岗位");
                         });
+                assertThat(definition.uiDefinition()).isNotNull();
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("position_default_form"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
+                                    .containsExactly("position", "position", "position", "position", "position");
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("categoryId", "code", "title", "description", "enabled");
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("categoryId"))
+                                    .singleElement()
+                                    .satisfies(field -> {
+                                        assertThat(field.label()).isEqualTo("所属分类");
+                                        assertThat(field.required().constant()).isTrue();
+                                    });
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("enabled"))
+                                    .singleElement()
+                                    .satisfies(field -> assertThat(field.uiType()).isEqualTo("enabledStatus"));
+                        });
             });
             assertThat(byAlias.get("iam.role")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
