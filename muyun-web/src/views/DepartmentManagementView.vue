@@ -10,6 +10,7 @@ import {
   RecordMetaSection,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  createScopedTreeModuleContext,
   type RecordActionItem,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
@@ -22,16 +23,8 @@ import type {
   Organization,
   ResolvedViewFieldDescriptor,
   ViewFieldDefinition,
-  WebListResponse,
-  WebQueryRequest,
-  WebTreeNode,
 } from '@muyun/web-contracts';
-import {
-  useModuleContext,
-  type ModuleAbilities,
-  type ModuleContext,
-  type StaticModuleTreeClient,
-} from '@muyun/web-core';
+import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createDepartmentManagementState,
@@ -79,7 +72,12 @@ const {
 } = createDepartmentManagementState(departmentContext, confirmAction);
 
 const scopedDepartmentContext = computed<ModuleContext<Department>>(() =>
-  createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
+  createScopedTreeModuleContext(departmentContext, {
+    scopeFieldName: 'organizationId',
+    scopeValue: selectedOrganizationId.value,
+    treePath: '/iam.department/tree',
+    sortPath: '/iam.department/sort',
+  }),
 );
 const departmentFormPickerConfigs = computed<
   Record<DepartmentFormPickerFieldName, RecordFormFieldPickerConfig>
@@ -218,88 +216,6 @@ function handleDepartmentAction(action: RecordActionItem) {
   if (action.key === 'save') {
     void save();
   }
-}
-
-function createOrganizationScopedDepartmentContext(
-  context: ModuleContext<Department>,
-  organizationId: string | undefined,
-): ModuleContext<Department> {
-  const treeClient = createOrganizationScopedDepartmentTreeClient(context, organizationId);
-  const abilities: ModuleAbilities<Department> = {
-    ...context.abilities,
-    tree: () => treeClient,
-    tryTree: () => (context.abilities.hasTree() ? treeClient : undefined),
-  };
-  return {
-    ...context,
-    abilities,
-  };
-}
-
-function createOrganizationScopedDepartmentTreeClient(
-  context: ModuleContext<Department>,
-  organizationId: string | undefined,
-): StaticModuleTreeClient<Department> {
-  return {
-    ...context.crud,
-    query: (request) => context.crud.query(scopedQuery(request, organizationId)),
-    tree: () => {
-      if (!organizationId) {
-        return emptyTreeResponse<Department>();
-      }
-      return context.http.request<WebListResponse<WebTreeNode<Department>>>({
-        path: '/iam.department/tree',
-        query: { organizationId },
-      });
-    },
-    treeFlat: (options) => {
-      if (!organizationId) {
-        return emptyListResponse<Department>();
-      }
-      const rootId = options?.rootId;
-      const path = rootId ? `/iam.department/tree/${encodeURIComponent(rootId)}` : '/iam.department/tree';
-      return context.http.request<WebListResponse<Department>>({
-        path,
-        query: {
-          organizationId,
-          flat: true,
-          includeSelf: options?.includeSelf,
-        },
-      });
-    },
-    subtree: (id, options) =>
-      context.http.request<WebListResponse<WebTreeNode<Department>>>({
-        path: `/iam.department/tree/${encodeURIComponent(id)}`,
-        query: options,
-      }),
-    sort: (id, request) =>
-      context.http.request({
-        method: 'POST',
-        path: `/iam.department/sort/${encodeURIComponent(id)}`,
-        body: request,
-      }),
-  };
-}
-
-function scopedQuery(request: WebQueryRequest | undefined, organizationId: string | undefined) {
-  if (!organizationId) {
-    return request;
-  }
-  return {
-    ...request,
-    conditions: [
-      ...(request?.conditions ?? []),
-      { fieldName: 'organizationId', operator: 'EQ', values: [organizationId] },
-    ],
-  };
-}
-
-async function emptyTreeResponse<TRecord>(): Promise<WebListResponse<WebTreeNode<TRecord>>> {
-  return { records: [] };
-}
-
-async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
-  return { records: [] };
 }
 
 const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFieldFallback> = {
