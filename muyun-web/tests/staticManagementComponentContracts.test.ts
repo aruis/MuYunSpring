@@ -136,8 +136,11 @@ test('dictionary management uses record form fields for category and item forms'
 
   assert.equal(matchCount(dictionaryViewSource, /<RecordFormFields/g), 2);
   assert.match(dictionaryViewSource, /onMounted\(loadDictionaryFormDefinitions\)/);
-  assert.match(dictionaryViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
-  assert.match(dictionaryViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'item_default_form'/);
+  assert.match(dictionaryViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
+  assert.match(
+    dictionaryViewSource,
+    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*'item_default_form',?\s*\)/,
+  );
   assert.match(dictionaryViewSource, /categoryFormFieldDefinitions/);
   assert.match(dictionaryViewSource, /itemFormFieldDefinitions/);
   assert.match(dictionaryViewSource, /:field-names="itemFormFieldNames"/);
@@ -218,7 +221,7 @@ test('department management uses organization as read-only scope and department 
   assert.match(departmentViewSource, /sortPath: '\/iam\.department\/sort'/);
   assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
   assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
-  assert.match(departmentViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(departmentViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(departmentViewSource, /<RecordFormFields/);
   assert.match(departmentViewSource, /resolveRecordFormFieldState/);
   assert.match(departmentViewSource, /departmentFormPickerConfigs/);
@@ -353,10 +356,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /:columns="employeeColumns"/);
   assert.doesNotMatch(employeeViewSource, /type: 'enabledStatus'/);
   assert.match(employeeViewSource, /onMounted\(loadEmployeeFormDefinition\)/);
-  assert.match(employeeViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(employeeViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(
     employeeViewSource,
-    /employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition \| ResolvedViewFieldDescriptor>>/,
+    /employeeFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/,
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
   assert.match(employeeViewSource, /resolveRecordFormFieldState/);

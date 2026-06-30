@@ -21,16 +21,11 @@ import {
   executeStaticRecordAction,
   presentPlatformError,
   presentPlatformMessage,
+  resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
 import { UiInput, confirmAction } from '@muyun/vue-ui-antdv';
-import type {
-  Department,
-  Employee,
-  Organization,
-  ResolvedViewFieldDescriptor,
-  ViewFieldDefinition,
-} from '@muyun/web-contracts';
+import type { Department, Employee, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'EmployeeManagementView' });
@@ -50,9 +45,7 @@ type EmployeeFormPickerFieldName = 'departmentId';
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
 const employeeContext = useModuleContext<Employee>({ moduleAlias: 'iam.employee' });
-const employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
-  new Map(),
-);
+const employeeFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
@@ -145,12 +138,7 @@ onMounted(loadEmployeeFormDefinition);
 async function loadEmployeeFormDefinition() {
   try {
     const runtimeContext = await employeeContext.runtime.ready;
-    const formView = runtimeContext.uiDescriptor?.views?.find(
-      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
-    );
-    employeeFormFieldDefinitions.value = new Map(
-      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
-    );
+    employeeFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
   }

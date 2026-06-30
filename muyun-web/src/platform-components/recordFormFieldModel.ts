@@ -1,4 +1,9 @@
-import type { Option, ResolvedViewFieldDescriptor, ViewFieldDefinition } from '@muyun/web-contracts';
+import type {
+  Option,
+  ResolvedModuleUiDescriptor,
+  ResolvedViewFieldDescriptor,
+  ViewFieldDefinition,
+} from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstraints';
 
@@ -65,6 +70,16 @@ export function resolveRecordFormFieldNames(
   fields?.forEach((_, fieldName) => append(fieldName));
   Object.keys(fallback).forEach(append);
   return names;
+}
+
+export function resolveRecordFormFields(
+  uiDescriptor: ResolvedModuleUiDescriptor | undefined,
+  viewCode = 'default_form',
+): Map<string, RecordFormFieldDescriptor> {
+  const formView = uiDescriptor?.views?.find(
+    (view) => view.viewKind === 'FORM' && view.viewCode === viewCode,
+  );
+  return new Map(formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? []);
 }
 
 export function resolveRecordFormFieldState(

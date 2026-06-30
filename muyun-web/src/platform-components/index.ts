@@ -55,7 +55,11 @@ export {
   defaultCrudRecordListTitle,
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
-export { resolveRecordFormFieldNames, resolveRecordFormFieldState } from './recordFormFieldModel';
+export {
+  resolveRecordFormFieldNames,
+  resolveRecordFormFieldState,
+  resolveRecordFormFields,
+} from './recordFormFieldModel';
 export { createScopedTreeClient, createScopedTreeModuleContext } from './scopedTreeModuleContext';
 export {
   createEmptyStaticTreeClient,

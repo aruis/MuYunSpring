@@ -11,10 +11,11 @@
 5. `/iam.employee/query` 和 `/iam.department/query` 响应按 resolved list view 和 `RecordReadProjection` 输出裁剪；SQL 仍暂时读取完整实体。
 6. `StaticRecordReadProjectionService` 已作为静态模块读投影门面，负责投影编译和 Web 响应重建。
 7. `recordFormFieldModel` 已作为前端表单字段解析门面，负责 descriptor 字段顺序、fallback 顺序、字段状态和 fallback 控件类型解析。
-8. `createScopedTreeModuleContext` 已作为前端 scope/tree 组合门面，负责作用域 query、树加载、平铺树候选和排序端点组合。
-9. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
-10. 静态子资源动作贡献可同步合并子资源实体事实和 UI view，用于把父模块下的子资源表单纳入同一套 descriptor。
-11. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+8. `resolveRecordFormFields` 已作为前端 form view 字段 Map 门面，负责从 resolved descriptor 按 view code 取表单字段，业务页不再手写 view 查找。
+9. `createScopedTreeModuleContext` 已作为前端 scope/tree 组合门面，负责作用域 query、树加载、平铺树候选和排序端点组合。
+10. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
+11. 静态子资源动作贡献可同步合并子资源实体事实和 UI view，用于把父模块下的子资源表单纳入同一套 descriptor。
+12. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
 
 ## 前端样板现状
 
