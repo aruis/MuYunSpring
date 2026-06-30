@@ -406,7 +406,6 @@ test('platform error feedback respects global error presentation slots', () => {
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
   const uiFeedbackSource = readSource('src/vue-ui-antdv/feedback.ts');
   const staticCrudStateSource = readSource('src/platform-components/staticCrudManagementState.ts');
-  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
   const organizationStateSource = readSource('src/views/organizationManagementState.ts');
   const positionStateSource = readSource('src/views/positionManagementState.ts');
   const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
