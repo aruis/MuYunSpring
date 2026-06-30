@@ -32,6 +32,7 @@ import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
   shouldCommitEmployeeDetailRequest,
+  shouldCloseEmployeeDetailOnCancel,
   shouldShowEmployeeDetailContent,
   type EmployeeDetailMode,
 } from './employeeDetailStateModel';
@@ -335,6 +336,25 @@ function closeEmployeeDetail() {
     : createEmployeeDraft(selectedOrganizationId.value);
 }
 
+function cancelEmployeeDetail() {
+  if (savingEmployee.value) {
+    return;
+  }
+  if (
+    shouldCloseEmployeeDetailOnCancel({
+      mode: employeeDetailMode.value,
+      selectedEmployeeId: selectedEmployee.value?.id,
+    })
+  ) {
+    closeEmployeeDetail();
+    return;
+  }
+  employeeDraft.value = copyEmployee(selectedEmployee.value!);
+  employeeDetailMode.value = 'view';
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+}
+
 async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailMode) {
   if (!canLeaveEmployeeDetailContext()) {
     return;
@@ -383,7 +403,7 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
 
 function handleEmployeeDetailAction(action: RecordActionItem) {
   if (action.key === 'cancel') {
-    closeEmployeeDetail();
+    cancelEmployeeDetail();
     return;
   }
   if (action.key === 'save') {

@@ -428,6 +428,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /const employeeDetailRequestSeq = ref\(0\)/);
   assert.match(employeeViewSource, /isEmployeeFormDisabled/);
   assert.match(employeeViewSource, /shouldShowEmployeeDetailContent/);
+  assert.match(employeeViewSource, /shouldCloseEmployeeDetailOnCancel/);
   assert.match(employeeViewSource, /canSwitchEmployeeDetailContext/);
   assert.match(employeeViewSource, /function canLeaveEmployeeDetailContext\(\)/);
   assert.match(employeeViewSource, /canSwitchEmployeeDetailContext\(\{ saving: savingEmployee\.value \}\)/);
@@ -460,6 +461,19 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
   assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
   assert.match(employeeViewSource, /employeeDetailRequestSeq\.value === requestSeq/);
+  assert.match(employeeViewSource, /function cancelEmployeeDetail\(\)/);
+  assert.match(
+    employeeViewSource,
+    /function cancelEmployeeDetail[\s\S]*shouldCloseEmployeeDetailOnCancel[\s\S]*closeEmployeeDetail\(\)/,
+  );
+  assert.match(
+    employeeViewSource,
+    /function cancelEmployeeDetail[\s\S]*employeeDraft\.value = copyEmployee\(selectedEmployee\.value!\)[\s\S]*employeeDetailMode\.value = 'view'/,
+  );
+  assert.match(
+    employeeViewSource,
+    /if \(action\.key === 'cancel'\) \{\s*cancelEmployeeDetail\(\);\s*return;\s*\}/,
+  );
   assert.match(
     employeeViewSource,
     /function handleEmployeeDetailAction[\s\S]*if \(!canLeaveEmployeeDetailContext\(\)\) \{\s*return;\s*\}[\s\S]*if \(action\.key === 'edit'\)/,

@@ -4,6 +4,7 @@ import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
   shouldCommitEmployeeDetailRequest,
+  shouldCloseEmployeeDetailOnCancel,
   shouldShowEmployeeDetailContent,
 } from '../src/views/employeeDetailStateModel.ts';
 
@@ -99,4 +100,28 @@ test('employee detail content hides temporary records while loading or failed', 
 test('employee detail context cannot switch while saving', () => {
   assert.equal(canSwitchEmployeeDetailContext({ saving: true }), false);
   assert.equal(canSwitchEmployeeDetailContext({ saving: false }), true);
+});
+
+test('employee detail cancel closes create but restores loaded edit detail', () => {
+  assert.equal(
+    shouldCloseEmployeeDetailOnCancel({
+      mode: 'create',
+      selectedEmployeeId: undefined,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldCloseEmployeeDetailOnCancel({
+      mode: 'edit',
+      selectedEmployeeId: undefined,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldCloseEmployeeDetailOnCancel({
+      mode: 'edit',
+      selectedEmployeeId: 'emp-1',
+    }),
+    false,
+  );
 });
