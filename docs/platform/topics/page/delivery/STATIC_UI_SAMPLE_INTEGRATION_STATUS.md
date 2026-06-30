@@ -15,7 +15,8 @@
 9. `createScopedTreeModuleContext` 已作为前端 scope/tree 组合门面，负责作用域 query、树加载、平铺树候选和排序端点组合。
 10. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
 11. 静态子资源动作贡献可同步合并子资源实体事实和 UI view，用于把父模块下的子资源表单纳入同一套 descriptor。
-12. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+12. 子资源默认表单 view code 使用稳定命名门面生成，约定为 `<resource>_default_form`，后端声明和前端读取不各自拼接字符串。
+13. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
 
 ## 前端样板现状
 

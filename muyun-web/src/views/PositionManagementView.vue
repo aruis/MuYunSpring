@@ -10,6 +10,7 @@ import {
   RecordMetaSection,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  childResourceDefaultFormViewCode,
   presentPlatformError,
   resolveRecordFormFields,
   type RecordActionItem,
@@ -28,6 +29,8 @@ import {
 defineOptions({ name: 'PositionManagementView' });
 
 type PositionFormFieldName = 'categoryId' | 'code' | 'title' | 'description';
+
+const POSITION_RESOURCE = 'position';
 
 const categoryContext = useModuleContext<PositionCategory>({ moduleAlias: 'iam.position_category' });
 const positionContext = useModuleContext<Position>({ moduleAlias: 'iam.position' });
@@ -215,7 +218,7 @@ async function loadPositionFormDefinition() {
     const runtimeContext = await categoryContext.runtime.ready;
     positionFormFieldDefinitions.value = resolveRecordFormFields(
       runtimeContext.uiDescriptor,
-      'position_default_form',
+      childResourceDefaultFormViewCode(POSITION_RESOURCE),
     );
   } catch (cause) {
     presentPlatformError(cause, { source: 'position-management', phase: 'load' });

@@ -17,6 +17,7 @@ import {
   RecordMetaSection,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  childResourceDefaultFormViewCode,
   createStaticTreeResourceModuleContext,
   parentRecordConstraints,
   presentPlatformError,
@@ -41,6 +42,8 @@ defineOptions({ name: 'DictionaryManagementView' });
 type DictionaryCategoryFormFieldName = 'applicationAlias' | 'alias' | 'categoryKind' | 'title' | 'enabled';
 type DictionaryItemFormFieldName = 'categoryTitle' | 'code' | 'title' | 'parentId';
 type DictionaryItemFormPickerFieldName = 'parentId';
+
+const ITEM_RESOURCE = 'item';
 
 const categoryContext = useModuleContext<DictionaryCategory>({ moduleAlias: 'platform.dictionary_category' });
 const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
@@ -214,7 +217,7 @@ async function loadDictionaryFormDefinitions() {
     categoryFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
     itemFormFieldDefinitions.value = resolveRecordFormFields(
       runtimeContext.uiDescriptor,
-      'item_default_form',
+      childResourceDefaultFormViewCode(ITEM_RESOURCE),
     );
   } catch (cause) {
     presentPlatformError(cause, { source: 'dictionary-management', phase: 'load' });

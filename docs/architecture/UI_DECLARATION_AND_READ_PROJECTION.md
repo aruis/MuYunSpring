@@ -260,7 +260,7 @@ contributor 仍然贡献模块 UI 定义，不改变 service 的运行能力面�
 
 ## 前端表单运行器边界
 
-前端静态业务页不直接遍历 `uiDescriptor.views` 查找表单字段，而是通过 `resolveRecordFormFields(uiDescriptor, viewCode)` 把 resolved form view 转成 `RecordFormFields` 可消费的字段 Map。`viewCode` 默认是 `default_form`；子资源表单显式传入对应 view code，例如 `item_default_form`。
+前端静态业务页不直接遍历 `uiDescriptor.views` 查找表单字段，而是通过 `resolveRecordFormFields(uiDescriptor, viewCode)` 把 resolved form view 转成 `RecordFormFields` 可消费的字段 Map。`viewCode` 默认是 `default_form`；子资源表单显式传入对应 view code，例如 `item_default_form`。子资源默认表单 view code 应由命名门面按 resource 生成，避免后端声明和前端读取各自维护字符串约定。
 
 `RecordFormFields` 只负责根据 descriptor 字段事实和页面 fallback 解析字段状态，并渲染当前已支持的控件类型。页面仍负责提供业务上下文：
 

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  childResourceDefaultFormViewCode,
   resolveRecordFormFields,
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
@@ -113,11 +114,18 @@ test('record form fields resolve form view descriptors by view code', () => {
 
   assert.deepEqual([...resolveRecordFormFields(uiDescriptor).keys()], ['alias', 'title']);
   assert.deepEqual(
-    [...resolveRecordFormFields(uiDescriptor, 'item_default_form').keys()],
+    [...resolveRecordFormFields(uiDescriptor, childResourceDefaultFormViewCode('item')).keys()],
     ['code', 'parentId'],
   );
   assert.deepEqual([...resolveRecordFormFields(uiDescriptor, 'missing_form').keys()], []);
   assert.deepEqual([...resolveRecordFormFields(undefined).keys()], []);
+});
+
+test('child resource default form view code follows platform naming rules', () => {
+  assert.equal(childResourceDefaultFormViewCode('item'), 'item_default_form');
+  assert.equal(childResourceDefaultFormViewCode('position'), 'position_default_form');
+  assert.throws(() => childResourceDefaultFormViewCode('Position'), /invalid child resource code/);
+  assert.throws(() => childResourceDefaultFormViewCode(''), /invalid child resource code/);
 });
 
 function field(

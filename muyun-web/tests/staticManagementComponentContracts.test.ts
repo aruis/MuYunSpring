@@ -139,8 +139,10 @@ test('dictionary management uses record form fields for category and item forms'
   assert.match(dictionaryViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(
     dictionaryViewSource,
-    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*'item_default_form',?\s*\)/,
+    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*childResourceDefaultFormViewCode\(ITEM_RESOURCE\),?\s*\)/,
   );
+  assert.match(dictionaryViewSource, /const ITEM_RESOURCE = 'item'/);
+  assert.match(dictionaryViewSource, /childResourceDefaultFormViewCode/);
   assert.match(dictionaryViewSource, /categoryFormFieldDefinitions/);
   assert.match(dictionaryViewSource, /itemFormFieldDefinitions/);
   assert.match(dictionaryViewSource, /:field-names="itemFormFieldNames"/);
@@ -161,8 +163,10 @@ test('position management uses child resource form descriptor for position form'
   assert.match(positionViewSource, /onMounted\(loadPositionFormDefinition\)/);
   assert.match(
     positionViewSource,
-    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*'position_default_form',?\s*\)/,
+    /resolveRecordFormFields\(\s*runtimeContext\.uiDescriptor,\s*childResourceDefaultFormViewCode\(POSITION_RESOURCE\),?\s*\)/,
   );
+  assert.match(positionViewSource, /const POSITION_RESOURCE = 'position'/);
+  assert.match(positionViewSource, /childResourceDefaultFormViewCode/);
   assert.match(
     positionViewSource,
     /positionFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/,

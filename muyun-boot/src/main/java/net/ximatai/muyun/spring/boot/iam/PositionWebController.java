@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
@@ -37,7 +38,7 @@ public class PositionWebController extends WebSupport<PositionService> implement
     @Override
     public ModuleUiDefinition moduleUiDefinition() {
         return ModuleUiDefinition.builder(PositionCategoryService.MODULE_ALIAS)
-                .formView("position_default_form", form -> form
+                .formView(ModuleUiViewCodes.childResourceDefaultForm(RESOURCE), form -> form
                         .title("岗位")
                         .field(RESOURCE, "categoryId", field -> field.label("所属分类").required())
                         .field(RESOURCE, "code", field -> field.label("岗位编码").required())

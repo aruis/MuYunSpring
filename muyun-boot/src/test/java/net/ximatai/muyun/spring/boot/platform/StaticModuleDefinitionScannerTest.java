@@ -174,7 +174,9 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.title()).isEqualTo("查询岗位");
                         });
                 assertThat(definition.uiDefinition()).isNotNull();
-                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("position_default_form"))
+                assertThat(definition.uiDefinition().views())
+                        .filteredOn(view -> view.viewCode()
+                                .equals(ModuleUiViewCodes.childResourceDefaultForm("position")))
                         .singleElement()
                         .satisfies(view -> {
                             assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
@@ -329,7 +331,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition()).isNotNull();
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
                     .extracting(ViewDefinition::viewCode)
-                    .containsExactly("default_form", "item_default_form");
+                    .containsExactly(ModuleUiViewCodes.DEFAULT_FORM,
+                            ModuleUiViewCodes.childResourceDefaultForm("item"));
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
                     .filteredOn(view -> view.viewCode().equals("default_form"))
                     .singleElement()
@@ -342,7 +345,7 @@ class StaticModuleDefinitionScannerTest {
                                 .satisfies(field -> assertThat(field.uiType()).isEqualTo("select"));
                     });
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
-                    .filteredOn(view -> view.viewCode().equals("item_default_form"))
+                    .filteredOn(view -> view.viewCode().equals(ModuleUiViewCodes.childResourceDefaultForm("item")))
                     .singleElement()
                     .satisfies(view -> {
                         assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
