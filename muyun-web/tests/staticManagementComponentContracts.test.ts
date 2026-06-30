@@ -307,7 +307,7 @@ test('employee management uses organization scope and platform query list panel'
     /'update:field': \[fieldName: string, value: string \| number \| boolean \| undefined\]/,
   );
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
-  assert.match(panelSource, /querySchema\(\)/);
+  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
   assert.match(panelSource, /emptyQuerySchema/);
   assert.match(panelSource, /isUnsupportedQuerySchemaError/);
   assert.match(panelSource, /query schema is not supported by/);
@@ -467,6 +467,31 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(panelSource, /uiDefinition/);
   assert.doesNotMatch(employeeViewSource, /uiDefinition/);
   assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
+});
+
+test('dynamic module host uses shared descriptor driven list and form runners', () => {
+  const hostSource = readSource('src/platform-workbench/hosts/DynamicModuleHost.vue');
+
+  assert.match(hostSource, /useModuleContext<QueryListRecord>/);
+  assert.match(hostSource, /<RecordQueryListPanel/);
+  assert.match(hostSource, /<RecordFormFields/);
+  assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
+  assert.match(hostSource, /isListPage/);
+  assert.match(hostSource, /listUiConfigId/);
+  assert.match(hostSource, /:ui-config-id="listUiConfigId"/);
+  assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
+  assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);
+  assert.doesNotMatch(hostSource, /等待接入页面 bootstrap 与列表查询/);
+});
+
+test('record query list panel forwards dynamic ui config and query template ids', () => {
+  const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+
+  assert.match(panelSource, /uiConfigId\?: string/);
+  assert.match(panelSource, /queryTemplateId\?: string/);
+  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
+  assert.match(panelSource, /request\.uiConfigId = props\.uiConfigId/);
+  assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
 });
 
 test('static crud state supports business-owned action errors before platform fallback', () => {

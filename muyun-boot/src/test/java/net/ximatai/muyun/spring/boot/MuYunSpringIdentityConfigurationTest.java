@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
+import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -13,6 +14,11 @@ import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
@@ -47,6 +53,8 @@ class MuYunSpringIdentityConfigurationTest {
                     .anyMatch(MenuService.class::isInstance);
             assertThat(context).hasSingleBean(InitialDataExecutor.class);
             assertThat(context).hasSingleBean(PlatformMenuInitialDataDeclarationProvider.class);
+            assertThat(context).hasSingleBean(DictionaryInitialDataDeclarations.class);
+            assertThat(context).hasSingleBean(PlatformDictionaryInitialDataDeclarationProvider.class);
             assertThat(bootstrapTasks.values())
                     .anyMatch(StaticModuleDefinitionRegistrar.class::isInstance)
                     .anyMatch(InitialDataBootstrapTask.class::isInstance);
@@ -138,6 +146,16 @@ class MuYunSpringIdentityConfigurationTest {
             return mock(TenantService.class);
         }
 
+        @Bean
+        DictionaryCategoryService dictionaryCategoryService() {
+            return new DictionaryCategoryService(dictionaryCategoryDao());
+        }
+
+        @Bean
+        DictionaryItemService dictionaryItemService(DictionaryCategoryService dictionaryCategoryService) {
+            return new DictionaryItemService(dictionaryItemDao(), dictionaryCategoryService);
+        }
+
         @SuppressWarnings("unchecked")
         private BaseDao<MenuScheme, String> menuSchemeDao() {
             return mock(BaseDao.class);
@@ -145,6 +163,16 @@ class MuYunSpringIdentityConfigurationTest {
 
         @SuppressWarnings("unchecked")
         private BaseDao<Menu, String> menuDao() {
+            return mock(BaseDao.class);
+        }
+
+        @SuppressWarnings("unchecked")
+        private BaseDao<DictionaryCategory, String> dictionaryCategoryDao() {
+            return mock(BaseDao.class);
+        }
+
+        @SuppressWarnings("unchecked")
+        private BaseDao<DictionaryItem, String> dictionaryItemDao() {
             return mock(BaseDao.class);
         }
     }

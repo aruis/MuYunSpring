@@ -24,6 +24,15 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedUiField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -68,6 +77,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 moduleService,
                 actionService,
                 new StaticModuleDefinitionCatalog(List.of(definition)),
+                null,
+                null,
                 null,
                 allowAllPolicy()
         );
@@ -141,6 +152,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 actionService,
                 new StaticModuleDefinitionCatalog(List.of(definition)),
                 null,
+                null,
+                null,
                 allowAllPolicy()
         );
 
@@ -176,6 +189,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 moduleService,
                 actionService,
                 new StaticModuleDefinitionCatalog(List.of(definition)),
+                null,
+                null,
                 null,
                 policyService
         );
@@ -233,6 +248,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 actionService,
                 new StaticModuleDefinitionCatalog(List.of()),
                 dynamicRecordService,
+                null,
+                null,
                 allowAllPolicy()
         );
 
@@ -272,6 +289,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 actionService,
                 new StaticModuleDefinitionCatalog(List.of()),
                 dynamicRecordService,
+                null,
+                null,
                 allowAllPolicy()
         );
 
@@ -281,6 +300,78 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.abilities()).contains("crud");
         assertThat(context.abilities()).doesNotContain("tree", "enable", "childRelation", "reference",
                 "referenceDependency");
+    }
+
+    @Test
+    void shouldExposeDynamicUiDescriptorFromPublishedPageSnapshot() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformPageBootstrapService bootstrapService = mock(PlatformPageBootstrapService.class);
+        when(moduleService.resolveVisibleModule("crm.customer"))
+                .thenReturn(module("crm.customer", "客户", ModuleKind.DYNAMIC));
+        when(actionService.listByModuleAliases(List.of("crm.customer"))).thenReturn(List.of());
+        when(dynamicRecordService.describe("crm.customer")).thenReturn(new DynamicModuleDescriptor(
+                "crm.customer",
+                "客户",
+                "customer",
+                List.of(dynamicAction(PlatformAction.QUERY), dynamicAction(PlatformAction.CREATE)),
+                List.of(dynamicEntity("customer", "CRUD")),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
+        PlatformUiSet formSet = uiSet("set-form", "crm.customer", "customer_form", PlatformUiSetType.FORM);
+        PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "客户列表");
+        PlatformUiConfig formConfig = uiConfig("ui-form-web", "set-form", "客户表单");
+        PlatformPageConfigSnapshot snapshot = new PlatformPageConfigSnapshot(
+                "crm.customer",
+                List.of(listSet, formSet),
+                List.of(listConfig, formConfig),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+        PlatformResolvedPageConfig resolvedConfig = new PlatformResolvedPageConfig(List.of(
+                resolvedField("ui-list-web", "field-name", null, "name", "客户名称", "160", "left"),
+                resolvedField("ui-list-web", "field-enabled", null, "enabled", "启用状态", "120", "center"),
+                resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null)
+        ), List.of());
+        when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot);
+        when(bootstrapService.resolveConfig(snapshot, PlatformUiClientType.WEB)).thenReturn(resolvedConfig);
+        PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of()),
+                dynamicRecordService,
+                snapshotService,
+                bootstrapService,
+                allowAllPolicy()
+        );
+
+        PlatformModuleRuntimeContext context = service.context("crm.customer");
+
+        assertThat(context.uiDescriptor()).isNotNull();
+        assertThat(context.uiDescriptor().moduleKind()).isEqualTo(ModuleKind.DYNAMIC);
+        assertThat(context.uiDescriptor().moduleAlias()).isEqualTo("crm.customer");
+        assertThat(context.uiDescriptor().views()).extracting(ResolvedViewDescriptor::viewCode)
+                .containsExactly("customer_list", "customer_form");
+        assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_list"))
+                .singleElement()
+                .satisfies(view -> {
+                    assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
+                    assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                            .containsExactly("name", "enabled");
+                });
+        assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_form"))
+                .singleElement()
+                .satisfies(view -> {
+                    assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                    assertThat(view.fields()).singleElement()
+                            .satisfies(field -> assertThat(field.fieldRef().fieldId()).isEqualTo("field-name"));
+                });
     }
 
 
@@ -357,6 +448,57 @@ class PlatformModuleRuntimeContextServiceTest {
                 true,
                 null,
                 List.of()
+        );
+    }
+
+    private PlatformUiSet uiSet(String id, String moduleAlias, String alias, PlatformUiSetType type) {
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId(id);
+        uiSet.setModuleAlias(moduleAlias);
+        uiSet.setAlias(alias);
+        uiSet.setTitle(alias);
+        uiSet.setSetType(type);
+        uiSet.setEnabled(Boolean.TRUE);
+        return uiSet;
+    }
+
+    private PlatformUiConfig uiConfig(String id, String uiSetId, String title) {
+        PlatformUiConfig config = new PlatformUiConfig();
+        config.setId(id);
+        config.setUiSetId(uiSetId);
+        config.setTitle(title);
+        config.setClientType(PlatformUiClientType.WEB);
+        config.setPublished(Boolean.TRUE);
+        config.setEnabled(Boolean.TRUE);
+        return config;
+    }
+
+    private PlatformResolvedUiField resolvedField(String uiConfigId,
+                                                  String fieldId,
+                                                  String relationAlias,
+                                                  String fieldName,
+                                                  String title,
+                                                  String width,
+                                                  String align) {
+        return new PlatformResolvedUiField(
+                uiConfigId,
+                fieldId,
+                relationAlias,
+                "customer",
+                fieldName,
+                fieldName,
+                title,
+                "string",
+                "STORED",
+                null,
+                true,
+                false,
+                false,
+                null,
+                null,
+                width == null ? null : Integer.valueOf(width),
+                align,
+                null
         );
     }
 

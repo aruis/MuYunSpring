@@ -31,6 +31,11 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -52,15 +57,21 @@ public class PlatformModuleRuntimeContextService {
     private final StaticModuleDefinitionCatalog staticModuleCatalog;
     private final DynamicRecordService dynamicRecordService;
     private final ActionExecutionPolicyService actionExecutionPolicyService;
+    private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
+    private final PlatformPageBootstrapService pageBootstrapService;
 
     @Autowired
     public PlatformModuleRuntimeContextService(PlatformModuleService moduleService,
                                                PlatformModuleActionService actionService,
                                                StaticModuleDefinitionCatalog staticModuleCatalog,
                                                ObjectProvider<DynamicRecordService> dynamicRecordService,
+                                               ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotService,
+                                               ObjectProvider<PlatformPageBootstrapService> pageBootstrapService,
                                                ObjectProvider<ActionExecutionPolicyService> actionExecutionPolicyService) {
         this(moduleService, actionService, staticModuleCatalog,
                 dynamicRecordService == null ? null : dynamicRecordService.getIfAvailable(),
+                pageConfigSnapshotService == null ? null : pageConfigSnapshotService.getIfAvailable(),
+                pageBootstrapService == null ? null : pageBootstrapService.getIfAvailable(),
                 actionExecutionPolicyService == null
                         ? new AllowAllActionExecutionPolicyService()
                         : actionExecutionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new));
@@ -70,11 +81,15 @@ public class PlatformModuleRuntimeContextService {
                                         PlatformModuleActionService actionService,
                                         StaticModuleDefinitionCatalog staticModuleCatalog,
                                         DynamicRecordService dynamicRecordService,
+                                        PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                        PlatformPageBootstrapService pageBootstrapService,
                                         ActionExecutionPolicyService actionExecutionPolicyService) {
         this.moduleService = moduleService;
         this.actionService = actionService;
         this.staticModuleCatalog = staticModuleCatalog;
         this.dynamicRecordService = dynamicRecordService;
+        this.pageConfigSnapshotService = pageConfigSnapshotService;
+        this.pageBootstrapService = pageBootstrapService;
         this.actionExecutionPolicyService = actionExecutionPolicyService == null
                 ? new AllowAllActionExecutionPolicyService()
                 : actionExecutionPolicyService;
@@ -93,9 +108,11 @@ public class PlatformModuleRuntimeContextService {
         List<PlatformModuleRuntimeAction> actions = actions(validModuleAlias, moduleKind, staticDefinition,
                 dynamicDescriptor);
         Set<EntityCapability> capabilities = capabilities(staticDefinition, dynamicDescriptor, actions);
+        String title = title(module, staticDefinition, dynamicDescriptor, validModuleAlias);
+        ResolvedModuleUiDescriptor uiDescriptor = uiDescriptor(validModuleAlias, moduleKind, title, staticDefinition);
         return new PlatformModuleRuntimeContext(
                 validModuleAlias,
-                title(module, staticDefinition, dynamicDescriptor, validModuleAlias),
+                title,
                 moduleKind,
                 entryType(module, staticDefinition),
                 entryRoute(module, staticDefinition),
@@ -104,10 +121,32 @@ public class PlatformModuleRuntimeContextService {
                 capabilities,
                 abilityCodes(capabilities),
                 actions,
-                staticDefinition
-                        .map(ModuleUiDescriptorCompiler::compile)
-                        .orElse(null)
+                uiDescriptor
         );
+    }
+
+    private ResolvedModuleUiDescriptor uiDescriptor(String moduleAlias,
+                                                    ModuleKind moduleKind,
+                                                    String title,
+                                                    Optional<StaticModuleDefinition> staticDefinition) {
+        if (moduleKind == ModuleKind.DYNAMIC) {
+            return dynamicUiDescriptor(moduleAlias, title);
+        }
+        return staticDefinition
+                .map(ModuleUiDescriptorCompiler::compile)
+                .orElse(null);
+    }
+
+    private ResolvedModuleUiDescriptor dynamicUiDescriptor(String moduleAlias, String title) {
+        if (pageConfigSnapshotService == null || pageBootstrapService == null) {
+            return null;
+        }
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformResolvedPageConfig resolvedConfig = pageBootstrapService.resolveConfig(snapshot,
+                PlatformUiClientType.WEB);
+        ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(snapshot,
+                resolvedConfig);
+        return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title);
     }
 
     private DynamicModuleDescriptor dynamicDescriptor(PlatformModule module, String moduleAlias) {

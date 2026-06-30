@@ -15,8 +15,12 @@ export interface StaticRecordMutationResult<TRecord> {
   message?: string;
 }
 
+export interface QuerySchemaRequestOptions {
+  uiConfigId?: string;
+}
+
 export interface StaticModuleCrudClient<TRecord> {
-  querySchema(): Promise<QuerySchema>;
+  querySchema(options?: QuerySchemaRequestOptions): Promise<QuerySchema>;
   query(request?: WebQueryRequest): Promise<WebPageResponse<TRecord>>;
   view(id: string): Promise<TRecord>;
   insert(record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
@@ -51,7 +55,13 @@ export function createStaticResourceCrudClient<TRecord>(
 ): StaticModuleCrudClient<TRecord> {
   const modulePath = modulePathOf(resourcePath);
   return {
-    querySchema: () => http.request<QuerySchema>({ path: `${modulePath}/query/schema` }),
+    querySchema: (options) =>
+      http.request<QuerySchema>({
+        path: `${modulePath}/query/schema`,
+        query: {
+          uiConfigId: options?.uiConfigId,
+        },
+      }),
     query: (request) =>
       http.request<WebPageResponse<TRecord>>({
         method: 'POST',

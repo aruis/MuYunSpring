@@ -68,6 +68,8 @@ const props = withDefaults(
     reloadKey?: number;
     refreshTitle?: string;
     pageSize?: number;
+    uiConfigId?: string;
+    queryTemplateId?: string;
     ready?: boolean;
     externalQueryValues?: Record<string, unknown>;
     quickSearchPlaceholder?: string;
@@ -87,6 +89,8 @@ const props = withDefaults(
     reloadKey: undefined,
     refreshTitle: undefined,
     pageSize: 20,
+    uiConfigId: undefined,
+    queryTemplateId: undefined,
     ready: true,
     externalQueryValues: undefined,
     quickSearchPlaceholder: '搜索',
@@ -220,7 +224,9 @@ async function loadSchemaAndRecords() {
   descriptorLoadError.value = false;
   try {
     runtimeViews.value = await loadRuntimeViews();
-    const nextSchema = await props.context.crud.querySchema();
+    const nextSchema = await props.context.crud.querySchema({
+      uiConfigId: props.uiConfigId,
+    });
     if (requestSeq !== schemaRequestSeq) {
       return;
     }
@@ -312,6 +318,12 @@ function buildQueryRequest(): WebQueryRequest {
     conditions: activeConditions.value,
     sorts: defaultSorts(),
   };
+  if (props.uiConfigId) {
+    request.uiConfigId = props.uiConfigId;
+  }
+  if (props.queryTemplateId) {
+    request.queryTemplateId = props.queryTemplateId;
+  }
   if (quickSearch && quickSearchEnabled.value) {
     request.quickSearch = quickSearch;
     request.quickSearchFields = schema.value?.quickSearch.fields ?? [];
