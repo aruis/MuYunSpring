@@ -82,6 +82,13 @@ export function resolveRecordFormFields(
   return new Map(formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? []);
 }
 
+export function childResourceDefaultFormViewCode(resource: string): string {
+  if (!/^[a-z][a-z0-9_]{0,62}$/.test(resource)) {
+    throw new Error(`invalid child resource code: ${resource}`);
+  }
+  return `${resource}_default_form`;
+}
+
 export function resolveRecordFormFieldState(
   fieldName: string,
   options: {

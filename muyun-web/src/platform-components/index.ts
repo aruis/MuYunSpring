@@ -56,6 +56,7 @@ export {
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
 export {
+  childResourceDefaultFormViewCode,
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
   resolveRecordFormFields,

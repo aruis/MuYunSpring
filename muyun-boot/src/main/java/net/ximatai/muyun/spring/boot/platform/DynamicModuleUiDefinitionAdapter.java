@@ -57,7 +57,7 @@ public final class DynamicModuleUiDefinitionAdapter {
                                        ModuleViewKind viewKind,
                                        List<PlatformResolvedUiField> fields) {
         return new ViewDefinition(
-                config.getId(),
+                uiSet.getAlias(),
                 viewKind,
                 ModuleUiClientType.WEB,
                 viewTitle(config, uiSet),

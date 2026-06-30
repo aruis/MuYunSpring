@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormDescriptor;
 import net.ximatai.muyun.spring.ability.form.FormField;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
@@ -91,6 +92,22 @@ class CrudWebFormSchemaTest {
     }
 
     @Test
+    void shouldIgnoreParentModuleUiContributionForFormSchemaEndpoint() throws Exception {
+        MockMvc mvc = MockMvcBuilders
+                .standaloneSetup(new DemoRecordChildUiController(new DemoRecordService()))
+                .build();
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(get("/demo.record.child/form/schema"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.scopeName").value("demo.record"))
+                    .andExpect(jsonPath("$.title").value("Demo Record"))
+                    .andExpect(jsonPath("$.fields[0].name").value("title"))
+                    .andExpect(jsonPath("$.fields[0].title").value("名称"));
+        }
+    }
+
+    @Test
     void shouldProjectStaticModuleQueryThroughCrudWebEndpoint() throws Exception {
         DemoRecordUiController controller = new DemoRecordUiController(new DemoRecordService());
         controller.setStaticRecordReadProjectionService(new StaticRecordReadProjectionService(
@@ -149,6 +166,24 @@ class CrudWebFormSchemaTest {
                             .field("title", field -> field.label("UI 名称").required().readOnly())
                             .field("status", field -> field.label("状态"))
                             .field("enabled", field -> field.label("启用状态").uiType("enabledStatus")))
+                    .build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/demo.record.child")
+    private static final class DemoRecordChildUiController extends WebSupport<DemoRecordService>
+            implements CrudWeb<DemoRecord, DemoRecordService>, StaticModuleUiContributor {
+        private DemoRecordChildUiController(DemoRecordService service) {
+            this.service = service;
+        }
+
+        @Override
+        public ModuleUiDefinition moduleUiDefinition() {
+            return ModuleUiDefinition.builder("demo.parent")
+                    .formView(ModuleUiViewCodes.childResourceDefaultForm("demo_record"), form -> form
+                            .title("Child UI Demo Record")
+                            .field("demo_record", "title", field -> field.label("子资源名称").required()))
                     .build();
         }
     }

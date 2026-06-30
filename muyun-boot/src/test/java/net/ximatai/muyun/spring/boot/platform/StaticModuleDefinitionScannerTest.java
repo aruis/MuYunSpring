@@ -173,6 +173,27 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.permissionActionCode()).isEqualTo("position_view");
                             assertThat(action.title()).isEqualTo("查询岗位");
                         });
+                assertThat(definition.uiDefinition()).isNotNull();
+                assertThat(definition.uiDefinition().views())
+                        .filteredOn(view -> view.viewCode()
+                                .equals(ModuleUiViewCodes.childResourceDefaultForm("position")))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
+                                    .containsExactly("position", "position", "position", "position", "position");
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("categoryId", "code", "title", "description", "enabled");
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("categoryId"))
+                                    .singleElement()
+                                    .satisfies(field -> {
+                                        assertThat(field.label()).isEqualTo("所属分类");
+                                        assertThat(field.required().constant()).isTrue();
+                                    });
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("enabled"))
+                                    .singleElement()
+                                    .satisfies(field -> assertThat(field.uiType()).isEqualTo("enabledStatus"));
+                        });
             });
             assertThat(byAlias.get("iam.role")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
@@ -310,7 +331,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition()).isNotNull();
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
                     .extracting(ViewDefinition::viewCode)
-                    .containsExactly("default_form", "item_default_form");
+                    .containsExactly(ModuleUiViewCodes.DEFAULT_FORM,
+                            ModuleUiViewCodes.childResourceDefaultForm("item"));
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
                     .filteredOn(view -> view.viewCode().equals("default_form"))
                     .singleElement()
@@ -323,7 +345,7 @@ class StaticModuleDefinitionScannerTest {
                                 .satisfies(field -> assertThat(field.uiType()).isEqualTo("select"));
                     });
             assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
-                    .filteredOn(view -> view.viewCode().equals("item_default_form"))
+                    .filteredOn(view -> view.viewCode().equals(ModuleUiViewCodes.childResourceDefaultForm("item")))
                     .singleElement()
                     .satisfies(view -> {
                         assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);

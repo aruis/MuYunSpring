@@ -20,14 +20,14 @@
 
 当前没有上线兼容成本，后续推进按“先立契约，再接真实链路，再扩展场景”的生产化顺序执行。SQL 列投影不是第一优先级；Web 契约、安全边界和字段事实先稳定，后续 SQL 裁剪只作为性能优化接入。
 
-当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单。下一步不继续横向铺更多页面，先收口文档化的稳定契约和运行器公共门面，再选择新的子资源样板验证复用性。
+当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单；`iam.position` 已验证非字典子资源表单可通过父模块 descriptor 和 `RecordFormFields` 复用同一套字段运行器。子资源表单样板已沉淀为稳定接入契约：子资源 view 归属父模块 descriptor，view code 由 resource 命名门面生成，字段按 relationCode 关联子资源实体事实并在编译期失败。后续不继续横向铺更多静态页面，优先推进动态发布快照接入共用 descriptor 的真实 Web 链路、SQL 列投影和字段级授权治理。
 
 ### 阶段 1：协议冻结
 
 1. `ResolvedModuleUiDescriptor` 成为唯一前端运行协议，`ModuleUiDefinition` 只存在于后端来源层。
 2. `/form/schema` 从静态模块 UI 主线退出；短期保留时也只能由 resolved form view 派生。
 3. descriptor 必须明确版本、模块身份、视图、字段、动作、端点、字段能力和视图能力。
-4. 字段引用统一支持主表字段、关系字段、动态 `fieldId` 和虚拟字段。
+4. 字段引用统一支持主表字段、关系字段和动态 `fieldId`；虚拟字段作为后续字段能力治理进入。
 5. 字段事实编译应覆盖 Java model、注解、Ability、平台标准字段、`@OptionField`、引用、字典、枚举、单位、金额和字段保护。
 6. `visible`、`required`、`readOnly` 要区分数据契约、页面声明、权限态和动作态来源；UI 声明不能绕过数据契约底线。
 
@@ -35,7 +35,7 @@
 
 1. 前端不读取 `uiDefinition` 兜底，静态页面入口只消费 `uiDescriptor`。
 2. descriptor 不包含物理列、SQL 片段或来源态配置。
-3. 字段缺失、字段能力冲突、只读必填无默认值等问题在编译期明确失败。
+3. 字段缺失和子资源 relation 缺失在编译期明确失败；字段能力冲突、只读必填无默认值等更细约束进入后续字段能力治理。
 
 ### 阶段 2：读写链路生产化
 
@@ -63,14 +63,14 @@
 
 验收口径：
 
-1. 普通 CRUD、树/排序、引用/字典/枚举三类静态样板均可通过标准运行器工作；当前已完成职员、部门和字典三个样板，下一轮应验证子资源声明能力能否迁移到非字典场景。
+1. 普通 CRUD、树/排序、引用/字典/枚举三类静态样板均可通过标准运行器工作；当前已完成职员、部门、字典和岗位四个样板，子资源声明能力已从字典迁移到非字典场景。
 2. 运行器在无权限、校验失败、乐观锁冲突和后端错误时有稳定 UI 行为。
 3. 业务页面新增字段时不需要重复维护列表列和表单字段事实。
 
 ### 阶段 4：动态归一与治理
 
 1. 动态 UI 配置发布快照不是前端协议，必须先转换为 `ModuleUiDefinition` 或等价源无关定义，再编译为 `ResolvedModuleUiDescriptor`。
-2. 动态字段 ID、字段名、关系、子表、虚拟字段和发布版本都要有稳定映射。
+2. 动态字段 ID、字段名、关系和 viewCode 已有最小稳定映射；子表、虚拟字段和发布版本继续进入治理链路。
 3. 动态模块和静态模块共用 descriptor、读投影、动作和前端运行器协议。
 4. descriptor 应带版本号、来源版本、编译时间和校验结果，支持 preview/dry-run 编译。
 5. 治理接口应能检查字段缺失、引用失效、字典缺失、动作不可达、权限配置缺口和发布快照不可用。
@@ -79,7 +79,7 @@
 验收口径：
 
 1. 至少一个动态模块通过同一运行器展示列表和表单。
-2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试。
+2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试；当前已覆盖动态快照到 `ModuleUiDefinition` 的最小适配、字段 ID、relation 和 viewCode 身份边界。
 3. preview/dry-run、健康检查、缓存失效和版本切换有 API 或 contract test 证据。
 
 ## 核心分层
@@ -200,7 +200,7 @@ ViewFieldRef
 
 静态主表声明可继续使用 `.field("title")` 这类短写法；编译器将其归一为 `relationCode=null, fieldName=title`。
 
-子资源字段声明使用 relation 字段引用，例如 `.field("item", "code")`。编译器按 `relationCode` 校验字段存在于子资源实体事实中；前端表单绑定仍按 `fieldName` 写入当前页面的 draft，`relationCode` 只承担 descriptor 和读模型定位，不要求业务页暴露后端实体结构。
+子资源字段声明使用 relation 字段引用，例如 `.field("item", "code")`。编译器按 `relationCode` 校验字段存在于子资源实体事实中；relation 或字段写错必须在后端 descriptor 编译阶段明确失败。前端表单绑定仍按 `fieldName` 写入当前页面的 draft，`relationCode` 只承担 descriptor 和读模型定位，不要求业务页暴露后端实体结构。
 
 `visible`、`required` 和 `readOnly` 在定义模型上应按规则对象表达：
 
@@ -250,7 +250,7 @@ service 不应因为 UI 声明新增公共 ability。确需拆分声明文件时
 
 ```java
 interface StaticModuleUiContributor {
-    void contribute(ModuleUiDefinitionBuilder builder);
+    ModuleUiDefinition moduleUiDefinition();
 }
 ```
 
@@ -260,7 +260,7 @@ contributor 仍然贡献模块 UI 定义，不改变 service 的运行能力面�
 
 ## 前端表单运行器边界
 
-前端静态业务页不直接遍历 `uiDescriptor.views` 查找表单字段，而是通过 `resolveRecordFormFields(uiDescriptor, viewCode)` 把 resolved form view 转成 `RecordFormFields` 可消费的字段 Map。`viewCode` 默认是 `default_form`；子资源表单显式传入对应 view code，例如 `item_default_form`。
+前端静态业务页不直接遍历 `uiDescriptor.views` 查找表单字段，而是通过 `resolveRecordFormFields(uiDescriptor, viewCode)` 把 resolved form view 转成 `RecordFormFields` 可消费的字段 Map。`viewCode` 默认是 `default_form`；子资源表单显式传入对应 view code，例如 `item_default_form`。子资源默认表单 view code 应由命名门面按 resource 生成，避免后端声明和前端读取各自维护字符串约定。
 
 `RecordFormFields` 只负责根据 descriptor 字段事实和页面 fallback 解析字段状态，并渲染当前已支持的控件类型。页面仍负责提供业务上下文：
 
@@ -327,7 +327,7 @@ Web 主协议应逐步收敛到模块或页面 bootstrap，而不是继续扩展
 
 对外 descriptor 与后端读模型分开。对外 descriptor 只表达前端需要的模块、字段、视图、动作和端点；后端 `ResolvedModuleReadModel` 是模块级、缓存级的已解析字段事实和能力事实，可包含投影规划需要的字段读模型、字段角色、存储形态和后处理线索，但不包含本次请求的输出字段、物理列集合或后处理任务，也不进入 Web 响应。
 
-旧的 `/form/schema` 不作为静态模块主入口；如果短期保留，只能作为由 resolved form view 派生的调试或兼容出口，而不是 service 上的 `FormAbility`。该出口不能只搬运 UI 声明字段，还必须合并静态模型事实，例如字段选项、选项标题输出字段、基础类型和模型字段存在性校验。前端默认路径应尽快收敛到模块 context 或页面 bootstrap。
+旧的 `/form/schema` 不作为静态模块主入口；如果短期保留，只能作为由当前模块 resolved form view 派生的调试或兼容出口，而不是 service 上的 `FormAbility`。子资源 controller 贡献给父模块的 UI view 不应被当前 controller 的 `/form/schema` 消费。该出口不能只搬运 UI 声明字段，还必须合并静态模型事实，例如字段选项、选项标题输出字段、基础类型和模型字段存在性校验。前端默认路径应尽快收敛到模块 context 或页面 bootstrap。
 
 ## 动态配置对齐
 
@@ -350,7 +350,7 @@ Web 主协议应逐步收敛到模块或页面 bootstrap，而不是继续扩展
 
 前端运行器、Web bootstrap、读投影和输出转换不应因为静态或动态来源不同而分裂成两套协议。
 
-动态 UI 配置不应直接等同于页面布局。布局、控件参数、交互和发布快照可以作为动态来源事实存在，但进入运行态前应先转换为平台通用的 `ModuleUiDefinition`，再与动态字段事实合并。这样动态侧可以有配置管理和发布治理，运行态仍保持与静态相同的 descriptor 和读投影链路。
+动态 UI 配置不应直接等同于页面布局。布局、控件参数、交互和发布快照可以作为动态来源事实存在，但进入运行态前应先转换为平台通用的 `ModuleUiDefinition`，再与动态字段事实合并。动态 viewCode 使用 UI set alias 这类稳定视图身份；`uiConfigId` 只保留为发布配置、请求校验和页面执行上下文，不作为 descriptor 视图身份。这样动态侧可以有配置管理和发布治理，运行态仍保持与静态相同的 descriptor 和读投影链路。
 
 ## 读投影与 SQL
 
@@ -427,8 +427,8 @@ id, version, tenant_id, employee_no, title, organization_id
 5. 先输出最小 `ResolvedModuleUiDescriptor`，随后补齐后端内部 `ResolvedModuleReadModel`。
 6. Web bootstrap 返回 resolved views。
 7. 增加 `RecordReadProjection` 内部模型，先用于列表字段校验和输出裁剪。
-8. 补一个动态配置到 `ModuleUiDefinition` 的最小适配契约或 contract test 样例，至少覆盖 `uiConfigId`、发布快照、字段 ID 与 `ViewFieldRef` 的映射。
-9. 废弃 service 层 `FormAbility` 作为 UI schema 来源。
+8. 已补动态配置到 `ModuleUiDefinition` 的最小适配契约，覆盖 `uiConfigId`、发布快照、字段 ID、relation 与 viewCode 身份边界。
+9. 静态模块主线不再以 service 层 `FormAbility` 作为 UI schema 来源；`/form/schema` 仅作为兼容出口保留。
 
 第一阶段暂不做：
 

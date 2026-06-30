@@ -5,22 +5,21 @@ import {
   RecordActionBar,
   RecordDetailPanel,
   RecordExplorerPanel,
+  RecordFormFields,
   RecordListExplorer,
   RecordMetaSection,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  childResourceDefaultFormViewCode,
+  presentPlatformError,
+  resolveRecordFormFields,
   type RecordActionItem,
+  type RecordFormFieldFallback,
+  type RecordFormRecord,
 } from '@muyun/platform-components';
 import type { Option, Position, PositionCategory } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import {
-  confirmAction,
-  UiEmpty,
-  UiInput,
-  UiSelect,
-  UiSpin,
-  type UiRecordInlineAction,
-} from '@muyun/vue-ui-antdv';
+import { confirmAction, UiEmpty, UiInput, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createPositionManagementState,
   positionCategoryTitleOf,
@@ -29,10 +28,15 @@ import {
 
 defineOptions({ name: 'PositionManagementView' });
 
+type PositionFormFieldName = 'categoryId' | 'code' | 'title' | 'description';
+
+const POSITION_RESOURCE = 'position';
+
 const categoryContext = useModuleContext<PositionCategory>({ moduleAlias: 'iam.position_category' });
 const positionContext = useModuleContext<Position>({ moduleAlias: 'iam.position' });
 const categorySearchKeyword = ref('');
 const positionSearchKeyword = ref('');
+const positionFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const {
   categoryReloadKey,
   positionReloadKey,
@@ -81,6 +85,19 @@ const categoryOptions = computed<Option[]>(() =>
       value: category.id ?? '',
     })),
 );
+const positionFormFieldNames: PositionFormFieldName[] = ['categoryId', 'code', 'title', 'description'];
+const positionFormFieldFallback = computed<Record<PositionFormFieldName, RecordFormFieldFallback>>(() => ({
+  categoryId: {
+    label: '所属分类',
+    required: true,
+    controlType: 'select',
+    options: categoryOptions.value,
+    placeholder: '选择岗位分类',
+  },
+  code: { label: '岗位编码', required: true, placeholder: '请输入岗位编码' },
+  title: { label: '岗位名称', required: true, placeholder: '请输入岗位名称' },
+  description: { label: '说明' },
+}));
 
 const categoryActions = computed<RecordActionItem[]>(() => {
   return [
@@ -128,6 +145,7 @@ const positionActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
+onMounted(loadPositionFormDefinition);
 onMounted(loadPositions);
 
 watch(positionReloadKey, () => {
@@ -193,6 +211,25 @@ function handlePositionAction(action: RecordActionItem) {
   if (action.key === 'position-save') {
     void savePosition();
   }
+}
+
+async function loadPositionFormDefinition() {
+  try {
+    const runtimeContext = await categoryContext.runtime.ready;
+    positionFormFieldDefinitions.value = resolveRecordFormFields(
+      runtimeContext.uiDescriptor,
+      childResourceDefaultFormViewCode(POSITION_RESOURCE),
+    );
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'position-management', phase: 'load' });
+  }
+}
+
+function updatePositionDraftField(fieldName: string, value: string | number | boolean | undefined) {
+  positionDraft.value = {
+    ...positionDraft.value,
+    [fieldName]: value,
+  };
 }
 </script>
 
@@ -329,36 +366,14 @@ function handlePositionAction(action: RecordActionItem) {
       </template>
       <UiEmpty v-if="!selectedPosition && positionMode === 'view'" description="请选择或新建岗位" />
       <form v-else class="position-form" @submit.prevent="savePosition">
-        <label>
-          <span>所属分类</span>
-          <UiSelect
-            v-model:value="positionDraft.categoryId"
-            :options="categoryOptions"
-            :disabled="positionReadonly"
-            :allow-clear="false"
-            placeholder="选择岗位分类"
-          />
-        </label>
-        <label>
-          <span>岗位编码</span>
-          <UiInput
-            v-model:value="positionDraft.code"
-            :disabled="positionReadonly"
-            placeholder="请输入岗位编码"
-          />
-        </label>
-        <label>
-          <span>岗位名称</span>
-          <UiInput
-            v-model:value="positionDraft.title"
-            :disabled="positionReadonly"
-            placeholder="请输入岗位名称"
-          />
-        </label>
-        <label class="full-row">
-          <span>说明</span>
-          <UiInput v-model:value="positionDraft.description" :disabled="positionReadonly" />
-        </label>
+        <RecordFormFields
+          :record="positionDraft as RecordFormRecord"
+          :field-names="positionFormFieldNames"
+          :fields="positionFormFieldDefinitions"
+          :fallback="positionFormFieldFallback"
+          :disabled="positionReadonly || positionSaving"
+          @update:field="updatePositionDraftField"
+        />
       </form>
       <RecordMetaSection
         v-if="selectedPosition || positionMode !== 'view'"
@@ -508,10 +523,6 @@ h3 {
 
 .position-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.full-row {
-  grid-column: 1 / -1;
 }
 
 @media (max-width: 1180px) {

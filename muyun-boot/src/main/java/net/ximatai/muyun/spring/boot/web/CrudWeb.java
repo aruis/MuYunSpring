@@ -125,10 +125,12 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     default FormSchema formSchema(@RequestParam(required = false) String uiConfigId) {
         return webScope(() -> {
             if (this instanceof StaticModuleUiContributor contributor) {
-                FormSchema schema = ModuleUiFormSchemaAdapter.formSchema(contributor.moduleUiDefinition(),
-                        formSchemaModelClass());
-                if (schema != null) {
-                    return schema;
+                if (isCurrentModuleUiDefinition(contributor)) {
+                    FormSchema schema = ModuleUiFormSchemaAdapter.formSchema(contributor.moduleUiDefinition(),
+                            formSchemaModelClass());
+                    if (schema != null) {
+                        return schema;
+                    }
                 }
             }
             if (service() instanceof FormAbility<?> formAbility) {
@@ -136,6 +138,11 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             }
             throw new IllegalArgumentException("form schema is not supported by " + webScopeName());
         });
+    }
+
+    private boolean isCurrentModuleUiDefinition(StaticModuleUiContributor contributor) {
+        return contributor.moduleUiDefinition() != null
+                && webScopeName().equals(contributor.moduleUiDefinition().moduleAlias());
     }
 
     private Class<?> formSchemaModelClass() {
