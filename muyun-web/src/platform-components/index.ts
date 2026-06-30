@@ -59,7 +59,11 @@ export { presentPlatformError, presentPlatformMessage } from './platformErrorFee
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
-export type { StaticFormSaveMode, StaticFormSaveOptions, StaticRecordActionOptions } from './staticFormActionFlow';
+export type {
+  StaticFormSaveMode,
+  StaticFormSaveOptions,
+  StaticRecordActionOptions,
+} from './staticFormActionFlow';
 export type {
   StaticCrudCardMode,
   StaticCrudConfirmAction,

@@ -216,7 +216,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(formFieldsSource, /field\?\.uiType === 'recordPicker'/);
   assert.match(formFieldsSource, /booleanFieldValue/);
   assert.match(formFieldsSource, /field\.controlType === 'recordPicker' && field\.pickerConfig/);
-  assert.match(formFieldsSource, /'update:field': \[fieldName: string, value: string \| boolean \| undefined\]/);
+  assert.match(
+    formFieldsSource,
+    /'update:field': \[fieldName: string, value: string \| boolean \| undefined\]/,
+  );
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
   assert.match(panelSource, /querySchema\(\)/);
   assert.match(panelSource, /emptyQuerySchema/);
@@ -297,7 +300,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /<RecordFormFields/);
   assert.match(employeeViewSource, /employeeStandardFormFields[\s\S]*'departmentId'[\s\S]*'enabled'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
-  assert.match(employeeViewSource, /context: scopedDepartmentContext\.value as unknown as ModuleContext<RecordPickerRecord>/);
+  assert.match(
+    employeeViewSource,
+    /context: scopedDepartmentContext\.value as unknown as ModuleContext<RecordPickerRecord>/,
+  );
   assert.match(employeeViewSource, /:picker-configs="employeeFormPickerConfigs"/);
   assert.match(employeeViewSource, /@update:field="updateEmployeeDraftField"/);
   assert.match(employeeViewSource, /employeeDetailMode === 'view' && selectedEmployee/);
@@ -315,7 +321,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /function employeeToggleActionCode/);
   assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
   assert.match(employeeViewSource, /executeStaticRecordAction/);
-  assert.match(employeeViewSource, /validateContext: \(\) => \(selectedOrganizationId\.value \? undefined : '请先选择机构'\)/);
+  assert.match(
+    employeeViewSource,
+    /validateContext: \(\) => \(selectedOrganizationId\.value \? undefined : '请先选择机构'\)/,
+  );
   assert.match(employeeViewSource, /canSave: \(\) => canSaveEmployee\.value/);
   assert.match(employeeViewSource, /validateRecord: \(draft\) =>/);
   assert.match(employeeViewSource, /当前用户无权保存职员/);

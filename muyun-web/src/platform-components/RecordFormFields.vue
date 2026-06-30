@@ -87,9 +87,10 @@ function fieldState(fieldName: string): RecordFormFieldState {
     visible,
     controlType,
     pickerConfig,
-    placeholder: props.placeholderOf?.(fieldName, { fieldName, label, required, readOnly, visible, controlType })
-      ?? fallback?.placeholder
-      ?? pickerConfig?.placeholder,
+    placeholder:
+      props.placeholderOf?.(fieldName, { fieldName, label, required, readOnly, visible, controlType }) ??
+      fallback?.placeholder ??
+      pickerConfig?.placeholder,
   };
 }
 

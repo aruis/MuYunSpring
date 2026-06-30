@@ -82,14 +82,16 @@ const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
 const scopedDepartmentContext = computed(() =>
   createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
 );
-const employeeFormPickerConfigs = computed<Record<EmployeeFormPickerFieldName, RecordFormFieldPickerConfig>>(() => ({
-  departmentId: {
-    context: scopedDepartmentContext.value as unknown as ModuleContext<RecordPickerRecord>,
-    reloadKey: organizationReloadKey.value,
-    placeholder: '请选择部门',
-    titleOf: (record) => departmentTitle(record as Department),
-  },
-}));
+const employeeFormPickerConfigs = computed<Record<EmployeeFormPickerFieldName, RecordFormFieldPickerConfig>>(
+  () => ({
+    departmentId: {
+      context: scopedDepartmentContext.value as unknown as ModuleContext<RecordPickerRecord>,
+      reloadKey: organizationReloadKey.value,
+      placeholder: '请选择部门',
+      titleOf: (record) => departmentTitle(record as Department),
+    },
+  }),
+);
 const employeeExternalQueryValues = computed<Record<string, unknown> | undefined>(() => {
   const organizationId = selectedOrganizationId.value;
   if (!organizationId) {
@@ -327,9 +329,7 @@ async function saveEmployee() {
     deniedMessage: '当前用户无权保存职员',
     createRecord: () => normalizedEmployeeDraft(employeeDraft.value, selectedOrganizationId.value ?? ''),
     validateRecord: (draft) =>
-      draft.departmentId && draft.employeeNo && draft.title
-        ? undefined
-        : '请填写部门、职员编号和职员姓名',
+      draft.departmentId && draft.employeeNo && draft.title ? undefined : '请填写部门、职员编号和职员姓名',
     save: (draft, mode) =>
       mode === 'edit' && selectedEmployee.value?.id
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
@@ -349,7 +349,7 @@ async function toggleEmployeeEnabled() {
   await executeStaticRecordAction({
     loading: savingEmployee,
     source: 'employee-management',
-    record: () => selectedEmployee.value && selectedEmployee.value.id ? selectedEmployee.value : undefined,
+    record: () => (selectedEmployee.value && selectedEmployee.value.id ? selectedEmployee.value : undefined),
     canExecute: () => canToggleEmployee.value,
     deniedMessage: '当前用户无权变更职员启停状态',
     execute: (employee) =>
@@ -431,7 +431,10 @@ function departmentTitle(record: Department) {
   return record.title ?? record.code ?? record.id ?? '未命名部门';
 }
 
-const employeeFormFieldFallback: Record<EmployeeFormFieldName, EmployeeFormFieldUi & RecordFormFieldFallback> = {
+const employeeFormFieldFallback: Record<
+  EmployeeFormFieldName,
+  EmployeeFormFieldUi & RecordFormFieldFallback
+> = {
   organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
   departmentId: { label: '所属部门', required: true, readOnly: false, visible: true },
   employeeNo: { label: '职员编号', required: true, readOnly: false, visible: true },

@@ -150,8 +150,8 @@ const panelActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
-const rowActionsProvider = computed(() =>
-  props.rowActionsOf ?? (props.standardCrudRowActions ? standardCrudRowActionsOf : undefined),
+const rowActionsProvider = computed(
+  () => props.rowActionsOf ?? (props.standardCrudRowActions ? standardCrudRowActionsOf : undefined),
 );
 const hasRowActions = computed(() => rowActionsProvider.value !== undefined);
 const rows = computed<QueryListRow[]>(() => records.value.map(resolveRow));
@@ -580,9 +580,7 @@ function cellValue(record: QueryListRecord, column: RecordQueryListColumn) {
   return column.render?.(record) ?? String(record[column.key] ?? '');
 }
 
-function columnsFromRuntimeListView(
-  views: ResolvedViewDescriptor[] | undefined,
-): RecordQueryListColumn[] {
+function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined): RecordQueryListColumn[] {
   const view =
     views?.find((item) => item.viewKind === 'LIST' && item.viewCode === 'default_list') ??
     views?.find((item) => item.viewKind === 'LIST');
