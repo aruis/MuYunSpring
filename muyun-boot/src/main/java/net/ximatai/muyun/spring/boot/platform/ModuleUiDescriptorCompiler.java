@@ -134,7 +134,7 @@ public final class ModuleUiDescriptorCompiler {
                                       Map<String, EntityDefinition> entities,
                                       EntityDefinition mainEntity) {
         ViewFieldRef fieldRef = field.fieldRef();
-        EntityDefinition entity = entity(fieldRef, entities, mainEntity);
+        EntityDefinition entity = entity(moduleAlias, view, fieldRef, entities, mainEntity);
         if (entity == null) {
             return;
         }
@@ -142,7 +142,7 @@ public final class ModuleUiDescriptorCompiler {
             return;
         }
         throw new IllegalArgumentException("static module UI field is not declared by model facts: "
-                + moduleAlias + "." + view.viewCode() + "." + fieldRef.fieldName());
+                + fieldPath(moduleAlias, view, fieldRef));
     }
 
     private static EntityDefinition entity(ViewFieldRef fieldRef,
@@ -157,6 +157,28 @@ public final class ModuleUiDescriptorCompiler {
                     + fieldRef.relationCode());
         }
         return entity;
+    }
+
+    private static EntityDefinition entity(String moduleAlias,
+                                           ViewDefinition view,
+                                           ViewFieldRef fieldRef,
+                                           Map<String, EntityDefinition> entities,
+                                           EntityDefinition mainEntity) {
+        if (fieldRef.relationCode() == null) {
+            return mainEntity;
+        }
+        EntityDefinition entity = entities.get(fieldRef.relationCode());
+        if (entity == null) {
+            throw new IllegalArgumentException("static module UI relation is not declared by model facts: "
+                    + moduleAlias + "." + view.viewCode() + "." + fieldRef.relationCode());
+        }
+        return entity;
+    }
+
+    private static String fieldPath(String moduleAlias, ViewDefinition view, ViewFieldRef fieldRef) {
+        return moduleAlias + "." + view.viewCode() + "."
+                + (fieldRef.relationCode() == null ? "" : fieldRef.relationCode() + ".")
+                + fieldRef.fieldName();
     }
 
     private static boolean hasField(EntityDefinition entity, String fieldName) {

@@ -109,10 +109,45 @@ class ModuleUiDescriptorCompilerTest {
                 .hasMessageContaining("iam.employee.default_list.ghostField");
     }
 
+    @Test
+    void shouldRejectChildResourceFormWhenRelationIsOutsideModelFacts() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.position_category")
+                .formView(ModuleUiViewCodes.childResourceDefaultForm("position"), form -> form
+                        .field("position", "code", field -> field.label("岗位编码"))
+                        .field("ghost", "code", field -> field.label("错误资源")))
+                .build();
+
+        StaticModuleDefinition definition = staticDefinition(uiDefinition, positionEntities());
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("static module UI relation is not declared by model facts")
+                .hasMessageContaining("iam.position_category.position_default_form.ghost");
+    }
+
+    @Test
+    void shouldRejectChildResourceFormWhenFieldIsOutsideRelationModelFacts() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.position_category")
+                .formView(ModuleUiViewCodes.childResourceDefaultForm("position"), form -> form
+                        .field("position", "ghostField", field -> field.label("错误字段")))
+                .build();
+
+        StaticModuleDefinition definition = staticDefinition(uiDefinition, positionEntities());
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("static module UI field is not declared by model facts")
+                .hasMessageContaining("iam.position_category.position_default_form.position.ghostField");
+    }
+
     private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition) {
+        return staticDefinition(uiDefinition, employeeEntities());
+    }
+
+    private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition, List<EntityDefinition> entities) {
         return new StaticModuleDefinition(
                 "iam",
-                "iam.employee",
+                uiDefinition.moduleAlias(),
                 "职员管理",
                 null,
                 ModuleEntryType.ROUTE,
@@ -120,7 +155,13 @@ class ModuleUiDescriptorCompilerTest {
                 null,
                 Set.of(EntityCapability.CRUD),
                 List.of(),
-                List.of(new EntityDefinition(
+                entities,
+                uiDefinition
+        );
+    }
+
+    private List<EntityDefinition> employeeEntities() {
+        return List.of(new EntityDefinition(
                         "employee",
                         "iam_employee",
                         "Employee",
@@ -128,8 +169,27 @@ class ModuleUiDescriptorCompilerTest {
                                 FieldDefinition.string("employeeNo", "职员编号"),
                                 FieldDefinition.string("mobile", "手机号")
                         )
-                )),
-                uiDefinition
+                )
+        );
+    }
+
+    private List<EntityDefinition> positionEntities() {
+        return List.of(
+                new EntityDefinition(
+                        "position_category",
+                        "iam_position_category",
+                        "PositionCategory",
+                        List.of(FieldDefinition.string("code", "分类编码"))
+                ),
+                new EntityDefinition(
+                        "position",
+                        "iam_position",
+                        "Position",
+                        List.of(
+                                FieldDefinition.string("categoryId", "所属分类"),
+                                FieldDefinition.string("code", "岗位编码")
+                        )
+                )
         );
     }
 }

@@ -200,7 +200,7 @@ ViewFieldRef
 
 静态主表声明可继续使用 `.field("title")` 这类短写法；编译器将其归一为 `relationCode=null, fieldName=title`。
 
-子资源字段声明使用 relation 字段引用，例如 `.field("item", "code")`。编译器按 `relationCode` 校验字段存在于子资源实体事实中；前端表单绑定仍按 `fieldName` 写入当前页面的 draft，`relationCode` 只承担 descriptor 和读模型定位，不要求业务页暴露后端实体结构。
+子资源字段声明使用 relation 字段引用，例如 `.field("item", "code")`。编译器按 `relationCode` 校验字段存在于子资源实体事实中；relation 或字段写错必须在后端 descriptor 编译阶段明确失败。前端表单绑定仍按 `fieldName` 写入当前页面的 draft，`relationCode` 只承担 descriptor 和读模型定位，不要求业务页暴露后端实体结构。
 
 `visible`、`required` 和 `readOnly` 在定义模型上应按规则对象表达：
 
