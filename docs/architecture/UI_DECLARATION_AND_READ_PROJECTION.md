@@ -20,7 +20,7 @@
 
 当前没有上线兼容成本，后续推进按“先立契约，再接真实链路，再扩展场景”的生产化顺序执行。SQL 列投影不是第一优先级；Web 契约、安全边界和字段事实先稳定，后续 SQL 裁剪只作为性能优化接入。
 
-当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流。下一步不继续横向铺更多页面，先收口表单字段解析门面和 scope/tree 组合门面，再以 `platform.dictionary` 验证分类、条目、树、父子选择和应用 scope 的组合场景。
+当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单。下一步不继续横向铺更多页面，先收口文档化的稳定契约和运行器公共门面，再选择新的子资源样板验证复用性。
 
 ### 阶段 1：协议冻结
 
@@ -63,7 +63,7 @@
 
 验收口径：
 
-1. 普通 CRUD、树/排序、引用/字典/枚举三类静态样板均可通过标准运行器工作；当前已完成职员和部门两个样板，字典样板进入下一轮验证。
+1. 普通 CRUD、树/排序、引用/字典/枚举三类静态样板均可通过标准运行器工作；当前已完成职员、部门和字典三个样板，下一轮应验证子资源声明能力能否迁移到非字典场景。
 2. 运行器在无权限、校验失败、乐观锁冲突和后端错误时有稳定 UI 行为。
 3. 业务页面新增字段时不需要重复维护列表列和表单字段事实。
 
@@ -161,7 +161,7 @@ class EmployeeService implements FormAbility<Employee> {
 
 ## 声明内容
 
-第一阶段只支持主表的扁平视图声明，先覆盖表单和列表。模型上应保留多视图和动态字段接入所需的稳定锚点，静态 DSL 可以提供最短写法，由编译器补齐默认值。
+第一阶段支持主资源的扁平视图声明，以及父模块下子资源贡献的扁平 form view。模型上应保留多视图、子资源和动态字段接入所需的稳定锚点，静态 DSL 可以提供最短写法，由编译器补齐默认值。
 
 视图身份至少包含：
 
@@ -172,6 +172,8 @@ class EmployeeService implements FormAbility<Employee> {
 | `clientType` | 客户端类型，第一阶段可默认为 Web |
 
 第一阶段 `clientType` 只作为未来锚点，不参与编译分支。同一套 `ResolvedModuleUiDescriptor` 协议不能因为客户端不同而生成两套语义模型。
+
+子资源视图继续属于父模块 descriptor，不注册成独立伪模块。例如字典项是 `platform.dictionary_category` 下的 `item` 子资源，动作由 `@PlatformStaticActionContribution(resource = "item")` 贡献，表单 view 使用 `item_default_form` 进入父模块的 `ResolvedModuleUiDescriptor`。这样权限动作、运行入口和页面上下文仍以父模块为边界，子资源字段事实通过 `relationCode=item` 保留定位。
 
 字段 UI 声明只表达页面意图：
 
@@ -197,6 +199,8 @@ ViewFieldRef
 ```
 
 静态主表声明可继续使用 `.field("title")` 这类短写法；编译器将其归一为 `relationCode=null, fieldName=title`。
+
+子资源字段声明使用 relation 字段引用，例如 `.field("item", "code")`。编译器按 `relationCode` 校验字段存在于子资源实体事实中；前端表单绑定仍按 `fieldName` 写入当前页面的 draft，`relationCode` 只承担 descriptor 和读模型定位，不要求业务页暴露后端实体结构。
 
 `visible`、`required` 和 `readOnly` 在定义模型上应按规则对象表达：
 
@@ -251,6 +255,21 @@ interface StaticModuleUiContributor {
 ```
 
 contributor 仍然贡献模块 UI 定义，不改变 service 的运行能力面。
+
+静态子资源 controller 可以同时作为 action contributor 和 UI contributor：action contribution 把标准子资源动作合并到目标父模块，UI contribution 把子资源 form view 合并到同一父模块 UI descriptor。扫描器同时合并子资源实体事实，保证 `relationCode` 字段能被编译期校验。子资源不因此获得独立菜单、独立路由或独立模块注册；是否成为独立模块必须由业务边界决定，而不是由页面表单需要倒推。
+
+## 前端表单运行器边界
+
+前端静态业务页不直接遍历 `uiDescriptor.views` 查找表单字段，而是通过 `resolveRecordFormFields(uiDescriptor, viewCode)` 把 resolved form view 转成 `RecordFormFields` 可消费的字段 Map。`viewCode` 默认是 `default_form`；子资源表单显式传入对应 view code，例如 `item_default_form`。
+
+`RecordFormFields` 只负责根据 descriptor 字段事实和页面 fallback 解析字段状态，并渲染当前已支持的控件类型。页面仍负责提供业务上下文：
+
+1. `recordPicker` 的候选 `ModuleContext`、scope、刷新 key、标题函数和选择约束。
+2. 页面合成的只读上下文字段，例如当前选中字典类目标题。
+3. 保存 payload 归一化、动作选择和保存后的页面状态同步。
+4. 当前页面是否禁用字段、是否隐藏上下文外字段。
+
+这种边界保证表单字段事实来自后端 descriptor，同时不把前端运行态对象、页面树状态或业务临时字段反向塞进 UI 声明。
 
 ## 编译与校验
 

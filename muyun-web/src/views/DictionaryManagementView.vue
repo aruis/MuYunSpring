@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type {
-  Application,
-  DictionaryCategory,
-  DictionaryItem,
-  ResolvedViewFieldDescriptor,
-  ViewFieldDefinition,
-} from '@muyun/web-contracts';
+import type { Application, DictionaryCategory, DictionaryItem } from '@muyun/web-contracts';
 import {
   createStaticResourceTreeClient,
   useModuleContext,
@@ -26,6 +20,7 @@ import {
   createStaticTreeResourceModuleContext,
   parentRecordConstraints,
   presentPlatformError,
+  resolveRecordFormFields,
   type RecordActionItem,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
@@ -54,12 +49,8 @@ const itemSearchKeyword = ref('');
 const applications = ref<Application[]>([]);
 const applicationsLoading = ref(false);
 const selectedApplicationAlias = ref<string>();
-const categoryFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
-  new Map(),
-);
-const itemFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
-  new Map(),
-);
+const categoryFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const itemFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 
 const itemClients = new Map<string, StaticModuleTreeClient<DictionaryItem>>();
 const categoryClients = new Map<string, StaticModuleTreeClient<DictionaryCategory>>();
@@ -220,17 +211,10 @@ onMounted(loadDictionaryFormDefinitions);
 async function loadDictionaryFormDefinitions() {
   try {
     const runtimeContext = await categoryContext.runtime.ready;
-    const categoryFormView = runtimeContext.uiDescriptor?.views?.find(
-      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
-    );
-    const itemFormView = runtimeContext.uiDescriptor?.views?.find(
-      (view) => view.viewKind === 'FORM' && view.viewCode === 'item_default_form',
-    );
-    categoryFormFieldDefinitions.value = new Map(
-      categoryFormView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
-    );
-    itemFormFieldDefinitions.value = new Map(
-      itemFormView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    categoryFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
+    itemFormFieldDefinitions.value = resolveRecordFormFields(
+      runtimeContext.uiDescriptor,
+      'item_default_form',
     );
   } catch (cause) {
     presentPlatformError(cause, { source: 'dictionary-management', phase: 'load' });

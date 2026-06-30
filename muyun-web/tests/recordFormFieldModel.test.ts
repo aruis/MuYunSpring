@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  resolveRecordFormFields,
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
   type RecordFormFieldDescriptor,
@@ -87,6 +88,38 @@ test('record form field state resolves select options from fallback metadata', (
   });
 });
 
+test('record form fields resolve form view descriptors by view code', () => {
+  const uiDescriptor = {
+    schemaVersion: '1',
+    moduleAlias: 'platform.dictionary_category',
+    views: [
+      {
+        viewCode: 'default_list',
+        viewKind: 'LIST',
+        fields: [descriptorField('title', '列表标题')],
+      },
+      {
+        viewCode: 'default_form',
+        viewKind: 'FORM',
+        fields: [descriptorField('alias', '类目 alias'), descriptorField('title', '类目名称')],
+      },
+      {
+        viewCode: 'item_default_form',
+        viewKind: 'FORM',
+        fields: [descriptorField('code', '字典项编码'), descriptorField('parentId', '上级字典项')],
+      },
+    ],
+  } as const;
+
+  assert.deepEqual([...resolveRecordFormFields(uiDescriptor).keys()], ['alias', 'title']);
+  assert.deepEqual(
+    [...resolveRecordFormFields(uiDescriptor, 'item_default_form').keys()],
+    ['code', 'parentId'],
+  );
+  assert.deepEqual([...resolveRecordFormFields(uiDescriptor, 'missing_form').keys()], []);
+  assert.deepEqual([...resolveRecordFormFields(undefined).keys()], []);
+});
+
 function field(
   label: string,
   options: { required?: boolean; readOnly?: boolean; visible?: boolean; uiType?: string } = {},
@@ -97,5 +130,15 @@ function field(
     required: { constant: options.required ?? false },
     readOnly: { constant: options.readOnly ?? false },
     visible: { constant: options.visible ?? true },
+  } as RecordFormFieldDescriptor;
+}
+
+function descriptorField(fieldName: string, label: string): RecordFormFieldDescriptor {
+  return {
+    fieldRef: { fieldName },
+    label,
+    required: { constant: false },
+    readOnly: { constant: false },
+    visible: { constant: true },
   } as RecordFormFieldDescriptor;
 }

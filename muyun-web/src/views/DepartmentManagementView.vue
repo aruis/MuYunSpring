@@ -16,14 +16,10 @@ import {
   type RecordFormFieldPickerConfig,
   type RecordFormRecord,
   presentPlatformError,
+  resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
-import type {
-  Department,
-  Organization,
-  ResolvedViewFieldDescriptor,
-  ViewFieldDefinition,
-} from '@muyun/web-contracts';
+import type { Department, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
@@ -39,9 +35,7 @@ type DepartmentFormPickerFieldName = 'parentId';
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
-const departmentFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
-  new Map(),
-);
+const departmentFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const organizationSearchKeyword = ref('');
 const departmentSearchKeyword = ref('');
 const {
@@ -130,12 +124,7 @@ onMounted(loadDepartmentFormDefinition);
 async function loadDepartmentFormDefinition() {
   try {
     const runtimeContext = await departmentContext.runtime.ready;
-    const formView = runtimeContext.uiDescriptor?.views?.find(
-      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
-    );
-    departmentFormFieldDefinitions.value = new Map(
-      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
-    );
+    departmentFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
   } catch (cause) {
     presentPlatformError(cause, { source: 'department-management', phase: 'load' });
   }
