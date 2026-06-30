@@ -57,6 +57,10 @@ export {
 export { resolveRecordActions } from './recordActionBarModel';
 export { resolveRecordFormFieldNames, resolveRecordFormFieldState } from './recordFormFieldModel';
 export { createScopedTreeClient, createScopedTreeModuleContext } from './scopedTreeModuleContext';
+export {
+  createEmptyStaticTreeClient,
+  createStaticTreeResourceModuleContext,
+} from './staticTreeResourceModuleContext';
 export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
@@ -74,3 +78,4 @@ export type {
 } from './staticCrudManagementState';
 export type { TreeRecordBase } from './treeRecordModel';
 export type { ScopedTreeModuleContextOptions } from './scopedTreeModuleContext';
+export type { StaticTreeResourceModuleContextOptions } from './staticTreeResourceModuleContext';

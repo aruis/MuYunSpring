@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Application, DictionaryCategory, DictionaryItem, QuerySchema } from '@muyun/web-contracts';
+import type { Application, DictionaryCategory, DictionaryItem } from '@muyun/web-contracts';
 import {
   createStaticResourceTreeClient,
   useModuleContext,
-  type ModuleContext,
   type StaticModuleTreeClient,
 } from '@muyun/web-core';
 import {
@@ -18,6 +17,7 @@ import {
   RecordPicker,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  createStaticTreeResourceModuleContext,
   parentRecordConstraints,
   presentPlatformError,
   type RecordActionItem,
@@ -101,8 +101,18 @@ const applicationOptions = computed(() =>
     disabled: application.enabled === false,
   })),
 );
-const categoryExplorerContext = computed(() => scopedCategoryContext(selectedApplicationAlias.value));
-const itemExplorerContext = computed(() => scopedItemContext(selectedCategory.value?.id));
+const categoryExplorerContext = computed(() =>
+  createStaticTreeResourceModuleContext(categoryContext, {
+    client: selectedApplicationAlias.value ? categoryClientOf() : undefined,
+    emptyQueryScopeName: 'platform.dictionary_category',
+  }),
+);
+const itemExplorerContext = computed(() =>
+  createStaticTreeResourceModuleContext(categoryContext, {
+    client: selectedCategory.value?.id ? itemClientOf(selectedCategory.value.id) : undefined,
+    emptyQueryScopeName: 'platform.dictionary_item',
+  }),
+);
 const itemListEmptyDescription = computed(() =>
   itemSearchKeyword.value.trim() ? '没有匹配的字典项' : '当前类目暂无字典项',
 );
@@ -204,101 +214,6 @@ function categoryClientOf() {
   );
   categoryClients.set(applicationAlias, client);
   return client;
-}
-
-function scopedCategoryContext(applicationAlias: string | undefined): ModuleContext<DictionaryCategory> {
-  const scopedClient = applicationAlias ? categoryClientOf() : fallbackCategoryClient();
-  return {
-    ...categoryContext,
-    crud: scopedClient,
-    abilities: {
-      crud: () => scopedClient,
-      tree: () => scopedClient,
-      enable: () => scopedClient,
-      tryCrud: () => scopedClient,
-      tryTree: () => scopedClient,
-      tryEnable: () => scopedClient,
-      has: categoryContext.abilities.has,
-      hasCrud: categoryContext.abilities.hasCrud,
-      hasTree: categoryContext.abilities.hasTree,
-      hasEnable: categoryContext.abilities.hasEnable,
-    },
-  };
-}
-
-function scopedItemContext(categoryId: string | undefined): ModuleContext<DictionaryItem> {
-  const scopedClient = categoryId ? itemClientOf(categoryId) : fallbackItemClient();
-  return {
-    ...categoryContext,
-    crud: scopedClient,
-    abilities: {
-      crud: () => scopedClient,
-      tree: () => scopedClient,
-      enable: () => scopedClient,
-      tryCrud: () => scopedClient,
-      tryTree: () => scopedClient,
-      tryEnable: () => scopedClient,
-      has: categoryContext.abilities.has,
-      hasCrud: categoryContext.abilities.hasCrud,
-      hasTree: categoryContext.abilities.hasTree,
-      hasEnable: categoryContext.abilities.hasEnable,
-    },
-  };
-}
-
-function fallbackCategoryClient(): StaticModuleTreeClient<DictionaryCategory> {
-  return {
-    querySchema: async () => emptyQuerySchema('platform.dictionary_category'),
-    query: async () => emptyPage(),
-    view: async () => ({}),
-    insert: async (record) => ({ record }),
-    update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 0 }),
-    enable: async () => ({ count: 0 }),
-    disable: async () => ({ count: 0 }),
-    tree: async () => ({ records: [] }),
-    treeFlat: async () => ({ records: [] }),
-    subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 0 }),
-  };
-}
-
-function fallbackItemClient(): StaticModuleTreeClient<DictionaryItem> {
-  return {
-    querySchema: async () => emptyQuerySchema('platform.dictionary_item'),
-    query: async () => emptyPage(),
-    view: async () => ({}),
-    insert: async (record) => ({ record }),
-    update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 0 }),
-    enable: async () => ({ count: 0 }),
-    disable: async () => ({ count: 0 }),
-    tree: async () => ({ records: [] }),
-    treeFlat: async () => ({ records: [] }),
-    subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 0 }),
-  };
-}
-
-function emptyQuerySchema(scopeName: string): QuerySchema {
-  return {
-    scopeName,
-    quickSearch: { enabled: false, fields: [], fieldSchemas: [] },
-    fields: [],
-    externalCriteria: [],
-    defaultSorts: [],
-  };
-}
-
-function emptyPage() {
-  return {
-    records: [],
-    total: 0,
-    pageNum: 1,
-    pageSize: 20,
-    pages: 0,
-    totalKnown: true,
-  };
 }
 
 function itemClientOf(categoryId: string) {

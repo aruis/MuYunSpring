@@ -93,11 +93,15 @@ test('application scope switcher is a platform component for scoped management p
   const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
 
   assert.match(indexSource, /ApplicationScopeSwitcher/);
+  assert.match(indexSource, /createStaticTreeResourceModuleContext/);
   assert.match(switcherSource, /defineOptions\(\{ name: 'ApplicationScopeSwitcher' \}\)/);
   assert.match(switcherSource, /UiDropdown/);
   assert.match(switcherSource, /:selected-key="String\(value \?\? ''\)"/);
   assert.match(switcherSource, /align="start"/);
   assert.match(dictionaryViewSource, /<ApplicationScopeSwitcher/);
+  assert.match(dictionaryViewSource, /createStaticTreeResourceModuleContext/);
+  assert.doesNotMatch(dictionaryViewSource, /function fallbackCategoryClient/);
+  assert.doesNotMatch(dictionaryViewSource, /function fallbackItemClient/);
   assert.doesNotMatch(dictionaryViewSource, /class="application-scope-select"/);
 });
 

@@ -12,7 +12,8 @@
 6. `StaticRecordReadProjectionService` 已作为静态模块读投影门面，负责投影编译和 Web 响应重建。
 7. `recordFormFieldModel` 已作为前端表单字段解析门面，负责 descriptor 字段顺序、fallback 顺序、字段状态和 fallback 控件类型解析。
 8. `createScopedTreeModuleContext` 已作为前端 scope/tree 组合门面，负责作用域 query、树加载、平铺树候选和排序端点组合。
-9. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+9. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
+10. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
 
 ## 前端样板现状
 
@@ -22,7 +23,8 @@
 4. `executeStaticRecordAction` 已承接启停和删除动作的重复提交保护、权限提示、确认后的 loading、成功反馈和异常反馈。
 5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
 6. `DepartmentManagementView` 已复用 resolved form view、`RecordFormFields`、统一保存动作、记录动作执行器和 scope/tree 组合门面；页面仍保留机构树 scope、父部门 picker 约束和树形操作编排。
-7. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
+7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树；页面仍保留应用选择、类目/条目状态编排和业务表单。
+8. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
 
 ## 仍属业务编排
 
@@ -41,7 +43,7 @@
 1. 字段级授权配置和角色授权存储模型。
 2. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
 3. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路。
-4. 第三个静态样板优先选择 `platform.dictionary`，验证分类、条目、树、父子选择和应用 scope 的组合能力。
+4. `platform.dictionary` 后续继续验证分类和条目表单能否接入 resolved form view 与 `RecordFormFields`。
 5. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
 
 ## 验收证据
@@ -49,7 +51,7 @@
 1. 后端测试覆盖静态 UI 声明扫描、descriptor 编译、runtime context 协议、读投影计划和 `/iam.employee/query`、`/iam.department/query` 输出裁剪。
 2. 后端测试覆盖 `StaticRecordReadProjectionService`、字段保护输出策略、action 权限上下文和字段级可读策略。
 3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`。
-4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView` 和 `DepartmentManagementView` 接入契约。
+4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView`、`DepartmentManagementView` 和 `DictionaryManagementView` 接入契约。
 5. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
 
 ## 删除条件
