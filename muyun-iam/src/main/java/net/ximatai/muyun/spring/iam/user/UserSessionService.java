@@ -5,7 +5,6 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -63,15 +62,16 @@ public class UserSessionService {
     }
 
     public LoginResult login(String tenantId, String username, String password) {
-        String validTenantId = Preconditions.requireText(tenantId, "tenantId");
-        try (TenantContext.Scope ignored = TenantContext.use(validTenantId)) {
-            verifyActiveTenantForLogin(validTenantId);
+        String normalizedTenantId = normalizeBlank(tenantId);
+        try (TenantContext.Scope ignored = loginTenantScope(normalizedTenantId)) {
+            if (normalizedTenantId != null) {
+                verifyActiveTenantForLogin(normalizedTenantId);
+            }
             UserAccount user = userAccountService.requireActiveUser(username);
             if (!userAccountService.passwordMatches(user, password)) {
                 throw new AuthenticationFailedException("invalid username or password");
             }
-            CurrentUser currentUser = CurrentUser.tenantUser(
-                    user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
+            CurrentUser currentUser = currentUserOf(user);
             String token = newToken();
             Instant issuedAt = now();
             Instant maxExpiresAt = issuedAt.plus(SESSION_ABSOLUTE_TTL);
@@ -102,7 +102,7 @@ public class UserSessionService {
         if (isExpired(session, now)) {
             return Optional.empty();
         }
-        try (TenantContext.Scope ignored = TenantContext.use(session.getTenantId())) {
+        try (TenantContext.Scope ignored = sessionTenantScope(session.getTenantId())) {
             if (!verifyActiveTenantForSession(session, now)) {
                 return Optional.empty();
             }
@@ -114,9 +114,7 @@ public class UserSessionService {
             if (!updateLastSeenIfDue(session, now)) {
                 return Optional.empty();
             }
-            CurrentUser currentUser = CurrentUser.tenantUser(
-                    user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
-            return Optional.of(currentUser);
+            return Optional.of(currentUserOf(user));
         }
     }
 
@@ -136,6 +134,9 @@ public class UserSessionService {
     }
 
     private boolean verifyActiveTenantForSession(UserSession session, Instant now) {
+        if (session.getTenantId() == null || session.getTenantId().isBlank()) {
+            return true;
+        }
         try {
             activeTenantVerifier.verifyActiveTenant(session.getTenantId());
             return true;
@@ -240,6 +241,29 @@ public class UserSessionService {
 
     private Instant now() {
         return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private TenantContext.Scope loginTenantScope(String tenantId) {
+        return tenantId == null
+                ? TenantContext.system("system user login")
+                : TenantContext.use(tenantId);
+    }
+
+    private TenantContext.Scope sessionTenantScope(String tenantId) {
+        return tenantId == null || tenantId.isBlank()
+                ? TenantContext.system("system user session")
+                : TenantContext.use(tenantId);
+    }
+
+    private CurrentUser currentUserOf(UserAccount user) {
+        if (user.getTenantId() == null || user.getTenantId().isBlank()) {
+            return CurrentUser.systemUser(user.getId(), user.getUsername());
+        }
+        return CurrentUser.tenantUser(user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private UserSession sessionById(String id) {

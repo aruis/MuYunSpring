@@ -194,6 +194,7 @@ test('three-column management pages use the platform detail panel', () => {
   const positionViewSource = readSource('src/views/PositionManagementView.vue');
   const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
   const departmentViewSource = readSource('src/views/DepartmentManagementView.vue');
+  const menuViewSource = readSource('src/views/MenuManagementView.vue');
   const dictionaryDetailSource = dictionaryViewSource.slice(
     dictionaryViewSource.indexOf('<RecordDetailPanel class="dictionary-column"'),
   );
@@ -213,6 +214,7 @@ test('three-column management pages use the platform detail panel', () => {
   assert.equal(matchCount(positionViewSource, /<RecordDetailPanel/g), 1);
   assert.equal(matchCount(dictionaryViewSource, /<RecordDetailPanel/g), 1);
   assert.equal(matchCount(departmentViewSource, /<RecordDetailPanel/g), 1);
+  assert.equal(matchCount(menuViewSource, /<RecordDetailPanel/g), 1);
   assert.match(positionViewSource, /v-if="positionMode !== 'view'"[\s\S]*:enabled="positionDraft\.enabled"/);
   assert.match(dictionaryViewSource, /v-if="itemMode !== 'view'"[\s\S]*:enabled="itemDraft\.enabled"/);
   assert.match(departmentViewSource, /<RecordFormFields[\s\S]*:record="draft as RecordFormRecord"/);
@@ -220,6 +222,9 @@ test('three-column management pages use the platform detail panel', () => {
   assert.doesNotMatch(positionViewSource, /v-if="positionMode === 'create'"/);
   assert.doesNotMatch(dictionaryViewSource, /v-if="itemMode === 'create'"/);
   assert.doesNotMatch(departmentViewSource, /v-if="mode\.startsWith\('create'\)"/);
+  assert.match(menuViewSource, /<template #editor>[\s\S]*scheme-editor-panel/);
+  assert.match(menuViewSource, /<RecordDetailPanel class="menu-detail-column"[\s\S]*:title="menuCardTitle"/);
+  assert.doesNotMatch(menuViewSource, /<RecordDetailPanel[\s\S]*:title="schemeCardTitle"/);
   assert.match(
     positionViewSource,
     /:enabled="categoryDraft\.enabled"[\s\S]*@change="categoryDraft\.enabled = \$event"/,

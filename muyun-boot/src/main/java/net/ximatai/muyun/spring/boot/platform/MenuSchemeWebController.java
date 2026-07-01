@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MenuSchemeService.MODULE_ALIAS, title = "平台菜单方案")
+@PlatformStaticModule(application = "platform", alias = MenuSchemeService.MODULE_ALIAS, title = "平台菜单方案",
+        route = "/config/menus")
 @PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "菜单方案", order = 40)
 @RequestMapping("/platform.menu_scheme")
 public class MenuSchemeWebController extends net.ximatai.muyun.spring.boot.web.WebSupport<MenuSchemeService>

@@ -17,13 +17,11 @@ import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
-import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -95,10 +93,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
 
     @Override
     public InitialDataOptions initialDataOptions() {
-        return InitialDataOptions.defaults()
-                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
-                .order(50)
-                .tenant(TenantService.PLATFORM_TENANT_ID);
+        return InitialDataOptions.system("platform.system-admin-user", 50);
     }
 
     @Override
@@ -108,7 +103,6 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setUsername(PLATFORM_SUPER_ADMIN_USERNAME);
         user.setPassword(initialAdminSettings.initialPassword());
         user.setTitle(PLATFORM_SUPER_ADMIN_USER_TITLE);
-        user.setOrganizationId(OrganizationService.PLATFORM_ROOT_ORGANIZATION_ID);
         user.setAuthUserId(user.getId());
         user.setAuthModuleAlias(MODULE_ALIAS);
         user.setEnabled(Boolean.TRUE);
@@ -129,6 +123,14 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setOrganizationId(normalizeBlank(user.getOrganizationId()));
         user.setAuthOrganizationId(user.getOrganizationId());
         user.setAuthModuleAlias(MODULE_ALIAS);
+    }
+
+    @Override
+    public void beforePrepareInsert(UserAccount user) {
+        if (!TenantContext.isSystem() || user.getTenantId() != null) {
+            requireActiveTenantMutationContext();
+        }
+        normalizeBeforeMutation(user);
     }
 
     @Override
@@ -176,7 +178,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     private void rejectDuplicateUsername(UserAccount user) {
-        rejectDuplicate(user, Criteria.of().eq("username", user.getUsername()),
+        rejectDuplicate(user, Criteria.of()
+                        .eq("username", user.getUsername())
+                        .eqNullable("tenantId", user.getTenantId()),
                 "username must be unique within tenant: " + user.getUsername());
     }
 

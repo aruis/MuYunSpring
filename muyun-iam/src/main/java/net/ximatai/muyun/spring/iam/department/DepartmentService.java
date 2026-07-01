@@ -5,15 +5,11 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,13 +23,9 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
         SoftDeleteAbility<Department>,
         EnableAbility<Department>,
         TreeAbility<Department>,
-        InitialDataAbility<Department>,
         ReferenceAbility<Department> {
 
     public static final String MODULE_ALIAS = "iam.department";
-    public static final String PLATFORM_ROOT_DEPARTMENT_ID = "platform.department.root";
-    public static final String PLATFORM_ROOT_DEPARTMENT_CODE = "ROOT";
-    public static final String PLATFORM_ROOT_DEPARTMENT_TITLE = "默认部门";
 
     private final OrganizationService organizationService;
 
@@ -49,27 +41,6 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
     public void normalizeBeforeMutation(Department department) {
         department.setOrganizationId(Preconditions.requireText(department.getOrganizationId(), "organizationId"));
         department.setCode(Preconditions.requireText(department.getCode(), "departmentCode"));
-    }
-
-    @Override
-    public InitialDataOptions initialDataOptions() {
-        return InitialDataOptions.defaults()
-                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
-                .order(42)
-                .tenant(TenantService.PLATFORM_TENANT_ID);
-    }
-
-    @Override
-    public List<Department> initialData() {
-        Department department = new Department();
-        department.setId(PLATFORM_ROOT_DEPARTMENT_ID);
-        department.setOrganizationId(OrganizationService.PLATFORM_ROOT_ORGANIZATION_ID);
-        department.setCode(PLATFORM_ROOT_DEPARTMENT_CODE);
-        department.setTitle(PLATFORM_ROOT_DEPARTMENT_TITLE);
-        department.setParentId(TreeAbility.ROOT_ID);
-        department.setEnabled(Boolean.TRUE);
-        department.setSortOrder(1);
-        return List.of(department);
     }
 
     @Override

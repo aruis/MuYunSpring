@@ -1,7 +1,5 @@
 package net.ximatai.muyun.spring.boot;
 
-import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminAuthorizationInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminSystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
@@ -17,9 +15,6 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
-import net.ximatai.muyun.spring.iam.role.RoleActionDao;
-import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
-import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
@@ -77,7 +72,7 @@ public class MuYunSpringIdentityConfiguration {
     @Bean
     @ConditionalOnMissingBean(SystemMenuSchemeAccessPolicy.class)
     public SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy() {
-        return new PlatformSuperAdminSystemMenuSchemeAccessPolicy();
+        return SystemMenuSchemeAccessPolicy.DENY_ALL;
     }
 
     @Bean
@@ -124,17 +119,6 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(InitialDataBootstrapTask.class)
     public InitialDataBootstrapTask initialDataBootstrapTask(InitialDataExecutor initialDataExecutor) {
         return new InitialDataBootstrapTask(initialDataExecutor);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(PlatformSuperAdminAuthorizationInitialDataDeclarationProvider.class)
-    public PlatformSuperAdminAuthorizationInitialDataDeclarationProvider platformSuperAdminAuthorizationInitialDataDeclarationProvider(
-            RoleService roleService,
-            RoleGrantDao roleGrantDao,
-            RoleActionDao roleActionDao,
-            PlatformModuleActionService moduleActionService) {
-        return new PlatformSuperAdminAuthorizationInitialDataDeclarationProvider(
-                roleService, roleGrantDao, roleActionDao, moduleActionService);
     }
 
     @Bean

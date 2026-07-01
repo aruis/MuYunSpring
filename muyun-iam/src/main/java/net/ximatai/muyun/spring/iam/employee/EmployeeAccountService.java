@@ -4,13 +4,9 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,10 +17,8 @@ import java.util.Objects;
 
 @Service
 public class EmployeeAccountService extends TenantStandardBusinessService<EmployeeAccount> implements
-        EnableAbility<EmployeeAccount>,
-        InitialDataAbility<EmployeeAccount> {
+        EnableAbility<EmployeeAccount> {
     public static final String MODULE_ALIAS = "iam.employee_account";
-    public static final String PLATFORM_ADMIN_EMPLOYEE_ACCOUNT_ID = "platform.employee_account.admin";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -49,25 +43,6 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         if (binding.getEnabled() == null) {
             binding.setEnabled(true);
         }
-    }
-
-    @Override
-    public InitialDataOptions initialDataOptions() {
-        return InitialDataOptions.defaults()
-                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
-                .order(60)
-                .tenant(TenantService.PLATFORM_TENANT_ID);
-    }
-
-    @Override
-    public List<EmployeeAccount> initialData() {
-        EmployeeAccount binding = new EmployeeAccount();
-        binding.setId(PLATFORM_ADMIN_EMPLOYEE_ACCOUNT_ID);
-        binding.setEmployeeId(EmployeeService.PLATFORM_ADMIN_EMPLOYEE_ID);
-        binding.setUserId(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID);
-        binding.setPrimaryAccount(Boolean.TRUE);
-        binding.setEnabled(Boolean.TRUE);
-        return List.of(binding);
     }
 
     @Override

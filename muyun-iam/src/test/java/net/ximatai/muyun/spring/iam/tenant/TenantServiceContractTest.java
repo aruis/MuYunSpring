@@ -91,24 +91,12 @@ class TenantServiceContractTest {
     }
 
     @Test
-    void shouldProtectPlatformTenantFromDisableAndDelete() {
+    void shouldNotReservePlatformTenantAlias() {
         TenantService service = new TenantService(mock(TenantDao.class));
 
         try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
-            assertThatThrownBy(() -> service.beforeUpdate(disabledTenant(TenantService.PLATFORM_TENANT_ID, "平台租户")))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("cannot be disabled");
-            Tenant tenantWithoutEnabled = tenant(TenantService.PLATFORM_TENANT_ID, "平台租户");
-            tenantWithoutEnabled.setEnabled(null);
-            assertThatThrownBy(() -> service.beforeUpdate(tenantWithoutEnabled))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("cannot be disabled");
-            assertThatThrownBy(() -> service.beforeDelete(TenantService.PLATFORM_TENANT_ID))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("cannot be deleted");
-
-            service.beforeUpdate(tenant(TenantService.PLATFORM_TENANT_ID, "平台租户"));
-            service.beforeDelete("tenant_a");
+            service.beforeUpdate(disabledTenant("platform", "平台租户"));
+            service.beforeDelete("platform");
         }
     }
 

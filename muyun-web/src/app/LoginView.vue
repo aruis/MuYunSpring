@@ -57,7 +57,7 @@ async function submit() {
         <p v-if="tenantLocked" class="login-context">租户：{{ tenantId }}</p>
         <label v-else>
           <span>租户 ID</span>
-          <input v-model="tenantId" autocomplete="organization" required />
+          <input v-model="tenantId" autocomplete="organization" placeholder="留空进入系统工作区" />
         </label>
         <label>
           <span>用户名</span>

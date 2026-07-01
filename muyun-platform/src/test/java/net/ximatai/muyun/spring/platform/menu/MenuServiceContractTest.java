@@ -498,22 +498,20 @@ class MenuServiceContractTest {
     }
 
     @Test
-    void shouldAllowPlatformSuperAdminTransitionUserToUseSystemMenuScheme() {
-        MenuSchemeService privilegedSchemeService = new MenuSchemeService(schemeDao, Optional.empty(),
-                user -> "platform.user.super_admin".equals(user.userId()));
-        MenuService scopedMenuService = new MenuService(menuDao, privilegedSchemeService, moduleService,
+    void shouldAllowSystemUserToUseSystemMenuScheme() {
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService,
                 Optional.of((moduleAlias, currentUser) -> true));
         String systemMenuId;
         try (TenantContext.Scope ignored = TenantContext.system("test system menu scheme")) {
-            String systemSchemeId = privilegedSchemeService.insert(scheme(
+            String systemSchemeId = schemeService.insert(scheme(
                     "platform_admin", MenuScopeType.SYSTEM, MenuSchemeService.SYSTEM_SCOPE_ID));
             systemMenuId = scopedMenuService.insert(moduleMenu(
                     systemSchemeId, "平台客户", TreeAbility.ROOT_ID, "crm.customer"));
         }
 
-        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+        try (TenantContext.Scope ignored = TenantContext.system("test system user menu");
              CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
-                     CurrentUser.tenantUser("platform.user.super_admin", "admin", "platform"))) {
+                     CurrentUser.systemUser("platform.user.super_admin", "admin"))) {
             assertThat(scopedMenuService.currentUserVisibleRootMenus())
                     .extracting(Menu::getId)
                     .containsExactly(systemMenuId);

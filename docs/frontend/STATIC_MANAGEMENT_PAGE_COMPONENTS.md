@@ -182,7 +182,7 @@ RecordDetailPanel
 | 页面     | Explorer 组合                                                                                 | 状态口径                                                                                                         |
 | -------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | 应用管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer -> RecordDetailPanel` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，详情区复用标准详情外壳。                                        |
-| 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer -> RecordDetailPanel` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，页面保留平台租户保护规则，详情区复用标准详情外壳。              |
+| 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer -> RecordDetailPanel` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，不内置特殊租户保护规则，详情区复用标准详情外壳。                |
 | 组织管理 | `StaticManagementLayout -> TreeRecordExplorer -> RecordDetailPanel`                           | 页面直接依赖树能力，避免在主业务页套业务语义树封装，详情区复用标准详情外壳。                                     |
 | 部门管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> TreeRecordExplorer`    | 左侧机构树只作为 scope 选择，不承载机构管理动作；部门树按机构 scope 加载和维护。                                 |
 | 岗位管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer`    | 分类树和岗位列表由页面统一编排，岗位列表加载依赖选中分类。                                                       |
