@@ -87,13 +87,31 @@ test('tree explorer state does not reopen category editor after delete or scope 
   );
 });
 
-test('menu scheme editor uses platform editor session cancel semantics', () => {
+test('composite management editors use platform editor session cancel semantics', () => {
   const indexSource = readSource('src/platform-components/index.ts');
   const menuStateSource = readSource('src/views/menuManagementState.ts');
+  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
+  const positionStateSource = readSource('src/views/positionManagementState.ts');
+  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
 
   assert.match(indexSource, /createRecordEditorSessionState/);
   assert.match(menuStateSource, /createRecordEditorSessionState<MenuScheme, MenuSchemeMode>/);
+  assert.match(menuStateSource, /createRecordEditorSessionState<MenuRecord, MenuNodeMode>/);
+  assert.match(departmentStateSource, /createRecordEditorSessionState<Department, DepartmentMode>/);
+  assert.match(positionStateSource, /createRecordEditorSessionState<PositionCategory, CategoryCardMode>/);
+  assert.match(positionStateSource, /createRecordEditorSessionState<Position, PositionCardMode>/);
+  assert.match(
+    dictionaryStateSource,
+    /createRecordEditorSessionState<DictionaryCategory, DictionaryCategoryMode>/,
+  );
+  assert.match(dictionaryStateSource, /createRecordEditorSessionState<DictionaryItem, DictionaryItemMode>/);
   assert.match(menuStateSource, /function cancelSchemeEdit\(\)[\s\S]*schemeEditor\.cancel\(\)/);
+  assert.match(menuStateSource, /function cancelMenuEdit\(\)[\s\S]*menuEditor\.cancel\(\)/);
+  assert.match(departmentStateSource, /function cancelEdit\(\)[\s\S]*departmentEditor\.cancel\(\)/);
+  assert.match(positionStateSource, /function cancelCategoryEdit\(\)[\s\S]*categoryEditor\.cancel\(\)/);
+  assert.match(positionStateSource, /function cancelPositionEdit\(\)[\s\S]*positionEditor\.cancel\(\)/);
+  assert.match(dictionaryStateSource, /function cancelCategoryEdit\(\)[\s\S]*categoryEditor\.cancel\(\)/);
+  assert.match(dictionaryStateSource, /function cancelItemEdit\(\)[\s\S]*itemEditor\.cancel\(\)/);
   assert.doesNotMatch(
     menuStateSource,
     /function cancelSchemeEdit\(\)[\s\S]*schemeMode\.value = selectedScheme\.value \? 'view' : 'create'/,

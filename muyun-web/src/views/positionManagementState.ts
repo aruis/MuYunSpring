@@ -2,7 +2,11 @@ import { computed, ref } from 'vue';
 import type { Position, PositionCategory, WebQueryCondition } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import {
+  createRecordEditorSessionState,
+  presentPlatformError,
+  presentPlatformMessage,
+} from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
 export type CategoryCardMode = 'view' | 'edit' | 'create-root' | 'create-child';
@@ -16,21 +20,35 @@ export function createPositionManagementState(
   const categoryReloadKey = ref(0);
   const positionReloadKey = ref(0);
   const categories = ref<PositionCategory[]>([]);
-  const selectedCategory = ref<PositionCategory>();
-  const categoryDraft = ref<PositionCategory>(emptyCategoryDraft());
-  const categoryMode = ref<CategoryCardMode>('view');
+  const categoryEditor = createRecordEditorSessionState<PositionCategory, CategoryCardMode>({
+    viewMode: 'view',
+    createMode: 'create-root',
+    editMode: 'edit',
+    emptyDraft: () => emptyCategoryDraft(),
+    copyRecord: copyCategory,
+  });
+  const selectedCategory = categoryEditor.selected;
+  const categoryDraft = categoryEditor.draft;
+  const categoryMode = categoryEditor.mode;
   const categorySaving = ref(false);
   const categoryError = ref<string>();
+  const selectedCategoryId = computed(() => selectedCategory.value?.id);
 
   const positions = ref<Position[]>([]);
-  const selectedPosition = ref<Position>();
-  const positionDraft = ref<Position>(emptyPositionDraft(''));
-  const positionMode = ref<PositionCardMode>('view');
+  const positionEditor = createRecordEditorSessionState<Position, PositionCardMode>({
+    viewMode: 'view',
+    createMode: 'create',
+    editMode: 'edit',
+    emptyDraft: () => emptyPositionDraft(selectedCategoryId.value ?? ''),
+    copyRecord: copyPosition,
+  });
+  const selectedPosition = positionEditor.selected;
+  const positionDraft = positionEditor.draft;
+  const positionMode = positionEditor.mode;
   const positionLoading = ref(false);
   const positionSaving = ref(false);
   const positionError = ref<string>();
 
-  const selectedCategoryId = computed(() => selectedCategory.value?.id);
   const selectedCategoryTitle = computed(() => positionCategoryTitleOf(selectedCategory.value));
   const filteredPositions = computed(() =>
     positions.value.filter((record) => positionMatchesCategory(record, selectedCategoryId.value)),
@@ -54,8 +72,8 @@ export function createPositionManagementState(
     }
     return categoryContext.can(positionToggleActionCode(selectedPosition.value)) === true;
   });
-  const positionReadonly = computed(() => positionMode.value === 'view');
-  const categoryReadonly = computed(() => categoryMode.value === 'view');
+  const positionReadonly = positionEditor.readonly;
+  const categoryReadonly = categoryEditor.readonly;
   const positionCardTitle = computed(() =>
     positionMode.value === 'create' ? '新建岗位' : positionTitleOf(selectedPosition.value),
   );
@@ -71,25 +89,23 @@ export function createPositionManagementState(
 
   function handleCategoriesLoaded(records: PositionCategory[]) {
     categories.value = records;
-    if (!selectedCategory.value?.id || !records.some((item) => item.id === selectedCategory.value?.id)) {
-      selectedCategory.value = records[0];
+    const matched = selectedCategory.value?.id
+      ? records.find((item) => item.id === selectedCategory.value?.id)
+      : undefined;
+    const next = matched ?? records[0];
+    if (next) {
+      categoryEditor.select(next);
     } else {
-      selectedCategory.value = records.find((item) => item.id === selectedCategory.value?.id);
+      categoryEditor.clearSelection();
     }
-    categoryDraft.value = selectedCategory.value
-      ? copyCategory(selectedCategory.value)
-      : emptyCategoryDraft();
     categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
     syncSelectedPosition();
   }
 
   function handleSelectCategory(record: PositionCategory) {
-    selectedCategory.value = record;
-    categoryDraft.value = copyCategory(record);
-    categoryMode.value = 'view';
+    categoryEditor.select(record);
     if (positionMode.value !== 'view') {
-      selectedPosition.value = undefined;
-      positionDraft.value = emptyPositionDraft(record.id ?? '');
+      positionEditor.clearSelection();
       positionMode.value = 'view';
     }
     clearCategoryFeedback();
@@ -129,15 +145,12 @@ export function createPositionManagementState(
       presentCategoryError('当前用户无权编辑岗位分类');
       return;
     }
-    categoryDraft.value = copyCategory(selectedCategory.value);
-    categoryMode.value = 'edit';
+    categoryEditor.startEdit();
     clearCategoryFeedback();
   }
 
   function cancelCategoryEdit() {
-    categoryDraft.value = selectedCategory.value
-      ? copyCategory(selectedCategory.value)
-      : emptyCategoryDraft();
+    categoryEditor.cancel();
     categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
     clearCategoryFeedback();
   }
@@ -165,8 +178,7 @@ export function createPositionManagementState(
           ? await crud.update(validDraft.id, validDraft)
           : await crud.insert(validDraft);
       const saved = result.record;
-      selectedCategory.value = saved;
-      categoryDraft.value = copyCategory(saved);
+      categoryEditor.select(saved);
       categoryMode.value = 'view';
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
@@ -194,8 +206,7 @@ export function createPositionManagementState(
         selectedCategory.value.enabled === false
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
-      selectedCategory.value = await categoryContext.abilities.crud().view(selectedCategory.value.id);
-      categoryDraft.value = copyCategory(selectedCategory.value);
+      categoryEditor.select(await categoryContext.abilities.crud().view(selectedCategory.value.id));
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
@@ -227,8 +238,7 @@ export function createPositionManagementState(
     try {
       await categoryContext.runtime.ready;
       const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
-      selectedCategory.value = undefined;
-      categoryDraft.value = emptyCategoryDraft();
+      categoryEditor.clearSelection();
       categoryMode.value = 'view';
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
@@ -272,18 +282,20 @@ export function createPositionManagementState(
     const matched = selectedPosition.value?.id
       ? rows.find((item) => item.id === selectedPosition.value?.id)
       : undefined;
-    selectedPosition.value = matched ?? rows[0];
+    const next = matched ?? rows[0];
     if (positionMode.value === 'view') {
-      positionDraft.value = selectedPosition.value
-        ? copyPosition(selectedPosition.value)
-        : emptyPositionDraft(selectedCategoryId.value ?? '');
+      if (next) {
+        positionEditor.select(next);
+      } else {
+        positionEditor.clearSelection();
+      }
+      return;
     }
+    selectedPosition.value = next;
   }
 
   function selectPosition(record: Position) {
-    selectedPosition.value = record;
-    positionDraft.value = copyPosition(record);
-    positionMode.value = 'view';
+    positionEditor.select(record);
     clearPositionFeedback();
   }
 
@@ -296,9 +308,7 @@ export function createPositionManagementState(
       presentPositionError('当前用户无权新增岗位');
       return;
     }
-    selectedPosition.value = undefined;
-    positionDraft.value = emptyPositionDraft(selectedCategoryId.value);
-    positionMode.value = 'create';
+    positionEditor.startCreate();
     clearPositionFeedback();
   }
 
@@ -310,16 +320,12 @@ export function createPositionManagementState(
       presentPositionError('当前用户无权编辑岗位');
       return;
     }
-    positionDraft.value = copyPosition(selectedPosition.value);
-    positionMode.value = 'edit';
+    positionEditor.startEdit();
     clearPositionFeedback();
   }
 
   function cancelPositionEdit() {
-    positionDraft.value = selectedPosition.value
-      ? copyPosition(selectedPosition.value)
-      : emptyPositionDraft(selectedCategoryId.value ?? '');
-    positionMode.value = 'view';
+    positionEditor.cancel();
     clearPositionFeedback();
   }
 
@@ -344,12 +350,16 @@ export function createPositionManagementState(
           ? await positionClient.update(validDraft.id, validDraft)
           : await positionClient.insert(validDraft);
       const saved = result.record;
-      selectedPosition.value = saved;
-      positionDraft.value = copyPosition(saved);
+      positionEditor.select(saved);
       positionMode.value = 'view';
       presentPositionSuccess(result.message ?? '操作成功');
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
-        selectedCategory.value = categories.value.find((category) => category.id === saved.categoryId);
+        const savedCategory = categories.value.find((category) => category.id === saved.categoryId);
+        if (savedCategory) {
+          categoryEditor.select(savedCategory);
+        } else {
+          categoryEditor.clearSelection();
+        }
         positions.value = [saved];
       }
       positionReloadKey.value += 1;
@@ -375,8 +385,7 @@ export function createPositionManagementState(
         selectedPosition.value.enabled === false
           ? await positionClient.enable(selectedPosition.value.id)
           : await positionClient.disable(selectedPosition.value.id);
-      selectedPosition.value = await positionClient.view(selectedPosition.value.id);
-      positionDraft.value = copyPosition(selectedPosition.value);
+      positionEditor.select(await positionClient.view(selectedPosition.value.id));
       presentPositionSuccess(result.message ?? '操作成功');
       positionReloadKey.value += 1;
     } catch (cause) {
@@ -407,9 +416,12 @@ export function createPositionManagementState(
     positionSaving.value = true;
     try {
       const result = await positionClient.delete(selectedPosition.value.id);
-      selectedPosition.value = undefined;
-      positionDraft.value = emptyPositionDraft(selectedCategoryId.value ?? '');
-      positionMode.value = selectedCategoryId.value && canCreatePosition.value ? 'create' : 'view';
+      positionEditor.clearSelection();
+      if (selectedCategoryId.value && canCreatePosition.value) {
+        positionEditor.startCreate();
+      } else {
+        positionMode.value = 'view';
+      }
       presentPositionSuccess(result.message ?? '操作成功');
       positionReloadKey.value += 1;
     } catch (cause) {

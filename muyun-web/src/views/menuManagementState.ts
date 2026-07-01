@@ -35,19 +35,26 @@ export function createMenuManagementState(
     copyRecord: copyScheme,
   });
   const selectedScheme = schemeEditor.selected;
-  const selectedMenu = ref<MenuRecord>();
+  const selectedSchemeId = computed(() => selectedScheme.value?.id);
+  const menuEditor = createRecordEditorSessionState<MenuRecord, MenuNodeMode>({
+    viewMode: 'view',
+    createMode: 'create-root',
+    editMode: 'edit',
+    emptyDraft: () => emptyMenuDraft(selectedSchemeId.value),
+    copyRecord: copyMenu,
+  });
+  const selectedMenu = menuEditor.selected;
   const schemeDraft = schemeEditor.draft;
-  const menuDraft = ref<MenuRecord>(emptyMenuDraft());
+  const menuDraft = menuEditor.draft;
   const schemeMode = schemeEditor.mode;
-  const menuMode = ref<MenuNodeMode>('view');
+  const menuMode = menuEditor.mode;
   const savingScheme = ref(false);
   const savingMenu = ref(false);
 
-  const selectedSchemeId = computed(() => selectedScheme.value?.id);
   const selectedSchemeTitle = computed(() => schemeTitleOf(selectedScheme.value));
   const selectedMenuTitle = computed(() => menuTitleOf(selectedMenu.value));
   const schemeReadonly = schemeEditor.readonly;
-  const menuReadonly = computed(() => menuMode.value === 'view');
+  const menuReadonly = menuEditor.readonly;
   const canCreateScheme = computed(() => schemeContext.can('create') === true);
   const canUpdateScheme = computed(
     () => Boolean(selectedScheme.value?.id) && schemeContext.can('update') === true,
@@ -114,21 +121,20 @@ export function createMenuManagementState(
   }
 
   function handleMenusLoaded(records: MenuRecord[]) {
-    if (!selectedMenu.value?.id || !records.some((item) => item.id === selectedMenu.value?.id)) {
-      selectedMenu.value = records[0];
+    const matched = selectedMenu.value?.id
+      ? records.find((item) => item.id === selectedMenu.value?.id)
+      : undefined;
+    const next = matched ?? records[0];
+    if (next) {
+      menuEditor.select(next);
     } else {
-      selectedMenu.value = records.find((item) => item.id === selectedMenu.value?.id);
+      menuEditor.clearSelection();
     }
-    menuDraft.value = selectedMenu.value
-      ? copyMenu(selectedMenu.value)
-      : emptyMenuDraft(selectedSchemeId.value);
     menuMode.value = 'view';
   }
 
   function selectMenu(record: MenuRecord) {
-    selectedMenu.value = record;
-    menuDraft.value = copyMenu(record);
-    menuMode.value = 'view';
+    menuEditor.select(record);
   }
 
   function startCreateScheme() {
@@ -153,9 +159,7 @@ export function createMenuManagementState(
     if (!selectedSchemeId.value || !canCreateMenu.value) {
       return;
     }
-    selectedMenu.value = undefined;
-    menuDraft.value = emptyMenuDraft(selectedSchemeId.value);
-    menuMode.value = 'create-root';
+    menuEditor.startCreate();
   }
 
   function startCreateChildMenu(parent?: MenuRecord) {
@@ -175,15 +179,11 @@ export function createMenuManagementState(
     if (!selectedMenu.value || !canUpdateMenu.value) {
       return;
     }
-    menuDraft.value = copyMenu(selectedMenu.value);
-    menuMode.value = 'edit';
+    menuEditor.startEdit();
   }
 
   function cancelMenuEdit() {
-    menuDraft.value = selectedMenu.value
-      ? copyMenu(selectedMenu.value)
-      : emptyMenuDraft(selectedSchemeId.value);
-    menuMode.value = 'view';
+    menuEditor.cancel();
   }
 
   async function saveScheme() {
@@ -202,8 +202,7 @@ export function createMenuManagementState(
         return saveMode === 'edit' && record.id ? crud.update(record.id, record) : crud.insert(record);
       },
       onSaved: ({ record }) => {
-        selectedScheme.value = record;
-        schemeDraft.value = copyScheme(record);
+        schemeEditor.select(record);
         schemeMode.value = 'view';
         schemeReloadKey.value += 1;
       },
@@ -232,8 +231,7 @@ export function createMenuManagementState(
         return saveMode === 'edit' && record.id ? crud.update(record.id, record) : crud.insert(record);
       },
       onSaved: ({ record }) => {
-        selectedMenu.value = record;
-        menuDraft.value = copyMenu(record);
+        menuEditor.select(record);
         menuMode.value = 'view';
         menuReloadKey.value += 1;
       },
@@ -254,8 +252,7 @@ export function createMenuManagementState(
       },
       onExecuted: async (_, scheme) => {
         const refreshed = await schemeContext.abilities.crud().view(scheme.id!);
-        selectedScheme.value = refreshed;
-        schemeDraft.value = copyScheme(refreshed);
+        schemeEditor.select(refreshed);
         schemeReloadKey.value += 1;
       },
     });
@@ -276,8 +273,7 @@ export function createMenuManagementState(
       },
       onExecuted: async (_, menu) => {
         const refreshed = await menuContext().abilities.crud().view(menu.id);
-        selectedMenu.value = refreshed;
-        menuDraft.value = copyMenu(refreshed);
+        menuEditor.select(refreshed);
         menuReloadKey.value += 1;
       },
     });
@@ -324,8 +320,7 @@ export function createMenuManagementState(
         }),
       execute: (menu) => menuContext().abilities.crud().delete(menu.id),
       onExecuted: () => {
-        selectedMenu.value = undefined;
-        menuDraft.value = emptyMenuDraft(selectedSchemeId.value);
+        menuEditor.clearSelection();
         menuMode.value = 'view';
         menuReloadKey.value += 1;
       },
@@ -333,8 +328,7 @@ export function createMenuManagementState(
   }
 
   function resetMenusForScheme() {
-    selectedMenu.value = undefined;
-    menuDraft.value = emptyMenuDraft(selectedSchemeId.value);
+    menuEditor.clearSelection();
     menuMode.value = 'view';
     menuReloadKey.value += 1;
   }
