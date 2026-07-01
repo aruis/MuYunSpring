@@ -5,6 +5,9 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -17,6 +20,7 @@ import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +33,12 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         EnableAbility<Employee>,
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
+        InitialDataAbility<Employee>,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
+    public static final String PLATFORM_ADMIN_EMPLOYEE_ID = "platform.employee.admin";
+    public static final String PLATFORM_ADMIN_EMPLOYEE_NO = "ADMIN";
+    public static final String PLATFORM_ADMIN_EMPLOYEE_TITLE = "平台管理员";
 
     private final OrganizationService organizationService;
     private final DepartmentService departmentService;
@@ -54,6 +62,27 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         employee.setGender(normalizeBlank(employee.getGender()));
         employee.setMobile(normalizeBlank(employee.getMobile()));
         employee.setEmail(normalizeBlank(employee.getEmail()));
+    }
+
+    @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.defaults()
+                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
+                .order(45)
+                .tenant(TenantService.PLATFORM_TENANT_ID);
+    }
+
+    @Override
+    public List<Employee> initialData() {
+        Employee employee = new Employee();
+        employee.setId(PLATFORM_ADMIN_EMPLOYEE_ID);
+        employee.setOrganizationId(OrganizationService.PLATFORM_ROOT_ORGANIZATION_ID);
+        employee.setDepartmentId(DepartmentService.PLATFORM_ROOT_DEPARTMENT_ID);
+        employee.setEmployeeNo(PLATFORM_ADMIN_EMPLOYEE_NO);
+        employee.setTitle(PLATFORM_ADMIN_EMPLOYEE_TITLE);
+        employee.setEnabled(Boolean.TRUE);
+        employee.setSortOrder(1);
+        return List.of(employee);
     }
 
     @Override

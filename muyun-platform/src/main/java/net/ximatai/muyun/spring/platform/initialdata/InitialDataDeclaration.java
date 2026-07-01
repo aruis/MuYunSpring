@@ -134,8 +134,7 @@ public final class InitialDataDeclaration<T extends EntityContract> {
         Objects.requireNonNull(desired, "desired must not be null");
         String id = requireText(desired.getId(), "initialDataId");
         @SuppressWarnings("unchecked")
-        Class<T> modelClass = (Class<T>) Objects.requireNonNull(service.modelClass(),
-                "service modelClass must not be null");
+        Class<T> modelClass = (Class<T>) (service.modelClass() == null ? desired.getClass() : service.modelClass());
         InitialDataRecord<T> record = InitialDataModelDescriptor.of(modelClass).record(id, policy, desired);
         return of(record, () -> selectExisting(service, id), service::insert, service::update);
     }

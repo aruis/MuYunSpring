@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
@@ -107,6 +108,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setUsername(PLATFORM_SUPER_ADMIN_USERNAME);
         user.setPassword(initialAdminSettings.initialPassword());
         user.setTitle(PLATFORM_SUPER_ADMIN_USER_TITLE);
+        user.setOrganizationId(OrganizationService.PLATFORM_ROOT_ORGANIZATION_ID);
         user.setAuthUserId(user.getId());
         user.setAuthModuleAlias(MODULE_ALIAS);
         user.setEnabled(Boolean.TRUE);

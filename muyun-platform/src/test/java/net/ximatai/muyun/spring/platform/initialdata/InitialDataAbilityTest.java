@@ -284,6 +284,24 @@ class InitialDataAbilityTest {
         assertThat(existing.getOperatorTitle()).isEqualTo("custom-operator");
     }
 
+    @Test
+    void shouldFallbackToDesiredRecordClassWhenServiceModelClassIsUnavailable() {
+        AnnotatedRecord desired = annotatedRecord("demo", "code", "managed", "operator");
+        TestInitialDataService service = new TestInitialDataService(null, List.of(desired)) {
+            @Override
+            public Class<?> modelClass() {
+                return null;
+            }
+        };
+
+        InitialDataExecutionReport report = new InitialDataExecutor(
+                List.<InitialDataAbility<?>>of(service), List.of()).initializeAll();
+
+        assertThat(report.results()).extracting(InitialDataResult::status)
+                .containsExactly(InitialDataStatus.INSERTED);
+        assertThat(service.select("demo").getCode()).isEqualTo("code");
+    }
+
     private InitialDataDeclarationProvider declarationProvider(String name, int order, List<String> executed) {
         return new InitialDataDeclarationProvider() {
             @Override
