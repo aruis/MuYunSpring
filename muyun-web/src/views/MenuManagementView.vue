@@ -141,11 +141,34 @@ const openModeOptions: Option[] = [
   { label: '页签', value: 'tab' },
   { label: '新窗口', value: 'window' },
 ];
+const pageModeOptions: Option[] = [
+  { label: '列表', value: 'LIST' },
+  { label: '表单', value: 'FORM' },
+  { label: '详情', value: 'DETAIL' },
+];
 const menuParentPickerContext = computed(() => menuContext.value);
 const menuParentPickerConstraints = computed(() => parentRecordConstraints(menuDraft.value.id));
 const menuFormDisabled = computed(() => menuReadonly.value || savingMenu.value);
 const schemeIdentityReadonly = computed(() => schemeMode.value !== 'create' || savingScheme.value);
+const selectedModuleEntry = ref<PlatformModule>();
 const hasModuleEntry = computed(() => Boolean(menuDraft.value.moduleAlias));
+const moduleEntryType = computed(() => {
+  if (!menuDraft.value.moduleAlias) {
+    return undefined;
+  }
+  const selectedAlias = selectedModuleEntry.value?.alias ?? selectedModuleEntry.value?.id;
+  if (selectedAlias === menuDraft.value.moduleAlias) {
+    return selectedModuleEntry.value?.entryType ?? 'module';
+  }
+  if (menuDraft.value.externalUrl) {
+    return 'link';
+  }
+  if (menuDraft.value.route) {
+    return 'route';
+  }
+  return 'module';
+});
+const isDynamicModuleEntry = computed(() => moduleEntryType.value === 'module');
 const schemeEditorVisible = computed(() => schemeMode.value !== 'view');
 
 function schemeSubtitle(record: CrudRecordListBase) {
@@ -253,6 +276,10 @@ function handleMenuAction(action: RecordActionItem) {
   if (action.key === 'save') {
     void saveMenu();
   }
+}
+
+function handleModuleEntrySelect(record: PlatformModule | undefined) {
+  selectedModuleEntry.value = record;
 }
 
 function moduleTitle(record: PlatformModule) {
@@ -479,6 +506,7 @@ function menuNodeTitle(menu: MenuRecord) {
               :disabled="menuFormDisabled"
               :title-of="(record) => moduleTitle(record as PlatformModule)"
               :description-of="(record) => moduleDescription(record as PlatformModule)"
+              @select="handleModuleEntrySelect($event as PlatformModule | undefined)"
             />
           </label>
           <label v-if="hasModuleEntry">
@@ -489,6 +517,23 @@ function menuNodeTitle(menu: MenuRecord) {
               :disabled="menuFormDisabled"
               :allow-clear="false"
             />
+          </label>
+          <label v-if="isDynamicModuleEntry">
+            <span>页面模式</span>
+            <UiSelect
+              v-model:value="menuDraft.pageMode"
+              :options="pageModeOptions"
+              placeholder="默认列表"
+              :disabled="menuFormDisabled"
+            />
+          </label>
+          <label v-if="isDynamicModuleEntry">
+            <span>默认 UI 配置</span>
+            <UiInput v-model:value="menuDraft.defaultUiConfigId" :disabled="menuFormDisabled" />
+          </label>
+          <label v-if="isDynamicModuleEntry">
+            <span>默认查询模板</span>
+            <UiInput v-model:value="menuDraft.defaultQueryTemplateId" :disabled="menuFormDisabled" />
           </label>
           <label v-if="hasModuleEntry" class="full-row">
             <span>入口参数 JSON</span>

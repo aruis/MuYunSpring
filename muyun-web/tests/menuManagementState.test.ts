@@ -78,6 +78,9 @@ test('menu management keeps entry fields only when module alias is bound', () =>
   assert.equal(moduleMenu.route, undefined);
   assert.equal(moduleMenu.externalUrl, undefined);
   assert.equal(moduleMenu.openMode, 'tab');
+  assert.equal(moduleMenu.pageMode, 'LIST');
+  assert.equal(moduleMenu.defaultUiConfigId, 'ui-1');
+  assert.equal(moduleMenu.defaultQueryTemplateId, 'query-1');
   assert.equal(routeMenu.moduleAlias, 'platform.menu_scheme');
   assert.equal(routeMenu.route, undefined);
   assert.equal(linkMenu.moduleAlias, 'platform.docs');
