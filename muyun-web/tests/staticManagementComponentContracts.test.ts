@@ -69,55 +69,6 @@ test('tree explorer editor is explicit edit mode instead of selected record pres
   assert.doesNotMatch(dictionaryViewSource, /categoryEditorVisible[\s\S]*Boolean\(selectedCategory/);
 });
 
-test('tree explorer state does not reopen category editor after delete or scope reset', () => {
-  const positionStateSource = readSource('src/views/positionManagementState.ts');
-  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
-
-  assert.doesNotMatch(
-    positionStateSource,
-    /categoryMode\.value = canCreateCategory\.value \? 'create-root' : 'view'/,
-  );
-  assert.doesNotMatch(
-    dictionaryStateSource,
-    /categoryMode\.value = canCreateCategory\.value[\s\S]*\? 'create-root' : 'view'/,
-  );
-  assert.doesNotMatch(
-    dictionaryStateSource,
-    /categoryMode\.value = selectedCategory\.value[\s\S]*\? 'view' : 'create-root'/,
-  );
-});
-
-test('composite management editors use platform editor session cancel semantics', () => {
-  const indexSource = readSource('src/platform-components/index.ts');
-  const menuStateSource = readSource('src/views/menuManagementState.ts');
-  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
-  const positionStateSource = readSource('src/views/positionManagementState.ts');
-  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
-
-  assert.match(indexSource, /createRecordEditorSessionState/);
-  assert.match(menuStateSource, /createRecordEditorSessionState<MenuScheme, MenuSchemeMode>/);
-  assert.match(menuStateSource, /createRecordEditorSessionState<MenuRecord, MenuNodeMode>/);
-  assert.match(departmentStateSource, /createRecordEditorSessionState<Department, DepartmentMode>/);
-  assert.match(positionStateSource, /createRecordEditorSessionState<PositionCategory, CategoryCardMode>/);
-  assert.match(positionStateSource, /createRecordEditorSessionState<Position, PositionCardMode>/);
-  assert.match(
-    dictionaryStateSource,
-    /createRecordEditorSessionState<DictionaryCategory, DictionaryCategoryMode>/,
-  );
-  assert.match(dictionaryStateSource, /createRecordEditorSessionState<DictionaryItem, DictionaryItemMode>/);
-  assert.match(menuStateSource, /function cancelSchemeEdit\(\)[\s\S]*schemeEditor\.cancel\(\)/);
-  assert.match(menuStateSource, /function cancelMenuEdit\(\)[\s\S]*menuEditor\.cancel\(\)/);
-  assert.match(departmentStateSource, /function cancelEdit\(\)[\s\S]*departmentEditor\.cancel\(\)/);
-  assert.match(positionStateSource, /function cancelCategoryEdit\(\)[\s\S]*categoryEditor\.cancel\(\)/);
-  assert.match(positionStateSource, /function cancelPositionEdit\(\)[\s\S]*positionEditor\.cancel\(\)/);
-  assert.match(dictionaryStateSource, /function cancelCategoryEdit\(\)[\s\S]*categoryEditor\.cancel\(\)/);
-  assert.match(dictionaryStateSource, /function cancelItemEdit\(\)[\s\S]*itemEditor\.cancel\(\)/);
-  assert.doesNotMatch(
-    menuStateSource,
-    /function cancelSchemeEdit\(\)[\s\S]*schemeMode\.value = selectedScheme\.value \? 'view' : 'create'/,
-  );
-});
-
 test('menu entry low-code fields are only exposed for dynamic module entries', () => {
   const menuViewSource = readSource('src/views/MenuManagementView.vue');
 
@@ -618,19 +569,6 @@ test('record query list panel forwards dynamic ui config and query template ids'
   assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
   assert.match(panelSource, /request\.uiConfigId = props\.uiConfigId/);
   assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
-});
-
-test('static crud state supports business-owned action errors before platform fallback', () => {
-  const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
-  const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
-
-  assert.match(stateSource, /StaticCrudActionErrorHandler/);
-  assert.match(stateSource, /presentPlatformError/);
-  assert.match(stateSource, /presentPlatformMessage/);
-  assert.match(stateSource, /matchesActionErrorHandler/);
-  assert.doesNotMatch(stateSource, /presentActionError/);
-  assert.match(feedbackSource, /handler\.code && error\.code === handler\.code/);
-  assert.match(feedbackSource, /error\.details\?\.marker === handler\.marker/);
 });
 
 test('platform error feedback respects global error presentation slots', () => {

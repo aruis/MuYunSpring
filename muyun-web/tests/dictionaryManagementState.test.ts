@@ -178,6 +178,104 @@ test('dictionary management state creates child dictionary items under selected 
   assert.equal(state.itemDraft.value.parentId, 'item-enabled');
 });
 
+test('dictionary management state cancels item creation back to selected item', () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient(),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+    },
+  ]);
+  state.handleItemsLoaded([
+    {
+      id: 'item-enabled',
+      categoryId: 'category-status',
+      categoryAlias: 'status',
+      code: 'enabled',
+      title: '启用',
+    },
+  ]);
+
+  state.startCreateItem();
+
+  assert.equal(state.itemMode.value, 'create');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.parentId, undefined);
+
+  state.itemDraft.value.title = '临时字典项';
+  state.cancelItemEdit();
+
+  assert.equal(state.itemMode.value, 'view');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.title, '启用');
+
+  state.startCreateChildItem(state.selectedItem.value!);
+
+  assert.equal(state.itemMode.value, 'create');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.parentId, 'item-enabled');
+
+  state.itemDraft.value.title = '临时下级字典项';
+  state.cancelItemEdit();
+
+  assert.equal(state.itemMode.value, 'view');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.title, '启用');
+});
+
+test('dictionary management state keeps delete fallback creation without selecting reload rows', async () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient(),
+    () => createItemClient({ delete: async () => ({ count: 1 }) }),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+    },
+  ]);
+  state.selectItem({
+    id: 'item-deleted',
+    categoryId: 'category-status',
+    categoryAlias: 'status',
+    code: 'deleted',
+    title: '待删除',
+  });
+
+  await state.deleteItem();
+  state.handleItemsLoaded([
+    {
+      id: 'item-enabled',
+      categoryId: 'category-status',
+      categoryAlias: 'status',
+      code: 'enabled',
+      title: '启用',
+    },
+  ]);
+  state.cancelItemEdit();
+
+  assert.equal(state.itemMode.value, 'view');
+  assert.equal(state.selectedItem.value, undefined);
+  assert.equal(state.itemDraft.value.title, '');
+});
+
 test('dictionary management state sends unexpected item save failures to global feedback', async () => {
   const categoryContext = createContext();
   const itemClient = createItemClient({
@@ -387,6 +485,11 @@ test('dictionary management state creates categories inside current application 
 
   applicationAlias = 'sales';
   state.resetForApplication();
+
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.deepEqual(state.categories.value, []);
+
   state.startCreateRootCategory();
 
   assert.equal(state.categoryDraft.value.applicationAlias, 'sales');
@@ -433,6 +536,12 @@ test('dictionary management state cancels category creation back to selected cat
   ]);
 
   state.startCreateRootCategory();
+
+  assert.equal(state.categoryMode.value, 'create-root');
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryDraft.value.parentId, undefined);
+  assert.equal(state.categoryDraft.value.applicationAlias, 'platform');
+
   state.categoryDraft.value.title = '临时根类目';
   state.cancelCategoryEdit();
 
@@ -441,12 +550,83 @@ test('dictionary management state cancels category creation back to selected cat
   assert.equal(state.categoryDraft.value.title, '状态字典');
 
   state.startCreateChildCategory();
+
+  assert.equal(state.categoryMode.value, 'create-child');
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryDraft.value.parentId, 'category-status');
+  assert.equal(state.categoryDraft.value.applicationAlias, 'platform');
+
   state.categoryDraft.value.title = '临时子类目';
   state.cancelCategoryEdit();
 
   assert.equal(state.selectedCategory.value?.id, 'category-status');
   assert.equal(state.categoryMode.value, 'view');
   assert.equal(state.categoryDraft.value.title, '状态字典');
+});
+
+test('dictionary management state keeps category create draft when categories reload', () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient(),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+      enabled: true,
+    },
+  ]);
+
+  state.startCreateRootCategory();
+  state.categoryDraft.value.title = '未保存类目';
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '刷新后的状态字典',
+      enabled: true,
+    },
+  ]);
+
+  assert.equal(state.categoryMode.value, 'create-root');
+  assert.equal(state.selectedCategory.value?.title, '刷新后的状态字典');
+  assert.equal(state.categoryDraft.value.title, '未保存类目');
+});
+
+test('dictionary management state keeps category editor closed after deleting category', async () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient({ delete: async () => ({ count: 1 }) }),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+      enabled: true,
+    },
+  ]);
+  await state.deleteCategory();
+
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.equal(state.categoryMode.value, 'view');
+  assert.deepEqual(state.items.value, []);
+  assert.equal(state.itemMode.value, 'view');
 });
 
 function createContext(can: (actionCode: string) => boolean = () => true): ModuleContext<DictionaryCategory> {
