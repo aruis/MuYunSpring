@@ -69,24 +69,6 @@ test('tree explorer editor is explicit edit mode instead of selected record pres
   assert.doesNotMatch(dictionaryViewSource, /categoryEditorVisible[\s\S]*Boolean\(selectedCategory/);
 });
 
-test('tree explorer state does not reopen category editor after delete or scope reset', () => {
-  const positionStateSource = readSource('src/views/positionManagementState.ts');
-  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
-
-  assert.doesNotMatch(
-    positionStateSource,
-    /categoryMode\.value = canCreateCategory\.value \? 'create-root' : 'view'/,
-  );
-  assert.doesNotMatch(
-    dictionaryStateSource,
-    /categoryMode\.value = canCreateCategory\.value[\s\S]*\? 'create-root' : 'view'/,
-  );
-  assert.doesNotMatch(
-    dictionaryStateSource,
-    /categoryMode\.value = selectedCategory\.value[\s\S]*\? 'view' : 'create-root'/,
-  );
-});
-
 test('menu entry low-code fields are only exposed for dynamic module entries', () => {
   const menuViewSource = readSource('src/views/MenuManagementView.vue');
 

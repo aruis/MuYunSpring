@@ -485,6 +485,11 @@ test('dictionary management state creates categories inside current application 
 
   applicationAlias = 'sales';
   state.resetForApplication();
+
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.deepEqual(state.categories.value, []);
+
   state.startCreateRootCategory();
 
   assert.equal(state.categoryDraft.value.applicationAlias, 'sales');
@@ -595,6 +600,33 @@ test('dictionary management state keeps category create draft when categories re
   assert.equal(state.categoryMode.value, 'create-root');
   assert.equal(state.selectedCategory.value?.title, '刷新后的状态字典');
   assert.equal(state.categoryDraft.value.title, '未保存类目');
+});
+
+test('dictionary management state keeps category editor closed after deleting category', async () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient({ delete: async () => ({ count: 1 }) }),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+      enabled: true,
+    },
+  ]);
+  await state.deleteCategory();
+
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.equal(state.categoryMode.value, 'view');
+  assert.deepEqual(state.items.value, []);
+  assert.equal(state.itemMode.value, 'view');
 });
 
 function createContext(can: (actionCode: string) => boolean = () => true): ModuleContext<DictionaryCategory> {

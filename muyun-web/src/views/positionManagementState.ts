@@ -104,7 +104,7 @@ export function createPositionManagementState(
     } else {
       categoryEditor.clearSelection();
     }
-    categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
+    categoryMode.value = 'view';
     syncSelectedPosition();
   }
 
@@ -160,7 +160,7 @@ export function createPositionManagementState(
 
   function cancelCategoryEdit() {
     categoryEditor.cancel();
-    categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
+    categoryMode.value = 'view';
     clearCategoryFeedback();
   }
 

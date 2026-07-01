@@ -287,6 +287,11 @@ test('position management state keeps category editor closed after deleting cate
 
   assert.equal(state.selectedCategory.value, undefined);
   assert.equal(state.categoryMode.value, 'view');
+
+  state.handleCategoriesLoaded([]);
+
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.equal(state.categoryMode.value, 'view');
 });
 
 test('position management state cancels creating a position back to empty view', () => {
