@@ -1,12 +1,5 @@
 import { computed, ref } from 'vue';
-import type {
-  CurrentUser,
-  MenuNodeType,
-  MenuOpenMode,
-  MenuPageMode,
-  MenuRecord,
-  MenuScheme,
-} from '@muyun/web-contracts';
+import type { CurrentUser, MenuOpenMode, MenuPageMode, MenuRecord, MenuScheme } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platform-components';
@@ -444,7 +437,6 @@ export function emptyMenuDraft(schemeId?: string): MenuRecord {
     id: '',
     schemeId: schemeId ?? '',
     title: '',
-    nodeType: 'group',
     openMode: undefined,
     enabled: true,
   };
@@ -475,22 +467,21 @@ export function normalizeSchemeDraft(
 }
 
 export function normalizeMenuDraft(record: MenuRecord, schemeId: string | undefined): MenuRecord {
-  const nodeType = normalizeNodeType(record.nodeType);
+  const moduleAlias = normalizeBlank(record.moduleAlias);
   const normalized: MenuRecord = {
     ...record,
     id: record.id?.trim(),
     schemeId: record.schemeId || schemeId || '',
     parentId: normalizeBlank(record.parentId),
     title: record.title?.trim() ?? '',
-    nodeType,
-    openMode: nodeType === 'group' ? undefined : normalizeOpenMode(record.openMode),
-    moduleAlias: nodeType === 'group' ? undefined : normalizeBlank(record.moduleAlias),
+    openMode: moduleAlias ? normalizeOpenMode(record.openMode) : undefined,
+    moduleAlias,
     route: undefined,
     externalUrl: undefined,
-    pageMode: nodeType === 'entry' ? normalizePageMode(record.pageMode) : undefined,
-    defaultUiConfigId: nodeType === 'entry' ? normalizeBlank(record.defaultUiConfigId) : undefined,
-    defaultQueryTemplateId: nodeType === 'entry' ? normalizeBlank(record.defaultQueryTemplateId) : undefined,
-    entryParamsJson: nodeType === 'entry' ? normalizeBlank(record.entryParamsJson) : undefined,
+    pageMode: moduleAlias ? normalizePageMode(record.pageMode) : undefined,
+    defaultUiConfigId: moduleAlias ? normalizeBlank(record.defaultUiConfigId) : undefined,
+    defaultQueryTemplateId: moduleAlias ? normalizeBlank(record.defaultQueryTemplateId) : undefined,
+    entryParamsJson: moduleAlias ? normalizeBlank(record.entryParamsJson) : undefined,
   };
   return normalized;
 }
@@ -500,27 +491,17 @@ export function isValidScheme(record: MenuScheme) {
 }
 
 export function validateMenu(record: MenuRecord) {
-  if (!record.schemeId || !record.title || !record.nodeType) {
-    return '所属方案、菜单名称和节点类型不能为空';
+  if (!record.schemeId || !record.title) {
+    return '所属方案和菜单名称不能为空';
   }
-  if (record.nodeType === 'entry' && !record.openMode) {
+  if (record.moduleAlias && !record.openMode) {
     return '入口菜单必须选择打开方式';
-  }
-  if (record.nodeType === 'entry' && !record.moduleAlias) {
-    return '入口菜单必须选择模块入口';
   }
   return undefined;
 }
 
 function normalizeScopeType(value: MenuScheme['scopeType']) {
   return value === 'system' || value === 'organization' ? value : 'tenant';
-}
-
-function normalizeNodeType(value: MenuNodeType | undefined): MenuNodeType {
-  if (value === 'entry') {
-    return value;
-  }
-  return 'group';
 }
 
 function normalizeOpenMode(value: MenuOpenMode | undefined): MenuOpenMode {

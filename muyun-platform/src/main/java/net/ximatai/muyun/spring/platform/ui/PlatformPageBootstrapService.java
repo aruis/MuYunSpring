@@ -9,7 +9,6 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionRefreshStrategy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
@@ -151,7 +150,8 @@ public class PlatformPageBootstrapService {
     }
 
     private boolean isModuleEntryMenu(Menu menu) {
-        return menu.getNodeType() == MenuNodeType.ENTRY
+        return menu.getModuleAlias() != null
+                && !menu.getModuleAlias().isBlank()
                 && (menu.getRoute() == null || menu.getRoute().isBlank())
                 && (menu.getExternalUrl() == null || menu.getExternalUrl().isBlank());
     }

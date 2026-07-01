@@ -211,10 +211,10 @@ class PlatformModelSchemaTest {
                 .contains("id", "tenant_id", "alias", "scope_type", "scope_id", "title", "enabled", "sort_order")
                 .doesNotContain("parent_id", "application_alias");
         assertThat(columnNames(mapper.toTable(Menu.class)))
-                .contains("id", "tenant_id", "scheme_id", "parent_id", "node_type", "module_alias",
+                .contains("id", "tenant_id", "scheme_id", "parent_id", "module_alias",
                         "open_mode", "route", "external_url", "page_mode", "default_ui_config_id", "default_query_template_id",
                         "entry_params_json", "title", "enabled", "sort_order")
-                .doesNotContain("application_alias");
+                .doesNotContain("application_alias", "node_type");
     }
 
     @Test
@@ -444,7 +444,6 @@ class PlatformModelSchemaTest {
         assertThat(columnDefault(mapper.toTable(PlatformModuleAction.class), "access_mode")).isEqualTo("'AUTH_REQUIRED'");
         assertThat(columnDefault(mapper.toTable(PlatformModuleAction.class), "action_auth")).isEqualTo("TRUE");
         assertThat(columnDefault(mapper.toTable(PlatformModuleAction.class), "data_auth")).isEqualTo("FALSE");
-        assertThat(columnDefault(mapper.toTable(Menu.class), "node_type")).isEqualTo("'group'");
         assertThat(columnDefault(mapper.toTable(ModuleMetadataRelation.class), "relation_role")).isEqualTo("'main'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "cardinality")).isEqualTo("'ONE'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldConfig.class), "queryable")).isNull();

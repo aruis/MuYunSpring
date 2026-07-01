@@ -195,11 +195,6 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.insert(moduleMenu(firstSchemeId, "不存在模块", TreeAbility.ROOT_ID, "crm.unknown")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("existing module");
-            Menu invalidGroup = groupMenu(firstSchemeId, "错误分组", TreeAbility.ROOT_ID);
-            invalidGroup.setModuleAlias("crm.customer");
-            assertThatThrownBy(() -> menuService.insert(invalidGroup))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("GROUP");
             Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithRoute.setRoute("/customer");
             String moduleWithRouteId = menuService.insert(moduleWithRoute);
@@ -208,12 +203,12 @@ class MenuServiceContractTest {
             groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
             assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("GROUP menu cannot have openMode");
+                    .hasMessageContaining("Container menu cannot have openMode");
             Menu moduleWithoutOpenMode = moduleMenu(firstSchemeId, "错误模块打开方式", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithoutOpenMode.setOpenMode(null);
             assertThatThrownBy(() -> menuService.insert(moduleWithoutOpenMode))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("ENTRY menu requires openMode");
+                    .hasMessageContaining("Module entry menu requires openMode");
         }
     }
 
@@ -352,7 +347,6 @@ class MenuServiceContractTest {
                     schemeId, "客户", TreeAbility.ROOT_ID, "crm.route_customer"));
 
             assertThat(menuService.select(menuId)).satisfies(menu -> {
-                assertThat(menu.getNodeType()).isEqualTo(MenuNodeType.ENTRY);
                 assertThat(menu.getRoute()).isEqualTo("/crm/customers");
                 assertThat(menu.getModuleAlias()).isEqualTo("crm.route_customer");
                 assertThat(menu.getPageMode()).isNull();
@@ -580,7 +574,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setNodeType(MenuNodeType.GROUP);
         return menu;
     }
 
@@ -589,7 +582,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -600,7 +592,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -611,7 +602,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;

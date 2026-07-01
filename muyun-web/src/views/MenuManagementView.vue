@@ -137,10 +137,6 @@ const scopeTypeOptions: Option[] = [
   { label: '租户', value: 'tenant' },
   { label: '机构', value: 'organization' },
 ];
-const nodeTypeOptions: Option[] = [
-  { label: '分组', value: 'group' },
-  { label: '入口', value: 'entry' },
-];
 const openModeOptions: Option[] = [
   { label: '页签', value: 'tab' },
   { label: '新窗口', value: 'window' },
@@ -149,7 +145,7 @@ const menuParentPickerContext = computed(() => menuContext.value);
 const menuParentPickerConstraints = computed(() => parentRecordConstraints(menuDraft.value.id));
 const menuFormDisabled = computed(() => menuReadonly.value || savingMenu.value);
 const schemeIdentityReadonly = computed(() => schemeMode.value !== 'create' || savingScheme.value);
-const nodeType = computed(() => menuDraft.value.nodeType ?? 'group');
+const hasModuleEntry = computed(() => Boolean(menuDraft.value.moduleAlias));
 const schemeEditorVisible = computed(() => schemeMode.value !== 'view');
 
 function schemeSubtitle(record: CrudRecordListBase) {
@@ -272,7 +268,7 @@ function scopeTypeTitle(value: MenuScheme['scopeType']) {
 }
 
 function menuNodeTitle(menu: MenuRecord) {
-  if (menu.nodeType !== 'entry') {
+  if (!menu.moduleAlias) {
     return '分组';
   }
   if (menu.externalUrl) {
@@ -474,24 +470,6 @@ function menuNodeTitle(menu: MenuRecord) {
             />
           </label>
           <label>
-            <span>节点类型</span>
-            <UiSelect
-              v-model:value="menuDraft.nodeType"
-              :options="nodeTypeOptions"
-              :disabled="menuFormDisabled"
-              :allow-clear="false"
-            />
-          </label>
-          <label v-if="nodeType === 'entry'">
-            <span>打开方式</span>
-            <UiSelect
-              v-model:value="menuDraft.openMode"
-              :options="openModeOptions"
-              :disabled="menuFormDisabled"
-              :allow-clear="false"
-            />
-          </label>
-          <label v-if="nodeType === 'entry'">
             <span>模块入口</span>
             <RecordPicker
               v-model:value="menuDraft.moduleAlias"
@@ -503,7 +481,16 @@ function menuNodeTitle(menu: MenuRecord) {
               :description-of="(record) => moduleDescription(record as PlatformModule)"
             />
           </label>
-          <label v-if="nodeType === 'entry'" class="full-row">
+          <label v-if="hasModuleEntry">
+            <span>打开方式</span>
+            <UiSelect
+              v-model:value="menuDraft.openMode"
+              :options="openModeOptions"
+              :disabled="menuFormDisabled"
+              :allow-clear="false"
+            />
+          </label>
+          <label v-if="hasModuleEntry" class="full-row">
             <span>入口参数 JSON</span>
             <UiInput v-model:value="menuDraft.entryParamsJson" :disabled="menuFormDisabled" />
           </label>

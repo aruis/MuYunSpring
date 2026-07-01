@@ -103,7 +103,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, Menu.class, java.util.List.of("id", "schemeId", "parentId", "title", "nodeType", "moduleAlias", "route", "externalUrl", "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, Menu.class, java.util.List.of("id", "schemeId", "parentId", "title", "moduleAlias", "route", "externalUrl", "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
@@ -139,7 +139,6 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         menu.setId(id);
         menu.setSchemeId(MenuSchemeService.ADMIN_SCHEME_ID);
         menu.setParentId(parentId);
-        menu.setNodeType(MenuNodeType.GROUP);
         menu.setTitle(title);
         menu.setEnabled(Boolean.TRUE);
         menu.setSortOrder(sortOrder);
@@ -229,15 +228,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         if (!visiting.add(menu.getId())) {
             return false;
         }
-        MenuNodeType type = menu.getNodeType() == null ? MenuNodeType.GROUP : menu.getNodeType();
         try {
             if (isModuleEntryMenu(menu)) {
                 return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
             }
-            if (type == MenuNodeType.GROUP) {
-                return !visibleChildren(schemeId, menu.getId(), visiting).isEmpty();
-            }
-            return true;
+            return !visibleChildren(schemeId, menu.getId(), visiting).isEmpty();
         } finally {
             visiting.remove(menu.getId());
         }
@@ -275,15 +270,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private boolean isModuleEntryMenu(Menu menu) {
-        return menu.getNodeType() == MenuNodeType.ENTRY && hasText(menu.getModuleAlias());
+        return hasText(menu.getModuleAlias());
     }
 
     private void normalizeAndValidate(Menu menu) {
         MenuScheme scheme = requireScheme(menu.getSchemeId());
         menu.setTenantId(scheme.getTenantId());
-        if (menu.getNodeType() == null) {
-            menu.setNodeType(MenuNodeType.GROUP);
-        }
         normalizeTarget(menu);
         validateParentScheme(menu);
     }
@@ -300,31 +292,28 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private void normalizeTarget(Menu menu) {
-        switch (menu.getNodeType()) {
-            case GROUP -> {
-                requireNoOpenMode(menu);
-                requireBlank(menu.getModuleAlias(), "GROUP menu cannot have moduleAlias");
-                requireBlank(menu.getRoute(), "GROUP menu cannot have route");
-                requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
-                requireBlankEntry(menu, "GROUP menu cannot have low-code entry config");
-            }
-            case ENTRY -> {
-                requireOpenMode(menu);
-                PlatformModule module = requireModuleEntry(menu);
-                syncModuleEntry(menu, module);
-            }
+        if (!hasText(menu.getModuleAlias())) {
+            menu.setModuleAlias(null);
+            requireNoOpenMode(menu);
+            requireBlank(menu.getRoute(), "Container menu cannot have route");
+            requireBlank(menu.getExternalUrl(), "Container menu cannot have externalUrl");
+            requireBlankEntry(menu, "Container menu cannot have low-code entry config");
+            return;
         }
+        requireOpenMode(menu);
+        PlatformModule module = requireModuleEntry(menu);
+        syncModuleEntry(menu, module);
     }
 
     private void requireOpenMode(Menu menu) {
         if (menu.getOpenMode() == null) {
-            throw new PlatformException(menu.getNodeType() + " menu requires openMode");
+            throw new PlatformException("Module entry menu requires openMode");
         }
     }
 
     private void requireNoOpenMode(Menu menu) {
         if (menu.getOpenMode() != null) {
-            throw new PlatformException("GROUP menu cannot have openMode");
+            throw new PlatformException("Container menu cannot have openMode");
         }
     }
 
@@ -337,11 +326,10 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private PlatformModule requireModuleEntry(Menu menu) {
-        requireText(menu.getModuleAlias(), menu.getNodeType() + " menu requires moduleAlias");
         String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
         if (module == null) {
-            throw new PlatformException(menu.getNodeType() + " menu requires existing module: " + moduleAlias);
+            throw new PlatformException("Module entry menu requires existing module: " + moduleAlias);
         }
         menu.setModuleAlias(moduleAlias);
         return module;
@@ -349,7 +337,6 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private void syncModuleEntry(Menu menu, PlatformModule module) {
         ModuleEntryType entryType = module.getEntryType() == null ? ModuleEntryType.MODULE : module.getEntryType();
-        menu.setNodeType(MenuNodeType.ENTRY);
         switch (entryType) {
             case MODULE -> {
                 menu.setRoute(null);
@@ -425,12 +412,6 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     private void validateParentScheme(Menu menu) {
         validateTreePlacementInScope(menu, schemeScope(menu.getSchemeId()),
                 "Menu parent must belong to the same scheme");
-    }
-
-    private void requireText(String value, String message) {
-        if (value == null || value.isBlank()) {
-            throw new PlatformException(message);
-        }
     }
 
     private void requireBlank(String value, String message) {

@@ -13,9 +13,7 @@ test('scoped resource tree context targets nested menu resource paths', async ()
 
   await scoped.abilities.tree().tree();
   await scoped.abilities.tree().treeFlat({ rootId: 'menu/1', includeSelf: false });
-  await scoped.abilities
-    .crud()
-    .insert({ id: 'menu-1', schemeId: 'scheme-1', title: '菜单', nodeType: 'group' });
+  await scoped.abilities.crud().insert({ id: 'menu-1', schemeId: 'scheme-1', title: '菜单' });
 
   assert.deepEqual(context.requests, [
     { path: '/platform.menu-scheme/platform.menu_scheme.admin/menus/tree' },
@@ -26,7 +24,7 @@ test('scoped resource tree context targets nested menu resource paths', async ()
     {
       method: 'POST',
       path: '/platform.menu-scheme/platform.menu_scheme.admin/menus/insert',
-      body: { id: 'menu-1', schemeId: 'scheme-1', title: '菜单', nodeType: 'group' },
+      body: { id: 'menu-1', schemeId: 'scheme-1', title: '菜单' },
     },
   ]);
 });
@@ -47,7 +45,7 @@ function createFakeModuleContext() {
   const crud = {
     querySchema: async () => ({ fields: [] }),
     query: async () => ({ records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0, totalKnown: true }),
-    view: async (id: string) => ({ id, schemeId: 'scheme-1', title: id, nodeType: 'group' }),
+    view: async (id: string) => ({ id, schemeId: 'scheme-1', title: id }),
     insert: async (record: MenuRecord) => ({ record }),
     update: async (_id: string, record: MenuRecord) => ({ record }),
     delete: async () => ({ count: 1 }),

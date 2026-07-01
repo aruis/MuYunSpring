@@ -177,11 +177,10 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | `schemeId`    | 所属菜单方案                          |
 | `parentId`    | 父菜单；根菜单使用平台树根节点值      |
 | `title`       | 菜单名称                              |
-| `nodeType`    | `group` / `entry`                     |
-| `openMode`    | `tab` / `window`；分组菜单不配置      |
-| `moduleAlias` | 模块菜单挂载的模块                    |
-| `route`       | 路由菜单的路由                        |
-| `externalUrl` | 外链菜单的 URL                        |
+| `moduleAlias` | 可选；绑定后该菜单成为可点击模块入口  |
+| `openMode`    | `tab` / `window`；入口菜单必填        |
+| `route`       | 从模块入口投影的内部路由              |
+| `externalUrl` | 从模块入口投影的外部链接 URL          |
 | `enabled`     | 是否启用                              |
 | `sortOrder`   | 排序                                  |
 
@@ -251,7 +250,7 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | 二级 | `platform.menu.group.identity` | 组织与权限           | `platform.menu.group.platform` |
 | 二级 | `platform.menu.group.ops`      | 平台运行运维         | `platform.menu.group.platform` |
 
-`@PlatformStaticModule` 声明模块能力和默认入口，未声明入口时默认是动态模块入口，声明 `route` 时是内部路由入口，声明 `externalUrl` 时是外部链接入口。`@PlatformMenu` 只声明该模块是否投影到菜单树，以及父级、打开方式、排序、启停等导航属性；菜单的 `nodeType` 只区分 `group` 和 `entry`，入口菜单通过 `moduleAlias` 绑定模块，`route/externalUrl` 由绑定模块的入口配置投影而来。`moduleAlias` 是唯一权限和模块上下文锚点。`route/link` 模块入口不承载 `pageMode/defaultUiConfig/defaultQueryTemplate` 等低代码入口配置。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+`@PlatformStaticModule` 声明模块能力和默认入口，未声明入口时默认是动态模块入口，声明 `route` 时是内部路由入口，声明 `externalUrl` 时是外部链接入口。`@PlatformMenu` 只声明该模块是否投影到菜单树，以及父级、打开方式、排序、启停等导航属性；菜单不保存独立节点类型，是否可点击由 `moduleAlias` 是否绑定模块入口决定。未绑定 `moduleAlias` 的菜单只是容器；绑定 `moduleAlias` 的菜单是入口，同时仍然可以拥有子菜单。`route/externalUrl` 由绑定模块的入口配置投影而来。`moduleAlias` 是唯一权限和模块上下文锚点。`route/link` 模块入口不承载 `pageMode/defaultUiConfig/defaultQueryTemplate` 等低代码入口配置。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
 
 注册顺序是先注册静态模块和动作，再执行初始化数据能力。平台菜单只做同方案内治理，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。菜单方案的 `alias/scope/tenantId` 和菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案或身份字段漂移，应显式失败，而不是启动时自动迁移。
 

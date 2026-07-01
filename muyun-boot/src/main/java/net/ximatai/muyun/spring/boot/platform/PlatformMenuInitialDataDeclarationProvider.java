@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -65,7 +64,6 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         String route = module.route().trim();
         String externalUrl = module.externalUrl().trim();
         validateModuleEntry(module, route, externalUrl);
-        desired.setNodeType(MenuNodeType.ENTRY);
         desired.setOpenMode(menu.openMode());
         desired.setParentId(menu.parent());
         desired.setTitle(menu.title().isBlank() ? module.title() : menu.title().trim());

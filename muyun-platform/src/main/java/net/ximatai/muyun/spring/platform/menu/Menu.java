@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.platform.menu;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
@@ -15,7 +14,7 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 @Table(name = "platform_menu", comment = "Platform menu")
 @InitialDataFields(
         identity = {"schemeId"},
-        managed = {"parentId", "nodeType", "openMode", "moduleAlias", "route", "externalUrl", "pageMode",
+        managed = {"parentId", "openMode", "moduleAlias", "route", "externalUrl", "pageMode",
                 "defaultUiConfigId", "defaultQueryTemplateId", "entryParamsJson"},
         operator = {"title", "enabled", "sortOrder"}
 )
@@ -26,10 +25,6 @@ public class Menu extends StandardEnabledTreeEntity {
 
     @Column(name = "scheme_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Menu scheme id")
     private String schemeId;
-
-    @Column(name = "node_type", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Menu node type",
-            defaultVal = @Default(varchar = "group"))
-    private MenuNodeType nodeType = MenuNodeType.GROUP;
 
     @Column(name = "open_mode", type = ColumnType.VARCHAR, length = 32, comment = "Menu open mode")
     private MenuOpenMode openMode;

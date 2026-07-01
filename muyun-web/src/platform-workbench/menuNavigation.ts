@@ -36,7 +36,7 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     return undefined;
   }
 
-  if (menu.nodeType !== 'entry' || !menu.openMode || !menu.moduleAlias) {
+  if (!menu.openMode || !menu.moduleAlias) {
     return undefined;
   }
 

@@ -66,9 +66,6 @@ export interface LoginResult {
   currentUser: CurrentUser;
 }
 
-// Matches current Spring/Jackson code output from /platform.menu/mine.
-export type MenuNodeType = 'group' | 'entry';
-
 // Matches current Spring/Jackson code output from menu page mode fields.
 export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
 
@@ -80,7 +77,6 @@ export interface MenuRecord {
   schemeId: string;
   parentId?: string;
   title: string;
-  nodeType: MenuNodeType;
   openMode?: MenuOpenMode;
   moduleAlias?: string;
   route?: string;
