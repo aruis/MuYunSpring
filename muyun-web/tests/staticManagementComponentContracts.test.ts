@@ -87,6 +87,19 @@ test('tree explorer state does not reopen category editor after delete or scope 
   );
 });
 
+test('menu scheme editor uses platform editor session cancel semantics', () => {
+  const indexSource = readSource('src/platform-components/index.ts');
+  const menuStateSource = readSource('src/views/menuManagementState.ts');
+
+  assert.match(indexSource, /createRecordEditorSessionState/);
+  assert.match(menuStateSource, /createRecordEditorSessionState<MenuScheme, MenuSchemeMode>/);
+  assert.match(menuStateSource, /function cancelSchemeEdit\(\)[\s\S]*schemeEditor\.cancel\(\)/);
+  assert.doesNotMatch(
+    menuStateSource,
+    /function cancelSchemeEdit\(\)[\s\S]*schemeMode\.value = selectedScheme\.value \? 'view' : 'create'/,
+  );
+});
+
 test('application scope switcher is a platform component for scoped management pages', () => {
   const indexSource = readSource('src/platform-components/index.ts');
   const switcherSource = readSource('src/platform-components/ApplicationScopeSwitcher.vue');

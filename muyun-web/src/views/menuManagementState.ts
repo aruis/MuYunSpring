@@ -2,7 +2,11 @@ import { computed, ref } from 'vue';
 import type { CurrentUser, MenuOpenMode, MenuPageMode, MenuRecord, MenuScheme } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platform-components';
+import {
+  createRecordEditorSessionState,
+  executeStaticFormSave,
+  executeStaticRecordAction,
+} from '@muyun/platform-components';
 
 export type MenuSchemeMode = 'view' | 'edit' | 'create';
 export type MenuNodeMode = 'view' | 'edit' | 'create-root' | 'create-child';
@@ -23,11 +27,18 @@ export function createMenuManagementState(
   const schemeReloadKey = ref(0);
   const menuReloadKey = ref(0);
   const schemes = ref<MenuScheme[]>([]);
-  const selectedScheme = ref<MenuScheme>();
+  const schemeEditor = createRecordEditorSessionState<MenuScheme, MenuSchemeMode>({
+    viewMode: 'view',
+    createMode: 'create',
+    editMode: 'edit',
+    emptyDraft: () => emptySchemeDraft(currentUser()),
+    copyRecord: copyScheme,
+  });
+  const selectedScheme = schemeEditor.selected;
   const selectedMenu = ref<MenuRecord>();
-  const schemeDraft = ref<MenuScheme>(emptySchemeDraft(currentUser()));
+  const schemeDraft = schemeEditor.draft;
   const menuDraft = ref<MenuRecord>(emptyMenuDraft());
-  const schemeMode = ref<MenuSchemeMode>('view');
+  const schemeMode = schemeEditor.mode;
   const menuMode = ref<MenuNodeMode>('view');
   const savingScheme = ref(false);
   const savingMenu = ref(false);
@@ -35,7 +46,7 @@ export function createMenuManagementState(
   const selectedSchemeId = computed(() => selectedScheme.value?.id);
   const selectedSchemeTitle = computed(() => schemeTitleOf(selectedScheme.value));
   const selectedMenuTitle = computed(() => menuTitleOf(selectedMenu.value));
-  const schemeReadonly = computed(() => schemeMode.value === 'view');
+  const schemeReadonly = schemeEditor.readonly;
   const menuReadonly = computed(() => menuMode.value === 'view');
   const canCreateScheme = computed(() => schemeContext.can('create') === true);
   const canUpdateScheme = computed(
@@ -98,9 +109,7 @@ export function createMenuManagementState(
     if (selectedScheme.value?.id === record.id) {
       return;
     }
-    selectedScheme.value = record;
-    schemeDraft.value = copyScheme(record);
-    schemeMode.value = 'view';
+    schemeEditor.select(record);
     resetMenusForScheme();
   }
 
@@ -126,24 +135,18 @@ export function createMenuManagementState(
     if (!canCreateScheme.value) {
       return;
     }
-    selectedScheme.value = undefined;
-    schemeDraft.value = emptySchemeDraft(currentUser());
-    schemeMode.value = 'create';
+    schemeEditor.startCreate();
   }
 
   function startEditScheme() {
     if (!selectedScheme.value || !canUpdateScheme.value) {
       return;
     }
-    schemeDraft.value = copyScheme(selectedScheme.value);
-    schemeMode.value = 'edit';
+    schemeEditor.startEdit();
   }
 
   function cancelSchemeEdit() {
-    schemeDraft.value = selectedScheme.value
-      ? copyScheme(selectedScheme.value)
-      : emptySchemeDraft(currentUser());
-    schemeMode.value = 'view';
+    schemeEditor.cancel();
   }
 
   function startCreateRootMenu() {
