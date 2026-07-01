@@ -13,7 +13,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 @Setter
 @Table(name = "iam_department", comment = "Department")
 @CompositeIndex(columns = {"tenant_id", "organization_id", "code"}, unique = true)
-@InitialDataFields(identity = {"organizationId", "code"}, operator = {"title", "enabled", "sortOrder", "parentId"})
+@InitialDataFields(managed = {"organizationId", "code"}, operator = {"title", "enabled", "sortOrder", "parentId"})
 public class Department extends StandardEnabledTreeEntity {
     @Column(name = "organization_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Organization id")

@@ -16,8 +16,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Table(name = "iam_employee", comment = "Employee")
 @CompositeIndex(columns = {"tenant_id", "organization_id", "employee_no"}, unique = true)
 @InitialDataFields(
-        identity = {"organizationId", "employeeNo"},
-        managed = {"departmentId"},
+        managed = {"organizationId", "departmentId", "employeeNo"},
         operator = {"title", "gender", "mobile", "email", "enabled", "sortOrder"}
 )
 public class Employee extends StandardEnabledSortableEntity {

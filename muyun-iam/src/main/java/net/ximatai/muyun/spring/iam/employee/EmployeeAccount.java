@@ -18,8 +18,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 @CompositeIndex(columns = {"tenant_id", "employee_id", "user_id"}, unique = true)
 @CompositeIndex(columns = {"tenant_id", "user_id"}, unique = true)
 @InitialDataFields(
-        identity = {"employeeId", "userId"},
-        managed = {"primaryAccount", "enabled"}
+        managed = {"employeeId", "userId", "primaryAccount", "enabled"}
 )
 public class EmployeeAccount extends StandardEntity implements EnabledCapable {
     @Column(name = "employee_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Employee id")
