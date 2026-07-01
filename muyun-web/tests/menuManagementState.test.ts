@@ -226,6 +226,11 @@ test('menu management cancel restores selected parent after child creation', () 
   ]);
   state.handleMenusLoaded([parent]);
   state.startCreateChildMenu(parent);
+
+  assert.equal(state.menuMode.value, 'create-child');
+  assert.equal(state.selectedMenu.value?.id, 'menu-parent');
+  assert.equal(state.menuDraft.value.parentId, 'menu-parent');
+
   state.menuDraft.value.title = '临时子菜单';
   state.cancelMenuEdit();
 
@@ -249,6 +254,11 @@ test('menu management cancel restores selected menu after root creation', () => 
   ]);
   state.handleMenusLoaded([selected]);
   state.startCreateRootMenu();
+
+  assert.equal(state.menuMode.value, 'create-root');
+  assert.equal(state.selectedMenu.value?.id, 'menu-selected');
+  assert.equal(state.menuDraft.value.parentId, undefined);
+
   state.menuDraft.value.title = '临时根菜单';
   state.cancelMenuEdit();
 

@@ -116,6 +116,12 @@ test('department management state cancels child creation back to selected parent
   ]);
 
   state.startCreateChild(state.selectedDepartment.value);
+
+  assert.equal(state.mode.value, 'create-child');
+  assert.equal(state.selectedDepartment.value?.id, 'dept-fin');
+  assert.equal(state.draft.value.parentId, 'dept-fin');
+  assert.equal(state.draft.value.organizationId, 'org-root');
+
   state.draft.value.title = '临时下级';
   state.cancelEdit();
 
@@ -133,6 +139,12 @@ test('department management state cancels root creation back to selected departm
   ]);
 
   state.startCreateRoot();
+
+  assert.equal(state.mode.value, 'create-root');
+  assert.equal(state.selectedDepartment.value?.id, 'dept-fin');
+  assert.equal(state.draft.value.parentId, undefined);
+  assert.equal(state.draft.value.organizationId, 'org-root');
+
   state.draft.value.title = '临时根部门';
   state.cancelEdit();
 

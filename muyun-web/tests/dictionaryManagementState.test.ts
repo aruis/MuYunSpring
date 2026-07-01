@@ -207,6 +207,11 @@ test('dictionary management state cancels item creation back to selected item', 
   ]);
 
   state.startCreateItem();
+
+  assert.equal(state.itemMode.value, 'create');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.parentId, undefined);
+
   state.itemDraft.value.title = '临时字典项';
   state.cancelItemEdit();
 
@@ -215,6 +220,11 @@ test('dictionary management state cancels item creation back to selected item', 
   assert.equal(state.itemDraft.value.title, '启用');
 
   state.startCreateChildItem(state.selectedItem.value!);
+
+  assert.equal(state.itemMode.value, 'create');
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemDraft.value.parentId, 'item-enabled');
+
   state.itemDraft.value.title = '临时下级字典项';
   state.cancelItemEdit();
 
@@ -521,6 +531,12 @@ test('dictionary management state cancels category creation back to selected cat
   ]);
 
   state.startCreateRootCategory();
+
+  assert.equal(state.categoryMode.value, 'create-root');
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryDraft.value.parentId, undefined);
+  assert.equal(state.categoryDraft.value.applicationAlias, 'platform');
+
   state.categoryDraft.value.title = '临时根类目';
   state.cancelCategoryEdit();
 
@@ -529,6 +545,12 @@ test('dictionary management state cancels category creation back to selected cat
   assert.equal(state.categoryDraft.value.title, '状态字典');
 
   state.startCreateChildCategory();
+
+  assert.equal(state.categoryMode.value, 'create-child');
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryDraft.value.parentId, 'category-status');
+  assert.equal(state.categoryDraft.value.applicationAlias, 'platform');
+
   state.categoryDraft.value.title = '临时子类目';
   state.cancelCategoryEdit();
 

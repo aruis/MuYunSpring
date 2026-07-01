@@ -233,6 +233,11 @@ test('position management state cancels category creation back to selected categ
   state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
 
   state.startCreateRootCategory();
+
+  assert.equal(state.categoryMode.value, 'create-root');
+  assert.equal(state.selectedCategory.value?.id, 'category-tech');
+  assert.equal(state.categoryDraft.value.parentId, undefined);
+
   state.categoryDraft.value.title = '临时根分类';
   state.cancelCategoryEdit();
 
@@ -241,6 +246,11 @@ test('position management state cancels category creation back to selected categ
   assert.equal(state.categoryDraft.value.title, '技术序列');
 
   state.startCreateChildCategory();
+
+  assert.equal(state.categoryMode.value, 'create-child');
+  assert.equal(state.selectedCategory.value?.id, 'category-tech');
+  assert.equal(state.categoryDraft.value.parentId, 'category-tech');
+
   state.categoryDraft.value.title = '临时子分类';
   state.cancelCategoryEdit();
 
@@ -304,6 +314,11 @@ test('position management state cancels creating a position back to selected pos
   state.syncSelectedPosition();
 
   state.startCreatePosition();
+
+  assert.equal(state.positionMode.value, 'create');
+  assert.equal(state.selectedPosition.value?.id, 'pos-dev');
+  assert.equal(state.positionDraft.value.categoryId, 'category-tech');
+
   state.positionDraft.value.title = '临时岗位';
   state.cancelPositionEdit();
 
