@@ -67,7 +67,7 @@ public class UserSessionService {
             if (normalizedTenantId != null) {
                 verifyActiveTenantForLogin(normalizedTenantId);
             }
-            UserAccount user = userAccountService.requireActiveUser(username);
+            UserAccount user = userAccountService.requireActiveUser(normalizedTenantId, username);
             if (!userAccountService.passwordMatches(user, password)) {
                 throw new AuthenticationFailedException("invalid username or password");
             }

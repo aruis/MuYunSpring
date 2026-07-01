@@ -62,7 +62,7 @@ const {
   toggleMenuEnabled,
   removeSelectedScheme,
   removeSelectedMenu,
-} = createMenuManagementState(schemeContext, menuBaseContext, confirmAction);
+} = createMenuManagementState(schemeContext, () => menuContext.value, confirmAction);
 
 const menuContext = computed<ModuleContext<MenuRecord>>(() =>
   createScopedResourceTreeModuleContext<MenuRecord, MenuRecord>(menuBaseContext, {
@@ -485,25 +485,17 @@ function menuTypeTitle(value: MenuRecord['menuType']) {
               :allow-clear="false"
             />
           </label>
-          <label v-if="menuType === 'module'">
-            <span>模块</span>
+          <label v-if="menuType !== 'group'">
+            <span>模块入口</span>
             <RecordPicker
               v-model:value="menuDraft.moduleAlias"
               :context="moduleContext"
               mode="list"
-              placeholder="选择模块"
+              placeholder="选择模块入口"
               :disabled="menuFormDisabled"
               :title-of="(record) => moduleTitle(record as PlatformModule)"
               :description-of="(record) => moduleDescription(record as PlatformModule)"
             />
-          </label>
-          <label v-if="menuType === 'route'">
-            <span>路由</span>
-            <UiInput v-model:value="menuDraft.route" :disabled="menuFormDisabled" />
-          </label>
-          <label v-if="menuType === 'link'">
-            <span>外链 URL</span>
-            <UiInput v-model:value="menuDraft.externalUrl" :disabled="menuFormDisabled" />
           </label>
           <label v-if="menuType === 'module'">
             <span>页面模式</span>

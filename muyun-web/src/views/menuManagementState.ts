@@ -7,10 +7,11 @@ import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platfor
 export type MenuSchemeMode = 'view' | 'edit' | 'create';
 export type MenuNodeMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
+type MenuContextProvider = () => ModuleContext<MenuRecord>;
 
 export function createMenuManagementState(
   schemeContext: ModuleContext<MenuScheme>,
-  menuContext: ModuleContext<MenuRecord>,
+  menuContextProvider: MenuContextProvider,
   confirmAction: ConfirmAction,
 ) {
   const schemeReloadKey = ref(0);
@@ -43,14 +44,20 @@ export function createMenuManagementState(
     }
     return schemeContext.can(selectedScheme.value.enabled === false ? 'enable' : 'disable') === true;
   });
-  const canCreateMenu = computed(() => Boolean(selectedSchemeId.value) && menuContext.can('create') === true);
-  const canUpdateMenu = computed(() => Boolean(selectedMenu.value?.id) && menuContext.can('update') === true);
-  const canDeleteMenu = computed(() => Boolean(selectedMenu.value?.id) && menuContext.can('delete') === true);
+  const canCreateMenu = computed(
+    () => Boolean(selectedSchemeId.value) && menuContext().can('create') === true,
+  );
+  const canUpdateMenu = computed(
+    () => Boolean(selectedMenu.value?.id) && menuContext().can('update') === true,
+  );
+  const canDeleteMenu = computed(
+    () => Boolean(selectedMenu.value?.id) && menuContext().can('delete') === true,
+  );
   const canToggleMenu = computed(() => {
     if (!selectedMenu.value?.id) {
       return false;
     }
-    return menuContext.can(selectedMenu.value.enabled === false ? 'enable' : 'disable') === true;
+    return menuContext().can(selectedMenu.value.enabled === false ? 'enable' : 'disable') === true;
   });
   const schemeCardTitle = computed(() => {
     if (schemeMode.value === 'create') {
@@ -208,8 +215,9 @@ export function createMenuManagementState(
       createRecord: () => normalizeMenuDraft(menuDraft.value, selectedSchemeId.value),
       validateRecord: validateMenu,
       save: async (record, saveMode) => {
-        await menuContext.runtime.ready;
-        const crud = menuContext.abilities.crud();
+        const context = menuContext();
+        await context.runtime.ready;
+        const crud = context.abilities.crud();
         return saveMode === 'edit' && record.id ? crud.update(record.id, record) : crud.insert(record);
       },
       onSaved: ({ record }) => {
@@ -250,12 +258,13 @@ export function createMenuManagementState(
       canExecute: () => canToggleMenu.value,
       deniedMessage: '当前用户无权变更菜单启停状态',
       execute: async (menu) => {
-        await menuContext.runtime.ready;
-        const enable = menuContext.abilities.enable();
+        const context = menuContext();
+        await context.runtime.ready;
+        const enable = context.abilities.enable();
         return menu.enabled === false ? enable.enable(menu.id) : enable.disable(menu.id);
       },
       onExecuted: async (_, menu) => {
-        const refreshed = await menuContext.abilities.crud().view(menu.id);
+        const refreshed = await menuContext().abilities.crud().view(menu.id);
         selectedMenu.value = refreshed;
         menuDraft.value = copyMenu(refreshed);
         menuReloadKey.value += 1;
@@ -302,7 +311,7 @@ export function createMenuManagementState(
           okText: '删除',
           danger: true,
         }),
-      execute: (menu) => menuContext.abilities.crud().delete(menu.id),
+      execute: (menu) => menuContext().abilities.crud().delete(menu.id),
       onExecuted: () => {
         selectedMenu.value = undefined;
         menuDraft.value = emptyMenuDraft(selectedSchemeId.value);
@@ -317,6 +326,10 @@ export function createMenuManagementState(
     menuDraft.value = emptyMenuDraft(selectedSchemeId.value);
     menuMode.value = 'view';
     menuReloadKey.value += 1;
+  }
+
+  function menuContext() {
+    return menuContextProvider();
   }
 
   return {
@@ -430,9 +443,9 @@ export function normalizeMenuDraft(record: MenuRecord, schemeId: string | undefi
     title: record.title?.trim() ?? '',
     menuType,
     openMode: menuType === 'group' ? undefined : normalizeOpenMode(record.openMode),
-    moduleAlias: menuType === 'module' ? normalizeBlank(record.moduleAlias) : undefined,
-    route: menuType === 'route' ? normalizeBlank(record.route) : undefined,
-    externalUrl: menuType === 'link' ? normalizeBlank(record.externalUrl) : undefined,
+    moduleAlias: menuType === 'group' ? undefined : normalizeBlank(record.moduleAlias),
+    route: undefined,
+    externalUrl: undefined,
     pageMode: menuType === 'module' ? normalizePageMode(record.pageMode) : undefined,
     defaultUiConfigId: menuType === 'module' ? normalizeBlank(record.defaultUiConfigId) : undefined,
     defaultQueryTemplateId: menuType === 'module' ? normalizeBlank(record.defaultQueryTemplateId) : undefined,
@@ -456,11 +469,8 @@ export function validateMenu(record: MenuRecord) {
   if (record.menuType === 'module' && !record.moduleAlias) {
     return '模块菜单必须选择模块';
   }
-  if (record.menuType === 'route' && !record.route) {
-    return '路由菜单必须填写路由';
-  }
-  if (record.menuType === 'link' && !record.externalUrl) {
-    return '外链菜单必须填写 URL';
+  if (record.menuType !== 'group' && !record.moduleAlias) {
+    return '非分组菜单必须选择模块入口';
   }
   return undefined;
 }

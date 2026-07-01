@@ -165,8 +165,14 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     public UserAccount requireActiveUser(String username) {
+        return requireActiveUser(TenantContext.currentTenantId().orElse(null), username);
+    }
+
+    public UserAccount requireActiveUser(String tenantId, String username) {
         String validUsername = requireUsername(username);
-        UserAccount user = findOne(Criteria.of().eq("username", validUsername));
+        UserAccount user = findOne(Criteria.of()
+                .eq("username", validUsername)
+                .eqNullable("tenantId", normalizeBlank(tenantId)));
         if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
             throw new AuthenticationFailedException("invalid username or password");
         }

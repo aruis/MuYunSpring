@@ -183,6 +183,22 @@ class UserSessionServiceTest {
     }
 
     @Test
+    void shouldNotLoginTenantUserFromSystemWorkspace() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThatThrownBy(() -> sessionService.login(null, "admin", "secret1"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("invalid username or password");
+
+        verify(sessionDao, never()).insert(any());
+    }
+
+    @Test
     void shouldRejectExpiredSession() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccountService userService = new UserAccountService(dao, tenantId -> {

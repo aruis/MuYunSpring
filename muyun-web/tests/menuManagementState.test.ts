@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeMenuDraft, normalizeSchemeDraft, validateMenu } from '../src/views/menuManagementState.ts';
-import type { MenuRecord } from '../src/web-contracts/index.ts';
+import {
+  createMenuManagementState,
+  normalizeMenuDraft,
+  normalizeSchemeDraft,
+  validateMenu,
+} from '../src/views/menuManagementState.ts';
+import type { MenuRecord, MenuScheme } from '../src/web-contracts/index.ts';
+import type { ModuleContext } from '../src/web-core/module/moduleContext.ts';
 
 test('menu management normalizes scheme identity only on create', () => {
   const created = normalizeSchemeDraft(
@@ -31,9 +37,12 @@ test('menu management keeps only fields that match the selected menu type', () =
     baseMenu({ menuType: 'module', moduleAlias: ' platform.menu ' }),
     'scheme-1',
   );
-  const routeMenu = normalizeMenuDraft(baseMenu({ menuType: 'route', route: ' /config/menus ' }), 'scheme-1');
+  const routeMenu = normalizeMenuDraft(
+    baseMenu({ menuType: 'route', moduleAlias: ' platform.menu_scheme ' }),
+    'scheme-1',
+  );
   const linkMenu = normalizeMenuDraft(
-    baseMenu({ menuType: 'link', externalUrl: ' https://example.com ' }),
+    baseMenu({ menuType: 'link', moduleAlias: ' platform.docs ' }),
     'scheme-1',
   );
   const groupMenu = normalizeMenuDraft(baseMenu({ menuType: 'group' }), 'scheme-1');
@@ -42,9 +51,10 @@ test('menu management keeps only fields that match the selected menu type', () =
   assert.equal(moduleMenu.route, undefined);
   assert.equal(moduleMenu.externalUrl, undefined);
   assert.equal(moduleMenu.openMode, 'tab');
-  assert.equal(routeMenu.route, '/config/menus');
-  assert.equal(routeMenu.moduleAlias, undefined);
-  assert.equal(linkMenu.externalUrl, 'https://example.com');
+  assert.equal(routeMenu.moduleAlias, 'platform.menu_scheme');
+  assert.equal(routeMenu.route, undefined);
+  assert.equal(linkMenu.moduleAlias, 'platform.docs');
+  assert.equal(linkMenu.externalUrl, undefined);
   assert.equal(linkMenu.openMode, 'tab');
   assert.equal(groupMenu.openMode, undefined);
   assert.equal(groupMenu.moduleAlias, undefined);
@@ -56,9 +66,63 @@ test('menu management validates required target by menu type', () => {
     validateMenu(baseMenu({ menuType: 'module', moduleAlias: undefined })),
     '模块菜单必须选择模块',
   );
-  assert.equal(validateMenu(baseMenu({ menuType: 'route', route: undefined })), '路由菜单必须填写路由');
-  assert.equal(validateMenu(baseMenu({ menuType: 'link', externalUrl: undefined })), '外链菜单必须填写 URL');
+  assert.equal(
+    validateMenu(baseMenu({ menuType: 'route', moduleAlias: undefined })),
+    '非分组菜单必须选择模块入口',
+  );
+  assert.equal(
+    validateMenu(baseMenu({ menuType: 'link', moduleAlias: undefined })),
+    '非分组菜单必须选择模块入口',
+  );
   assert.equal(validateMenu(baseMenu({ menuType: 'module', moduleAlias: 'platform.menu' })), undefined);
+  assert.equal(validateMenu(baseMenu({ menuType: 'route', moduleAlias: 'platform.menu_scheme' })), undefined);
+  assert.equal(validateMenu(baseMenu({ menuType: 'link', moduleAlias: 'platform.docs' })), undefined);
+});
+
+test('menu management writes menus through the current scoped menu context', async () => {
+  const schemeContext = createFakeContext<MenuScheme>('platform.menu_scheme');
+  const menuContext = createFakeContext<MenuRecord>('platform.menu-scheme/scheme-1/menus');
+  const state = createMenuManagementState(
+    schemeContext,
+    () => menuContext,
+    async () => true,
+  );
+
+  state.handleSchemesLoaded([
+    { id: 'scheme-1', alias: 'admin', title: '管理菜单', scopeType: 'system', enabled: true },
+  ]);
+
+  state.startCreateRootMenu();
+  state.menuDraft.value = baseMenu({
+    id: 'menu-created',
+    schemeId: 'scheme-1',
+    title: '菜单',
+    menuType: 'module',
+    moduleAlias: 'platform.menu_scheme',
+  });
+  await state.saveMenu();
+
+  state.handleMenusLoaded([
+    {
+      id: 'menu-created',
+      schemeId: 'scheme-1',
+      title: '菜单',
+      menuType: 'module',
+      moduleAlias: 'platform.menu_scheme',
+      openMode: 'tab',
+      enabled: true,
+    },
+  ]);
+  await state.toggleMenuEnabled();
+  await state.removeSelectedMenu();
+
+  assert.deepEqual(menuContext.calls, [
+    ['insert', 'menu-created'],
+    ['disable', 'menu-created'],
+    ['view', 'menu-created'],
+    ['delete', 'menu-created'],
+  ]);
+  assert.deepEqual(schemeContext.calls, []);
 });
 
 function baseMenu(overrides: Partial<MenuRecord>): MenuRecord {
@@ -77,4 +141,69 @@ function baseMenu(overrides: Partial<MenuRecord>): MenuRecord {
     entryParamsJson: '{}',
     ...overrides,
   };
+}
+
+function createFakeContext<TRecord extends { id?: string }>(moduleAlias: string) {
+  const calls: unknown[][] = [];
+  const records = new Map<string, TRecord>();
+  const crud = {
+    querySchema: async () => ({ fields: [] }),
+    query: async () => ({ records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0, totalKnown: true }),
+    view: async (id: string) => {
+      calls.push(['view', id]);
+      return records.get(id) ?? ({ id } as TRecord);
+    },
+    insert: async (record: TRecord) => {
+      calls.push(['insert', record.id]);
+      if (record.id) {
+        records.set(record.id, record);
+      }
+      return { record };
+    },
+    update: async (id: string, record: TRecord) => {
+      calls.push(['update', id]);
+      records.set(id, { ...record, id });
+      return { record };
+    },
+    delete: async (id: string) => {
+      calls.push(['delete', id]);
+      records.delete(id);
+      return { count: 1 };
+    },
+    enable: async (id: string) => {
+      calls.push(['enable', id]);
+      return { count: 1 };
+    },
+    disable: async (id: string) => {
+      calls.push(['disable', id]);
+      return { count: 1 };
+    },
+  };
+  const context = {
+    moduleAlias,
+    runtime: {
+      ready: Promise.resolve(),
+      refresh: async () => undefined,
+      snapshot: () => undefined,
+      action: () => undefined,
+      can: () => true,
+      hasAbility: () => true,
+    },
+    abilities: {
+      crud: () => crud,
+      tree: () => crud,
+      enable: () => crud,
+      tryCrud: () => crud,
+      tryTree: () => crud,
+      tryEnable: () => crud,
+      has: () => true,
+      hasCrud: () => true,
+      hasTree: () => true,
+      hasEnable: () => true,
+    },
+    action: () => undefined,
+    can: () => true,
+    calls,
+  };
+  return context as unknown as ModuleContext<TRecord> & { calls: unknown[][] };
 }
