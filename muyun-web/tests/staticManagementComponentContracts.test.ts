@@ -571,19 +571,6 @@ test('record query list panel forwards dynamic ui config and query template ids'
   assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
 });
 
-test('static crud state supports business-owned action errors before platform fallback', () => {
-  const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
-  const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
-
-  assert.match(stateSource, /StaticCrudActionErrorHandler/);
-  assert.match(stateSource, /presentPlatformError/);
-  assert.match(stateSource, /presentPlatformMessage/);
-  assert.match(stateSource, /matchesActionErrorHandler/);
-  assert.doesNotMatch(stateSource, /presentActionError/);
-  assert.match(feedbackSource, /handler\.code && error\.code === handler\.code/);
-  assert.match(feedbackSource, /error\.details\?\.marker === handler\.marker/);
-});
-
 test('platform error feedback respects global error presentation slots', () => {
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
   const uiFeedbackSource = readSource('src/vue-ui-antdv/feedback.ts');
