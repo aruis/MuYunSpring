@@ -107,6 +107,59 @@ test('department management state saves root and child departments inside select
   assert.equal(state.departmentReloadKey.value, 3);
 });
 
+test('department management state cancels child creation back to selected parent', () => {
+  const state = createDepartmentManagementState(createContext(), async () => true);
+
+  state.handleOrganizationsLoaded([{ id: 'org-root', code: 'ROOT', title: '总部' }]);
+  state.handleDepartmentsLoaded([
+    { id: 'dept-fin', organizationId: 'org-root', code: 'FIN', title: '财务部' },
+  ]);
+
+  state.startCreateChild(state.selectedDepartment.value);
+  state.draft.value.title = '临时下级';
+  state.cancelEdit();
+
+  assert.equal(state.mode.value, 'view');
+  assert.equal(state.selectedDepartment.value?.id, 'dept-fin');
+  assert.equal(state.draft.value.title, '财务部');
+});
+
+test('department management state cancels root creation back to selected department', () => {
+  const state = createDepartmentManagementState(createContext(), async () => true);
+
+  state.handleOrganizationsLoaded([{ id: 'org-root', code: 'ROOT', title: '总部' }]);
+  state.handleDepartmentsLoaded([
+    { id: 'dept-fin', organizationId: 'org-root', code: 'FIN', title: '财务部' },
+  ]);
+
+  state.startCreateRoot();
+  state.draft.value.title = '临时根部门';
+  state.cancelEdit();
+
+  assert.equal(state.mode.value, 'view');
+  assert.equal(state.selectedDepartment.value?.id, 'dept-fin');
+  assert.equal(state.draft.value.title, '财务部');
+});
+
+test('department management state keeps edit draft when departments reload', () => {
+  const state = createDepartmentManagementState(createContext(), async () => true);
+
+  state.handleOrganizationsLoaded([{ id: 'org-root', code: 'ROOT', title: '总部' }]);
+  state.handleDepartmentsLoaded([
+    { id: 'dept-fin', organizationId: 'org-root', code: 'FIN', title: '财务部' },
+  ]);
+
+  state.startEdit();
+  state.draft.value.title = '未保存部门';
+  state.handleDepartmentsLoaded([
+    { id: 'dept-fin', organizationId: 'org-root', code: 'FIN', title: '刷新后的财务部' },
+  ]);
+
+  assert.equal(state.mode.value, 'edit');
+  assert.equal(state.selectedDepartment.value?.title, '刷新后的财务部');
+  assert.equal(state.draft.value.title, '未保存部门');
+});
+
 test('department management state exposes stable fallback titles', () => {
   assert.equal(organizationTitleOf({ code: 'ROOT' }), 'ROOT');
   assert.equal(organizationTitleOf(undefined), '机构');

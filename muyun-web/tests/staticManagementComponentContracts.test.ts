@@ -112,6 +112,42 @@ test('composite management editors use platform editor session cancel semantics'
   assert.match(positionStateSource, /function cancelPositionEdit\(\)[\s\S]*positionEditor\.cancel\(\)/);
   assert.match(dictionaryStateSource, /function cancelCategoryEdit\(\)[\s\S]*categoryEditor\.cancel\(\)/);
   assert.match(dictionaryStateSource, /function cancelItemEdit\(\)[\s\S]*itemEditor\.cancel\(\)/);
+  assert.match(
+    menuStateSource,
+    /function startCreateChildMenu\([^)]*\)[\s\S]*menuEditor\.startCreate\(\{[\s\S]*mode: 'create-child'/,
+  );
+  assert.match(
+    menuStateSource,
+    /function startCreateRootMenu\(\)[\s\S]*menuEditor\.startCreate\(\{ preserveSelection: true \}\)/,
+  );
+  assert.match(
+    departmentStateSource,
+    /function startCreateChild\([^)]*\)[\s\S]*departmentEditor\.startCreate\(\{[\s\S]*mode: 'create-child'/,
+  );
+  assert.match(
+    departmentStateSource,
+    /function startCreateRoot\(\)[\s\S]*departmentEditor\.startCreate\(\{ mode: 'create-root', preserveSelection: true \}\)/,
+  );
+  assert.match(
+    dictionaryStateSource,
+    /function startCreateRootCategory\(\)[\s\S]*categoryEditor\.startCreate\(\{[\s\S]*preserveSelection: true/,
+  );
+  assert.match(
+    dictionaryStateSource,
+    /function startCreateItem\(\)[\s\S]*itemEditor\.startCreate\(\{ preserveSelection: true \}\)/,
+  );
+  assert.match(
+    dictionaryStateSource,
+    /function startCreateChildItem\([^)]*\)[\s\S]*itemEditor\.startCreate\(\{[\s\S]*selectedRecord: parent/,
+  );
+  assert.match(
+    positionStateSource,
+    /function startCreateRootCategory\(\)[\s\S]*categoryEditor\.startCreate\(\{ preserveSelection: true \}\)/,
+  );
+  assert.match(
+    positionStateSource,
+    /function startCreatePosition\(\)[\s\S]*positionEditor\.startCreate\(\{ preserveSelection: true \}\)/,
+  );
   assert.doesNotMatch(
     menuStateSource,
     /function cancelSchemeEdit\(\)[\s\S]*schemeMode\.value = selectedScheme\.value \? 'view' : 'create'/,

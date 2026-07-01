@@ -249,6 +249,22 @@ test('position management state cancels category creation back to selected categ
   assert.equal(state.categoryDraft.value.title, '技术序列');
 });
 
+test('position management state keeps category create draft when categories reload', () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position');
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+
+  state.startCreateRootCategory();
+  state.categoryDraft.value.title = '未保存分类';
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '刷新后的技术序列' }]);
+
+  assert.equal(state.categoryMode.value, 'create-root');
+  assert.equal(state.selectedCategory.value?.title, '刷新后的技术序列');
+  assert.equal(state.categoryDraft.value.title, '未保存分类');
+});
+
 test('position management state keeps category editor closed after deleting category', async () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category', {
     delete: async () => ({ count: 1 }),
@@ -276,6 +292,24 @@ test('position management state cancels creating a position back to empty view',
   assert.equal(state.positionMode.value, 'view');
   assert.equal(state.selectedPosition.value, undefined);
   assert.deepEqual(state.positionDraft.value, emptyPositionDraft('category-tech'));
+});
+
+test('position management state cancels creating a position back to selected position', () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position');
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+  state.positions.value = [{ id: 'pos-dev', categoryId: 'category-tech', code: 'DEV', title: '开发工程师' }];
+  state.syncSelectedPosition();
+
+  state.startCreatePosition();
+  state.positionDraft.value.title = '临时岗位';
+  state.cancelPositionEdit();
+
+  assert.equal(state.positionMode.value, 'view');
+  assert.equal(state.selectedPosition.value?.id, 'pos-dev');
+  assert.equal(state.positionDraft.value.title, '开发工程师');
 });
 
 test('position management state exposes category toggle authorization', async () => {
@@ -327,6 +361,26 @@ test('position management state respects delete confirmation result', async () =
   assert.deepEqual(calls, ['delete:pos-dev']);
   assert.equal(state.selectedPosition.value, undefined);
   assert.equal(state.positionMode.value, 'create');
+});
+
+test('position management state keeps delete fallback creation without selecting reload rows', async () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position', {
+    delete: async () => ({ count: 1 }),
+  });
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+  state.selectPosition({ id: 'pos-deleted', categoryId: 'category-tech', code: 'DEL', title: '待删除岗位' });
+
+  await state.deletePosition();
+  state.positions.value = [{ id: 'pos-dev', categoryId: 'category-tech', code: 'DEV', title: '开发工程师' }];
+  state.syncSelectedPosition();
+  state.cancelPositionEdit();
+
+  assert.equal(state.positionMode.value, 'view');
+  assert.equal(state.selectedPosition.value, undefined);
+  assert.deepEqual(state.positionDraft.value, emptyPositionDraft('category-tech'));
 });
 
 test('position management state notifies delete failures globally', async () => {

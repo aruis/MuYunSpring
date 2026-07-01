@@ -81,6 +81,12 @@ export function createDepartmentManagementState(
     const matched = selectedDepartment.value?.id
       ? records.find((item) => item.id === selectedDepartment.value?.id)
       : undefined;
+    if (mode.value !== 'view') {
+      if (matched) {
+        departmentEditor.replaceSelected(matched);
+      }
+      return;
+    }
     const next = matched ?? records[0];
     if (next) {
       departmentEditor.select(next);
@@ -98,8 +104,7 @@ export function createDepartmentManagementState(
     if (!selectedOrganizationId.value || !canCreate.value) {
       return;
     }
-    departmentEditor.startCreate();
-    mode.value = 'create-root';
+    departmentEditor.startCreate({ mode: 'create-root', preserveSelection: true });
   }
 
   function startCreateChild(parent?: Department) {
@@ -107,12 +112,14 @@ export function createDepartmentManagementState(
     if (!selectedOrganizationId.value || !current?.id || !canCreate.value) {
       return;
     }
-    selectedDepartment.value = current;
-    draft.value = {
-      ...emptyDepartmentDraft(selectedOrganizationId.value),
-      parentId: current.id,
-    };
-    mode.value = 'create-child';
+    departmentEditor.startCreate({
+      mode: 'create-child',
+      selectedRecord: current,
+      draft: () => ({
+        ...emptyDepartmentDraft(selectedOrganizationId.value),
+        parentId: current.id,
+      }),
+    });
   }
 
   function startEdit() {

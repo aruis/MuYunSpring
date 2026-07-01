@@ -99,6 +99,12 @@ export function createDictionaryManagementState(
     const matched = selectedCategory.value?.id
       ? records.find((item) => item.id === selectedCategory.value?.id)
       : undefined;
+    if (categoryMode.value !== 'view') {
+      if (matched) {
+        categoryEditor.replaceSelected(matched);
+      }
+      return;
+    }
     const next = matched ?? records[0];
     if (next) {
       categoryEditor.select(next);
@@ -121,8 +127,10 @@ export function createDictionaryManagementState(
       presentCategoryMessage('当前用户无权新增字典类目');
       return;
     }
-    categoryDraft.value = emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
-    categoryMode.value = 'create-root';
+    categoryEditor.startCreate({
+      preserveSelection: true,
+      draft: () => emptyDictionaryCategoryDraft(undefined, currentApplicationAlias()),
+    });
     clearCategoryFeedback();
   }
 
@@ -135,8 +143,12 @@ export function createDictionaryManagementState(
       presentCategoryMessage('请先选择上级类目');
       return;
     }
-    categoryDraft.value = emptyDictionaryCategoryDraft(selectedCategory.value.id, currentApplicationAlias());
-    categoryMode.value = 'create-child';
+    const parentId = selectedCategory.value.id;
+    categoryEditor.startCreate({
+      mode: 'create-child',
+      preserveSelection: true,
+      draft: () => emptyDictionaryCategoryDraft(parentId, currentApplicationAlias()),
+    });
     clearCategoryFeedback();
   }
 
@@ -297,7 +309,7 @@ export function createDictionaryManagementState(
       presentItemMessage('当前用户无权新增字典项');
       return;
     }
-    itemEditor.startCreate();
+    itemEditor.startCreate({ preserveSelection: true });
     clearItemFeedback();
   }
 
@@ -313,12 +325,13 @@ export function createDictionaryManagementState(
       presentItemMessage('当前用户无权新增字典项');
       return;
     }
-    selectedItem.value = parent;
-    itemDraft.value = {
-      ...emptyDictionaryItemDraft(selectedCategory.value),
-      parentId: parent.id,
-    };
-    itemMode.value = 'create';
+    itemEditor.startCreate({
+      selectedRecord: parent,
+      draft: () => ({
+        ...emptyDictionaryItemDraft(selectedCategory.value),
+        parentId: parent.id,
+      }),
+    });
     clearItemFeedback();
   }
 
@@ -460,7 +473,9 @@ export function createDictionaryManagementState(
       }
       return;
     }
-    selectedItem.value = next;
+    if (matched) {
+      itemEditor.replaceSelected(matched);
+    }
   }
 
   function itemClient() {

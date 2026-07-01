@@ -124,6 +124,12 @@ export function createMenuManagementState(
     const matched = selectedMenu.value?.id
       ? records.find((item) => item.id === selectedMenu.value?.id)
       : undefined;
+    if (menuMode.value !== 'view') {
+      if (matched) {
+        menuEditor.replaceSelected(matched);
+      }
+      return;
+    }
     const next = matched ?? records[0];
     if (next) {
       menuEditor.select(next);
@@ -159,7 +165,7 @@ export function createMenuManagementState(
     if (!selectedSchemeId.value || !canCreateMenu.value) {
       return;
     }
-    menuEditor.startCreate();
+    menuEditor.startCreate({ preserveSelection: true });
   }
 
   function startCreateChildMenu(parent?: MenuRecord) {
@@ -167,12 +173,14 @@ export function createMenuManagementState(
     if (!selectedSchemeId.value || !current?.id || !canCreateMenu.value) {
       return;
     }
-    selectedMenu.value = current;
-    menuDraft.value = {
-      ...emptyMenuDraft(selectedSchemeId.value),
-      parentId: current.id,
-    };
-    menuMode.value = 'create-child';
+    menuEditor.startCreate({
+      mode: 'create-child',
+      selectedRecord: current,
+      draft: () => ({
+        ...emptyMenuDraft(selectedSchemeId.value),
+        parentId: current.id,
+      }),
+    });
   }
 
   function startEditMenu() {

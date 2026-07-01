@@ -92,6 +92,12 @@ export function createPositionManagementState(
     const matched = selectedCategory.value?.id
       ? records.find((item) => item.id === selectedCategory.value?.id)
       : undefined;
+    if (categoryMode.value !== 'view') {
+      if (matched) {
+        categoryEditor.replaceSelected(matched);
+      }
+      return;
+    }
     const next = matched ?? records[0];
     if (next) {
       categoryEditor.select(next);
@@ -118,8 +124,7 @@ export function createPositionManagementState(
       presentCategoryError('当前用户无权新增岗位分类');
       return;
     }
-    categoryDraft.value = emptyCategoryDraft();
-    categoryMode.value = 'create-root';
+    categoryEditor.startCreate({ preserveSelection: true });
     clearCategoryFeedback();
   }
 
@@ -132,8 +137,12 @@ export function createPositionManagementState(
       presentCategoryError('请先选择上级分类');
       return;
     }
-    categoryDraft.value = emptyCategoryDraft(selectedCategory.value.id);
-    categoryMode.value = 'create-child';
+    const parentId = selectedCategory.value.id;
+    categoryEditor.startCreate({
+      mode: 'create-child',
+      preserveSelection: true,
+      draft: () => emptyCategoryDraft(parentId),
+    });
     clearCategoryFeedback();
   }
 
@@ -291,7 +300,9 @@ export function createPositionManagementState(
       }
       return;
     }
-    selectedPosition.value = next;
+    if (matched) {
+      positionEditor.replaceSelected(matched);
+    }
   }
 
   function selectPosition(record: Position) {
@@ -308,7 +319,7 @@ export function createPositionManagementState(
       presentPositionError('当前用户无权新增岗位');
       return;
     }
-    positionEditor.startCreate();
+    positionEditor.startCreate({ preserveSelection: true });
     clearPositionFeedback();
   }
 
