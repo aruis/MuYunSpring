@@ -100,6 +100,16 @@ test('menu scheme editor uses platform editor session cancel semantics', () => {
   );
 });
 
+test('menu entry low-code fields are only exposed for dynamic module entries', () => {
+  const menuViewSource = readSource('src/views/MenuManagementView.vue');
+
+  assert.match(menuViewSource, /<label v-if="isDynamicModuleEntry"[\s\S]*页面模式/);
+  assert.match(menuViewSource, /<label v-if="isDynamicModuleEntry"[\s\S]*默认 UI 配置/);
+  assert.match(menuViewSource, /<label v-if="isDynamicModuleEntry"[\s\S]*默认查询模板/);
+  assert.match(menuViewSource, /<label v-if="isDynamicModuleEntry" class="full-row"[\s\S]*入口参数 JSON/);
+  assert.doesNotMatch(menuViewSource, /<label v-if="hasModuleEntry" class="full-row"[\s\S]*入口参数 JSON/);
+});
+
 test('application scope switcher is a platform component for scoped management pages', () => {
   const indexSource = readSource('src/platform-components/index.ts');
   const switcherSource = readSource('src/platform-components/ApplicationScopeSwitcher.vue');

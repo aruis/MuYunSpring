@@ -535,7 +535,7 @@ function menuNodeTitle(menu: MenuRecord) {
             <span>默认查询模板</span>
             <UiInput v-model:value="menuDraft.defaultQueryTemplateId" :disabled="menuFormDisabled" />
           </label>
-          <label v-if="hasModuleEntry" class="full-row">
+          <label v-if="isDynamicModuleEntry" class="full-row">
             <span>入口参数 JSON</span>
             <UiInput v-model:value="menuDraft.entryParamsJson" :disabled="menuFormDisabled" />
           </label>
