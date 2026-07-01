@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -232,6 +233,33 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.update(moving))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("scheme");
+        }
+    }
+
+    @Test
+    void shouldRejectDeletingMenuSchemeWhenMenusExist() {
+        AtomicReference<MenuService> menuServiceReference = new AtomicReference<>();
+        MenuSchemeService guardedSchemeService = new MenuSchemeService(
+                schemeDao,
+                Optional.empty(),
+                SystemMenuSchemeAccessPolicy.DENY_ALL,
+                menuServiceReference::get
+        );
+        MenuService guardedMenuService = new MenuService(menuDao, guardedSchemeService, moduleService);
+        menuServiceReference.set(guardedMenuService);
+
+        String schemeId;
+        String emptySchemeId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            schemeId = guardedSchemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            guardedMenuService.insert(moduleMenu(schemeId, "客户", TreeAbility.ROOT_ID, "crm.customer"));
+            emptySchemeId = guardedSchemeService.insert(scheme("empty", MenuScopeType.TENANT, null));
+
+            assertThatThrownBy(() -> guardedSchemeService.delete(schemeId))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("menus exist");
+
+            assertThat(guardedSchemeService.delete(emptySchemeId)).isEqualTo(1);
         }
     }
 

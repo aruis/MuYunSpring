@@ -1,5 +1,12 @@
 import { computed, ref } from 'vue';
-import type { MenuOpenMode, MenuPageMode, MenuRecord, MenuScheme, MenuType } from '@muyun/web-contracts';
+import type {
+  CurrentUser,
+  MenuOpenMode,
+  MenuPageMode,
+  MenuRecord,
+  MenuScheme,
+  MenuType,
+} from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platform-components';
@@ -8,18 +15,24 @@ export type MenuSchemeMode = 'view' | 'edit' | 'create';
 export type MenuNodeMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 type MenuContextProvider = () => ModuleContext<MenuRecord>;
+type CurrentUserProvider = () => CurrentUser | undefined;
+
+export interface MenuManagementStateOptions {
+  currentUser?: CurrentUserProvider;
+}
 
 export function createMenuManagementState(
   schemeContext: ModuleContext<MenuScheme>,
   menuContextProvider: MenuContextProvider,
   confirmAction: ConfirmAction,
+  options: MenuManagementStateOptions = {},
 ) {
   const schemeReloadKey = ref(0);
   const menuReloadKey = ref(0);
   const schemes = ref<MenuScheme[]>([]);
   const selectedScheme = ref<MenuScheme>();
   const selectedMenu = ref<MenuRecord>();
-  const schemeDraft = ref<MenuScheme>(emptySchemeDraft());
+  const schemeDraft = ref<MenuScheme>(emptySchemeDraft(currentUser()));
   const menuDraft = ref<MenuRecord>(emptyMenuDraft());
   const schemeMode = ref<MenuSchemeMode>('view');
   const menuMode = ref<MenuNodeMode>('view');
@@ -121,7 +134,7 @@ export function createMenuManagementState(
       return;
     }
     selectedScheme.value = undefined;
-    schemeDraft.value = emptySchemeDraft();
+    schemeDraft.value = emptySchemeDraft(currentUser());
     schemeMode.value = 'create';
   }
 
@@ -134,7 +147,9 @@ export function createMenuManagementState(
   }
 
   function cancelSchemeEdit() {
-    schemeDraft.value = selectedScheme.value ? copyScheme(selectedScheme.value) : emptySchemeDraft();
+    schemeDraft.value = selectedScheme.value
+      ? copyScheme(selectedScheme.value)
+      : emptySchemeDraft(currentUser());
     schemeMode.value = selectedScheme.value ? 'view' : 'create';
   }
 
@@ -289,7 +304,7 @@ export function createMenuManagementState(
       execute: (scheme) => schemeContext.abilities.crud().delete(scheme.id!),
       onExecuted: () => {
         selectedScheme.value = undefined;
-        schemeDraft.value = emptySchemeDraft();
+        schemeDraft.value = emptySchemeDraft(currentUser());
         schemeMode.value = canCreateScheme.value ? 'create' : 'view';
         resetMenusForScheme();
         schemeReloadKey.value += 1;
@@ -330,6 +345,10 @@ export function createMenuManagementState(
 
   function menuContext() {
     return menuContextProvider();
+  }
+
+  function currentUser() {
+    return options.currentUser?.();
   }
 
   return {
@@ -389,12 +408,34 @@ export function menuTitleOf(record: MenuRecord | undefined) {
   );
 }
 
-export function emptySchemeDraft(): MenuScheme {
+export function emptySchemeDraft(currentUser?: CurrentUser): MenuScheme {
   return {
     alias: '',
     title: '',
-    scopeType: 'tenant',
+    ...defaultMenuSchemeScope(currentUser),
     enabled: true,
+  };
+}
+
+export function defaultMenuSchemeScope(
+  currentUser?: CurrentUser,
+): Pick<MenuScheme, 'tenantId' | 'scopeType' | 'scopeId'> {
+  if (currentUser?.system) {
+    return {
+      tenantId: undefined,
+      scopeType: 'system',
+      scopeId: 'system',
+    };
+  }
+  if (currentUser?.tenantId) {
+    return {
+      tenantId: currentUser.tenantId,
+      scopeType: 'tenant',
+      scopeId: currentUser.tenantId,
+    };
+  }
+  return {
+    scopeType: 'tenant',
   };
 }
 

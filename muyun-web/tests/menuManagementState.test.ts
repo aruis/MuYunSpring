@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createMenuManagementState,
+  defaultMenuSchemeScope,
   normalizeMenuDraft,
   normalizeSchemeDraft,
   validateMenu,
@@ -30,6 +31,41 @@ test('menu management normalizes scheme identity only on create', () => {
   });
   assert.equal(updated.id, 'scheme-1');
   assert.equal(updated.alias, 'admin');
+});
+
+test('menu management defaults scheme scope from current user identity', () => {
+  assert.deepEqual(defaultMenuSchemeScope({ userId: 'admin', username: 'admin', system: true }), {
+    tenantId: undefined,
+    scopeType: 'system',
+    scopeId: 'system',
+  });
+  assert.deepEqual(
+    defaultMenuSchemeScope({
+      userId: 'tenant-admin',
+      username: 'admin',
+      tenantId: 'tenant-a',
+      system: false,
+    }),
+    {
+      tenantId: 'tenant-a',
+      scopeType: 'tenant',
+      scopeId: 'tenant-a',
+    },
+  );
+  assert.deepEqual(
+    defaultMenuSchemeScope({
+      userId: 'org-admin',
+      username: 'admin',
+      tenantId: 'tenant-a',
+      organizationId: 'org-a',
+      system: false,
+    }),
+    {
+      tenantId: 'tenant-a',
+      scopeType: 'tenant',
+      scopeId: 'tenant-a',
+    },
+  );
 });
 
 test('menu management keeps only fields that match the selected menu type', () => {
@@ -123,6 +159,25 @@ test('menu management writes menus through the current scoped menu context', asy
     ['delete', 'menu-created'],
   ]);
   assert.deepEqual(schemeContext.calls, []);
+});
+
+test('menu management starts scheme creation with current user default scope', () => {
+  const schemeContext = createFakeContext<MenuScheme>('platform.menu_scheme');
+  const menuContext = createFakeContext<MenuRecord>('platform.menu-scheme/scheme-1/menus');
+  const state = createMenuManagementState(
+    schemeContext,
+    () => menuContext,
+    async () => true,
+    {
+      currentUser: () => ({ userId: 'admin', username: 'admin', system: true }),
+    },
+  );
+
+  state.startCreateScheme();
+
+  assert.equal(state.schemeDraft.value.scopeType, 'system');
+  assert.equal(state.schemeDraft.value.scopeId, 'system');
+  assert.equal(state.schemeDraft.value.tenantId, undefined);
 });
 
 function baseMenu(overrides: Partial<MenuRecord>): MenuRecord {

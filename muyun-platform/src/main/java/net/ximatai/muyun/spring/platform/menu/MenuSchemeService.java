@@ -24,9 +24,11 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
+import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implements
@@ -41,27 +43,37 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     public static final String ADMIN_SCHEME_ALIAS = "platform_admin";
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
     private final SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy;
+    private final Supplier<MenuService> menuServiceProvider;
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao) {
-        this(schemeDao, Optional.empty(), SystemMenuSchemeAccessPolicy.DENY_ALL);
+        this(schemeDao, Optional.empty(), SystemMenuSchemeAccessPolicy.DENY_ALL, null);
     }
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
                              Optional<OrganizationHierarchyService> organizationHierarchyService) {
-        this(schemeDao, organizationHierarchyService, SystemMenuSchemeAccessPolicy.DENY_ALL);
+        this(schemeDao, organizationHierarchyService, SystemMenuSchemeAccessPolicy.DENY_ALL, null);
     }
 
     @Autowired
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
                              Optional<OrganizationHierarchyService> organizationHierarchyService,
-                             Optional<SystemMenuSchemeAccessPolicy> systemMenuSchemeAccessPolicy) {
+                             Optional<SystemMenuSchemeAccessPolicy> systemMenuSchemeAccessPolicy,
+                             ObjectProvider<MenuService> menuServiceProvider) {
         this(schemeDao, organizationHierarchyService,
-                systemMenuSchemeAccessPolicy.orElse(SystemMenuSchemeAccessPolicy.DENY_ALL));
+                systemMenuSchemeAccessPolicy.orElse(SystemMenuSchemeAccessPolicy.DENY_ALL),
+                menuServiceProvider == null ? null : menuServiceProvider::getIfAvailable);
     }
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
                              Optional<OrganizationHierarchyService> organizationHierarchyService,
                              SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy) {
+        this(schemeDao, organizationHierarchyService, systemMenuSchemeAccessPolicy, null);
+    }
+
+    public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
+                             Optional<OrganizationHierarchyService> organizationHierarchyService,
+                             SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy,
+                             Supplier<MenuService> menuServiceProvider) {
         super(MODULE_ALIAS, MenuScheme.class, schemeDao);
         this.organizationHierarchyService = organizationHierarchyService == null
                 ? Optional.empty()
@@ -69,6 +81,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         this.systemMenuSchemeAccessPolicy = systemMenuSchemeAccessPolicy == null
                 ? SystemMenuSchemeAccessPolicy.DENY_ALL
                 : systemMenuSchemeAccessPolicy;
+        this.menuServiceProvider = menuServiceProvider;
     }
 
     @Override
@@ -87,6 +100,11 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     public void beforeUpdate(MenuScheme scheme) {
         validateImmutableIdentity(scheme);
         normalizeAndValidate(scheme);
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        rejectDeleteWhenMenusExist(id);
     }
 
     @Override
@@ -172,6 +190,20 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
                         .eq("scopeId", scheme.getScopeId())
                         .eq("alias", scheme.getAlias()),
                 "menuSchemeAlias must be unique within scope: " + scheme.getAlias());
+    }
+
+    private void rejectDeleteWhenMenusExist(String schemeId) {
+        if (schemeId == null || schemeId.isBlank() || menuServiceProvider == null) {
+            return;
+        }
+        MenuService menuService = menuServiceProvider.get();
+        if (menuService == null) {
+            return;
+        }
+        long menuCount = menuService.count(Criteria.of().eq("schemeId", schemeId));
+        if (menuCount > 0) {
+            throw new PlatformException("Menu scheme cannot be deleted while menus exist: " + schemeId);
+        }
     }
 
     private void validateImmutableIdentity(MenuScheme scheme) {

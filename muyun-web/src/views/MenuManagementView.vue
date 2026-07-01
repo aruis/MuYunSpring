@@ -19,6 +19,7 @@ import {
 import type { MenuRecord, MenuScheme, Option, PlatformModule } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, UiSelect, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
+import { useCurrentUserContext } from '../app/currentUserContext';
 import { createMenuManagementState, menuTitleOf, schemeTitleOf } from './menuManagementState';
 
 defineOptions({ name: 'MenuManagementView' });
@@ -26,6 +27,7 @@ defineOptions({ name: 'MenuManagementView' });
 const schemeContext = useModuleContext<MenuScheme>({ moduleAlias: 'platform.menu_scheme' });
 const menuBaseContext = useModuleContext<MenuRecord>({ moduleAlias: 'platform.menu' });
 const moduleContext = useModuleContext<PlatformModule>({ moduleAlias: 'platform.module' });
+const currentUser = useCurrentUserContext();
 const schemeSearchKeyword = ref('');
 const menuSearchKeyword = ref('');
 const {
@@ -62,7 +64,9 @@ const {
   toggleMenuEnabled,
   removeSelectedScheme,
   removeSelectedMenu,
-} = createMenuManagementState(schemeContext, () => menuContext.value, confirmAction);
+} = createMenuManagementState(schemeContext, () => menuContext.value, confirmAction, {
+  currentUser: () => currentUser?.value,
+});
 
 const menuContext = computed<ModuleContext<MenuRecord>>(() =>
   createScopedResourceTreeModuleContext<MenuRecord, MenuRecord>(menuBaseContext, {
