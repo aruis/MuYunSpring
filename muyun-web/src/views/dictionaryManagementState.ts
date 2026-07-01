@@ -8,7 +8,11 @@ import {
   type StaticModuleTreeClient,
 } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import {
+  createRecordEditorSessionState,
+  presentPlatformError,
+  presentPlatformMessage,
+} from '@muyun/platform-components';
 
 export type DictionaryCategoryMode = 'view' | 'edit' | 'create-root' | 'create-child';
 export type DictionaryItemMode = 'view' | 'edit' | 'create';
@@ -24,18 +28,30 @@ export function createDictionaryManagementState(
   const categoryReloadKey = ref(0);
   const itemReloadKey = ref(0);
   const categories = ref<DictionaryCategory[]>([]);
-  const selectedCategory = ref<DictionaryCategory>();
-  const categoryDraft = ref<DictionaryCategory>(
-    emptyDictionaryCategoryDraft(undefined, currentApplicationAlias()),
-  );
-  const categoryMode = ref<DictionaryCategoryMode>('view');
+  const categoryEditor = createRecordEditorSessionState<DictionaryCategory, DictionaryCategoryMode>({
+    viewMode: 'view',
+    createMode: 'create-root',
+    editMode: 'edit',
+    emptyDraft: () => emptyDictionaryCategoryDraft(undefined, currentApplicationAlias()),
+    copyRecord: copyDictionaryCategory,
+  });
+  const selectedCategory = categoryEditor.selected;
+  const categoryDraft = categoryEditor.draft;
+  const categoryMode = categoryEditor.mode;
   const categorySaving = ref(false);
   const categoryError = ref<string>();
 
   const items = ref<DictionaryItem[]>([]);
-  const selectedItem = ref<DictionaryItem>();
-  const itemDraft = ref<DictionaryItem>(emptyDictionaryItemDraft());
-  const itemMode = ref<DictionaryItemMode>('view');
+  const itemEditor = createRecordEditorSessionState<DictionaryItem, DictionaryItemMode>({
+    viewMode: 'view',
+    createMode: 'create',
+    editMode: 'edit',
+    emptyDraft: () => emptyDictionaryItemDraft(selectedCategory.value),
+    copyRecord: copyDictionaryItem,
+  });
+  const selectedItem = itemEditor.selected;
+  const itemDraft = itemEditor.draft;
+  const itemMode = itemEditor.mode;
   const itemLoading = ref(false);
   const itemSaving = ref(false);
   const itemError = ref<string>();
@@ -63,8 +79,8 @@ export function createDictionaryManagementState(
     }
     return categoryContext.can(itemToggleActionCode(selectedItem.value)) === true;
   });
-  const categoryReadonly = computed(() => categoryMode.value === 'view');
-  const itemReadonly = computed(() => itemMode.value === 'view');
+  const categoryReadonly = categoryEditor.readonly;
+  const itemReadonly = itemEditor.readonly;
   const categoryEditorTitle = computed(() => {
     if (categoryMode.value === 'create-root') {
       return '新建字典类目';
@@ -80,22 +96,21 @@ export function createDictionaryManagementState(
 
   function handleCategoriesLoaded(records: DictionaryCategory[]) {
     categories.value = records;
-    if (!selectedCategory.value?.id || !records.some((item) => item.id === selectedCategory.value?.id)) {
-      selectedCategory.value = records[0];
+    const matched = selectedCategory.value?.id
+      ? records.find((item) => item.id === selectedCategory.value?.id)
+      : undefined;
+    const next = matched ?? records[0];
+    if (next) {
+      categoryEditor.select(next);
     } else {
-      selectedCategory.value = records.find((item) => item.id === selectedCategory.value?.id);
+      categoryEditor.clearSelection();
     }
-    categoryDraft.value = selectedCategory.value
-      ? copyDictionaryCategory(selectedCategory.value)
-      : emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
     categoryMode.value = 'view';
     resetItemsForCategory();
   }
 
   function handleSelectCategory(record: DictionaryCategory) {
-    selectedCategory.value = record;
-    categoryDraft.value = copyDictionaryCategory(record);
-    categoryMode.value = 'view';
+    categoryEditor.select(record);
     resetItemsForCategory();
     clearCategoryFeedback();
     clearItemFeedback();
@@ -133,16 +148,12 @@ export function createDictionaryManagementState(
       presentCategoryMessage('当前用户无权编辑字典类目');
       return;
     }
-    categoryDraft.value = copyDictionaryCategory(selectedCategory.value);
-    categoryMode.value = 'edit';
+    categoryEditor.startEdit();
     clearCategoryFeedback();
   }
 
   function cancelCategoryEdit() {
-    categoryDraft.value = selectedCategory.value
-      ? copyDictionaryCategory(selectedCategory.value)
-      : emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
-    categoryMode.value = 'view';
+    categoryEditor.cancel();
     clearCategoryFeedback();
   }
 
@@ -169,8 +180,7 @@ export function createDictionaryManagementState(
           ? await crud.update(validDraft.id, validDraft)
           : await crud.insert(validDraft);
       const saved = result.record;
-      selectedCategory.value = saved;
-      categoryDraft.value = copyDictionaryCategory(saved);
+      categoryEditor.select(saved);
       categoryMode.value = 'view';
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
@@ -199,8 +209,7 @@ export function createDictionaryManagementState(
         selectedCategory.value.enabled === false
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
-      selectedCategory.value = await categoryClientOf().view(selectedCategory.value.id);
-      categoryDraft.value = copyDictionaryCategory(selectedCategory.value);
+      categoryEditor.select(await categoryClientOf().view(selectedCategory.value.id));
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
@@ -232,8 +241,7 @@ export function createDictionaryManagementState(
     try {
       await categoryContext.runtime.ready;
       const result = await categoryClientOf().delete(selectedCategory.value.id);
-      selectedCategory.value = undefined;
-      categoryDraft.value = emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
+      categoryEditor.clearSelection();
       categoryMode.value = 'view';
       presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
@@ -276,9 +284,7 @@ export function createDictionaryManagementState(
   }
 
   function selectItem(record: DictionaryItem) {
-    selectedItem.value = record;
-    itemDraft.value = copyDictionaryItem(record);
-    itemMode.value = 'view';
+    itemEditor.select(record);
     clearItemFeedback();
   }
 
@@ -291,9 +297,7 @@ export function createDictionaryManagementState(
       presentItemMessage('当前用户无权新增字典项');
       return;
     }
-    selectedItem.value = undefined;
-    itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
-    itemMode.value = 'create';
+    itemEditor.startCreate();
     clearItemFeedback();
   }
 
@@ -326,16 +330,12 @@ export function createDictionaryManagementState(
       presentItemMessage('当前用户无权编辑字典项');
       return;
     }
-    itemDraft.value = copyDictionaryItem(selectedItem.value);
-    itemMode.value = 'edit';
+    itemEditor.startEdit();
     clearItemFeedback();
   }
 
   function cancelItemEdit() {
-    itemDraft.value = selectedItem.value
-      ? copyDictionaryItem(selectedItem.value)
-      : emptyDictionaryItemDraft(selectedCategory.value);
-    itemMode.value = 'view';
+    itemEditor.cancel();
     clearItemFeedback();
   }
 
@@ -360,8 +360,7 @@ export function createDictionaryManagementState(
           ? await itemClient().update(validDraft.id, validDraft)
           : await itemClient().insert(validDraft);
       const saved = result.record;
-      selectedItem.value = saved;
-      itemDraft.value = copyDictionaryItem(saved);
+      itemEditor.select(saved);
       itemMode.value = 'view';
       presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
@@ -387,8 +386,7 @@ export function createDictionaryManagementState(
         selectedItem.value.enabled === false
           ? await itemClient().enable(selectedItem.value.id)
           : await itemClient().disable(selectedItem.value.id);
-      selectedItem.value = await itemClient().view(selectedItem.value.id);
-      itemDraft.value = copyDictionaryItem(selectedItem.value);
+      itemEditor.select(await itemClient().view(selectedItem.value.id));
       presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
     } catch (cause) {
@@ -419,9 +417,12 @@ export function createDictionaryManagementState(
     itemSaving.value = true;
     try {
       const result = await itemClient().delete(selectedItem.value.id);
-      selectedItem.value = undefined;
-      itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
-      itemMode.value = selectedCategoryIsDictionary.value && canCreateItem.value ? 'create' : 'view';
+      itemEditor.clearSelection();
+      if (selectedCategoryIsDictionary.value && canCreateItem.value) {
+        itemEditor.startCreate();
+      } else {
+        itemMode.value = 'view';
+      }
       presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
     } catch (cause) {
@@ -433,15 +434,13 @@ export function createDictionaryManagementState(
 
   function resetItemsForCategory() {
     items.value = [];
-    selectedItem.value = undefined;
-    itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
+    itemEditor.clearSelection();
     itemMode.value = 'view';
   }
 
   function resetForApplication() {
     categories.value = [];
-    selectedCategory.value = undefined;
-    categoryDraft.value = emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
+    categoryEditor.clearSelection();
     categoryMode.value = 'view';
     resetItemsForCategory();
     clearCategoryFeedback();
@@ -452,12 +451,16 @@ export function createDictionaryManagementState(
     const matched = selectedItem.value?.id
       ? items.value.find((item) => item.id === selectedItem.value?.id)
       : undefined;
-    selectedItem.value = matched ?? items.value[0];
+    const next = matched ?? items.value[0];
     if (itemMode.value === 'view') {
-      itemDraft.value = selectedItem.value
-        ? copyDictionaryItem(selectedItem.value)
-        : emptyDictionaryItemDraft(selectedCategory.value);
+      if (next) {
+        itemEditor.select(next);
+      } else {
+        itemEditor.clearSelection();
+      }
+      return;
     }
+    selectedItem.value = next;
   }
 
   function itemClient() {

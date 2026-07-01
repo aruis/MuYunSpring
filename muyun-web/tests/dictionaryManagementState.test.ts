@@ -412,6 +412,43 @@ test('dictionary management category editor opens only for explicit edit intents
   assert.equal(state.categoryMode.value, 'view');
 });
 
+test('dictionary management state cancels category creation back to selected category', () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient(),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+      enabled: true,
+    },
+  ]);
+
+  state.startCreateRootCategory();
+  state.categoryDraft.value.title = '临时根类目';
+  state.cancelCategoryEdit();
+
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryDraft.value.title, '状态字典');
+
+  state.startCreateChildCategory();
+  state.categoryDraft.value.title = '临时子类目';
+  state.cancelCategoryEdit();
+
+  assert.equal(state.selectedCategory.value?.id, 'category-status');
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryDraft.value.title, '状态字典');
+});
+
 function createContext(can: (actionCode: string) => boolean = () => true): ModuleContext<DictionaryCategory> {
   const crud: ModuleContext<DictionaryCategory>['crud'] = {
     query: async () => ({

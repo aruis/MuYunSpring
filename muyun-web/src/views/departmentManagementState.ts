@@ -2,7 +2,11 @@ import { computed, ref } from 'vue';
 import type { Department, Organization } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { executeStaticFormSave, executeStaticRecordAction } from '@muyun/platform-components';
+import {
+  createRecordEditorSessionState,
+  executeStaticFormSave,
+  executeStaticRecordAction,
+} from '@muyun/platform-components';
 
 export type DepartmentMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
@@ -16,15 +20,22 @@ export function createDepartmentManagementState(
   const organizations = ref<Organization[]>([]);
   const selectedOrganization = ref<Organization>();
   const departments = ref<Department[]>([]);
-  const selectedDepartment = ref<Department>();
-  const draft = ref<Department>(emptyDepartmentDraft());
-  const mode = ref<DepartmentMode>('view');
+  const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
+  const departmentEditor = createRecordEditorSessionState<Department, DepartmentMode>({
+    viewMode: 'view',
+    createMode: 'create-root',
+    editMode: 'edit',
+    emptyDraft: () => emptyDepartmentDraft(selectedOrganizationId.value),
+    copyRecord: copyDepartment,
+  });
+  const selectedDepartment = departmentEditor.selected;
+  const draft = departmentEditor.draft;
+  const mode = departmentEditor.mode;
   const saving = ref(false);
 
-  const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
   const selectedOrganizationTitle = computed(() => organizationTitleOf(selectedOrganization.value));
   const selectedDepartmentTitle = computed(() => departmentTitleOf(selectedDepartment.value));
-  const readonly = computed(() => mode.value === 'view');
+  const readonly = departmentEditor.readonly;
   const canCreate = computed(() => departmentContext.can('create') === true);
   const canUpdate = computed(() => departmentContext.can('update') === true);
   const canDelete = computed(() => departmentContext.can('delete') === true);
@@ -67,29 +78,27 @@ export function createDepartmentManagementState(
 
   function handleDepartmentsLoaded(records: Department[]) {
     departments.value = records;
-    if (!selectedDepartment.value?.id || !records.some((item) => item.id === selectedDepartment.value?.id)) {
-      selectedDepartment.value = records[0];
+    const matched = selectedDepartment.value?.id
+      ? records.find((item) => item.id === selectedDepartment.value?.id)
+      : undefined;
+    const next = matched ?? records[0];
+    if (next) {
+      departmentEditor.select(next);
     } else {
-      selectedDepartment.value = records.find((item) => item.id === selectedDepartment.value?.id);
+      departmentEditor.clearSelection();
     }
-    draft.value = selectedDepartment.value
-      ? copyDepartment(selectedDepartment.value)
-      : emptyDepartmentDraft(selectedOrganizationId.value);
     mode.value = 'view';
   }
 
   function selectDepartment(record: Department) {
-    selectedDepartment.value = record;
-    draft.value = copyDepartment(record);
-    mode.value = 'view';
+    departmentEditor.select(record);
   }
 
   function startCreateRoot() {
     if (!selectedOrganizationId.value || !canCreate.value) {
       return;
     }
-    selectedDepartment.value = undefined;
-    draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
+    departmentEditor.startCreate();
     mode.value = 'create-root';
   }
 
@@ -110,15 +119,11 @@ export function createDepartmentManagementState(
     if (!selectedDepartment.value || !canUpdate.value) {
       return;
     }
-    draft.value = copyDepartment(selectedDepartment.value);
-    mode.value = 'edit';
+    departmentEditor.startEdit();
   }
 
   function cancelEdit() {
-    draft.value = selectedDepartment.value
-      ? copyDepartment(selectedDepartment.value)
-      : emptyDepartmentDraft(selectedOrganizationId.value);
-    mode.value = 'view';
+    departmentEditor.cancel();
   }
 
   async function save() {
@@ -143,8 +148,7 @@ export function createDepartmentManagementState(
         return saveMode === 'edit' && record.id ? crud.update(record.id, record) : crud.insert(record);
       },
       onSaved: ({ record }) => {
-        selectedDepartment.value = record;
-        draft.value = copyDepartment(record);
+        departmentEditor.select(record);
         mode.value = 'view';
         departmentReloadKey.value += 1;
       },
@@ -165,8 +169,7 @@ export function createDepartmentManagementState(
       },
       onExecuted: async (_, department) => {
         const refreshed = await departmentContext.abilities.crud().view(department.id!);
-        selectedDepartment.value = refreshed;
-        draft.value = copyDepartment(refreshed);
+        departmentEditor.select(refreshed);
         departmentReloadKey.value += 1;
       },
     });
@@ -188,8 +191,7 @@ export function createDepartmentManagementState(
         }),
       execute: (department) => departmentContext.abilities.crud().delete(department.id!),
       onExecuted: () => {
-        selectedDepartment.value = undefined;
-        draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
+        departmentEditor.clearSelection();
         mode.value = 'view';
         departmentReloadKey.value += 1;
       },
@@ -198,8 +200,7 @@ export function createDepartmentManagementState(
 
   function resetDepartmentsForOrganization() {
     departments.value = [];
-    selectedDepartment.value = undefined;
-    draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
+    departmentEditor.clearSelection();
     mode.value = 'view';
     departmentReloadKey.value += 1;
   }
