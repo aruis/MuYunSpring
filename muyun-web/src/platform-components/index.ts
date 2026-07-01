@@ -5,6 +5,7 @@ export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as RecordActionBar } from './RecordActionBar.vue';
 export { default as RecordDetailDrawer } from './RecordDetailDrawer.vue';
+export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export { default as RecordFormFields } from './RecordFormFields.vue';
@@ -39,6 +40,7 @@ export type {
 export { resolveRecordPickerMode } from './recordPickerModel';
 export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
+export type { RecordDetailDisplayResolver, RecordDetailDisplayValue } from './recordDetailFieldModel';
 export type { RecordListExplorerRecord } from './RecordListExplorer.vue';
 export type { QueryListRecord, RecordQueryListColumn } from './RecordQueryListPanel.vue';
 export type {
@@ -55,6 +57,7 @@ export {
   defaultCrudRecordListTitle,
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
+export { resolveRecordDetailDisplayValue } from './recordDetailFieldModel';
 export {
   childResourceDefaultFormViewCode,
   resolveRecordFormFieldNames,

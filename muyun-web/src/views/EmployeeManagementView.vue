@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import {
   RecordActionBar,
   RecordDetailDrawer,
+  RecordDetailFields,
   RecordExplorerPanel,
   RecordFormFields,
   RecordMetaSection,
@@ -24,13 +25,21 @@ import {
   resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
-import { UiInput, confirmAction } from '@muyun/vue-ui-antdv';
+import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
 import type { Department, Employee, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import {
+  canSwitchEmployeeDetailContext,
+  isEmployeeFormDisabled,
+  shouldCommitEmployeeDetailRequest,
+  shouldCloseEmployeeDetailOnCancel,
+  shouldShowEmployeeDetailContent,
+  validateEmployeeRequiredFormFields,
+  type EmployeeDetailMode,
+} from './employeeDetailStateModel';
 
 defineOptions({ name: 'EmployeeManagementView' });
 
-type EmployeeDetailMode = 'view' | 'create' | 'edit';
 type EmployeeFormFieldName =
   | 'organizationId'
   | 'departmentId'
@@ -41,6 +50,12 @@ type EmployeeFormFieldName =
   | 'email'
   | 'enabled';
 type EmployeeFormPickerFieldName = 'departmentId';
+
+const employeeRequiredFormFieldNames = [
+  'departmentId',
+  'employeeNo',
+  'title',
+] as const satisfies readonly EmployeeFormFieldName[];
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
@@ -54,8 +69,12 @@ const selectedEmployeeKey = ref<string>();
 const selectedEmployee = ref<Employee>();
 const employeeDetailOpen = ref(false);
 const employeeDetailMode = ref<EmployeeDetailMode>('view');
+const loadingEmployeeDetail = ref(false);
+const employeeDetailLoadFailed = ref(false);
 const savingEmployee = ref(false);
+const employeeDetailRequestSeq = ref(0);
 const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
+const employeeDetailDepartment = ref<Department>();
 
 const employeeListContext = computed(() => employeeContext as unknown as ModuleContext<QueryListRecord>);
 const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
@@ -95,16 +114,33 @@ const employeeDetailTitle = computed(() => {
   }
   return employeeTitle(selectedEmployee.value ?? employeeDraft.value);
 });
-const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
-const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
+const employeeFormDisabled = computed(() =>
+  isEmployeeFormDisabled({
+    mode: employeeDetailMode.value,
+    loadingDetail: loadingEmployeeDetail.value,
+    saving: savingEmployee.value,
+    selectedEmployeeId: selectedEmployee.value?.id,
+  }),
+);
+const showEmployeeDetailContent = computed(() =>
+  shouldShowEmployeeDetailContent({
+    mode: employeeDetailMode.value,
+    loadingDetail: loadingEmployeeDetail.value,
+    loadFailed: employeeDetailLoadFailed.value,
+    selectedEmployeeId: selectedEmployee.value?.id,
+  }),
+);
 const canSaveEmployee = computed(() => {
+  if (loadingEmployeeDetail.value) {
+    return false;
+  }
   if (employeeDetailMode.value === 'create') {
     return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
   }
   return Boolean(selectedEmployee.value?.id) && employeeContext.can('update') === true;
 });
 const canToggleEmployee = computed(() => {
-  if (!selectedEmployee.value?.id) {
+  if (loadingEmployeeDetail.value || !selectedEmployee.value?.id) {
     return false;
   }
   return employeeContext.can(employeeToggleActionCode(selectedEmployee.value)) === true;
@@ -115,8 +151,15 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
       return [];
     }
     return [
-      { key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit' },
-      { key: 'delete', actionCode: 'delete', title: '删除', iconName: 'delete', danger: true },
+      { key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit', disabled: savingEmployee.value },
+      {
+        key: 'delete',
+        actionCode: 'delete',
+        title: '删除',
+        iconName: 'delete',
+        danger: true,
+        disabled: savingEmployee.value,
+      },
     ];
   }
   return [
@@ -163,11 +206,32 @@ function employeeFormVisible(fieldName: EmployeeFormFieldName) {
   return employeeFormField(fieldName).visible;
 }
 
+function canLeaveEmployeeDetailContext() {
+  return canSwitchEmployeeDetailContext({ saving: savingEmployee.value });
+}
+
 function updateEmployeeDraftField(fieldName: string, value: string | number | boolean | undefined) {
   employeeDraft.value = {
     ...employeeDraft.value,
     [fieldName]: value,
   };
+}
+
+function employeeDetailDisplayValue(
+  fieldName: string,
+  value: unknown,
+): string | number | boolean | undefined | null {
+  if (fieldName === 'organizationId') {
+    return selectedOrganization.value?.title ?? selectedOrganization.value?.id ?? String(value ?? '');
+  }
+  if (fieldName === 'departmentId') {
+    const department = employeeDetailDepartment.value;
+    if (department && department.id === value) {
+      return departmentTitle(department);
+    }
+    return undefined;
+  }
+  return undefined;
 }
 
 function handleOrganizationsLoaded(records: Organization[]) {
@@ -177,9 +241,15 @@ function handleOrganizationsLoaded(records: Organization[]) {
 }
 
 function selectOrganization(record: Organization) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   selectedOrganization.value = record;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+  employeeDetailDepartment.value = undefined;
   closeEmployeeDetail();
 }
 
@@ -188,16 +258,37 @@ function refreshOrganizations() {
 }
 
 function selectEmployee(record: QueryListRecord) {
-  selectedEmployeeKey.value = String(record.id ?? '');
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
+  const nextKey = String(record.id ?? '');
+  const currentDetailId = String(selectedEmployee.value?.id ?? employeeDraft.value.id ?? '');
+  selectedEmployeeKey.value = nextKey;
+  if (employeeDetailOpen.value && currentDetailId !== nextKey) {
+    employeeDetailRequestSeq.value += 1;
+    loadingEmployeeDetail.value = false;
+    employeeDetailLoadFailed.value = false;
+    employeeDetailDepartment.value = undefined;
+    selectedEmployee.value = undefined;
+    employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+    employeeDetailOpen.value = false;
+    employeeDetailMode.value = 'view';
+  }
 }
 
 function handleEmployeeListAction(action: RecordActionItem) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'create') {
     startCreateEmployee();
   }
 }
 
 function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'view') {
     void openEmployeeDetail(record, 'view');
     return;
@@ -212,10 +303,16 @@ function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: Query
 }
 
 function handleEmployeeRowDblclick(record: QueryListRecord) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   void openEmployeeDetail(record, 'view');
 }
 
 function startCreateEmployee() {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (!selectedOrganizationId.value) {
     presentPlatformMessage('请先选择机构', { phase: 'validation' });
     return;
@@ -224,6 +321,10 @@ function startCreateEmployee() {
   selectedEmployee.value = undefined;
   selectedEmployeeKey.value = undefined;
   employeeDetailMode.value = 'create';
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+  employeeDetailRequestSeq.value += 1;
+  employeeDetailDepartment.value = undefined;
   employeeDetailOpen.value = true;
 }
 
@@ -231,14 +332,40 @@ function closeEmployeeDetail() {
   if (savingEmployee.value) {
     return;
   }
+  employeeDetailRequestSeq.value += 1;
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
   employeeDetailOpen.value = false;
   employeeDetailMode.value = 'view';
+  employeeDetailDepartment.value = undefined;
   employeeDraft.value = selectedEmployee.value
     ? copyEmployee(selectedEmployee.value)
     : createEmployeeDraft(selectedOrganizationId.value);
 }
 
+function cancelEmployeeDetail() {
+  if (savingEmployee.value) {
+    return;
+  }
+  if (
+    shouldCloseEmployeeDetailOnCancel({
+      mode: employeeDetailMode.value,
+      selectedEmployeeId: selectedEmployee.value?.id,
+    })
+  ) {
+    closeEmployeeDetail();
+    return;
+  }
+  employeeDraft.value = copyEmployee(selectedEmployee.value!);
+  employeeDetailMode.value = 'view';
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+}
+
 async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailMode) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   const id = String(record.id ?? '');
   if (!id) {
     return;
@@ -246,36 +373,76 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
   selectedEmployeeKey.value = id;
   employeeDetailOpen.value = true;
   employeeDetailMode.value = mode;
-  selectedEmployee.value = record as Employee;
+  selectedEmployee.value = undefined;
   employeeDraft.value = copyEmployee(record as Employee);
+  employeeDetailDepartment.value = undefined;
+  loadingEmployeeDetail.value = true;
+  employeeDetailLoadFailed.value = false;
+  const requestSeq = employeeDetailRequestSeq.value + 1;
+  employeeDetailRequestSeq.value = requestSeq;
+  const canCommitRequest = () =>
+    shouldCommitEmployeeDetailRequest({
+      activeRequestSeq: employeeDetailRequestSeq.value,
+      requestSeq,
+      selectedEmployeeKey: selectedEmployeeKey.value,
+      recordId: id,
+    });
   try {
     const fullRecord = await employeeContext.crud.view(id);
+    if (!canCommitRequest()) {
+      return;
+    }
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
+    employeeDetailLoadFailed.value = false;
+    await loadEmployeeDetailDepartment(fullRecord, requestSeq);
   } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    if (canCommitRequest()) {
+      employeeDetailLoadFailed.value = true;
+      presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    }
+  } finally {
+    if (canCommitRequest()) {
+      loadingEmployeeDetail.value = false;
+    }
   }
 }
 
 function handleEmployeeDetailAction(action: RecordActionItem) {
   if (action.key === 'cancel') {
-    closeEmployeeDetail();
+    cancelEmployeeDetail();
     return;
   }
   if (action.key === 'save') {
     void saveEmployee();
     return;
   }
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'edit') {
-    if (selectedEmployee.value) {
-      employeeDraft.value = copyEmployee(selectedEmployee.value);
+    if (!selectedEmployee.value || loadingEmployeeDetail.value) {
+      return;
     }
+    employeeDraft.value = copyEmployee(selectedEmployee.value);
     employeeDetailMode.value = 'edit';
     return;
   }
   if (action.key === 'delete') {
     void removeEmployee(selectedEmployee.value);
   }
+}
+
+function retryEmployeeDetail() {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
+  const id = String(employeeDraft.value.id ?? selectedEmployeeKey.value ?? '');
+  if (!id) {
+    return;
+  }
+  const mode = employeeDetailMode.value === 'create' ? 'view' : employeeDetailMode.value;
+  void openEmployeeDetail({ ...employeeDraft.value, id } as QueryListRecord, mode);
 }
 
 async function saveEmployee() {
@@ -287,19 +454,15 @@ async function saveEmployee() {
     canSave: () => canSaveEmployee.value,
     deniedMessage: '当前用户无权保存职员',
     createRecord: () => normalizedEmployeeDraft(employeeDraft.value, selectedOrganizationId.value ?? ''),
-    validateRecord: (draft) =>
-      draft.departmentId && draft.employeeNo && draft.title ? undefined : '请填写部门、职员编号和职员姓名',
+    validateRecord: validateEmployeeDraft,
     save: (draft, mode) =>
       mode === 'edit' && selectedEmployee.value?.id
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
         : employeeContext.crud.insert(draft),
     onSaved: ({ record }) => {
-      selectedEmployee.value = record;
-      employeeDraft.value = copyEmployee(record);
-      selectedEmployeeKey.value = record.id;
-      employeeDetailMode.value = 'view';
-      employeeDetailOpen.value = true;
+      const requestSeq = commitEmployeeDetailRecord(record);
       employeeReloadKey.value += 1;
+      void loadEmployeeDetailDepartment(record, requestSeq);
     },
   });
 }
@@ -317,8 +480,8 @@ async function toggleEmployeeEnabled() {
         : employeeContext.crud.disable(employee.id!),
     onExecuted: async (_, employee) => {
       const refreshed = await employeeContext.crud.view(employee.id!);
-      selectedEmployee.value = refreshed;
-      employeeDraft.value = copyEmployee(refreshed);
+      const requestSeq = commitEmployeeDetailRecord(refreshed);
+      await loadEmployeeDetailDepartment(refreshed, requestSeq);
       employeeReloadKey.value += 1;
     },
   });
@@ -345,6 +508,10 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         selectedEmployeeKey.value = undefined;
         selectedEmployee.value = undefined;
         employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+        loadingEmployeeDetail.value = false;
+        employeeDetailLoadFailed.value = false;
+        employeeDetailRequestSeq.value += 1;
+        employeeDetailDepartment.value = undefined;
         employeeDetailOpen.value = false;
         employeeDetailMode.value = 'view';
       }
@@ -377,6 +544,68 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
   } as Employee;
+}
+
+function validateEmployeeDraft(draft: Employee) {
+  return validateEmployeeRequiredFormFields(
+    employeeRequiredFormFieldNames.map((fieldName) => {
+      const field = employeeFormField(fieldName);
+      return {
+        fieldName,
+        label: field.label,
+        required: field.required,
+        visible: field.visible,
+        value: draft[fieldName],
+      };
+    }),
+  );
+}
+
+function commitEmployeeDetailRecord(record: Employee) {
+  selectedEmployee.value = record;
+  employeeDraft.value = copyEmployee(record);
+  selectedEmployeeKey.value = record.id;
+  employeeDetailMode.value = 'view';
+  employeeDetailOpen.value = true;
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+  const requestSeq = employeeDetailRequestSeq.value + 1;
+  employeeDetailRequestSeq.value = requestSeq;
+  return requestSeq;
+}
+
+function canCommitEmployeeDetailSideEffect(recordId: string | undefined, requestSeq: number) {
+  return (
+    Boolean(recordId) &&
+    shouldCommitEmployeeDetailRequest({
+      activeRequestSeq: employeeDetailRequestSeq.value,
+      requestSeq,
+      selectedEmployeeKey: selectedEmployeeKey.value,
+      recordId: recordId ?? '',
+    })
+  );
+}
+
+async function loadEmployeeDetailDepartment(
+  record: Partial<Employee>,
+  requestSeq = employeeDetailRequestSeq.value,
+) {
+  employeeDetailDepartment.value = undefined;
+  const employeeId = record.id;
+  const departmentId = record.departmentId;
+  if (!departmentId) {
+    return;
+  }
+  try {
+    const department = await departmentContext.crud.view(departmentId);
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
+      employeeDetailDepartment.value = department;
+    }
+  } catch (cause) {
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
+      presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    }
+  }
 }
 
 function employeeTitle(record: Partial<Employee> | QueryListRecord | undefined) {
@@ -503,25 +732,42 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
         />
       </template>
 
-      <form class="employee-form" @submit.prevent="saveEmployee">
-        <label v-if="employeeFormVisible('organizationId')">
-          <span class="employee-form-label">
-            {{ employeeFormLabel('organizationId') }}
-            <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
-          </span>
-          <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
-        </label>
-        <RecordFormFields
+      <UiSpin v-if="loadingEmployeeDetail" class="employee-detail-state" tip="加载职员详情" />
+      <div v-else-if="employeeDetailLoadFailed" class="employee-detail-state">
+        <UiError title="详情加载失败" message="无法加载职员详情，请重试" />
+        <UiButton type="primary" icon-name="reload" @click="retryEmployeeDetail">重试</UiButton>
+      </div>
+
+      <template v-else-if="showEmployeeDetailContent">
+        <RecordDetailFields
+          v-if="employeeDetailMode === 'view'"
           :record="employeeDraft as RecordFormRecord"
           :fields="employeeFormFieldDefinitions"
-          :exclude-field-names="['organizationId']"
           :fallback="employeeFormFieldFallback"
           :picker-configs="employeeFormPickerConfigs"
-          :disabled="employeeFormDisabled"
-          @update:field="updateEmployeeDraftField"
+          :display-of="employeeDetailDisplayValue"
         />
-      </form>
-      <RecordMetaSection v-if="employeeDetailMode !== 'create'" :record="employeeDraft" show-sort-order />
+
+        <form v-else class="employee-form" @submit.prevent="saveEmployee">
+          <label v-if="employeeFormVisible('organizationId')">
+            <span class="employee-form-label">
+              {{ employeeFormLabel('organizationId') }}
+              <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
+            </span>
+            <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
+          </label>
+          <RecordFormFields
+            :record="employeeDraft as RecordFormRecord"
+            :fields="employeeFormFieldDefinitions"
+            :exclude-field-names="['organizationId']"
+            :fallback="employeeFormFieldFallback"
+            :picker-configs="employeeFormPickerConfigs"
+            :disabled="employeeFormDisabled"
+            @update:field="updateEmployeeDraftField"
+          />
+        </form>
+        <RecordMetaSection v-if="employeeDetailMode !== 'create'" :record="employeeDraft" show-sort-order />
+      </template>
     </RecordDetailDrawer>
   </section>
 </template>
@@ -564,6 +810,13 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 .employee-form-label strong {
   color: #d92d20;
   font-weight: 600;
+}
+
+.employee-detail-state {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 180px;
 }
 
 @media (max-width: 900px) {

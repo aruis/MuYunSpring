@@ -373,6 +373,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /create-title="新建职员"/);
   assert.match(employeeViewSource, /@action="handleEmployeeListAction"/);
   assert.match(indexSource, /RecordDetailDrawer/);
+  assert.match(indexSource, /RecordDetailFields/);
   assert.match(drawerSource, /closeOnOutside\?: boolean/);
   assert.match(drawerSource, /handleDocumentPointerDown/);
   assert.match(employeeViewSource, /<RecordDetailDrawer/);
@@ -391,6 +392,11 @@ test('employee management uses organization scope and platform query list panel'
     /employeeFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/,
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
+  assert.match(employeeViewSource, /<RecordDetailFields/);
+  assert.match(employeeViewSource, /v-if="employeeDetailMode === 'view'"/);
+  assert.match(employeeViewSource, /<form v-else class="employee-form"/);
+  assert.match(employeeViewSource, /:display-of="employeeDetailDisplayValue"/);
+  assert.match(employeeViewSource, /function employeeDetailDisplayValue/);
   assert.match(employeeViewSource, /resolveRecordFormFieldState/);
   assert.match(employeeViewSource, /:exclude-field-names="\['organizationId'\]"/);
   assert.doesNotMatch(employeeViewSource, /const employeeStandardFormFields = computed/);
@@ -417,9 +423,71 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /<span>所属部门<\/span>/);
   assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
   assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
+  assert.match(employeeViewSource, /const loadingEmployeeDetail = ref\(false\)/);
+  assert.match(employeeViewSource, /const employeeDetailLoadFailed = ref\(false\)/);
+  assert.match(employeeViewSource, /const employeeDetailRequestSeq = ref\(0\)/);
+  assert.match(employeeViewSource, /isEmployeeFormDisabled/);
+  assert.match(employeeViewSource, /shouldShowEmployeeDetailContent/);
+  assert.match(employeeViewSource, /shouldCloseEmployeeDetailOnCancel/);
+  assert.match(employeeViewSource, /canSwitchEmployeeDetailContext/);
+  assert.match(employeeViewSource, /function canLeaveEmployeeDetailContext\(\)/);
+  assert.match(employeeViewSource, /canSwitchEmployeeDetailContext\(\{ saving: savingEmployee\.value \}\)/);
+  assert.match(employeeViewSource, /if \(!canLeaveEmployeeDetailContext\(\)\) \{\s*return;\s*\}/);
+  assert.match(employeeViewSource, /key: 'edit'[\s\S]*disabled: savingEmployee\.value/);
+  assert.match(employeeViewSource, /key: 'delete'[\s\S]*disabled: savingEmployee\.value/);
+  assert.match(employeeViewSource, /selectedEmployeeId: selectedEmployee\.value\?\.id/);
+  assert.match(
+    employeeViewSource,
+    /const currentDetailId = String\(selectedEmployee\.value\?\.id \?\? employeeDraft\.value\.id \?\? ''\)/,
+  );
+  assert.match(employeeViewSource, /employeeDetailOpen\.value && currentDetailId !== nextKey/);
+  assert.match(employeeViewSource, /employeeDetailOpen\.value = false/);
   assert.match(employeeViewSource, /const canSaveEmployee = computed/);
+  assert.match(employeeViewSource, /if \(loadingEmployeeDetail\.value\) \{\s*return false;\s*\}/);
   assert.match(employeeViewSource, /const canToggleEmployee = computed/);
+  assert.match(employeeViewSource, /loadingEmployeeDetail\.value \|\| !selectedEmployee\.value\?\.id/);
   assert.match(employeeViewSource, /function employeeToggleActionCode/);
+  assert.match(
+    employeeViewSource,
+    /selectedEmployee\.value = undefined;\s*employeeDraft\.value = copyEmployee/,
+  );
+  assert.doesNotMatch(employeeViewSource, /selectedEmployee\.value = record as Employee/);
+  assert.match(employeeViewSource, /const requestSeq = employeeDetailRequestSeq\.value \+ 1/);
+  assert.match(employeeViewSource, /employeeDetailRequestSeq\.value = requestSeq/);
+  assert.match(employeeViewSource, /shouldCommitEmployeeDetailRequest/);
+  assert.match(employeeViewSource, /const canCommitRequest = \(\) =>/);
+  assert.match(employeeViewSource, /if \(!canCommitRequest\(\)\)/);
+  assert.match(employeeViewSource, /if \(canCommitRequest\(\)\) \{\s*employeeDetailLoadFailed\.value = true/);
+  assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
+  assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
+  assert.match(employeeViewSource, /function canCommitEmployeeDetailSideEffect/);
+  assert.match(employeeViewSource, /activeRequestSeq: employeeDetailRequestSeq\.value/);
+  assert.match(employeeViewSource, /selectedEmployeeKey: selectedEmployeeKey\.value/);
+  assert.match(employeeViewSource, /if \(canCommitEmployeeDetailSideEffect\(employeeId, requestSeq\)\)/);
+  assert.match(employeeViewSource, /function cancelEmployeeDetail\(\)/);
+  assert.match(
+    employeeViewSource,
+    /function cancelEmployeeDetail[\s\S]*shouldCloseEmployeeDetailOnCancel[\s\S]*closeEmployeeDetail\(\)/,
+  );
+  assert.match(
+    employeeViewSource,
+    /function cancelEmployeeDetail[\s\S]*employeeDraft\.value = copyEmployee\(selectedEmployee\.value!\)[\s\S]*employeeDetailMode\.value = 'view'/,
+  );
+  assert.match(
+    employeeViewSource,
+    /if \(action\.key === 'cancel'\) \{\s*cancelEmployeeDetail\(\);\s*return;\s*\}/,
+  );
+  assert.match(
+    employeeViewSource,
+    /function handleEmployeeDetailAction[\s\S]*if \(!canLeaveEmployeeDetailContext\(\)\) \{\s*return;\s*\}[\s\S]*if \(action\.key === 'edit'\)/,
+  );
+  assert.match(employeeViewSource, /if \(!selectedEmployee\.value \|\| loadingEmployeeDetail\.value\)/);
+  assert.match(employeeViewSource, /function retryEmployeeDetail/);
+  assert.match(employeeViewSource, /<UiSpin v-if="loadingEmployeeDetail"/);
+  assert.match(employeeViewSource, /v-else-if="employeeDetailLoadFailed"/);
+  assert.match(employeeViewSource, /<UiError title="详情加载失败"/);
+  assert.match(employeeViewSource, /@click="retryEmployeeDetail"/);
+  assert.match(employeeViewSource, /v-else-if="showEmployeeDetailContent"/);
   assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
   assert.match(employeeViewSource, /executeStaticRecordAction/);
   assert.match(
@@ -427,12 +495,24 @@ test('employee management uses organization scope and platform query list panel'
     /validateContext: \(\) => \(selectedOrganizationId\.value \? undefined : '请先选择机构'\)/,
   );
   assert.match(employeeViewSource, /canSave: \(\) => canSaveEmployee\.value/);
-  assert.match(employeeViewSource, /validateRecord: \(draft\) =>/);
+  assert.match(employeeViewSource, /validateRecord: validateEmployeeDraft/);
+  assert.match(employeeViewSource, /function validateEmployeeDraft\(draft: Employee\)/);
+  assert.match(employeeViewSource, /validateEmployeeRequiredFormFields/);
+  assert.match(employeeViewSource, /const employeeRequiredFormFieldNames = \[/);
+  assert.doesNotMatch(employeeViewSource, /draft\.departmentId && draft\.employeeNo && draft\.title/);
+  assert.match(
+    employeeViewSource,
+    /onSaved: \(\{ record \}\) => \{\s*const requestSeq = commitEmployeeDetailRecord\(record\)[\s\S]*void loadEmployeeDetailDepartment\(record, requestSeq\)/,
+  );
   assert.match(employeeViewSource, /当前用户无权保存职员/);
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
   assert.match(employeeViewSource, /canExecute: \(\) => canToggleEmployee\.value/);
   assert.match(employeeViewSource, /employeeContext\.crud\.enable\(employee\.id!\)/);
   assert.match(employeeViewSource, /employeeContext\.crud\.disable\(employee\.id!\)/);
+  assert.match(
+    employeeViewSource,
+    /const refreshed = await employeeContext\.crud\.view\(employee\.id!\);\s*const requestSeq = commitEmployeeDetailRecord\(refreshed\);\s*await loadEmployeeDetailDepartment\(refreshed, requestSeq\)/,
+  );
   assert.match(employeeViewSource, /confirm: \(target\) =>[\s\S]*title: '删除职员'/);
   assert.match(employeeViewSource, /content: `确认删除职员/);
   assert.match(employeeViewSource, /employeeContext\.crud\.delete\(String\(target\.id\)\)/);
