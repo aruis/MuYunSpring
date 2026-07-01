@@ -29,7 +29,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
@@ -456,7 +456,7 @@ class PlatformDynamicRuntimeRefresherIT {
     private Menu moduleMenu(String schemeId, String title, String moduleAlias) {
         Menu menu = new Menu();
         menu.setSchemeId(schemeId);
-        menu.setMenuType(MenuType.MODULE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         menu.setTitle(title);

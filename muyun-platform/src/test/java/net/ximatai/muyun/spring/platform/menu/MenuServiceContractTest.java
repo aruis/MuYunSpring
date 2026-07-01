@@ -213,7 +213,7 @@ class MenuServiceContractTest {
             moduleWithoutOpenMode.setOpenMode(null);
             assertThatThrownBy(() -> menuService.insert(moduleWithoutOpenMode))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("MODULE menu requires openMode");
+                    .hasMessageContaining("ENTRY menu requires openMode");
         }
     }
 
@@ -352,7 +352,7 @@ class MenuServiceContractTest {
                     schemeId, "客户", TreeAbility.ROOT_ID, "crm.route_customer"));
 
             assertThat(menuService.select(menuId)).satisfies(menu -> {
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
+                assertThat(menu.getNodeType()).isEqualTo(MenuNodeType.ENTRY);
                 assertThat(menu.getRoute()).isEqualTo("/crm/customers");
                 assertThat(menu.getModuleAlias()).isEqualTo("crm.route_customer");
                 assertThat(menu.getPageMode()).isNull();
@@ -580,7 +580,7 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.GROUP);
+        menu.setNodeType(MenuNodeType.GROUP);
         return menu;
     }
 
@@ -589,7 +589,7 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.MODULE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -600,7 +600,7 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.ROUTE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -611,7 +611,7 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.LINK);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;

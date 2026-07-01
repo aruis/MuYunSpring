@@ -36,31 +36,11 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     return undefined;
   }
 
-  if (menu.menuType === 'module' && menu.openMode && menu.moduleAlias) {
-    return {
-      menuId: menu.id,
-      menuType: 'module',
-      openMode: menu.openMode,
-      moduleAlias: menu.moduleAlias,
-      pageMode: menu.pageMode,
-      defaultUiConfigId: menu.defaultUiConfigId,
-      defaultQueryTemplateId: menu.defaultQueryTemplateId,
-      entryParamsJson: menu.entryParamsJson,
-    };
+  if (menu.nodeType !== 'entry' || !menu.openMode || !menu.moduleAlias) {
+    return undefined;
   }
 
-  if (menu.menuType === 'route' && menu.openMode && menu.route) {
-    return {
-      menuId: menu.id,
-      menuType: 'route',
-      openMode: menu.openMode,
-      route: menu.route,
-      moduleAlias: menu.moduleAlias,
-      entryParamsJson: menu.entryParamsJson,
-    };
-  }
-
-  if (menu.menuType === 'link' && menu.openMode && menu.externalUrl) {
+  if (menu.externalUrl) {
     return {
       menuId: menu.id,
       menuType: 'link',
@@ -71,7 +51,27 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     };
   }
 
-  return undefined;
+  if (menu.route) {
+    return {
+      menuId: menu.id,
+      menuType: 'route',
+      openMode: menu.openMode,
+      route: menu.route,
+      moduleAlias: menu.moduleAlias,
+      entryParamsJson: menu.entryParamsJson,
+    };
+  }
+
+  return {
+    menuId: menu.id,
+    menuType: 'module',
+    openMode: menu.openMode,
+    moduleAlias: menu.moduleAlias,
+    pageMode: menu.pageMode,
+    defaultUiConfigId: menu.defaultUiConfigId,
+    defaultQueryTemplateId: menu.defaultQueryTemplateId,
+    entryParamsJson: menu.entryParamsJson,
+  };
 }
 
 export function isTabMenuTarget(target: MenuNavigationTarget): boolean {

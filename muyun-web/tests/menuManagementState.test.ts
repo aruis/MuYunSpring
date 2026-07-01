@@ -68,20 +68,20 @@ test('menu management defaults scheme scope from current user identity', () => {
   );
 });
 
-test('menu management keeps only fields that match the selected menu type', () => {
+test('menu management keeps only fields that match the selected node type', () => {
   const moduleMenu = normalizeMenuDraft(
-    baseMenu({ menuType: 'module', moduleAlias: ' platform.menu ' }),
+    baseMenu({ nodeType: 'entry', moduleAlias: ' platform.menu ' }),
     'scheme-1',
   );
   const routeMenu = normalizeMenuDraft(
-    baseMenu({ menuType: 'route', moduleAlias: ' platform.menu_scheme ' }),
+    baseMenu({ nodeType: 'entry', moduleAlias: ' platform.menu_scheme ' }),
     'scheme-1',
   );
   const linkMenu = normalizeMenuDraft(
-    baseMenu({ menuType: 'link', moduleAlias: ' platform.docs ' }),
+    baseMenu({ nodeType: 'entry', moduleAlias: ' platform.docs ' }),
     'scheme-1',
   );
-  const groupMenu = normalizeMenuDraft(baseMenu({ menuType: 'group' }), 'scheme-1');
+  const groupMenu = normalizeMenuDraft(baseMenu({ nodeType: 'group' }), 'scheme-1');
 
   assert.equal(moduleMenu.moduleAlias, 'platform.menu');
   assert.equal(moduleMenu.route, undefined);
@@ -96,23 +96,13 @@ test('menu management keeps only fields that match the selected menu type', () =
   assert.equal(groupMenu.moduleAlias, undefined);
 });
 
-test('menu management validates required target by menu type', () => {
-  assert.equal(validateMenu(baseMenu({ menuType: 'group' })), undefined);
+test('menu management validates required target by node type', () => {
+  assert.equal(validateMenu(baseMenu({ nodeType: 'group' })), undefined);
   assert.equal(
-    validateMenu(baseMenu({ menuType: 'module', moduleAlias: undefined })),
-    '模块菜单必须选择模块',
+    validateMenu(baseMenu({ nodeType: 'entry', moduleAlias: undefined })),
+    '入口菜单必须选择模块入口',
   );
-  assert.equal(
-    validateMenu(baseMenu({ menuType: 'route', moduleAlias: undefined })),
-    '非分组菜单必须选择模块入口',
-  );
-  assert.equal(
-    validateMenu(baseMenu({ menuType: 'link', moduleAlias: undefined })),
-    '非分组菜单必须选择模块入口',
-  );
-  assert.equal(validateMenu(baseMenu({ menuType: 'module', moduleAlias: 'platform.menu' })), undefined);
-  assert.equal(validateMenu(baseMenu({ menuType: 'route', moduleAlias: 'platform.menu_scheme' })), undefined);
-  assert.equal(validateMenu(baseMenu({ menuType: 'link', moduleAlias: 'platform.docs' })), undefined);
+  assert.equal(validateMenu(baseMenu({ nodeType: 'entry', moduleAlias: 'platform.menu' })), undefined);
 });
 
 test('menu management writes menus through the current scoped menu context', async () => {
@@ -133,7 +123,7 @@ test('menu management writes menus through the current scoped menu context', asy
     id: 'menu-created',
     schemeId: 'scheme-1',
     title: '菜单',
-    menuType: 'module',
+    nodeType: 'entry',
     moduleAlias: 'platform.menu_scheme',
   });
   await state.saveMenu();
@@ -143,7 +133,7 @@ test('menu management writes menus through the current scoped menu context', asy
       id: 'menu-created',
       schemeId: 'scheme-1',
       title: '菜单',
-      menuType: 'module',
+      nodeType: 'entry',
       moduleAlias: 'platform.menu_scheme',
       openMode: 'tab',
       enabled: true,
@@ -185,7 +175,7 @@ function baseMenu(overrides: Partial<MenuRecord>): MenuRecord {
     id: 'menu-1',
     schemeId: 'scheme-1',
     title: '菜单',
-    menuType: 'group',
+    nodeType: 'group',
     openMode: 'tab',
     moduleAlias: 'dirty.module',
     route: '/dirty',

@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -64,7 +64,8 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         desired.setSchemeId(schemeId);
         String route = module.route().trim();
         String externalUrl = module.externalUrl().trim();
-        desired.setMenuType(menuType(module));
+        validateModuleEntry(module, route, externalUrl);
+        desired.setNodeType(MenuNodeType.ENTRY);
         desired.setOpenMode(menu.openMode());
         desired.setParentId(menu.parent());
         desired.setTitle(menu.title().isBlank() ? module.title() : menu.title().trim());
@@ -77,20 +78,11 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         return InitialDataDeclaration.reconcileManaged(menuService, desired);
     }
 
-    private MenuType menuType(PlatformStaticModule module) {
-        boolean hasRoute = !module.route().isBlank();
-        boolean hasExternalUrl = !module.externalUrl().isBlank();
-        if (hasRoute && hasExternalUrl) {
+    private void validateModuleEntry(PlatformStaticModule module, String route, String externalUrl) {
+        if (!route.isBlank() && !externalUrl.isBlank()) {
             throw new IllegalStateException("@PlatformStaticModule cannot declare both route and externalUrl: "
                     + module.alias());
         }
-        if (hasRoute) {
-            return MenuType.ROUTE;
-        }
-        if (hasExternalUrl) {
-            return MenuType.LINK;
-        }
-        return MenuType.MODULE;
     }
 
     private String moduleMenuId(String moduleAlias) {

@@ -23,7 +23,7 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
@@ -157,7 +157,7 @@ class PlatformUiConfigurationServiceContractTest {
         Menu menu = new Menu();
         menu.setId("menu-1");
         menu.setTitle("Contracts");
-        menu.setMenuType(MenuType.MODULE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias("crm.contract");
         menu.setPageMode(MenuPageMode.LIST);
@@ -195,7 +195,7 @@ class PlatformUiConfigurationServiceContractTest {
         Menu menu = new Menu();
         menu.setId("menu-virtual");
         menu.setTitle("Customers");
-        menu.setMenuType(MenuType.MODULE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias("crm.customer");
         menu.setPageMode(MenuPageMode.LIST);

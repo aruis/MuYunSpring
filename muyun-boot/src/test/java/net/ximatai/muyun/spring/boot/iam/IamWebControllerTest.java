@@ -45,7 +45,7 @@ import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -606,11 +606,11 @@ class IamWebControllerTest {
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
 
-        Menu group = menu("group-1", "scheme-1", MenuType.GROUP, null);
-        Menu contract = menu("menu-1", "scheme-1", MenuType.MODULE, "sales.contract");
-        Menu organization = menu("menu-2", "scheme-1", MenuType.ROUTE, "iam.organization");
+        Menu group = menu("group-1", "scheme-1", MenuNodeType.GROUP, null);
+        Menu contract = menu("menu-1", "scheme-1", MenuNodeType.ENTRY, "sales.contract");
+        Menu organization = menu("menu-2", "scheme-1", MenuNodeType.ENTRY, "iam.organization");
         organization.setRoute("/iam/organizations");
-        Menu docs = menu("menu-3", "scheme-1", MenuType.LINK, "platform.docs");
+        Menu docs = menu("menu-3", "scheme-1", MenuNodeType.ENTRY, "platform.docs");
         docs.setExternalUrl("https://example.com/docs");
         when(menuService.rootMenus("scheme-1")).thenReturn(List.of(group));
         when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract, organization, docs));
@@ -749,12 +749,12 @@ class IamWebControllerTest {
         return grant;
     }
 
-    private Menu menu(String id, String schemeId, MenuType menuType, String moduleAlias) {
+    private Menu menu(String id, String schemeId, MenuNodeType nodeType, String moduleAlias) {
         Menu menu = new Menu();
         menu.setId(id);
         menu.setSchemeId(schemeId);
-        menu.setMenuType(menuType);
-        if (menuType != MenuType.GROUP) {
+        menu.setNodeType(nodeType);
+        if (nodeType != MenuNodeType.GROUP) {
             menu.setOpenMode(MenuOpenMode.TAB);
         }
         menu.setModuleAlias(moduleAlias);

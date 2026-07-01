@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionRefreshStrategy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.menu.MenuNodeType;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
@@ -74,8 +74,8 @@ public class PlatformPageBootstrapService {
         if (menu == null) {
             throw new PlatformException("Menu is not visible or does not exist: " + menuId);
         }
-        if (menu.getMenuType() != MenuType.MODULE) {
-            throw new PlatformException("Page bootstrap requires MODULE menu: " + menuId);
+        if (!isModuleEntryMenu(menu)) {
+            throw new PlatformException("Page bootstrap requires module entry menu: " + menuId);
         }
         PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(menu.getModuleAlias());
         MenuPageMode pageMode = menu.getPageMode() == null ? MenuPageMode.LIST : menu.getPageMode();
@@ -148,6 +148,12 @@ public class PlatformPageBootstrapService {
                 .map(PlatformUiConfig::getId)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean isModuleEntryMenu(Menu menu) {
+        return menu.getNodeType() == MenuNodeType.ENTRY
+                && (menu.getRoute() == null || menu.getRoute().isBlank())
+                && (menu.getExternalUrl() == null || menu.getExternalUrl().isBlank());
     }
 
     private String resolveDefaultQueryTemplateId(PlatformPageConfigSnapshot snapshot, String requestedTemplateId) {

@@ -15,7 +15,7 @@ const menus: MenuTreeNode[] = [
       id: 'platform',
       schemeId: 'default',
       title: '平台管理',
-      menuType: 'group',
+      nodeType: 'group',
     },
     children: [
       {
@@ -23,7 +23,7 @@ const menus: MenuTreeNode[] = [
           id: 'config',
           schemeId: 'default',
           title: '平台配置',
-          menuType: 'group',
+          nodeType: 'group',
         },
         children: [
           {
@@ -31,7 +31,7 @@ const menus: MenuTreeNode[] = [
               id: 'dictionary',
               schemeId: 'default',
               title: '字典管理',
-              menuType: 'module',
+              nodeType: 'entry',
               openMode: 'tab',
               moduleAlias: 'platform.dictionary_category',
             },
@@ -41,7 +41,7 @@ const menus: MenuTreeNode[] = [
                   id: 'dictionary-items',
                   schemeId: 'default',
                   title: '字典项',
-                  menuType: 'module',
+                  nodeType: 'entry',
                   openMode: 'tab',
                   moduleAlias: 'platform.dictionary_item',
                   enabled: false,

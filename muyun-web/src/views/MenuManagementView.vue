@@ -137,26 +137,19 @@ const scopeTypeOptions: Option[] = [
   { label: '租户', value: 'tenant' },
   { label: '机构', value: 'organization' },
 ];
-const menuTypeOptions: Option[] = [
+const nodeTypeOptions: Option[] = [
   { label: '分组', value: 'group' },
-  { label: '模块', value: 'module' },
-  { label: '路由', value: 'route' },
-  { label: '外链', value: 'link' },
+  { label: '入口', value: 'entry' },
 ];
 const openModeOptions: Option[] = [
   { label: '页签', value: 'tab' },
   { label: '新窗口', value: 'window' },
 ];
-const pageModeOptions: Option[] = [
-  { label: '列表', value: 'LIST' },
-  { label: '表单', value: 'FORM' },
-  { label: '详情', value: 'DETAIL' },
-];
 const menuParentPickerContext = computed(() => menuContext.value);
 const menuParentPickerConstraints = computed(() => parentRecordConstraints(menuDraft.value.id));
 const menuFormDisabled = computed(() => menuReadonly.value || savingMenu.value);
 const schemeIdentityReadonly = computed(() => schemeMode.value !== 'create' || savingScheme.value);
-const menuType = computed(() => menuDraft.value.menuType ?? 'group');
+const nodeType = computed(() => menuDraft.value.nodeType ?? 'group');
 const schemeEditorVisible = computed(() => schemeMode.value !== 'view');
 
 function schemeSubtitle(record: CrudRecordListBase) {
@@ -185,7 +178,7 @@ function menuTagOf(record: TreeRecordBase) {
   if (menu.enabled === false) {
     return '停用';
   }
-  return menuTypeTitle(menu.menuType);
+  return menuNodeTitle(menu);
 }
 
 function menuFilterOption(record: TreeRecordBase, keyword: string) {
@@ -278,8 +271,17 @@ function scopeTypeTitle(value: MenuScheme['scopeType']) {
   return scopeTypeOptions.find((item) => item.value === value)?.label ?? '租户';
 }
 
-function menuTypeTitle(value: MenuRecord['menuType']) {
-  return menuTypeOptions.find((item) => item.value === value)?.label ?? '分组';
+function menuNodeTitle(menu: MenuRecord) {
+  if (menu.nodeType !== 'entry') {
+    return '分组';
+  }
+  if (menu.externalUrl) {
+    return '外链入口';
+  }
+  if (menu.route) {
+    return '路由入口';
+  }
+  return '模块入口';
 }
 </script>
 
@@ -472,15 +474,15 @@ function menuTypeTitle(value: MenuRecord['menuType']) {
             />
           </label>
           <label>
-            <span>菜单类型</span>
+            <span>节点类型</span>
             <UiSelect
-              v-model:value="menuDraft.menuType"
-              :options="menuTypeOptions"
+              v-model:value="menuDraft.nodeType"
+              :options="nodeTypeOptions"
               :disabled="menuFormDisabled"
               :allow-clear="false"
             />
           </label>
-          <label v-if="menuType !== 'group'">
+          <label v-if="nodeType === 'entry'">
             <span>打开方式</span>
             <UiSelect
               v-model:value="menuDraft.openMode"
@@ -489,7 +491,7 @@ function menuTypeTitle(value: MenuRecord['menuType']) {
               :allow-clear="false"
             />
           </label>
-          <label v-if="menuType !== 'group'">
+          <label v-if="nodeType === 'entry'">
             <span>模块入口</span>
             <RecordPicker
               v-model:value="menuDraft.moduleAlias"
@@ -501,24 +503,7 @@ function menuTypeTitle(value: MenuRecord['menuType']) {
               :description-of="(record) => moduleDescription(record as PlatformModule)"
             />
           </label>
-          <label v-if="menuType === 'module'">
-            <span>页面模式</span>
-            <UiSelect
-              v-model:value="menuDraft.pageMode"
-              :options="pageModeOptions"
-              placeholder="默认列表"
-              :disabled="menuFormDisabled"
-            />
-          </label>
-          <label v-if="menuType === 'module'">
-            <span>默认 UI 配置</span>
-            <UiInput v-model:value="menuDraft.defaultUiConfigId" :disabled="menuFormDisabled" />
-          </label>
-          <label v-if="menuType === 'module'">
-            <span>默认查询模板</span>
-            <UiInput v-model:value="menuDraft.defaultQueryTemplateId" :disabled="menuFormDisabled" />
-          </label>
-          <label v-if="menuType === 'module' || menuType === 'route'" class="full-row">
+          <label v-if="nodeType === 'entry'" class="full-row">
             <span>入口参数 JSON</span>
             <UiInput v-model:value="menuDraft.entryParamsJson" :disabled="menuFormDisabled" />
           </label>

@@ -103,7 +103,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, Menu.class, java.util.List.of("id", "schemeId", "parentId", "title", "menuType", "moduleAlias", "route", "externalUrl", "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, Menu.class, java.util.List.of("id", "schemeId", "parentId", "title", "nodeType", "moduleAlias", "route", "externalUrl", "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
@@ -139,7 +139,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         menu.setId(id);
         menu.setSchemeId(MenuSchemeService.ADMIN_SCHEME_ID);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.GROUP);
+        menu.setNodeType(MenuNodeType.GROUP);
         menu.setTitle(title);
         menu.setEnabled(Boolean.TRUE);
         menu.setSortOrder(sortOrder);
@@ -229,12 +229,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         if (!visiting.add(menu.getId())) {
             return false;
         }
-        MenuType type = menu.getMenuType() == null ? MenuType.GROUP : menu.getMenuType();
+        MenuNodeType type = menu.getNodeType() == null ? MenuNodeType.GROUP : menu.getNodeType();
         try {
             if (isModuleEntryMenu(menu)) {
                 return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
             }
-            if (type == MenuType.GROUP) {
+            if (type == MenuNodeType.GROUP) {
                 return !visibleChildren(schemeId, menu.getId(), visiting).isEmpty();
             }
             return true;
@@ -275,14 +275,14 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private boolean isModuleEntryMenu(Menu menu) {
-        return menu.getMenuType() != MenuType.GROUP && hasText(menu.getModuleAlias());
+        return menu.getNodeType() == MenuNodeType.ENTRY && hasText(menu.getModuleAlias());
     }
 
     private void normalizeAndValidate(Menu menu) {
         MenuScheme scheme = requireScheme(menu.getSchemeId());
         menu.setTenantId(scheme.getTenantId());
-        if (menu.getMenuType() == null) {
-            menu.setMenuType(MenuType.GROUP);
+        if (menu.getNodeType() == null) {
+            menu.setNodeType(MenuNodeType.GROUP);
         }
         normalizeTarget(menu);
         validateParentScheme(menu);
@@ -300,7 +300,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private void normalizeTarget(Menu menu) {
-        switch (menu.getMenuType()) {
+        switch (menu.getNodeType()) {
             case GROUP -> {
                 requireNoOpenMode(menu);
                 requireBlank(menu.getModuleAlias(), "GROUP menu cannot have moduleAlias");
@@ -308,17 +308,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
                 requireBlankEntry(menu, "GROUP menu cannot have low-code entry config");
             }
-            case MODULE -> {
-                requireOpenMode(menu);
-                PlatformModule module = requireModuleEntry(menu);
-                syncModuleEntry(menu, module);
-            }
-            case ROUTE -> {
-                requireOpenMode(menu);
-                PlatformModule module = requireModuleEntry(menu);
-                syncModuleEntry(menu, module);
-            }
-            case LINK -> {
+            case ENTRY -> {
                 requireOpenMode(menu);
                 PlatformModule module = requireModuleEntry(menu);
                 syncModuleEntry(menu, module);
@@ -328,7 +318,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private void requireOpenMode(Menu menu) {
         if (menu.getOpenMode() == null) {
-            throw new PlatformException(menu.getMenuType() + " menu requires openMode");
+            throw new PlatformException(menu.getNodeType() + " menu requires openMode");
         }
     }
 
@@ -347,11 +337,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private PlatformModule requireModuleEntry(Menu menu) {
-        requireText(menu.getModuleAlias(), menu.getMenuType() + " menu requires moduleAlias");
+        requireText(menu.getModuleAlias(), menu.getNodeType() + " menu requires moduleAlias");
         String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
         if (module == null) {
-            throw new PlatformException(menu.getMenuType() + " menu requires existing module: " + moduleAlias);
+            throw new PlatformException(menu.getNodeType() + " menu requires existing module: " + moduleAlias);
         }
         menu.setModuleAlias(moduleAlias);
         return module;
@@ -359,7 +349,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private void syncModuleEntry(Menu menu, PlatformModule module) {
         ModuleEntryType entryType = module.getEntryType() == null ? ModuleEntryType.MODULE : module.getEntryType();
-        menu.setMenuType(menuType(entryType));
+        menu.setNodeType(MenuNodeType.ENTRY);
         switch (entryType) {
             case MODULE -> {
                 menu.setRoute(null);
@@ -377,14 +367,6 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 clearLowCodeEntry(menu);
             }
         }
-    }
-
-    private MenuType menuType(ModuleEntryType entryType) {
-        return switch (entryType) {
-            case MODULE -> MenuType.MODULE;
-            case ROUTE -> MenuType.ROUTE;
-            case LINK -> MenuType.LINK;
-        };
     }
 
     private void clearLowCodeEntry(Menu menu) {

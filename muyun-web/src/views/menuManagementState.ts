@@ -1,11 +1,11 @@
 import { computed, ref } from 'vue';
 import type {
   CurrentUser,
+  MenuNodeType,
   MenuOpenMode,
   MenuPageMode,
   MenuRecord,
   MenuScheme,
-  MenuType,
 } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
@@ -444,7 +444,7 @@ export function emptyMenuDraft(schemeId?: string): MenuRecord {
     id: '',
     schemeId: schemeId ?? '',
     title: '',
-    menuType: 'group',
+    nodeType: 'group',
     openMode: undefined,
     enabled: true,
   };
@@ -475,23 +475,22 @@ export function normalizeSchemeDraft(
 }
 
 export function normalizeMenuDraft(record: MenuRecord, schemeId: string | undefined): MenuRecord {
-  const menuType = normalizeMenuType(record.menuType);
+  const nodeType = normalizeNodeType(record.nodeType);
   const normalized: MenuRecord = {
     ...record,
     id: record.id?.trim(),
     schemeId: record.schemeId || schemeId || '',
     parentId: normalizeBlank(record.parentId),
     title: record.title?.trim() ?? '',
-    menuType,
-    openMode: menuType === 'group' ? undefined : normalizeOpenMode(record.openMode),
-    moduleAlias: menuType === 'group' ? undefined : normalizeBlank(record.moduleAlias),
+    nodeType,
+    openMode: nodeType === 'group' ? undefined : normalizeOpenMode(record.openMode),
+    moduleAlias: nodeType === 'group' ? undefined : normalizeBlank(record.moduleAlias),
     route: undefined,
     externalUrl: undefined,
-    pageMode: menuType === 'module' ? normalizePageMode(record.pageMode) : undefined,
-    defaultUiConfigId: menuType === 'module' ? normalizeBlank(record.defaultUiConfigId) : undefined,
-    defaultQueryTemplateId: menuType === 'module' ? normalizeBlank(record.defaultQueryTemplateId) : undefined,
-    entryParamsJson:
-      menuType === 'module' || menuType === 'route' ? normalizeBlank(record.entryParamsJson) : undefined,
+    pageMode: nodeType === 'entry' ? normalizePageMode(record.pageMode) : undefined,
+    defaultUiConfigId: nodeType === 'entry' ? normalizeBlank(record.defaultUiConfigId) : undefined,
+    defaultQueryTemplateId: nodeType === 'entry' ? normalizeBlank(record.defaultQueryTemplateId) : undefined,
+    entryParamsJson: nodeType === 'entry' ? normalizeBlank(record.entryParamsJson) : undefined,
   };
   return normalized;
 }
@@ -501,17 +500,14 @@ export function isValidScheme(record: MenuScheme) {
 }
 
 export function validateMenu(record: MenuRecord) {
-  if (!record.schemeId || !record.title || !record.menuType) {
-    return '所属方案、菜单名称和菜单类型不能为空';
+  if (!record.schemeId || !record.title || !record.nodeType) {
+    return '所属方案、菜单名称和节点类型不能为空';
   }
-  if (record.menuType !== 'group' && !record.openMode) {
-    return '非分组菜单必须选择打开方式';
+  if (record.nodeType === 'entry' && !record.openMode) {
+    return '入口菜单必须选择打开方式';
   }
-  if (record.menuType === 'module' && !record.moduleAlias) {
-    return '模块菜单必须选择模块';
-  }
-  if (record.menuType !== 'group' && !record.moduleAlias) {
-    return '非分组菜单必须选择模块入口';
+  if (record.nodeType === 'entry' && !record.moduleAlias) {
+    return '入口菜单必须选择模块入口';
   }
   return undefined;
 }
@@ -520,8 +516,8 @@ function normalizeScopeType(value: MenuScheme['scopeType']) {
   return value === 'system' || value === 'organization' ? value : 'tenant';
 }
 
-function normalizeMenuType(value: MenuType | undefined): MenuType {
-  if (value === 'module' || value === 'route' || value === 'link') {
+function normalizeNodeType(value: MenuNodeType | undefined): MenuNodeType {
+  if (value === 'entry') {
     return value;
   }
   return 'group';

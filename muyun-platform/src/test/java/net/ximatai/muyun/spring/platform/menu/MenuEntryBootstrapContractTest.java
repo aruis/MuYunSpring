@@ -496,7 +496,7 @@ class MenuEntryBootstrapContractTest {
         menu.setSchemeId(schemeId);
         menu.setParentId(TreeAbility.ROOT_ID);
         menu.setTitle(title);
-        menu.setMenuType(MenuType.MODULE);
+        menu.setNodeType(MenuNodeType.ENTRY);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -507,7 +507,7 @@ class MenuEntryBootstrapContractTest {
         menu.setSchemeId(schemeId);
         menu.setParentId(TreeAbility.ROOT_ID);
         menu.setTitle(title);
-        menu.setMenuType(MenuType.GROUP);
+        menu.setNodeType(MenuNodeType.GROUP);
         return menu;
     }
 

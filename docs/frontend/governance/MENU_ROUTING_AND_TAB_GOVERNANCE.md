@@ -94,7 +94,8 @@ MenuRecord
 
 | 字段或语义                                     | 当前作用                                                  | 风险与观察点                                                                                                         |
 | ---------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `menuType`                                     | 区分分组、模块、路由、外链等入口类型。                    | 如果继续扩展 online app 或 micro app，不宜把所有新入口都塞进 `link`。                                                |
+| `nodeType`                                     | 后端菜单树节点类型，只区分分组和入口。                    | 入口具体是动态模块、内部路由还是外链，应优先由模块入口配置表达，不在菜单层重复建模。                                 |
+| `MenuNavigationTarget.menuType`                | 前端 resolver 的解析结果，区分 `module`、`route`、`link`。 | 这是前端承载和页签治理语义，不是后端菜单模型字段；不要把它反向作为权限或菜单配置主体。                               |
 | `route`                                        | 表达平台 route、offline 业务 path、routeName 或 pageKey。 | 字段容易过载；新增能力应通过结构化 target 或 resolver 规则区分语义。                                                 |
 | `openMode`                                     | 表达菜单入口在 Workbench 页签还是外部窗口打开。           | 使用 `tab` / `window`，不按 URL 形态隐式推断承载方式；`group` 不配置。                                               |
 | `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | URL 只表达目标，不表达打开方式；`link + tab` 由前端编译为 iframe，`link + window` 打开新窗口。                       |
@@ -111,7 +112,7 @@ MenuRecord
 3. 页面入口需要参与配置校验、权限、审计或配置包迁移，但只存在不可校验的 JSON 或 URL。
 4. URL 恢复需要跨菜单方案、跨租户或跨环境稳定，但只依赖当前菜单树 `menuId`。
 
-后端菜单 `openMode` 是业务打开方式，只表达 `tab` 或 `window`。前端 resolver 再结合 `menuType` 编译成内部 `PageDescriptor.openMode`：`module + tab` 进入 dynamic runner，`route + tab` 进入 route host，`link + tab` 进入 iframe，`window` 入口点击时打开新窗口。不要根据 URL 是相对路径、同源地址还是绝对地址推断打开方式。
+后端菜单 `openMode` 是业务打开方式，只表达 `tab` 或 `window`。前端 resolver 先结合菜单入口快照编译出 `MenuNavigationTarget.menuType`，再生成内部 `PageDescriptor.openMode`：`module + tab` 进入 dynamic runner，`route + tab` 进入 route host，`link + tab` 进入 iframe，`window` 入口点击时打开新窗口。不要根据 URL 是相对路径、同源地址还是绝对地址推断打开方式。
 
 建议长期保留以下 host 概念：
 
