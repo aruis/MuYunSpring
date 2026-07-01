@@ -28,7 +28,6 @@ const {
   cardTitle,
   readonly,
   aliasReadonly,
-  isPlatformTenant,
   canDelete,
   canEnable,
   handleListLoaded,
@@ -41,7 +40,7 @@ const {
   removeSelected,
 } = createTenantManagementState(tenantContext, confirmAction);
 
-const enabledReadonly = computed(() => isPlatformTenant.value && draft.value.enabled !== false);
+const enabledReadonly = computed(() => false);
 
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -112,7 +111,6 @@ function handleCardAction(action: RecordActionItem) {
     sidebar-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
-    :muted-message="isPlatformTenant ? '平台租户是系统内置身份根，不能删除或停用。' : undefined"
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>

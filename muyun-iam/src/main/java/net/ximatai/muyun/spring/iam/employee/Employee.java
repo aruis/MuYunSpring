@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
@@ -14,6 +15,10 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Setter
 @Table(name = "iam_employee", comment = "Employee")
 @CompositeIndex(columns = {"tenant_id", "organization_id", "employee_no"}, unique = true)
+@InitialDataFields(
+        managed = {"organizationId", "departmentId", "employeeNo"},
+        operator = {"title", "gender", "mobile", "email", "enabled", "sortOrder"}
+)
 public class Employee extends StandardEnabledSortableEntity {
     @Column(name = "organization_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Organization id")

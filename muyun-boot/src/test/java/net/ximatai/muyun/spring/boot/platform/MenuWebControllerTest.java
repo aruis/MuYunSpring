@@ -21,7 +21,6 @@ import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,8 +57,8 @@ class MenuWebControllerTest {
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setMessageConverters(codeTitleEnumConverter())
                 .build();
-        Menu root = menu("root-1", "scheme-1", "业务中心", null, MenuType.GROUP);
-        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer", MenuType.MODULE);
+        Menu root = menu("root-1", "scheme-1", "业务中心", null);
+        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
         when(menuService.currentUserVisibleRootMenus()).thenReturn(List.of(root));
         when(menuService.visibleChildren("scheme-1", "root-1")).thenReturn(List.of(child));
         when(menuService.visibleChildren("scheme-1", "menu-1")).thenReturn(List.of());
@@ -81,8 +80,8 @@ class MenuWebControllerTest {
                 .addFilters(new CurrentUserWebFilter(new BearerTokenCurrentUserProvider(sessionService)))
                 .build();
         CurrentUser currentUser = CurrentUser.tenantUser("user-1", "alice", "tenant-a", "dept-1");
-        Menu root = menu("root-1", "scheme-1", "业务中心", null, MenuType.GROUP);
-        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer", MenuType.MODULE);
+        Menu root = menu("root-1", "scheme-1", "业务中心", null);
+        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
         when(sessionService.currentUser("token-1")).thenReturn(Optional.of(currentUser));
         when(menuService.currentUserVisibleRootMenus()).thenAnswer(invocation -> {
             assertThat(CurrentUserContext.currentUser()).contains(currentUser);
@@ -167,9 +166,9 @@ class MenuWebControllerTest {
         MenuService menuService = mock(MenuService.class);
         MenuManagementWebController controller = new MenuManagementWebController();
         ReflectionTestUtils.setField(controller, "service", menuService);
-        Menu root = menu("root-1", "scheme-1", "业务中心", null, MenuType.GROUP);
-        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer", MenuType.MODULE);
-        Menu inserted = menu("menu-2", "scheme-1", "订单", "crm.order", MenuType.MODULE);
+        Menu root = menu("root-1", "scheme-1", "业务中心", null);
+        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
+        Menu inserted = menu("menu-2", "scheme-1", "订单", "crm.order");
         when(menuService.rootMenus("scheme-1")).thenReturn(List.of(root));
         when(menuService.children("scheme-1", "root-1")).thenReturn(List.of(child));
         when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
@@ -186,7 +185,7 @@ class MenuWebControllerTest {
         mvc.perform(post("/platform.menu-scheme/scheme-1/menus/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"schemeId":"other-scheme","parentId":"root-1","title":"订单","menuType":"module","moduleAlias":"crm.order"}
+                                {"schemeId":"other-scheme","parentId":"root-1","title":"订单","moduleAlias":"crm.order"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.record.schemeId").value("scheme-1"));
@@ -201,7 +200,7 @@ class MenuWebControllerTest {
         MenuService menuService = mock(MenuService.class);
         MenuManagementWebController controller = new MenuManagementWebController();
         ReflectionTestUtils.setField(controller, "service", menuService);
-        when(menuService.select("menu-1")).thenReturn(menu("menu-1", "other-scheme", "客户", "crm.customer", MenuType.MODULE));
+        when(menuService.select("menu-1")).thenReturn(menu("menu-1", "other-scheme", "客户", "crm.customer"));
 
         org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
         request.setAttribute(org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
@@ -212,14 +211,13 @@ class MenuWebControllerTest {
                 .hasMessageContaining("menu does not belong to scheme");
     }
 
-    private Menu menu(String id, String schemeId, String title, String moduleAlias, MenuType type) {
+    private Menu menu(String id, String schemeId, String title, String moduleAlias) {
         Menu menu = new Menu();
         menu.setId(id);
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setModuleAlias(moduleAlias);
-        menu.setMenuType(type);
-        if (type != MenuType.GROUP) {
+        if (moduleAlias != null && !moduleAlias.isBlank()) {
             menu.setOpenMode(MenuOpenMode.TAB);
         }
         menu.setEnabled(Boolean.TRUE);

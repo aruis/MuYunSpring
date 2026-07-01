@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAddSignEditMode;
@@ -46,7 +45,6 @@ class PlatformEnumContractTest {
         assertEnumContract(ModuleKind.class);
         assertEnumContract(RelationRole.class);
         assertEnumContract(MenuScopeType.class);
-        assertEnumContract(MenuType.class);
         assertEnumContract(MenuOpenMode.class);
         assertEnumContract(DictionaryCategoryKind.class);
         assertEnumContract(WorkflowDefinitionStatus.class);

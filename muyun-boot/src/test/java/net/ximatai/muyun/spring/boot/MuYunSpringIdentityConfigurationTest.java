@@ -89,14 +89,14 @@ class MuYunSpringIdentityConfigurationTest {
     }
 
     @Test
-    void shouldLimitSystemMenuFallbackToPlatformSuperAdminTenant() {
+    void shouldNotFallbackTenantUsersToSystemMenuSchemeByDefault() {
         contextRunner.run(context -> {
             SystemMenuSchemeAccessPolicy policy = context.getBean(SystemMenuSchemeAccessPolicy.class);
 
             assertThat(policy.canUseSystemMenuScheme(CurrentUser.tenantUser(
                     UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
                     UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
-                    TenantService.PLATFORM_TENANT_ID))).isTrue();
+                    "platform"))).isFalse();
             assertThat(policy.canUseSystemMenuScheme(CurrentUser.tenantUser(
                     UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
                     UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,

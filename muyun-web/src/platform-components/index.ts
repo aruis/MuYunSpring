@@ -69,8 +69,10 @@ export {
   createEmptyStaticTreeClient,
   createStaticTreeResourceModuleContext,
 } from './staticTreeResourceModuleContext';
+export { createScopedResourceTreeModuleContext } from './scopedResourceTreeModuleContext';
 export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
+export { createRecordEditorSessionState } from './recordEditorSessionState';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
 export type {
@@ -78,6 +80,7 @@ export type {
   StaticFormSaveOptions,
   StaticRecordActionOptions,
 } from './staticFormActionFlow';
+export type { RecordEditorSessionOptions } from './recordEditorSessionState';
 export type {
   StaticCrudCardMode,
   StaticCrudConfirmAction,
@@ -87,3 +90,4 @@ export type {
 export type { TreeRecordBase } from './treeRecordModel';
 export type { ScopedTreeModuleContextOptions } from './scopedTreeModuleContext';
 export type { StaticTreeResourceModuleContextOptions } from './staticTreeResourceModuleContext';
+export type { ScopedResourceTreeModuleContextOptions } from './scopedResourceTreeModuleContext';

@@ -21,7 +21,6 @@ import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -87,7 +86,6 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             assertThat(platformModuleMenu.getId())
                     .isEqualTo("platform.menu.module.platform.module");
             assertThat(platformModuleMenu).satisfies(menu -> {
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(menu.getModuleAlias()).isEqualTo("platform.module");
                 assertThat(menu.getPageMode()).isEqualTo(MenuPageMode.LIST);
@@ -109,7 +107,6 @@ class PlatformMenuInitialDataDeclarationProviderTest {
 
             assertThat(moduleMenu("platform.window")).satisfies(menu -> {
                 assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.WINDOW);
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
             });
         }
     }
@@ -121,7 +118,6 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             initializePlatformMenus(context);
 
             assertThat(moduleMenu("platform.route")).satisfies(menu -> {
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
                 assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(menu.getModuleAlias()).isEqualTo("platform.route");
                 assertThat(menu.getRoute()).isEqualTo("/platform/routes");
@@ -137,7 +133,6 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             initializePlatformMenus(context);
 
             assertThat(moduleMenu("iam.organization")).satisfies(menu -> {
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
                 assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(menu.getModuleAlias()).isEqualTo("iam.organization");
                 assertThat(menu.getRoute()).isEqualTo("/iam/organizations");
@@ -196,11 +191,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
 
             Menu group = menuDao.findById(PlatformMenuGroups.CONFIG);
             group.setParentId("wrong-parent");
-            group.setMenuType(MenuType.ROUTE);
             group.setOpenMode(MenuOpenMode.TAB);
             group.setRoute("/wrong");
             Menu moduleMenu = moduleMenu("platform.module");
-            moduleMenu.setMenuType(MenuType.LINK);
             moduleMenu.setOpenMode(MenuOpenMode.TAB);
             moduleMenu.setExternalUrl("https://example.com");
 
@@ -209,14 +202,12 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             assertThat(menuService.select(PlatformMenuGroups.CONFIG)).satisfies(repaired -> {
                 assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.PLATFORM);
-                assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
                 assertThat(repaired.getOpenMode()).isNull();
                 assertThat(repaired.getRoute()).isNull();
             });
             assertThat(moduleMenu("platform.module")).satisfies(repaired -> {
                 assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.CONFIG);
-                assertThat(repaired.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(repaired.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(repaired.getModuleAlias()).isEqualTo("platform.module");
                 assertThat(repaired.getExternalUrl()).isNull();
@@ -299,15 +290,13 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         Menu platform = menu(
                 PlatformMenuGroups.PLATFORM,
                 MenuSchemeService.ADMIN_SCHEME_ID,
-                TreeAbility.ROOT_ID,
-                MenuType.GROUP
+                TreeAbility.ROOT_ID
         );
         menuDao.insert(platform);
         Menu parent = menu(
                 PlatformMenuGroups.CONFIG,
                 MenuSchemeService.ADMIN_SCHEME_ID,
-                PlatformMenuGroups.PLATFORM,
-                MenuType.GROUP
+                PlatformMenuGroups.PLATFORM
         );
         menuDao.insert(parent);
         PlatformModule module = new PlatformModule();
@@ -318,18 +307,17 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         Menu existing = menu(
                 "platform.menu.module.platform.module",
                 MenuSchemeService.ADMIN_SCHEME_ID,
-                PlatformMenuGroups.CONFIG,
-                MenuType.MODULE
+                PlatformMenuGroups.CONFIG
         );
         existing.setModuleAlias("old.module");
         menuDao.insert(existing);
         Menu desired = menu(
                 "platform.menu.module.platform.module",
                 MenuSchemeService.ADMIN_SCHEME_ID,
-                PlatformMenuGroups.CONFIG,
-                MenuType.MODULE
+                PlatformMenuGroups.CONFIG
         );
         desired.setModuleAlias("platform.module");
+        desired.setOpenMode(MenuOpenMode.TAB);
 
         InitialDataDeclaration<Menu> declaration = InitialDataDeclaration.reconcileManaged(menuService, desired);
 
@@ -365,15 +353,11 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         return context;
     }
 
-    private Menu menu(String id, String schemeId, String parentId, MenuType type) {
+    private Menu menu(String id, String schemeId, String parentId) {
         Menu menu = new Menu();
         menu.setId(id);
         menu.setSchemeId(schemeId);
         menu.setParentId(parentId);
-        menu.setMenuType(type);
-        if (type != MenuType.GROUP) {
-            menu.setOpenMode(MenuOpenMode.TAB);
-        }
         menu.setTitle("模块管理");
         menu.setEnabled(Boolean.TRUE);
         menu.setSortOrder(20);

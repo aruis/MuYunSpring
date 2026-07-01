@@ -46,7 +46,6 @@ test('getMenuNavigationTarget ignores disabled menus', () => {
     id: 'disabled-runtime',
     schemeId: 'default',
     title: 'Disabled Runtime',
-    menuType: 'module',
     openMode: 'tab',
     moduleAlias: 'platform.runtime',
     enabled: false,
@@ -60,7 +59,7 @@ test('getMenuNavigationTarget requires explicit open mode for navigation menus',
     id: 'missing-open-mode',
     schemeId: 'default',
     title: 'Missing Open Mode',
-    menuType: 'link',
+    moduleAlias: 'crm.customer',
     externalUrl: '/crm/customer/list',
   });
 
@@ -110,7 +109,6 @@ test('resolvePageDescriptor carries route menu module alias for business module 
     id: 'organization',
     schemeId: 'default',
     title: '组织管理',
-    menuType: 'route',
     openMode: 'tab',
     route: '/iam/organizations',
     moduleAlias: 'iam.organization',
@@ -239,7 +237,6 @@ test('getMenuNavigationTarget carries link module alias for module-first menu en
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'link',
     openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
     moduleAlias: 'ops.report',
@@ -300,17 +297,17 @@ test('menu target open mode helpers split tab and window behavior', () => {
     id: 'crm-online',
     schemeId: 'default',
     title: 'CRM Online',
-    menuType: 'link',
     openMode: 'tab',
     externalUrl: '/crm/customer/list',
+    moduleAlias: 'crm.customer',
   });
   const windowTarget = getMenuNavigationTarget({
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'link',
     openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
+    moduleAlias: 'ops.report',
   });
 
   assert.ok(tabTarget);
@@ -326,9 +323,9 @@ test('createMenuTab rejects window menu targets', () => {
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'link' as const,
     openMode: 'window' as const,
     externalUrl: 'https://bi.example.com/report',
+    moduleAlias: 'ops.report',
   };
   const target = getMenuNavigationTarget(menu);
 

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -194,11 +195,6 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.insert(moduleMenu(firstSchemeId, "不存在模块", TreeAbility.ROOT_ID, "crm.unknown")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("existing module");
-            Menu invalidGroup = groupMenu(firstSchemeId, "错误分组", TreeAbility.ROOT_ID);
-            invalidGroup.setModuleAlias("crm.customer");
-            assertThatThrownBy(() -> menuService.insert(invalidGroup))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("GROUP");
             Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithRoute.setRoute("/customer");
             String moduleWithRouteId = menuService.insert(moduleWithRoute);
@@ -207,12 +203,12 @@ class MenuServiceContractTest {
             groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
             assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("GROUP menu cannot have openMode");
+                    .hasMessageContaining("Container menu cannot have openMode");
             Menu moduleWithoutOpenMode = moduleMenu(firstSchemeId, "错误模块打开方式", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithoutOpenMode.setOpenMode(null);
             assertThatThrownBy(() -> menuService.insert(moduleWithoutOpenMode))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("MODULE menu requires openMode");
+                    .hasMessageContaining("Module entry menu requires openMode");
         }
     }
 
@@ -232,6 +228,33 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.update(moving))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("scheme");
+        }
+    }
+
+    @Test
+    void shouldRejectDeletingMenuSchemeWhenMenusExist() {
+        AtomicReference<MenuService> menuServiceReference = new AtomicReference<>();
+        MenuSchemeService guardedSchemeService = new MenuSchemeService(
+                schemeDao,
+                Optional.empty(),
+                SystemMenuSchemeAccessPolicy.DENY_ALL,
+                menuServiceReference::get
+        );
+        MenuService guardedMenuService = new MenuService(menuDao, guardedSchemeService, moduleService);
+        menuServiceReference.set(guardedMenuService);
+
+        String schemeId;
+        String emptySchemeId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            schemeId = guardedSchemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            guardedMenuService.insert(moduleMenu(schemeId, "客户", TreeAbility.ROOT_ID, "crm.customer"));
+            emptySchemeId = guardedSchemeService.insert(scheme("empty", MenuScopeType.TENANT, null));
+
+            assertThatThrownBy(() -> guardedSchemeService.delete(schemeId))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("menus exist");
+
+            assertThat(guardedSchemeService.delete(emptySchemeId)).isEqualTo(1);
         }
     }
 
@@ -324,7 +347,6 @@ class MenuServiceContractTest {
                     schemeId, "客户", TreeAbility.ROOT_ID, "crm.route_customer"));
 
             assertThat(menuService.select(menuId)).satisfies(menu -> {
-                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
                 assertThat(menu.getRoute()).isEqualTo("/crm/customers");
                 assertThat(menu.getModuleAlias()).isEqualTo("crm.route_customer");
                 assertThat(menu.getPageMode()).isNull();
@@ -498,22 +520,20 @@ class MenuServiceContractTest {
     }
 
     @Test
-    void shouldAllowPlatformSuperAdminTransitionUserToUseSystemMenuScheme() {
-        MenuSchemeService privilegedSchemeService = new MenuSchemeService(schemeDao, Optional.empty(),
-                user -> "platform.user.super_admin".equals(user.userId()));
-        MenuService scopedMenuService = new MenuService(menuDao, privilegedSchemeService, moduleService,
+    void shouldAllowSystemUserToUseSystemMenuScheme() {
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService,
                 Optional.of((moduleAlias, currentUser) -> true));
         String systemMenuId;
         try (TenantContext.Scope ignored = TenantContext.system("test system menu scheme")) {
-            String systemSchemeId = privilegedSchemeService.insert(scheme(
+            String systemSchemeId = schemeService.insert(scheme(
                     "platform_admin", MenuScopeType.SYSTEM, MenuSchemeService.SYSTEM_SCOPE_ID));
             systemMenuId = scopedMenuService.insert(moduleMenu(
                     systemSchemeId, "平台客户", TreeAbility.ROOT_ID, "crm.customer"));
         }
 
-        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+        try (TenantContext.Scope ignored = TenantContext.system("test system user menu");
              CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
-                     CurrentUser.tenantUser("platform.user.super_admin", "admin", "platform"))) {
+                     CurrentUser.systemUser("platform.user.super_admin", "admin"))) {
             assertThat(scopedMenuService.currentUserVisibleRootMenus())
                     .extracting(Menu::getId)
                     .containsExactly(systemMenuId);
@@ -554,7 +574,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.GROUP);
         return menu;
     }
 
@@ -563,7 +582,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.MODULE);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -574,7 +592,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.ROUTE);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
@@ -585,7 +602,6 @@ class MenuServiceContractTest {
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
         menu.setParentId(parentId);
-        menu.setMenuType(MenuType.LINK);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;

@@ -121,7 +121,7 @@ test('tenant management state respects delete confirmation result', async () => 
   assert.equal(state.mode.value, 'create');
 });
 
-test('tenant management state protects platform tenant from disable and delete actions', async () => {
+test('tenant management state treats platform alias as ordinary tenant', async () => {
   const calls: string[] = [];
   const context = createContext({
     disable: async (id) => {
@@ -135,21 +135,18 @@ test('tenant management state protects platform tenant from disable and delete a
   });
   const state = createTenantManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台租户', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
 
-  assert.equal(state.isPlatformTenant.value, true);
-  assert.equal(state.canDelete.value, false);
-  assert.equal(state.canEnable.value, false);
+  assert.equal(state.canDelete.value, true);
+  assert.equal(state.canEnable.value, true);
 
   await state.toggleEnabled();
-  assert.equal(state.actionError.value, '当前用户无权变更租户启停状态');
 
   await state.removeSelected();
-  assert.equal(state.actionError.value, '平台租户不能删除');
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, ['disable:platform', 'delete:platform']);
 });
 
-test('tenant management state rejects saving disabled platform tenant', async () => {
+test('tenant management state allows saving disabled platform alias', async () => {
   const calls: unknown[] = [];
   const context = createContext({
     update: async (id, record) => {
@@ -164,8 +161,18 @@ test('tenant management state rejects saving disabled platform tenant', async ()
   state.draft.value.enabled = false;
   await state.save();
 
-  assert.equal(state.actionError.value, '平台租户不能停用');
-  assert.deepEqual(calls, []);
+  assert.equal(state.actionError.value, undefined);
+  assert.deepEqual(calls, [
+    {
+      id: 'platform',
+      record: {
+        id: 'platform',
+        alias: 'platform',
+        title: '平台租户',
+        enabled: false,
+      },
+    },
+  ]);
 });
 
 test('tenant management state does not enter create mode without create permission', async () => {

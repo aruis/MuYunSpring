@@ -2,8 +2,6 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.boot.iam.PlatformRoleActionGrantVerifier;
-import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminAuthorizationInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminSystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -33,6 +31,7 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionDao;
@@ -89,7 +88,7 @@ class PlatformAdminMenuVisibilityContractTest {
     private final MenuSchemeService schemeService = new MenuSchemeService(
             schemeDao,
             java.util.Optional.empty(),
-            new PlatformSuperAdminSystemMenuSchemeAccessPolicy()
+            SystemMenuSchemeAccessPolicy.DENY_ALL
     );
     private final MenuService menuService = new MenuService(
             menuDao,
@@ -105,7 +104,7 @@ class PlatformAdminMenuVisibilityContractTest {
     }
 
     @Test
-    void platformMenuModulesShouldRegisterMenuActionGrantSuperAdminAndBecomeVisible() {
+    void platformMenuModulesShouldRegisterMenuActionAndBecomeVisibleForSystemAdmin() {
         try (GenericApplicationContext context = platformEntryContext()) {
             registerStaticModules(context);
             initializePlatformData(context);
@@ -123,15 +122,8 @@ class PlatformAdminMenuVisibilityContractTest {
                             PlatformAction.MENU.code()
                     )).as(moduleAlias + " menu action").isNotNull());
 
-            try (TenantContext.Scope ignoredTenant = TenantContext.use(TenantService.PLATFORM_TENANT_ID);
+            try (TenantContext.Scope ignoredTenant = TenantContext.system("system admin menu test");
                  CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(platformSuperAdmin())) {
-                assertThat(menuModuleAliases)
-                        .allSatisfy(moduleAlias -> assertThat(roleService.hasActionPermission(
-                                UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
-                                moduleAlias,
-                                PlatformAction.MENU.code()
-                        )).as(moduleAlias + " super admin grant").isTrue());
-
                 assertThat(visibleModuleAliases()).containsAll(menuModuleAliases);
             }
         }
@@ -183,27 +175,16 @@ class PlatformAdminMenuVisibilityContractTest {
                 List.<InitialDataAbility<?>>of(
                         schemeService,
                         menuService,
-                        tenantService,
-                        roleService,
                         userAccountService
                 ),
-                List.of(
-                        new PlatformMenuInitialDataDeclarationProvider(menuService, context),
-                        new PlatformSuperAdminAuthorizationInitialDataDeclarationProvider(
-                                roleService,
-                                roleGrantDao,
-                                roleActionDao,
-                                moduleActionService
-                        )
-                )
+                List.of(new PlatformMenuInitialDataDeclarationProvider(menuService, context))
         ).initializeAll();
     }
 
     private CurrentUser platformSuperAdmin() {
-        return CurrentUser.tenantUser(
+        return CurrentUser.systemUser(
                 UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
-                UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
-                TenantService.PLATFORM_TENANT_ID
+                UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME
         );
     }
 

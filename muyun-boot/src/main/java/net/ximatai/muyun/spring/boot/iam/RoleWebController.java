@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -287,8 +286,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     private boolean isModuleEntryMenu(Menu menu) {
-        return menu.getMenuType() != MenuType.GROUP
-                && menu.getModuleAlias() != null
+        return menu.getModuleAlias() != null
                 && !menu.getModuleAlias().isBlank();
     }
 

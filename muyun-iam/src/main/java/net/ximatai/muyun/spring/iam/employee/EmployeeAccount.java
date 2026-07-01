@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
@@ -16,6 +17,9 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 @Table(name = "iam_employee_account", comment = "Employee account binding")
 @CompositeIndex(columns = {"tenant_id", "employee_id", "user_id"}, unique = true)
 @CompositeIndex(columns = {"tenant_id", "user_id"}, unique = true)
+@InitialDataFields(
+        managed = {"employeeId", "userId", "primaryAccount", "enabled"}
+)
 public class EmployeeAccount extends StandardEntity implements EnabledCapable {
     @Column(name = "employee_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Employee id")
     private String employeeId;

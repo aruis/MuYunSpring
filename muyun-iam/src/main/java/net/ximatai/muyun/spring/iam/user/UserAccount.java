@@ -16,7 +16,7 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 @Table(name = "iam_user", comment = "User account")
 @CompositeIndex(columns = {"tenant_id", "username"}, unique = true)
 @InitialDataFields(
-        identity = {"username"},
+        identity = {"tenantId", "username"},
         managed = {"organizationId", "authUserId", "authOrganizationId", "authModuleAlias"},
         operator = {"title", "mobile", "email", "enabled", "sortOrder"}
 )

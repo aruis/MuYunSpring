@@ -17,6 +17,9 @@ public interface ScopedWeb<S> {
     }
 
     private <T> T webScope(String scopeName, boolean verifyActiveTenant, Supplier<T> action) {
+        if (TenantContext.isSystem()) {
+            return action.get();
+        }
         String tenantId = TenantContext.currentTenantId()
                 .orElseThrow(() -> new PlatformException(scopeName + " requires tenant context"));
         if (verifyActiveTenant && service() instanceof ActiveTenantVerifier activeTenantVerifier) {

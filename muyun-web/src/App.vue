@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
@@ -9,6 +9,7 @@ import {
   isAuthenticationRequiredError,
   saveAuthToken,
 } from './app/authSession';
+import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
 import { businessModuleRoutes, businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
@@ -23,6 +24,7 @@ import {
 } from './app/workbenchStartup';
 
 const startup = ref<WorkbenchStartupState>();
+const currentUser = computed(() => startup.value?.session.currentUser);
 const loading = ref(true);
 const error = ref<string>();
 const activeTabKey = ref<string>();
@@ -33,6 +35,7 @@ const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoute
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
+provideCurrentUserContext(currentUser);
 
 const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 

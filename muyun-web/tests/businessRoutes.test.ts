@@ -13,6 +13,7 @@ test('static business route registry exposes route prefixes for navigation resol
   assert.deepEqual(businessRoutePrefixes, [
     '/config/applications',
     '/config/dictionaries',
+    '/config/menus',
     '/iam/tenants',
     '/iam/organizations',
     '/iam/departments',
@@ -22,6 +23,7 @@ test('static business route registry exposes route prefixes for navigation resol
   assert.deepEqual(businessModuleRoutes, {
     'platform.application': '/config/applications',
     'platform.dictionary_category': '/config/dictionaries',
+    'platform.menu_scheme': '/config/menus',
     'iam.tenant': '/iam/tenants',
     'iam.organization': '/iam/organizations',
     'iam.department': '/iam/departments',
@@ -137,6 +139,22 @@ test('static business route registry resolves dictionary category as dictionary 
 
   assert.equal(route?.route, '/config/dictionaries');
   assert.equal(route?.moduleAlias, 'platform.dictionary_category');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves menu scheme as menu management entry', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/config/menus', moduleAlias: 'platform.menu_scheme' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/config/menus');
+  assert.equal(route?.moduleAlias, 'platform.menu_scheme');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 

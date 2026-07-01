@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.StandardBusinessService;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -32,9 +34,12 @@ public class ApplicationService extends StandardBusinessService<Application> imp
         SoftDeleteAbility<Application>,
         EnableAbility<Application>,
         SortAbility<Application>,
+        InitialDataAbility<Application>,
         QueryAbility<Application> {
 
     public static final String MODULE_ALIAS = "platform.application";
+    public static final String PLATFORM_APPLICATION_ALIAS = "platform";
+    public static final String IAM_APPLICATION_ALIAS = "iam";
 
     private final Optional<PlatformModuleService> moduleService;
     private final Optional<MetadataService> metadataService;
@@ -62,6 +67,19 @@ public class ApplicationService extends StandardBusinessService<Application> imp
     }
 
     @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.system("platform.applications", 10);
+    }
+
+    @Override
+    public List<Application> initialData() {
+        return List.of(
+                application(PLATFORM_APPLICATION_ALIAS, "平台能力", 10),
+                application(IAM_APPLICATION_ALIAS, "身份权限", 20)
+        );
+    }
+
+    @Override
     public void normalizeBeforeMutation(Application application) {
         requireAlias(application.getAlias());
     }
@@ -76,6 +94,15 @@ public class ApplicationService extends StandardBusinessService<Application> imp
 
     private void requireAlias(String alias) {
         PlatformNameRules.requireApplicationAlias(alias);
+    }
+
+    private Application application(String alias, String title, int sortOrder) {
+        Application application = new Application();
+        application.setAlias(alias);
+        application.setTitle(title);
+        application.setEnabled(Boolean.TRUE);
+        application.setSortOrder(sortOrder);
+        return application;
     }
 
     private <T extends EntityContract> void rejectReferenced(Optional<? extends CrudAbility<T>> service,

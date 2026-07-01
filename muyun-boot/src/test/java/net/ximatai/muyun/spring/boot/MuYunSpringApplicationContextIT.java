@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.boot;
 import com.fasterxml.jackson.databind.JsonNode;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
@@ -83,7 +82,7 @@ class MuYunSpringApplicationContextIT {
         assertThat(columnExists("iam_user_session", "max_expires_at")).isTrue();
 
         LoginResult login = userSessionService.login(
-                TenantService.PLATFORM_TENANT_ID,
+                null,
                 UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
                 "admin123");
 
@@ -116,7 +115,6 @@ class MuYunSpringApplicationContextIT {
     void shouldLoadCurrentUserAndMenusThroughRealHttpLogin() {
         ResponseEntity<JsonNode> login = restTemplate.postForEntity("/iam.auth/login",
                 Map.of(
-                        "tenantId", TenantService.PLATFORM_TENANT_ID,
                         "username", UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
                         "password", "admin123"
                 ),
@@ -128,6 +126,8 @@ class MuYunSpringApplicationContextIT {
         assertThat(token).isNotBlank();
         assertThat(loginBody.path("currentUser").path("userId").asText())
                 .isEqualTo(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID);
+        assertThat(loginBody.path("currentUser").path("system").asBoolean()).isTrue();
+        assertThat(loginBody.path("currentUser").has("tenantId")).isFalse();
 
         HttpEntity<Void> bearerRequest = new HttpEntity<>(bearerHeaders(token));
         ResponseEntity<JsonNode> context = restTemplate.exchange(

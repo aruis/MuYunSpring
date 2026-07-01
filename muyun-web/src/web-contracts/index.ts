@@ -54,7 +54,7 @@ export interface SessionContext {
 }
 
 export interface LoginRequest {
-  tenantId: string;
+  tenantId?: string;
   username: string;
   password: string;
 }
@@ -65,9 +65,6 @@ export interface LoginResult {
   issuedAt: string;
   currentUser: CurrentUser;
 }
-
-// Matches current Spring/Jackson code output from /platform.menu/mine.
-export type MenuType = 'group' | 'module' | 'route' | 'link';
 
 // Matches current Spring/Jackson code output from menu page mode fields.
 export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
@@ -80,7 +77,6 @@ export interface MenuRecord {
   schemeId: string;
   parentId?: string;
   title: string;
-  menuType: MenuType;
   openMode?: MenuOpenMode;
   moduleAlias?: string;
   route?: string;
@@ -96,6 +92,14 @@ export interface MenuRecord {
 export type MenuTreeNode = WebTreeNode<MenuRecord>;
 
 export type MenuMineResponse = WebListResponse<MenuTreeNode>;
+
+export type MenuScopeType = 'system' | 'tenant' | 'organization';
+
+export interface MenuScheme extends StandardEnabledSortableEntity {
+  alias?: string;
+  scopeType?: MenuScopeType;
+  scopeId?: string;
+}
 
 export interface ModuleMenuTarget {
   menuId: string;
@@ -468,6 +472,20 @@ export interface Employee extends StandardEnabledSortableEntity {
 
 export interface Application extends StandardEnabledSortableEntity {
   alias?: string;
+}
+
+export type ModuleKind = 'static' | 'dynamic';
+
+export type ModuleEntryType = 'module' | 'route' | 'link';
+
+export interface PlatformModule extends StandardEnabledTreeEntity {
+  alias?: string;
+  applicationAlias?: string;
+  moduleKind?: ModuleKind;
+  entryType?: ModuleEntryType;
+  entryRoute?: string;
+  entryExternalUrl?: string;
+  systemManaged?: boolean;
 }
 
 export interface Tenant extends StandardEnabledSortableEntity {

@@ -9,7 +9,6 @@ import {
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
-const PLATFORM_TENANT_ID = 'platform';
 
 export interface TenantManagementStateOptions {
   actionErrorHandlers?: StaticCrudActionErrorHandler<Tenant>[];
@@ -36,20 +35,13 @@ export function createTenantManagementState(
     saveDeniedMessage: '当前用户无权保存租户',
     createDeniedMessage: '当前用户无权新建租户',
     enableDeniedMessage: '当前用户无权变更租户启停状态',
-    deleteDeniedMessage: (record) =>
-      isPlatformTenantRecord(record) ? '平台租户不能删除' : '当前用户无权删除租户',
-    canDeleteRecord: (record) => !isPlatformTenantRecord(record),
-    canEnableRecord: (record, actionCode) => !(isPlatformTenantRecord(record) && actionCode === 'disable'),
-    validateBeforeSave: (record) =>
-      record.id === PLATFORM_TENANT_ID && record.enabled === false ? '平台租户不能停用' : undefined,
+    deleteDeniedMessage: () => '当前用户无权删除租户',
     actionErrorHandlers: options.actionErrorHandlers,
   });
   const aliasReadonly = computed(() => state.mode.value !== 'create');
-  const isPlatformTenant = computed(() => isPlatformTenantRecord(state.selected.value));
   return {
     ...state,
     aliasReadonly,
-    isPlatformTenant,
   };
 }
 
@@ -82,8 +74,4 @@ function normalizedDraft(record: Tenant, selected: Tenant | undefined, mode: Car
 
 function tenantAliasOf(record: Tenant | undefined) {
   return record?.alias?.trim() || record?.id?.trim();
-}
-
-function isPlatformTenantRecord(record: Tenant | undefined) {
-  return tenantAliasOf(record) === PLATFORM_TENANT_ID;
 }
