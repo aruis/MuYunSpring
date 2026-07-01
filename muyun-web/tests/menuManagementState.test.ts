@@ -162,6 +162,55 @@ test('menu management starts scheme creation with current user default scope', (
   assert.equal(state.schemeDraft.value.tenantId, undefined);
 });
 
+test('menu management cancel closes scheme creation panel', () => {
+  const schemeContext = createFakeContext<MenuScheme>('platform.menu_scheme');
+  const menuContext = createFakeContext<MenuRecord>('platform.menu-scheme/scheme-1/menus');
+  const state = createMenuManagementState(
+    schemeContext,
+    () => menuContext,
+    async () => true,
+    {
+      currentUser: () => ({ userId: 'admin', username: 'admin', system: true }),
+    },
+  );
+
+  state.startCreateScheme();
+  state.schemeDraft.value.title = '临时方案';
+  state.cancelSchemeEdit();
+
+  assert.equal(state.schemeMode.value, 'view');
+  assert.equal(state.selectedScheme.value, undefined);
+  assert.equal(state.schemeDraft.value.title, '');
+  assert.equal(state.schemeDraft.value.scopeType, 'system');
+});
+
+test('menu management cancel restores selected scheme edit draft', () => {
+  const schemeContext = createFakeContext<MenuScheme>('platform.menu_scheme');
+  const menuContext = createFakeContext<MenuRecord>('platform.menu-scheme/scheme-1/menus');
+  const state = createMenuManagementState(
+    schemeContext,
+    () => menuContext,
+    async () => true,
+  );
+  const selected = {
+    id: 'scheme-1',
+    alias: 'admin',
+    title: '管理菜单',
+    scopeType: 'system' as const,
+    scopeId: 'system',
+    enabled: true,
+  };
+
+  state.handleSchemesLoaded([selected]);
+  state.startEditScheme();
+  state.schemeDraft.value.title = '已修改';
+  state.cancelSchemeEdit();
+
+  assert.equal(state.schemeMode.value, 'view');
+  assert.equal(state.schemeDraft.value.title, '管理菜单');
+  assert.equal(state.selectedScheme.value?.id, 'scheme-1');
+});
+
 function baseMenu(overrides: Partial<MenuRecord>): MenuRecord {
   return {
     id: 'menu-1',

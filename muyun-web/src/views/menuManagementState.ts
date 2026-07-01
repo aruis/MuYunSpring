@@ -143,7 +143,7 @@ export function createMenuManagementState(
     schemeDraft.value = selectedScheme.value
       ? copyScheme(selectedScheme.value)
       : emptySchemeDraft(currentUser());
-    schemeMode.value = selectedScheme.value ? 'view' : 'create';
+    schemeMode.value = 'view';
   }
 
   function startCreateRootMenu() {
