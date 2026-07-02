@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiSpin } from '@muyun/vue-ui-antdv';
+import { UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordListExplorer, { type RecordListExplorerRecord } from './RecordListExplorer.vue';
+import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 import {
   defaultCrudRecordListMatches,
   defaultCrudRecordListTitle,
@@ -23,6 +24,8 @@ const props = withDefaults(
     fallbackTitle?: string;
     titleOf?: (record: CrudRecordListBase) => string;
     subtitleOf?: (record: CrudRecordListBase) => string | undefined;
+    itemOf?: (record: CrudRecordListBase) => RecordExplorerItemDescriptor | undefined;
+    actionsOf?: (record: CrudRecordListBase) => UiRecordInlineAction[];
     filterOption?: (record: CrudRecordListBase, normalizedKeyword: string) => boolean;
     tagOf?: (record: CrudRecordListBase) => string | undefined;
     mutedOf?: (record: CrudRecordListBase) => boolean;
@@ -36,6 +39,8 @@ const props = withDefaults(
     fallbackTitle: '未命名记录',
     titleOf: undefined,
     subtitleOf: undefined,
+    itemOf: undefined,
+    actionsOf: undefined,
     filterOption: undefined,
     tagOf: undefined,
     mutedOf: undefined,
@@ -44,6 +49,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [record: CrudRecordListBase];
+  action: [action: UiRecordInlineAction, record: CrudRecordListBase];
   loaded: [records: CrudRecordListBase[]];
 }>();
 
@@ -81,11 +87,13 @@ async function loadRecords() {
 }
 
 function recordTitle(record: CrudRecordListBase) {
-  return props.titleOf?.(record) ?? defaultCrudRecordListTitle(record, props.fallbackTitle);
+  const item = props.itemOf?.(record);
+  return item?.title ?? props.titleOf?.(record) ?? defaultCrudRecordListTitle(record, props.fallbackTitle);
 }
 
 function recordCode(record: CrudRecordListBase) {
-  return props.subtitleOf?.(record) ?? record.alias ?? record.code ?? record.id;
+  const item = props.itemOf?.(record);
+  return item ? item.secondary : props.subtitleOf ? props.subtitleOf(record) : (record.alias ?? record.code ?? record.id);
 }
 
 function matchesKeyword(record: CrudRecordListBase, normalized: string) {
@@ -97,6 +105,10 @@ function matchesKeyword(record: CrudRecordListBase, normalized: string) {
 
 function handleSelect(record: CrudRecordListBase) {
   emit('select', record);
+}
+
+function handleAction(action: UiRecordInlineAction, record: CrudRecordListBase) {
+  emit('action', action, record);
 }
 </script>
 
@@ -111,10 +123,13 @@ function handleSelect(record: CrudRecordListBase) {
       :empty-description="emptyDescription"
       :title-of="(record) => recordTitle(record as CrudRecordListBase)"
       :code-of="(record) => recordCode(record as CrudRecordListBase)"
+      :item-of="(record) => itemOf?.(record as CrudRecordListBase)"
       :filter-option="(record, normalized) => matchesKeyword(record as CrudRecordListBase, normalized)"
+      :actions-of="(record) => actionsOf?.(record as CrudRecordListBase) ?? []"
       :tag-of="(record) => tagOf?.(record as CrudRecordListBase)"
       :muted-of="(record) => mutedOf?.(record as CrudRecordListBase) ?? record.enabled === false"
       @select="handleSelect($event as CrudRecordListBase)"
+      @action="(action, record) => handleAction(action, record as CrudRecordListBase)"
     />
   </div>
 </template>

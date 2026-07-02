@@ -45,6 +45,27 @@
 3. 如果存在“新建根节点 / 新建下级”等多个创建语义，侧栏只保留默认主动作，其他动作放到详情动作区或后续菜单组件。
 4. 动作语义不能只依赖 `title` tooltip 区分。
 
+## Explorer Item 契约
+
+列表和树的单条记录都应先映射成统一的 `RecordExplorerItemDescriptor`：
+
+```text
+title       主标题，必须有且只表达当前记录名称
+secondary   一个辅助身份，可选；不要堆多个辅助字段
+tag         类型或状态短标签，可选，例如“系统”“分组”“模块入口”“停用”
+muted       弱化展示，可选
+actions     当前记录的行内动作，可选
+```
+
+页面可以继续使用 `titleOf`、`secondaryOf`、`tagOf`、`actionsOf` 等兼容入口，但新增页面优先使用 `itemOf` 一次性声明 item descriptor。这样列表和树保持同一套视觉语言，页面只负责业务事实到 descriptor 的映射。
+
+稳定规则：
+
+1. `secondary` 最多一个；如果需要同时展示作用域和 alias，应优先把作用域放到 `tag`，alias 只在搜索中参与匹配。
+2. `tag` 用于类型或状态，不用于承载长业务身份。
+3. 编辑、删除、新建下级等当前记录动作必须进入 `actions`，不要放到 panel header。
+4. 列表和树都使用 `UiRecordExplorerItem`，业务页不单独覆盖 item 字号、行高、hover 或 selected 样式。
+
 ### RecordListExplorer
 
 `RecordListExplorer` 是纯列表 body。
@@ -55,6 +76,7 @@
 records 展示
 keyword 本地过滤
 selected 高亮
+统一 item descriptor
 停用或自定义 tag
 inline action
 select/action 事件
@@ -99,7 +121,7 @@ emit loaded/select
 emit loaded/select/action
 ```
 
-当管理页已经有 `RecordExplorerPanel` 时，搜索入口应放在 panel，树组件通过 `keyword` 消费搜索词，并设置 `searchMode="none"` 关闭内置搜索行。
+当管理页已经有 `RecordExplorerPanel` 时，搜索入口应放在 panel，树组件通过 `keyword` 消费搜索词，并设置 `searchMode="none"` 关闭内置搜索行。同一 explorer 区域不能同时出现 panel 搜索和树内部搜索。
 
 树节点也使用 `UiRecordExplorerItem` 的视觉契约。不要在业务页单独覆盖 Ant Tree 字号来制造页面差异。
 

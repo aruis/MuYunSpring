@@ -13,6 +13,7 @@ import {
   createScopedResourceTreeModuleContext,
   parentRecordConstraints,
   type CrudRecordListBase,
+  type RecordExplorerItemDescriptor,
   type RecordActionItem,
   type TreeRecordBase,
 } from '@muyun/platform-components';
@@ -171,9 +172,42 @@ const moduleEntryType = computed(() => {
 const isDynamicModuleEntry = computed(() => moduleEntryType.value === 'module');
 const schemeEditorVisible = computed(() => schemeMode.value !== 'view');
 
-function schemeSubtitle(record: CrudRecordListBase) {
+function schemeFilterOption(record: CrudRecordListBase, keyword: string) {
   const scheme = record as MenuScheme;
-  return [scopeTypeTitle(scheme.scopeType), scheme.alias ?? scheme.id].filter(Boolean).join(' / ');
+  return [scheme.title, scheme.alias, scheme.id, scopeTypeTitle(scheme.scopeType)]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(keyword));
+}
+
+function schemeActionsOf(record: CrudRecordListBase): UiRecordInlineAction[] {
+  const scheme = record as MenuScheme;
+  if (!scheme.id) {
+    return [];
+  }
+  const actions: UiRecordInlineAction[] = [];
+  if (schemeContext.can('update') === true) {
+    actions.push({ key: 'edit', title: '编辑菜单方案', iconName: 'edit', disabled: savingScheme.value });
+  }
+  if (schemeContext.can('delete') === true) {
+    actions.push({
+      key: 'delete',
+      title: '删除菜单方案',
+      iconName: 'delete',
+      danger: true,
+      disabled: savingScheme.value,
+    });
+  }
+  return actions;
+}
+
+function schemeItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
+  const scheme = record as MenuScheme;
+  return {
+    title: schemeTitleOf(scheme),
+    tag: scopeTypeTitle(scheme.scopeType),
+    muted: scheme.enabled === false,
+    actions: schemeActionsOf(scheme),
+  };
 }
 
 function handleSchemeLoaded(records: CrudRecordListBase[]) {
@@ -182,6 +216,17 @@ function handleSchemeLoaded(records: CrudRecordListBase[]) {
 
 function handleSchemeSelect(record: CrudRecordListBase) {
   selectScheme(record as MenuScheme);
+}
+
+function handleSchemeInlineAction(action: UiRecordInlineAction, record: CrudRecordListBase) {
+  selectScheme(record as MenuScheme);
+  if (action.key === 'edit') {
+    startEditScheme();
+    return;
+  }
+  if (action.key === 'delete') {
+    void removeSelectedScheme();
+  }
 }
 
 function handleMenuLoaded(records: TreeRecordBase[]) {
@@ -323,25 +368,6 @@ function menuNodeTitle(menu: MenuRecord) {
           <ModuleActionButton
             class="record-panel-create-button"
             :context="schemeContext"
-            action-code="update"
-            title="编辑菜单方案"
-            icon-only
-            :disabled="!selectedScheme || savingScheme"
-            @click="startEditScheme"
-          />
-          <ModuleActionButton
-            class="record-panel-create-button"
-            :context="schemeContext"
-            action-code="delete"
-            title="删除菜单方案"
-            icon-only
-            danger
-            :disabled="!selectedScheme || savingScheme"
-            @click="removeSelectedScheme"
-          />
-          <ModuleActionButton
-            class="record-panel-create-button"
-            :context="schemeContext"
             action-code="create"
             title="新建菜单方案"
             icon-only
@@ -356,9 +382,10 @@ function menuNodeTitle(menu: MenuRecord) {
           empty-description="暂无菜单方案"
           loading-tip="加载菜单方案"
           fallback-title="未命名方案"
-          :title-of="(record) => schemeTitleOf(record as MenuScheme)"
-          :subtitle-of="schemeSubtitle"
+          :item-of="schemeItemOf"
+          :filter-option="schemeFilterOption"
           @select="handleSchemeSelect"
+          @action="handleSchemeInlineAction"
           @loaded="handleSchemeLoaded"
         />
         <template #editor>
@@ -435,6 +462,7 @@ function menuNodeTitle(menu: MenuRecord) {
           :selected-id="selectedMenu?.id"
           :reload-key="menuReloadKey"
           :keyword="menuSearchKeyword"
+          search-mode="none"
           search-trigger="external"
           empty-description="暂无菜单"
           loading-tip="加载菜单树"

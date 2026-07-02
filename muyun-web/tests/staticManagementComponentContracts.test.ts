@@ -8,11 +8,37 @@ const root = resolve(import.meta.dirname, '..');
 test('record list explorer exposes visible secondary identity text', () => {
   const itemSource = readSource('src/vue-ui-antdv/components/UiRecordExplorerItem.vue');
   const listSource = readSource('src/platform-components/RecordListExplorer.vue');
+  const crudListSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
+  const treeSource = readSource('src/platform-components/TreeRecordExplorer.vue');
+  const itemModelSource = readSource('src/platform-components/recordExplorerItemModel.ts');
+  const treeTypesSource = readSource('src/vue-ui-antdv/types.ts');
+  const uiTreeSource = readSource('src/vue-ui-antdv/components/UiTree.vue');
 
+  assert.match(itemModelSource, /interface RecordExplorerItemDescriptor/);
+  assert.match(itemModelSource, /title: string/);
+  assert.match(itemModelSource, /secondary\?: string/);
+  assert.match(itemModelSource, /tag\?: string/);
+  assert.match(itemModelSource, /actions\?: UiRecordInlineAction\[\]/);
   assert.match(itemSource, /secondary\?: string/);
   assert.match(itemSource, /class="ui-record-explorer-item-secondary"/);
+  assert.match(listSource, /itemOf\?: \(record: RecordListExplorerRecord\) => RecordExplorerItemDescriptor \| undefined/);
   assert.match(listSource, /function recordSecondary/);
+  assert.match(listSource, /props\.codeOf \? props\.codeOf\(record\)/);
   assert.match(listSource, /:secondary="recordSecondary\(record\)"/);
+  assert.match(crudListSource, /itemOf\?: \(record: CrudRecordListBase\) => RecordExplorerItemDescriptor \| undefined/);
+  assert.match(crudListSource, /actionsOf\?: \(record: CrudRecordListBase\) => UiRecordInlineAction\[\]/);
+  assert.match(crudListSource, /action: \[action: UiRecordInlineAction, record: CrudRecordListBase\]/);
+  assert.match(crudListSource, /props\.subtitleOf \? props\.subtitleOf\(record\)/);
+  assert.match(crudListSource, /:item-of="\(record\) => itemOf\?\.\(record as CrudRecordListBase\)"/);
+  assert.match(crudListSource, /:actions-of="\(record\) => actionsOf\?\.\(record as CrudRecordListBase\) \?\? \[\]"/);
+  assert.match(crudListSource, /@action="\(action, record\) => handleAction\(action, record as CrudRecordListBase\)"/);
+  assert.match(treeTypesSource, /secondary\?: string/);
+  assert.match(treeSource, /secondaryOf\?: \(record: TreeRecordBase\) => string \| undefined/);
+  assert.match(treeSource, /itemOf\?: \(record: TreeRecordBase\) => RecordExplorerItemDescriptor \| undefined/);
+  assert.match(treeSource, /const item = props\.itemOf\?\.\(record\)/);
+  assert.match(treeSource, /secondary: item\?\.secondary \?\? props\.secondaryOf\?\.\(record\)/);
+  assert.match(uiTreeSource, /#title="\{ key, title, secondary, tag, muted, actions \}"/);
+  assert.match(uiTreeSource, /:secondary="secondary"/);
 });
 
 test('record explorer panel uses a single title contract', () => {
@@ -49,8 +75,28 @@ test('record explorer panel focuses and closes search from keyboard', () => {
 
   assert.match(panelSource, /focusSearchInput/);
   assert.match(panelSource, /querySelector\('input'\)\?\.focus\(\)/);
+  assert.match(panelSource, /@mousedown\.prevent/);
   assert.match(panelSource, /@keydown\.esc="handleSearchEscape"/);
   assert.match(inputSource, /keydown: \[event: KeyboardEvent\]/);
+});
+
+test('menu management keeps scheme actions inline and delegates search to panel', () => {
+  const menuViewSource = readSource('src/views/MenuManagementView.vue');
+  const schemePanelStart = menuViewSource.indexOf('title="菜单方案"');
+  const menuTreePanelStart = menuViewSource.indexOf('title="菜单树"');
+  const schemePanelSource = menuViewSource.slice(schemePanelStart, menuTreePanelStart);
+  const menuTreePanelSource = menuViewSource.slice(menuTreePanelStart);
+
+  assert.match(menuViewSource, /function schemeActionsOf/);
+  assert.match(menuViewSource, /function schemeItemOf/);
+  assert.match(menuViewSource, /function handleSchemeInlineAction/);
+  assert.match(schemePanelSource, /:item-of="schemeItemOf"/);
+  assert.match(schemePanelSource, /@action="handleSchemeInlineAction"/);
+  assert.match(schemePanelSource, /:filter-option="schemeFilterOption"/);
+  assert.doesNotMatch(schemePanelSource, /title="编辑菜单方案"/);
+  assert.doesNotMatch(schemePanelSource, /title="删除菜单方案"/);
+  assert.match(menuTreePanelSource, /search-mode="none"/);
+  assert.match(menuTreePanelSource, /search-trigger="external"/);
 });
 
 test('tree explorer editor is explicit edit mode instead of selected record presence', () => {

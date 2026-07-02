@@ -34,6 +34,7 @@ export interface UiTreeNode {
   key: string;
   title: string;
   disabled?: boolean;
+  secondary?: string;
   tag?: string;
   muted?: boolean;
   actions?: UiRecordInlineAction[];

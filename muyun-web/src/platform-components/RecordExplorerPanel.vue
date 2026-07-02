@@ -82,6 +82,7 @@ async function focusSearchInput() {
           icon-name="search"
           type="text"
           :title="`搜索${title}`"
+          @mousedown.prevent
           @click="toggleSearch"
         />
         <slot name="actions" />
