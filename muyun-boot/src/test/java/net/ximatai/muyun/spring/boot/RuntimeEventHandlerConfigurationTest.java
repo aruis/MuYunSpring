@@ -1,65 +1,56 @@
 package net.ximatai.muyun.spring.boot;
 
+import jakarta.enterprise.context.spi.CreationalContext;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.spi.Bean;
+import jakarta.enterprise.inject.spi.BeanManager;
 import net.ximatai.muyun.spring.ability.event.ModuleExtension;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventHandler;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventHandlerRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
-import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
-import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class RuntimeEventHandlerConfigurationTest {
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(
-                    MuYunSpringRuntimeEventHandlerConfiguration.class,
-                    RuntimeEventPublisherConfiguration.class,
-                    TestExtensionConfiguration.class
-            );
+    private final MuYunSpringRuntimeEventHandlerConfiguration configuration =
+            new MuYunSpringRuntimeEventHandlerConfiguration();
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void shouldRegisterModuleExtensionAsRuntimeEventListener() {
-        contextRunner.run(context -> {
-            RuntimeEventHandlerRegistry registry = context.getBean(RuntimeEventHandlerRegistry.class);
-            ContractExtension extension = context.getBean(ContractExtension.class);
+        ContractExtension extension = new ContractExtension();
+        Bean bean = mock(Bean.class);
+        CreationalContext<ContractExtension> creationalContext = mock(CreationalContext.class);
+        BeanManager beanManager = mock(BeanManager.class);
+        when(bean.getBeanClass()).thenReturn(ContractExtension.class);
+        when(beanManager.getBeans(Object.class, Any.Literal.INSTANCE)).thenReturn(Set.of(bean));
+        when(beanManager.createCreationalContext(bean)).thenReturn(creationalContext);
+        when(beanManager.getReference(eq(bean), eq(ContractExtension.class), any(CreationalContext.class)))
+                .thenReturn(extension);
 
-            assertThat(registry.descriptors()).hasSize(1);
+        RuntimeEventHandlerRegistry registry = configuration.runtimeEventHandlerRegistry(beanManager);
+        RuntimeEventListener listener = configuration.runtimeEventHandlerListener(registry);
 
-            context.getBean(RuntimeEventPublisher.class).publish(event());
+        listener.onRuntimeEvent(event());
 
-            assertThat(extension.count).isEqualTo(1);
-        });
+        assertThat(registry.descriptors()).hasSize(1);
+        assertThat(extension.count).isEqualTo(1);
     }
 
     private RuntimeEvent event() {
         return RuntimeEvent.of(RuntimeEventType.AFTER_CREATE, "sales.contract", "contract", "contract-1",
                 null, "tenant-1", false, RuntimeMutationSource.BUSINESS, Map.of());
-    }
-
-    @Configuration(proxyBeanMethods = false)
-    static class RuntimeEventPublisherConfiguration {
-        @Bean
-        RuntimeEventPublisher runtimeEventPublisher(ObjectProvider<RuntimeEventListener> listeners) {
-            return new RuntimeEventMulticaster(() -> listeners.orderedStream().toList());
-        }
-    }
-
-    @Configuration(proxyBeanMethods = false)
-    static class TestExtensionConfiguration {
-        @Bean
-        ContractExtension contractExtension() {
-            return new ContractExtension();
-        }
     }
 
     @ModuleExtension("sales.contract")

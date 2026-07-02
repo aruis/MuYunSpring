@@ -16,29 +16,32 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.util.ReflectionUtils;
+import jakarta.enterprise.context.spi.CreationalContext;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.spi.Bean;
+import jakarta.enterprise.inject.spi.BeanManager;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class StaticModuleDefinitionScanner {
-    private final ApplicationContext applicationContext;
+    private final BeanManager beanManager;
 
-    public StaticModuleDefinitionScanner(ApplicationContext applicationContext) {
-        this.applicationContext = applicationContext;
+    public StaticModuleDefinitionScanner(BeanManager beanManager) {
+        this.beanManager = beanManager;
     }
 
     public List<StaticModuleDefinition> scan() {
         LinkedHashMap<String, StaticModuleDefinition> definitions = new LinkedHashMap<>();
-        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticModule.class)) {
-            Object bean = applicationContext.getBean(beanName);
-            Class<?> beanClass = AopUtils.getTargetClass(bean);
-            PlatformStaticModule module = AnnotationUtils.findAnnotation(beanClass, PlatformStaticModule.class);
+        for (Bean<?> cdiBean : beansWithAnnotation(PlatformStaticModule.class)) {
+            Object bean = reference(cdiBean);
+            Class<?> beanClass = cdiBean.getBeanClass();
+            PlatformStaticModule module = findAnnotation(beanClass, PlatformStaticModule.class);
             if (module == null) {
                 continue;
             }
@@ -124,11 +127,12 @@ public class StaticModuleDefinitionScanner {
 
     private Object service(Class<?> beanClass) {
         try {
-            String[] beanNames = applicationContext.getBeanNamesForType(beanClass);
-            if (beanNames.length == 0) {
+            Set<Bean<?>> beans = beanManager.getBeans(beanClass, Any.Literal.INSTANCE);
+            if (beans.isEmpty()) {
                 return null;
             }
-            Object bean = applicationContext.getBean(beanNames[0]);
+            Bean<?> cdiBean = beanManager.resolve(beans);
+            Object bean = reference(cdiBean);
             if (!(bean instanceof ScopedWeb<?> scopedWeb)) {
                 return null;
             }
@@ -142,23 +146,7 @@ public class StaticModuleDefinitionScanner {
         if (!ScopedWeb.class.isAssignableFrom(beanClass)) {
             return;
         }
-        org.springframework.web.bind.annotation.RequestMapping mapping =
-                AnnotationUtils.findAnnotation(beanClass, org.springframework.web.bind.annotation.RequestMapping.class);
-        String path = mapping == null ? null : firstText(mapping.value());
-        if (path == null && mapping != null) {
-            path = firstText(mapping.path());
-        }
-        if (path == null) {
-            return;
-        }
-        String scopeName = path.replaceFirst("^/", "");
-        if (scopeName.contains("/")) {
-            return;
-        }
-        if (!module.alias().equals(scopeName) && !normalizeScope(module.alias()).equals(normalizeScope(scopeName))) {
-            throw new IllegalStateException("@PlatformStaticModule alias must match web scope: "
-                    + module.alias() + " != " + scopeName);
-        }
+        // Web scope validation moves to the Quarkus REST migration because Spring RequestMapping is no longer present.
     }
 
     private String normalizeScope(String value) {
@@ -171,16 +159,18 @@ public class StaticModuleDefinitionScanner {
         addMenuAction(actions, beanClass);
         addStandardActions(actions, beanClass);
         addWorkflowActions(actions, capabilities);
-        ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
+        for (Method method : methods(beanClass)) {
+            addAnnotatedAction(actions, method);
+        }
         return List.copyOf(actions.values());
     }
 
     private void addActionContributions(LinkedHashMap<String, StaticModuleDefinition> definitions) {
-        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticActionContribution.class)) {
-            Object bean = applicationContext.getBean(beanName);
-            Class<?> beanClass = AopUtils.getTargetClass(bean);
+        for (Bean<?> cdiBean : beansWithAnnotation(PlatformStaticActionContribution.class)) {
+            Object bean = reference(cdiBean);
+            Class<?> beanClass = cdiBean.getBeanClass();
             PlatformStaticActionContribution contribution =
-                    AnnotationUtils.findAnnotation(beanClass, PlatformStaticActionContribution.class);
+                    findAnnotation(beanClass, PlatformStaticActionContribution.class);
             if (contribution == null) {
                 continue;
             }
@@ -304,13 +294,14 @@ public class StaticModuleDefinitionScanner {
                                                                    PlatformStaticActionContribution contribution) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
         addContributionStandardActions(actions, beanClass, contribution);
-        ReflectionUtils.doWithMethods(beanClass, method -> addContributionAnnotatedAction(actions, method,
-                contribution));
+        for (Method method : methods(beanClass)) {
+            addContributionAnnotatedAction(actions, method, contribution);
+        }
         return List.copyOf(actions.values());
     }
 
     private void addMenuAction(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
-        if (AnnotationUtils.findAnnotation(beanClass, PlatformMenu.class) != null) {
+        if (findAnnotation(beanClass, PlatformMenu.class) != null) {
             addPlatform(actions, PlatformAction.MENU);
         }
     }
@@ -383,11 +374,11 @@ public class StaticModuleDefinitionScanner {
     }
 
     private void addAnnotatedAction(Map<String, StaticModuleActionDefinition> actions, Method method) {
-        ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
+        ActionEndpoint standard = method.getAnnotation(ActionEndpoint.class);
         if (standard != null) {
             addPlatform(actions, standard.value());
         }
-        CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);
+        CustomActionEndpoint custom = method.getAnnotation(CustomActionEndpoint.class);
         if (custom != null) {
             actions.put(custom.value(), new StaticModuleActionDefinition(
                     custom.value(),
@@ -405,11 +396,11 @@ public class StaticModuleDefinitionScanner {
     private void addContributionAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
                                                 Method method,
                                                 PlatformStaticActionContribution contribution) {
-        ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
+        ActionEndpoint standard = method.getAnnotation(ActionEndpoint.class);
         if (standard != null) {
             addContributionPlatform(actions, contribution, standard.value());
         }
-        CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);
+        CustomActionEndpoint custom = method.getAnnotation(CustomActionEndpoint.class);
         if (custom != null) {
             String actionCode = PlatformStaticActionContributionSupport.actionCode(contribution, custom.value());
             actions.put(actionCode, new StaticModuleActionDefinition(
@@ -461,10 +452,36 @@ public class StaticModuleDefinitionScanner {
         };
     }
 
-    private String firstText(String[] values) {
-        if (values == null || values.length == 0 || values[0].isBlank()) {
-            return null;
+    private List<Bean<?>> beansWithAnnotation(Class<? extends Annotation> annotationType) {
+        return beanManager.getBeans(Object.class, Any.Literal.INSTANCE).stream()
+                .filter(bean -> findAnnotation(bean.getBeanClass(), annotationType) != null)
+                .toList();
+    }
+
+    private Object reference(Bean<?> bean) {
+        CreationalContext<?> context = beanManager.createCreationalContext(bean);
+        return beanManager.getReference(bean, bean.getBeanClass(), context);
+    }
+
+    private static <A extends Annotation> A findAnnotation(Class<?> type, Class<A> annotationType) {
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            A annotation = current.getAnnotation(annotationType);
+            if (annotation != null) {
+                return annotation;
+            }
+            current = current.getSuperclass();
         }
-        return values[0];
+        return null;
+    }
+
+    private static List<Method> methods(Class<?> type) {
+        List<Method> methods = new ArrayList<>();
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            methods.addAll(List.of(current.getDeclaredMethods()));
+            current = current.getSuperclass();
+        }
+        return methods;
     }
 }

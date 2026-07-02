@@ -1,10 +1,12 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeMode;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ConfigurationProperties("muyun.runtime")
+@ApplicationScoped
 public class MuYunSpringRuntimeProperties {
+    @ConfigProperty(name = "muyun.runtime.mode", defaultValue = "PRODUCTION")
     private PlatformRuntimeMode mode = PlatformRuntimeMode.PRODUCTION;
 
     public PlatformRuntimeMode getMode() {

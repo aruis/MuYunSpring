@@ -14,7 +14,6 @@ import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.ApplicationRunner;
 
 import java.util.List;
 
@@ -40,9 +39,8 @@ class StaticModuleDefinitionRegistrarTest {
         );
 
         assertThat(registrar).isInstanceOf(PlatformBootstrapTask.class);
-        assertThat(registrar).isNotInstanceOf(ApplicationRunner.class);
         assertThat(registrar.order()).isLessThan(new InitialDataBootstrapTask(mock(InitialDataExecutor.class)).order());
-        assertThat(new PlatformBootstrapRunner(List.of(registrar)).getOrder()).isEqualTo(0);
+        assertThat(new PlatformBootstrapRunner(List.of(registrar))).isNotNull();
     }
 
     @Test

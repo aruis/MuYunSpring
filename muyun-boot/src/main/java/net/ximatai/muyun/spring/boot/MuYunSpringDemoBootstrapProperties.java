@@ -1,15 +1,23 @@
 package net.ximatai.muyun.spring.boot;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ConfigurationProperties("muyun.demo-bootstrap")
+@ApplicationScoped
 public class MuYunSpringDemoBootstrapProperties {
+    @ConfigProperty(name = "muyun.demo-bootstrap.enabled", defaultValue = "false")
     private boolean enabled;
+    @ConfigProperty(name = "muyun.demo-bootstrap.tenant-title", defaultValue = "演示租户")
     private String tenantTitle = "演示租户";
+    @ConfigProperty(name = "muyun.demo-bootstrap.organization-title", defaultValue = "戏码台")
     private String organizationTitle = "戏码台";
+    @ConfigProperty(name = "muyun.demo-bootstrap.department-title", defaultValue = "综合管理部")
     private String departmentTitle = "综合管理部";
+    @ConfigProperty(name = "muyun.demo-bootstrap.employee-title", defaultValue = "演示租户管理员")
     private String employeeTitle = "演示租户管理员";
+    @ConfigProperty(name = "muyun.demo-bootstrap.admin-username", defaultValue = "demo_admin")
     private String adminUsername = "demo_admin";
+    @ConfigProperty(name = "muyun.demo-bootstrap.admin-initial-password", defaultValue = "demo123")
     private String adminInitialPassword = "demo123";
 
     public boolean isEnabled() {

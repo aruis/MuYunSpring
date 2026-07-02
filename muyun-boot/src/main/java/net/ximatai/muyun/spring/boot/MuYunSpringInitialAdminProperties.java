@@ -1,10 +1,12 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ConfigurationProperties("muyun.initial-admin")
+@ApplicationScoped
 public class MuYunSpringInitialAdminProperties implements PlatformInitialAdminSettings {
+    @ConfigProperty(name = "muyun.initial-admin.initial-password", defaultValue = "admin123")
     private String initialPassword = "admin123";
 
     public String getInitialPassword() {

@@ -34,44 +34,34 @@ import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import io.quarkus.arc.DefaultBean;
+import io.quarkus.narayana.jta.QuarkusTransaction;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 
 import java.time.Clock;
 import java.time.ZoneId;
 
-@Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(MuYunSpringPlatformTimeProperties.class)
-@Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
+@ApplicationScoped
 public class MuYunSpringDynamicRuntimeConfiguration {
-    @Bean
-    @ConditionalOnBean(DictionaryItemService.class)
-    @ConditionalOnMissingBean(DynamicFieldValueValidator.class)
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     DynamicFieldValueValidator dictionaryFieldValueValidator(DictionaryItemService itemService) {
         return new DictionaryFieldValueValidator(itemService);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    DynamicFieldValueValidator dynamicFieldValueValidator() {
-        return DynamicFieldValueValidator.NONE;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     Clock clock() {
         return Clock.systemDefaultZone();
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     PlatformTimeService platformTimeService(ObjectProvider<Clock> clockProvider,
                                             ObjectProvider<BusinessTimeZoneResolver> zoneResolvers,
                                             MuYunSpringPlatformTimeProperties timeProperties) {
@@ -92,30 +82,34 @@ public class MuYunSpringDynamicRuntimeConfiguration {
         return PlatformTimeService.requireIanaZoneId(configured);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     BusinessCalendarService businessCalendarService(PlatformTimeService platformTimeService) {
         return new NaturalBusinessCalendarService(platformTimeService);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     ModuleDefinitionValidator moduleDefinitionValidator() {
         return new ModuleDefinitionValidator();
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations,
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
+    DynamicSchemaService dynamicSchemaService(IDatabaseOperations operations,
                                               ModuleDefinitionValidator moduleDefinitionValidator,
                                               PlatformRuntimeModeProvider runtimeModeProvider) {
         return new DynamicSchemaService(operations, new DynamicTableMapper(), moduleDefinitionValidator,
                 new PlatformSchemaMigrationPolicy(runtimeModeProvider));
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations<?> operations,
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
+    DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations operations,
                                               DynamicFieldValueValidator fieldValueValidator,
                                               RuntimeEventPublisher eventPublisher,
                                               DynamicActionExecutorRegistry actionExecutorRegistry,
@@ -132,8 +126,9 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                 databaseValueConverter);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime,
                                               ObjectProvider<ActionExecutionPolicyService> actionExecutionPolicyService,
                                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
@@ -144,38 +139,37 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                 DynamicRecordMutationCoordinators.lazyComposite(() -> mutationCoordinator.orderedStream().toList()));
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     ReferenceDependencyScopeResolver dynamicReferenceDependencyScopeResolver(DynamicRecordRuntime runtime) {
         return new DynamicReferenceDependencyScopeResolver(runtime);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     DynamicActionExecutorRegistry dynamicActionExecutorRegistry(ObjectProvider<DynamicActionExecutor> executors) {
         return new DynamicActionExecutorRegistry(() -> executors.orderedStream().toList());
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    DynamicActionTransactionOperator dynamicActionTransactionOperator(
-            ObjectProvider<PlatformTransactionManager> transactionManager) {
-        PlatformTransactionManager manager = transactionManager.getIfAvailable();
-        if (manager == null) {
-            return DynamicActionTransactionOperator.none();
-        }
-        TransactionTemplate transactionTemplate = new TransactionTemplate(manager);
-        return (context, action) -> transactionTemplate.execute(status -> action.get());
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
+    DynamicActionTransactionOperator dynamicActionTransactionOperator() {
+        return (context, action) -> QuarkusTransaction.joiningExisting().call(action::get);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     RuntimeEventPublisher runtimeEventPublisher(ObjectProvider<RuntimeEventListener> listeners) {
         return new RuntimeEventMulticaster(() -> listeners.orderedStream().toList());
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     DynamicModuleRuntimeRefresher dynamicModuleRuntimeRefresher(DynamicSchemaService schemaService,
                                                   DynamicRecordRuntime runtime) {
         return new DynamicModuleRuntimeRefresher(schemaService, runtime);

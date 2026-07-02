@@ -9,12 +9,13 @@ import com.fasterxml.jackson.databind.module.SimpleDeserializers;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
 
-@Configuration(proxyBeanMethods = false)
+@ApplicationScoped
 public class MuYunSpringJacksonConfiguration {
-    @Bean
+    @Produces
+    @ApplicationScoped
     public Module codeTitleEnumJacksonModule() {
         SimpleModule module = new SimpleModule("codeTitleEnum");
         module.addSerializer(CodeTitleEnum.class, new CodeTitleEnumJsonSerializer());

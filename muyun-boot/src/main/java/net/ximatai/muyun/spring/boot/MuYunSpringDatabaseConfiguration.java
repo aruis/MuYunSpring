@@ -2,9 +2,7 @@ package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
-import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
-import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
-import net.ximatai.muyun.database.spring.boot.JdbiConfigurer;
+import net.ximatai.muyun.database.quarkus.MuYunJdbiConfigurer;
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
 import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
@@ -18,43 +16,27 @@ import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.argument.AbstractArgumentFactory;
 import org.jdbi.v3.core.argument.Argument;
 import org.jdbi.v3.core.config.ConfigRegistry;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import io.quarkus.arc.DefaultBean;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
 
 import java.math.BigInteger;
 import java.sql.Types;
 
-@Configuration(proxyBeanMethods = false)
-@Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
+@ApplicationScoped
 public class MuYunSpringDatabaseConfiguration {
-    @Bean
-    @ConditionalOnMissingBean
-    EntityMetaResolver entityMetaResolver() {
-        return PlatformEntityManagers.entityMetaResolver();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
-                                            EntityMetaResolver entityMetaResolver,
-                                            DatabaseValueConverter databaseValueConverter) {
-        return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver, databaseValueConverter);
-    }
-
-    @Bean
-    @ConditionalOnBean(IDatabaseOperations.class)
-    @ConditionalOnMissingBean
-    StaticSchemaService staticSchemaService(IDatabaseOperations<?> operations,
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
+    StaticSchemaService staticSchemaService(IDatabaseOperations operations,
                                             PlatformRuntimeModeProvider runtimeModeProvider) {
         return new StaticSchemaService(operations, new StaticEntityTableMapper(),
                 new PlatformSchemaMigrationPolicy(runtimeModeProvider));
     }
 
-    @Bean
-    JdbiConfigurer bigIntegerJdbiConfigurer() {
+    @Produces
+    @ApplicationScoped
+    MuYunJdbiConfigurer bigIntegerJdbiConfigurer() {
         return jdbi -> jdbi.registerArgument(new AbstractArgumentFactory<BigInteger>(Types.BIGINT) {
             @Override
             protected Argument build(BigInteger value, ConfigRegistry config) {
@@ -63,16 +45,16 @@ public class MuYunSpringDatabaseConfiguration {
         });
     }
 
-    @Bean
-    @ConditionalOnBean(Jdbi.class)
-    @ConditionalOnMissingBean(CodeSequenceAllocator.class)
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     CodeSequenceAllocator codeSequenceAllocator(Jdbi jdbi) {
         return new PostgresCodeSequenceAllocator(jdbi);
     }
 
-    @Bean
-    @ConditionalOnBean(Jdbi.class)
-    @ConditionalOnMissingBean(CodeRecycleConsumer.class)
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     CodeRecycleConsumer codeRecycleConsumer(Jdbi jdbi) {
         return new PostgresCodeRecycleConsumer(jdbi);
     }

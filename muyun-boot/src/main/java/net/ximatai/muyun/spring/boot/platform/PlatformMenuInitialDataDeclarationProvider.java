@@ -6,21 +6,23 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.annotation.AnnotationUtils;
+import jakarta.enterprise.context.spi.CreationalContext;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.spi.Bean;
+import jakarta.enterprise.inject.spi.BeanManager;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
 
 public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDeclarationProvider {
     private final MenuService menuService;
-    private final ApplicationContext applicationContext;
+    private final BeanManager beanManager;
 
     public PlatformMenuInitialDataDeclarationProvider(MenuService menuService,
-                                                      ApplicationContext applicationContext) {
+                                                      BeanManager beanManager) {
         this.menuService = menuService;
-        this.applicationContext = applicationContext;
+        this.beanManager = beanManager;
     }
 
     @Override
@@ -40,14 +42,13 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
 
     private List<InitialDataDeclaration<?>> contributedMenus(String schemeId) {
         List<InitialDataDeclaration<?>> declarations = new ArrayList<>();
-        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformMenu.class)) {
-            Object bean = applicationContext.getBean(beanName);
-            Class<?> beanClass = AopUtils.getTargetClass(bean);
-            PlatformMenu menu = AnnotationUtils.findAnnotation(beanClass, PlatformMenu.class);
+        for (Bean<?> cdiBean : beansWithAnnotation(PlatformMenu.class)) {
+            Class<?> beanClass = cdiBean.getBeanClass();
+            PlatformMenu menu = findAnnotation(beanClass, PlatformMenu.class);
             if (menu == null) {
                 continue;
             }
-            PlatformStaticModule module = AnnotationUtils.findAnnotation(beanClass, PlatformStaticModule.class);
+            PlatformStaticModule module = findAnnotation(beanClass, PlatformStaticModule.class);
             if (module == null) {
                 throw new IllegalStateException("@PlatformMenu requires @PlatformStaticModule: " + beanClass.getName());
             }
@@ -85,5 +86,28 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
 
     private String moduleMenuId(String moduleAlias) {
         return "platform.menu.module." + moduleAlias;
+    }
+
+    private List<Bean<?>> beansWithAnnotation(Class<? extends Annotation> annotationType) {
+        return beanManager.getBeans(Object.class, Any.Literal.INSTANCE).stream()
+                .filter(bean -> findAnnotation(bean.getBeanClass(), annotationType) != null)
+                .toList();
+    }
+
+    private Object reference(Bean<?> bean) {
+        CreationalContext<?> context = beanManager.createCreationalContext(bean);
+        return beanManager.getReference(bean, bean.getBeanClass(), context);
+    }
+
+    private static <A extends Annotation> A findAnnotation(Class<?> type, Class<A> annotationType) {
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            A annotation = current.getAnnotation(annotationType);
+            if (annotation != null) {
+                return annotation;
+            }
+            current = current.getSuperclass();
+        }
+        return null;
     }
 }

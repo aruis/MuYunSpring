@@ -9,13 +9,13 @@ import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@ApplicationScoped
 public class BuiltInRolePermissionTemplateService {
     public static final String TENANT_ADMIN_TEMPLATE_ALIAS = "tenant.admin";
     public static final String ORGANIZATION_ADMIN_TEMPLATE_ALIAS = "organization.admin";

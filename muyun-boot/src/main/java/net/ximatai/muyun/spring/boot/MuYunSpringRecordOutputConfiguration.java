@@ -7,19 +7,19 @@ import net.ximatai.muyun.spring.ability.output.OptionTitleRecordOutputTransforme
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
+import io.quarkus.arc.DefaultBean;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 
 import java.util.List;
 
-@Configuration(proxyBeanMethods = false)
+@ApplicationScoped
 public class MuYunSpringRecordOutputConfiguration {
-    @Bean
-    @Order(0)
+    @Produces
+    @ApplicationScoped
+    @Priority(0)
     RecordOutputTransformer optionTitleRecordOutputTransformer(
             ObjectProvider<StaticOptionFieldTitlePopulator> titlePopulatorProvider) {
         return new OptionTitleRecordOutputTransformer(
@@ -27,31 +27,34 @@ public class MuYunSpringRecordOutputConfiguration {
         );
     }
 
-    @Bean
-    @Order(100)
+    @Produces
+    @ApplicationScoped
+    @Priority(100)
     RecordOutputTransformer fieldProtectionRecordOutputTransformer() {
         return new FieldProtectionRecordOutputTransformer();
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     PlatformRecordOutput platformRecordOutput(ObjectProvider<RecordOutputTransformer> transformerProvider) {
         List<RecordOutputTransformer> transformers = transformerProvider.orderedStream().toList();
         return new DefaultPlatformRecordOutput(transformers);
     }
 
-    @Bean
+    @Produces
+    @ApplicationScoped
     WebOutputSupportRegistration webOutputSupportRegistration(PlatformRecordOutput recordOutput) {
         return new WebOutputSupportRegistration(recordOutput);
     }
 
-    static final class WebOutputSupportRegistration implements DisposableBean {
+    static final class WebOutputSupportRegistration implements AutoCloseable {
         WebOutputSupportRegistration(PlatformRecordOutput recordOutput) {
             WebOutputSupport.configure(recordOutput);
         }
 
         @Override
-        public void destroy() {
+        public void close() {
             WebOutputSupport.reset();
         }
     }
