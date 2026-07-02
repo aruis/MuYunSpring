@@ -27,7 +27,6 @@ dependencies {
 tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
         "**/IamWebControllerTest.java",
-        "**/PlatformConfigurationWebControllerTest.java",
         "**/MenuWebControllerTest.java",
         "**/RecordLinkageRuleWebControllerTest.java",
         "**/PlatformModuleRuntimeContextWebControllerTest.java",

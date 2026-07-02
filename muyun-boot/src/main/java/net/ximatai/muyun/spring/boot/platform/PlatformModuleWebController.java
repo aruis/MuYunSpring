@@ -20,22 +20,22 @@ import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
 @PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "模块管理", order = 20)
-@RequestMapping("/platform.module")
+@Path("/platform.module")
 public class PlatformModuleWebController extends WebSupport<PlatformModuleService> implements
         CrudWeb<PlatformModule, PlatformModuleService>,
         EnableWeb<PlatformModule, PlatformModuleService>,
@@ -43,7 +43,7 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
 
     private PlatformDynamicRuntimeRefreshService runtimeRefreshService;
 
-    @Autowired
+    @Inject
     public PlatformModuleWebController(PlatformDynamicRuntimeRefreshService runtimeRefreshService) {
         this.runtimeRefreshService = runtimeRefreshService;
     }
@@ -51,10 +51,11 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
     public PlatformModuleWebController() {
     }
 
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+    public WebCountResponse sort(@PathParam("id") String id,
+                                 TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             if (blank(normalized.previousId()) && blank(normalized.nextId()) && blank(normalized.parentId())) {
@@ -65,10 +66,11 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         });
     }
 
-    @GetMapping("/tree/{applicationAlias}")
+    @GET
+    @Path("/tree/{applicationAlias}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@PathVariable String applicationAlias,
-                                   @RequestParam(defaultValue = "false") boolean flat) {
+    public WebListResponse<?> tree(@PathParam("applicationAlias") String applicationAlias,
+                                   @DefaultValue("false") @QueryParam("flat") boolean flat) {
         return webScope(() -> {
             String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
             List<PlatformModule> roots = service().rootModules(validApplicationAlias);
@@ -86,12 +88,13 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         });
     }
 
-    @GetMapping("/tree/{applicationAlias}/{parentId}")
+    @GET
+    @Path("/tree/{applicationAlias}/{parentId}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> treeChildren(@PathVariable String applicationAlias,
-                                           @PathVariable String parentId,
-                                           @RequestParam(defaultValue = "false") boolean flat,
-                                           @RequestParam(defaultValue = "true") boolean includeSelf) {
+    public WebListResponse<?> treeChildren(@PathParam("applicationAlias") String applicationAlias,
+                                           @PathParam("parentId") String parentId,
+                                           @DefaultValue("false") @QueryParam("flat") boolean flat,
+                                           @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
         return webScope(() -> {
             String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
             PlatformModule root = TreeAbility.ROOT_ID.equals(parentId) ? null : service().select(parentId);
@@ -115,24 +118,27 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         });
     }
 
-    @PostMapping("/{moduleAlias}/runtime/refresh")
+    @POST
+    @Path("/{moduleAlias}/runtime/refresh")
     @CustomActionEndpoint(value = "refreshDynamicRuntime", title = "刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public DynamicModuleRefreshResult refreshRuntime(@PathVariable String moduleAlias) {
+    public DynamicModuleRefreshResult refreshRuntime(@PathParam("moduleAlias") String moduleAlias) {
         return webScope(() -> runtimeRefreshService.refresh(moduleAlias));
     }
 
-    @PostMapping("/{moduleAlias}/runtime/execute-refresh")
+    @POST
+    @Path("/{moduleAlias}/runtime/execute-refresh")
     @CustomActionEndpoint(value = "executeRefreshDynamicRuntime", title = "执行刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public DynamicModuleRefreshResult executeRefreshRuntime(@PathVariable String moduleAlias) {
+    public DynamicModuleRefreshResult executeRefreshRuntime(@PathParam("moduleAlias") String moduleAlias) {
         return webScope(() -> runtimeRefreshService.executeRefresh(moduleAlias));
     }
 
-    @PostMapping("/{moduleAlias}/runtime/preview-refresh")
+    @POST
+    @Path("/{moduleAlias}/runtime/preview-refresh")
     @CustomActionEndpoint(value = "previewRefreshDynamicRuntime", title = "预览刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public DynamicModuleRefreshResult previewRefreshRuntime(@PathVariable String moduleAlias) {
+    public DynamicModuleRefreshResult previewRefreshRuntime(@PathParam("moduleAlias") String moduleAlias) {
         return webScope(() -> runtimeRefreshService.previewRefresh(moduleAlias));
     }
 
