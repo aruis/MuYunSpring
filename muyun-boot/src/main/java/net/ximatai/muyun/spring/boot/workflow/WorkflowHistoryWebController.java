@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.boot.workflow;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
@@ -11,18 +10,14 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryQueryService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryTaskView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
 
-@RestController
-@RequestMapping("/workflow/history")
+@ApplicationScoped
+@Path("/workflow/history")
 public class WorkflowHistoryWebController {
     private final WorkflowHistoryQueryService historyQueryService;
 
@@ -30,8 +25,9 @@ public class WorkflowHistoryWebController {
         this.historyQueryService = historyQueryService;
     }
 
-    @PostMapping("/query")
-    public WebListResponse<WorkflowHistoryInstance> query(@RequestBody WorkflowHistoryQueryWebRequest request) {
+    @POST
+    @Path("/query")
+    public WebListResponse<WorkflowHistoryInstance> query(WorkflowHistoryQueryWebRequest request) {
         WorkflowHistoryQueryWebRequest payload = request == null
                 ? new WorkflowHistoryQueryWebRequest(null, null, null, null)
                 : request;
@@ -39,28 +35,33 @@ public class WorkflowHistoryWebController {
                 payload.moduleAlias(), payload.recordId(), payload.startedBy(), page(payload.page())));
     }
 
-    @GetMapping("/{historyInstanceId}/bundle")
-    public WorkflowRuntimeRenderBundle renderBundle(@PathVariable String historyInstanceId) {
+    @GET
+    @Path("/{historyInstanceId}/bundle")
+    public WorkflowRuntimeRenderBundle renderBundle(@PathParam("historyInstanceId") String historyInstanceId) {
         return historyQueryService.renderBundle(historyInstanceId);
     }
 
-    @GetMapping("/{historyInstanceId}/tasks")
-    public WebListResponse<WorkflowTask> tasks(@PathVariable String historyInstanceId) {
+    @GET
+    @Path("/{historyInstanceId}/tasks")
+    public WebListResponse<WorkflowTask> tasks(@PathParam("historyInstanceId") String historyInstanceId) {
         return new WebListResponse<>(historyQueryService.tasks(historyInstanceId));
     }
 
-    @GetMapping("/{historyInstanceId}/tasks/view")
-    public WebListResponse<WorkflowHistoryTaskView> taskViews(@PathVariable String historyInstanceId) {
+    @GET
+    @Path("/{historyInstanceId}/tasks/view")
+    public WebListResponse<WorkflowHistoryTaskView> taskViews(@PathParam("historyInstanceId") String historyInstanceId) {
         return new WebListResponse<>(historyQueryService.taskViews(historyInstanceId));
     }
 
-    @GetMapping("/{historyInstanceId}/events")
-    public WebListResponse<WorkflowEvent> events(@PathVariable String historyInstanceId) {
+    @GET
+    @Path("/{historyInstanceId}/events")
+    public WebListResponse<WorkflowEvent> events(@PathParam("historyInstanceId") String historyInstanceId) {
         return new WebListResponse<>(historyQueryService.events(historyInstanceId));
     }
 
-    @GetMapping("/{historyInstanceId}/events/view")
-    public WebListResponse<WorkflowHistoryEventView> eventViews(@PathVariable String historyInstanceId) {
+    @GET
+    @Path("/{historyInstanceId}/events/view")
+    public WebListResponse<WorkflowHistoryEventView> eventViews(@PathParam("historyInstanceId") String historyInstanceId) {
         return new WebListResponse<>(historyQueryService.eventViews(historyInstanceId));
     }
 
