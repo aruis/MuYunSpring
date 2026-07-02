@@ -25,7 +25,6 @@ import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,7 +42,7 @@ class AbilityContractTest {
         CacheRegistry.resetPolicy();
         PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
         TenantContext.clear();
-        clearTransactionState();
+        TransactionScopeSupport.resetTransactionAdapter();
     }
 
     @Test
@@ -855,14 +854,16 @@ class AbilityContractTest {
         service.select(id);
         service.selectAllWithCache();
         service.rawDao().findById(id).setTitle("Changed in transaction");
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
+        transactionAdapter.begin();
+        TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
 
         assertThat(service.select(id).getTitle()).isEqualTo("Changed in transaction");
         assertThat(service.selectAllWithCache())
                 .extracting(DemoPlainRecord::getTitle)
                 .containsExactly("Changed in transaction");
 
-        TransactionSynchronizationManager.setActualTransactionActive(false);
+        transactionAdapter.commit();
         assertThat(service.select(id).getTitle()).isEqualTo("Cached");
         assertThat(service.selectAllWithCache())
                 .extracting(DemoPlainRecord::getTitle)
@@ -1854,13 +1855,6 @@ class AbilityContractTest {
         public List<ReferenceLookup> referenceLookups() {
             return List.of(referenceLookup(customerService));
         }
-    }
-
-    private void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     private static DemoOrganization scopedOrganization(String title, String parentId, String scopeKey) {

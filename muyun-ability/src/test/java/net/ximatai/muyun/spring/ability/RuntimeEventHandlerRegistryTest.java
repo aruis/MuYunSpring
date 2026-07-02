@@ -10,10 +10,9 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventHandlerPhase;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventHandlerRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -24,12 +23,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RuntimeEventHandlerRegistryTest {
+    private final TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
+
+    @BeforeEach
+    void setUp() {
+        TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
+    }
+
     @AfterEach
-    void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
+    void tearDown() {
+        TransactionScopeSupport.resetTransactionAdapter();
     }
 
     @Test
@@ -74,16 +77,13 @@ class RuntimeEventHandlerRegistryTest {
         RuntimeEventHandlerRegistry registry = RuntimeEventHandlerRegistry.fromBeans(Map.of("failingAfter", extension));
         RuntimeEvent event = event(RuntimeEventType.AFTER_UPDATE, "sales.contract", "contract", null);
 
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        transactionAdapter.begin();
 
         registry.dispatch(event);
 
         assertThat(extension.count).isZero();
-        assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
-        for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
-            synchronization.afterCommit();
-        }
+        assertThat(transactionAdapter.pendingActions()).isEqualTo(1);
+        transactionAdapter.commit();
         assertThat(extension.count).isEqualTo(1);
     }
 

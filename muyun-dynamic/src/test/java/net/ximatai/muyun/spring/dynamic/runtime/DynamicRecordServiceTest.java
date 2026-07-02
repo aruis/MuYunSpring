@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
@@ -53,8 +54,6 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -1671,22 +1670,19 @@ class DynamicRecordServiceTest {
                 .setValue("amount", BigDecimal.ZERO);
         draft.setId("contract-1");
 
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
         try {
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
+            TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
+            transactionAdapter.begin();
             assertThatThrownBy(() -> service.entity(MODULE, "contract")
                     .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
                     .isInstanceOf(DynamicActionExecutionException.class);
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            transactionAdapter.rollback();
             assertThat(events.events()).singleElement()
                     .extracting(RuntimeEvent::eventType)
                     .isEqualTo(RuntimeEventType.ACTION_FAILED);
         } finally {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.clearSynchronization();
-            }
-            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionScopeSupport.resetTransactionAdapter();
         }
     }
 
@@ -2661,20 +2657,17 @@ class DynamicRecordServiceTest {
                 .setValue("code", "C-001");
         record.setId("contract-1");
 
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
         try {
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
+            TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
+            transactionAdapter.begin();
             service.create(MODULE, "contract", record);
             assertThat(events.events()).isEmpty();
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(TransactionSynchronization::afterCommit);
+            transactionAdapter.commit();
             assertThat(events.events()).extracting(RuntimeEvent::eventType)
                     .containsExactly(RuntimeEventType.AFTER_CREATE);
         } finally {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.clearSynchronization();
-            }
-            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionScopeSupport.resetTransactionAdapter();
         }
     }
 
@@ -2689,18 +2682,15 @@ class DynamicRecordServiceTest {
                 .setValue("code", "C-001");
         record.setId("contract-1");
 
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
         try {
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
+            TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
+            transactionAdapter.begin();
             service.create(MODULE, "contract", record);
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            transactionAdapter.rollback();
             assertThat(events.events()).isEmpty();
         } finally {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.clearSynchronization();
-            }
-            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionScopeSupport.resetTransactionAdapter();
         }
     }
 
@@ -3869,26 +3859,22 @@ class DynamicRecordServiceTest {
         @Override
         public Object execute(DynamicActionExecutionContext context, Supplier<?> action) {
             boolean actionCompleted = false;
+            TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
             try {
-                TransactionSynchronizationManager.initSynchronization();
-                TransactionSynchronizationManager.setActualTransactionActive(true);
+                TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
+                transactionAdapter.begin();
                 Object result = action.get();
                 actionCompleted = true;
                 committed++;
-                TransactionSynchronizationManager.getSynchronizations()
-                        .forEach(TransactionSynchronization::afterCommit);
+                transactionAdapter.commit();
                 return result;
             } catch (RuntimeException e) {
-                if (!actionCompleted && TransactionSynchronizationManager.isSynchronizationActive()) {
-                    TransactionSynchronizationManager.getSynchronizations()
-                            .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+                if (!actionCompleted) {
+                    transactionAdapter.rollback();
                 }
                 throw e;
             } finally {
-                if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                    TransactionSynchronizationManager.clearSynchronization();
-                }
-                TransactionSynchronizationManager.setActualTransactionActive(false);
+                TransactionScopeSupport.resetTransactionAdapter();
             }
         }
 
@@ -4221,6 +4207,47 @@ class DynamicRecordServiceTest {
 
         DynamicActionExecutionContext context() {
             return context;
+        }
+    }
+
+    private static final class TestTransactionAdapter implements TransactionScopeSupport.TransactionAdapter {
+        private final List<Runnable> afterCommitActions = new ArrayList<>();
+        private boolean active;
+
+        void begin() {
+            active = true;
+        }
+
+        void commit() {
+            List<Runnable> actions = List.copyOf(afterCommitActions);
+            afterCommitActions.clear();
+            active = false;
+            actions.forEach(Runnable::run);
+        }
+
+        void rollback() {
+            afterCommitActions.clear();
+            active = false;
+        }
+
+        @Override
+        public boolean isTransactionActive() {
+            return active;
+        }
+
+        @Override
+        public boolean registerAfterCommit(Runnable action) {
+            if (!active) {
+                return false;
+            }
+            afterCommitActions.add(() -> {
+                try {
+                    action.run();
+                } catch (RuntimeException e) {
+                    throw new TransactionScopeSupport.AfterCommitActionException(e);
+                }
+            });
+            return true;
         }
     }
 }

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.runtime;
 
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
@@ -26,11 +27,10 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import net.ximatai.muyun.spring.platform.support.TestTransactionAdapter;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -82,24 +82,23 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
 
     @Test
     void shouldRefreshAfterCommitWhenTransactionIsActive() {
-        clearTransactionState();
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
         try {
+            TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
             when(refreshService.refresh(anyString())).thenAnswer(invocation -> result(invocation.getArgument(0)));
             relationDao.insert(relation("rel-customer-main", "crm.customer", "metadata-customer"));
             MetadataField field = new MetadataField();
             field.setMetadataId("metadata-customer");
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
+            transactionAdapter.begin();
 
             List<DynamicModuleRefreshResult> results = coordinator.refreshByMetadataField(field);
 
             assertThat(results).isEmpty();
             verify(refreshService, never()).refresh(anyString());
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(TransactionSynchronization::afterCommit);
+            transactionAdapter.commit();
             verify(refreshService).refresh("crm.customer");
         } finally {
-            clearTransactionState();
+            TransactionScopeSupport.resetTransactionAdapter();
         }
     }
 
@@ -297,10 +296,4 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
         return new DynamicModuleRefreshResult(new ModuleDefinition(moduleAlias, moduleAlias, List.of()), Map.of(), false);
     }
 
-    private void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
-    }
 }

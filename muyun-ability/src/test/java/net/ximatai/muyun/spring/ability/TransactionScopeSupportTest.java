@@ -3,8 +3,6 @@ package net.ximatai.muyun.spring.ability;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -12,21 +10,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TransactionScopeSupportTest {
+    private final TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
+
     @BeforeEach
     void setUp() {
-        clearTransactionState();
+        TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
     }
 
     @AfterEach
     void tearDown() {
-        clearTransactionState();
-    }
-
-    private void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
+        TransactionScopeSupport.resetTransactionAdapter();
     }
 
     @Test
@@ -39,44 +32,38 @@ class TransactionScopeSupportTest {
     }
 
     @Test
-    void shouldRunAfterCommitWhenSpringTransactionSynchronizationIsActive() {
+    void shouldRunAfterCommitWhenTransactionSynchronizationIsActive() {
         AtomicInteger calls = new AtomicInteger();
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        transactionAdapter.begin();
 
         TransactionScopeSupport.afterCommitOrNow(calls::incrementAndGet);
 
         assertThat(calls).hasValue(0);
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(TransactionSynchronization::afterCommit);
+        transactionAdapter.commit();
         assertThat(calls).hasValue(1);
     }
 
     @Test
-    void shouldNotRunWhenSpringTransactionRollsBack() {
+    void shouldNotRunWhenTransactionRollsBack() {
         AtomicInteger calls = new AtomicInteger();
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        transactionAdapter.begin();
 
         TransactionScopeSupport.afterCommitOrNow(calls::incrementAndGet);
 
         assertThat(calls).hasValue(0);
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+        transactionAdapter.rollback();
         assertThat(calls).hasValue(0);
     }
 
     @Test
     void shouldMarkAfterCommitActionFailure() {
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        transactionAdapter.begin();
 
         TransactionScopeSupport.afterCommitOrNow(() -> {
             throw new IllegalStateException("event failed");
         });
 
-        assertThatThrownBy(() -> TransactionSynchronizationManager.getSynchronizations()
-                .forEach(TransactionSynchronization::afterCommit))
+        assertThatThrownBy(transactionAdapter::commit)
                 .isInstanceOf(TransactionScopeSupport.AfterCommitActionException.class)
                 .hasCauseInstanceOf(IllegalStateException.class);
     }

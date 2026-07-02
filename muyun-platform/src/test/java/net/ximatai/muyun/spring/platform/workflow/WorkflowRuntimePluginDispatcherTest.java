@@ -1,10 +1,10 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
+import net.ximatai.muyun.spring.platform.support.TestTransactionAdapter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,14 +13,16 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkflowRuntimePluginDispatcherTest {
+    private final TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
+
     @BeforeEach
     void setUp() {
-        clearTransactionState();
+        TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
     }
 
     @AfterEach
     void tearDown() {
-        clearTransactionState();
+        TransactionScopeSupport.resetTransactionAdapter();
     }
 
     @Test
@@ -62,7 +64,7 @@ class WorkflowRuntimePluginDispatcherTest {
     }
 
     @Test
-    void shouldRunAfterCommitPluginsOnlyAfterSpringTransactionCommit() {
+    void shouldRunAfterCommitPluginsOnlyAfterTransactionCommit() {
         List<String> calls = new ArrayList<>();
         WorkflowRuntimePluginDispatcher dispatcher = new WorkflowRuntimePluginDispatcher(List.of(
                 plugin("after-a", 20, "sales.contract", "approve",
@@ -72,14 +74,12 @@ class WorkflowRuntimePluginDispatcherTest {
                         Set.of(WorkflowRuntimePluginEventType.AFTER_APPROVE),
                         WorkflowRuntimePluginDispatchTiming.AFTER_COMMIT, calls)
         ));
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        transactionAdapter.begin();
 
         dispatcher.dispatch(context(WorkflowRuntimePluginEventType.AFTER_APPROVE));
 
         assertThat(calls).isEmpty();
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(TransactionSynchronization::afterCommit);
+        transactionAdapter.commit();
         assertThat(calls).containsExactly("after-b", "after-a");
     }
 
@@ -137,10 +137,4 @@ class WorkflowRuntimePluginDispatcherTest {
                 null, null, null);
     }
 
-    private void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
-    }
 }

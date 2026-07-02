@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -11,11 +12,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import net.ximatai.muyun.spring.platform.support.TestTransactionAdapter;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -136,25 +136,24 @@ class PlatformMetadataSchemaEnsureServiceTest {
 
     @Test
     void shouldRunSchemaEnsureAfterCommitWhenTransactionIsActive() {
-        clearTransactionState();
+        TestTransactionAdapter transactionAdapter = new TestTransactionAdapter();
         try {
+            TransactionScopeSupport.configureTransactionAdapter(transactionAdapter);
             TestContext context = testContext();
             RecordingSchemaService schemaService = new RecordingSchemaService();
             PlatformMetadataSchemaEnsureService ensureService =
                     new PlatformMetadataSchemaEnsureService(context.compiler, schemaService);
             String metadataId = context.metadataService.insert(metadata("crm", "customer"));
             context.fieldService.insert(titleField(metadataId));
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
+            transactionAdapter.begin();
 
             ensureService.ensure(metadataId);
 
             assertThat(schemaService.ensuredEntities).isEmpty();
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(TransactionSynchronization::afterCommit);
+            transactionAdapter.commit();
             assertThat(schemaService.ensuredEntities).hasSize(1);
         } finally {
-            clearTransactionState();
+            TransactionScopeSupport.resetTransactionAdapter();
         }
     }
 
@@ -229,13 +228,6 @@ class PlatformMetadataSchemaEnsureServiceTest {
         fieldType.setFieldType(type);
         fieldType.setDefaultLength(length);
         return fieldType;
-    }
-
-    private void clearTransactionState() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     private boolean hasSchemaEnsureDependency(Class<?> serviceClass) {
