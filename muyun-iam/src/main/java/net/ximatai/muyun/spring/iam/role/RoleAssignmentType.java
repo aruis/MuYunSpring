@@ -2,16 +2,14 @@ package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
-public enum RoleKind implements CodeTitleEnum {
-    STANDARD("standard", "标准角色"),
-    GROUP("group", "角色组"),
-    DATA_GRANT("dataGrant", "数据授权角色"),
-    SYSTEM("system", "系统角色");
+public enum RoleAssignmentType implements CodeTitleEnum {
+    ACCOUNT("account", "账号角色"),
+    EMPLOYMENT("employment", "任职角色");
 
     private final String code;
     private final String title;
 
-    RoleKind(String code, String title) {
+    RoleAssignmentType(String code, String title) {
         this.code = code;
         this.title = title;
     }

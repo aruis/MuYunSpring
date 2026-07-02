@@ -26,11 +26,12 @@ import net.ximatai.muyun.spring.iam.position.PositionCategoryDao;
 import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
 import net.ximatai.muyun.spring.iam.position.PositionDao;
 import net.ximatai.muyun.spring.iam.position.PositionService;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
-import net.ximatai.muyun.spring.iam.role.RoleGrant;
-import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -375,11 +376,11 @@ class IamWebControllerTest {
         currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
         Role saved = new Role();
         saved.setId("role-1");
-        saved.setTitle("Position Role");
-        saved.setRoleKind(RoleKind.POSITION_TEMPLATE);
+        saved.setTitle("Data Grant Role");
+        saved.setRoleKind(RoleKind.DATA_GRANT);
         when(roleService.insert(any())).thenAnswer(invocation -> {
             Role incoming = invocation.getArgument(0);
-            assertThat(incoming.getRoleKind()).isEqualTo(RoleKind.POSITION_TEMPLATE);
+            assertThat(incoming.getRoleKind()).isEqualTo(RoleKind.DATA_GRANT);
             return "role-1";
         });
         when(roleService.select("role-1")).thenReturn(saved);
@@ -388,13 +389,13 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "title":"Position Role",
-                                  "roleKind":"positionTemplate"
+                                  "title":"Data Grant Role",
+                                  "roleKind":"dataGrant"
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.roleKind").value("positionTemplate"));
+                .andExpect(jsonPath("$.record.roleKind").value("dataGrant"));
     }
 
     @Test
@@ -473,30 +474,48 @@ class IamWebControllerTest {
     @Test
     void shouldExposeRoleGrantAndActionGrantEndpoints() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        RoleGrant grant = roleGrant("grant-1", "role-1", RoleGrantSubjectType.USER_ACCOUNT, "user-2");
-        when(roleService.grantRole("role-1", RoleGrantSubjectType.USER_ACCOUNT, "user-2")).thenReturn("grant-1");
-        when(roleService.roleGrants("role-1")).thenReturn(List.of(grant));
-        when(roleService.deleteGrant("role-1", "grant-1")).thenReturn(1);
+        AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
+                ManagementScopeType.TENANT, "tenant_a");
+        EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
+        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn("grant-1");
+        when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
+        when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
+        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
+        when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
+        when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
                 DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
                 null, null, null)).thenReturn(1);
-        when(roleService.grantWildcardDataScopeAction("scope-1", "query",
-                DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT)).thenReturn(1);
         when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
 
-        mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
+        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
                         .contentType("application/json")
                         .content("""
-                                {"subjectType":"userAccount","subjectId":"user-2"}
+                                {"userId":"user-2","managementScopeType":"tenant","managementScopeId":"tenant_a"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value("grant-1"));
-        mvc.perform(get("/iam.role/{roleId}/grants", "role-1"))
+        mvc.perform(get("/iam.role/{roleId}/account-grants", "role-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].subjectType").value("userAccount"))
-                .andExpect(jsonPath("$[0].subjectId").value("user-2"));
-        mvc.perform(post("/iam.role/{roleId}/grants/{grantId}/delete", "role-1", "grant-1"))
+                .andExpect(jsonPath("$[0].userId").value("user-2"))
+                .andExpect(jsonPath("$[0].managementScopeType").value("tenant"));
+        mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
+                        .contentType("application/json")
+                        .content("""
+                                {"employeePositionId":"position-1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value("grant-2"));
+        mvc.perform(get("/iam.role/{roleId}/employment-grants", "role-2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("grant-2"))
+                .andExpect(jsonPath("$[0].employeePositionId").value("position-1"));
+        mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
@@ -515,17 +534,6 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content("""
                                 {"moduleAlias":"sales.contract","actionCode":"query"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.role/wildcard-data-scope/{roleId}/grant", "scope-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "actionCode":"query",
-                                  "dataScopePolicy":"owner",
-                                  "tenantScopePolicy":"currentTenant"
-                                }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
@@ -739,12 +747,26 @@ class IamWebControllerTest {
         return position;
     }
 
-    private RoleGrant roleGrant(String id, String roleId, RoleGrantSubjectType subjectType, String subjectId) {
-        RoleGrant grant = new RoleGrant();
+    private AccountRoleGrant accountRoleGrant(String id,
+                                              String roleId,
+                                              String userId,
+                                              ManagementScopeType scopeType,
+                                              String scopeId) {
+        AccountRoleGrant grant = new AccountRoleGrant();
         grant.setId(id);
         grant.setRoleId(roleId);
-        grant.setSubjectType(subjectType);
-        grant.setSubjectId(subjectId);
+        grant.setUserId(userId);
+        grant.setManagementScopeType(scopeType);
+        grant.setManagementScopeId(scopeId);
+        grant.setEnabled(Boolean.TRUE);
+        return grant;
+    }
+
+    private EmploymentRoleGrant employmentRoleGrant(String id, String roleId, String employeePositionId) {
+        EmploymentRoleGrant grant = new EmploymentRoleGrant();
+        grant.setId(id);
+        grant.setRoleId(roleId);
+        grant.setEmployeePositionId(employeePositionId);
         grant.setEnabled(Boolean.TRUE);
         return grant;
     }

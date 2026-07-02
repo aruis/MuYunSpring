@@ -310,10 +310,10 @@ class RoleDataScopeCriteriaServiceTest {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
                 effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-1", "org-main", "dept-main", null)),
                 effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "position-role"),
-                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        effectiveRoleGrant("position-role", RoleAssignmentType.EMPLOYMENT,
                                 "position-1", "org-branch", "dept-branch", "position-1"))
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -336,14 +336,17 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldResolveAccountRoleOrganizationScopeFromCurrentUserWhenContextHasNoOrganization() {
+    void shouldResolveAccountRoleOrganizationScopeFromManagementScope() {
         RoleService roleService = mock(RoleService.class);
+        OrganizationService organizationService = mock(OrganizationService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
-                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "account-role"),
-                        effectiveRoleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT,
-                                "user-1", null, null, null))
+                effectiveActionGrant(grant(DataScopePolicy.NONE, "account-role"),
+                        effectiveAccountRoleGrant("account-role", "user-1",
+                                ManagementScopeType.ORGANIZATION, "org-admin"))
         ));
-        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        when(organizationService.selfAndDescendantIds("org-admin")).thenReturn(List.of("org-admin", "org-child"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService,
+                Optional.of(organizationService));
 
         Criteria scoped = service.applyReadScope(
                 "sales.contract",
@@ -355,8 +358,9 @@ class RoleDataScopeCriteriaServiceTest {
         CompiledCriteria compiled = compile(scoped);
         assertThat(compiled.getSql())
                 .contains("\"status\" = :p0")
-                .contains("\"authOrganizationId\" = :p1");
-        assertThat(compiled.getParams()).containsEntry("p1", "org-account");
+                .contains("\"authOrganizationId\" IN (:p1_0, :p1_1)");
+        assertThat(compiled.getParams()).containsEntry("p1_0", "org-admin")
+                .containsEntry("p1_1", "org-child");
     }
 
     @Test
@@ -365,10 +369,10 @@ class RoleDataScopeCriteriaServiceTest {
         OrganizationService organizationService = mock(OrganizationService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
                 effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-1", "org-main", "dept-main", null)),
                 effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN, "position-role"),
-                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        effectiveRoleGrant("position-role", RoleAssignmentType.EMPLOYMENT,
                                 "position-1", "org-branch", "dept-branch", "position-1"))
         ));
         when(organizationService.selfAndDescendantIds("org-main")).thenReturn(List.of("org-main", "org-main-child"));
@@ -397,10 +401,10 @@ class RoleDataScopeCriteriaServiceTest {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
                 effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-1", "org-main", "dept-main", null)),
                 effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "position-role"),
-                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        effectiveRoleGrant("position-role", RoleAssignmentType.EMPLOYMENT,
                                 "position-1", "org-branch", "dept-branch", "position-1"))
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -430,7 +434,7 @@ class RoleDataScopeCriteriaServiceTest {
         when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
                 .thenReturn(List.of(effectiveActionGrant(
                         grant(DataScopePolicy.DEPARTMENT, "position-role"),
-                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        effectiveRoleGrant("position-role", RoleAssignmentType.EMPLOYMENT,
                                 "position-principal", "org-grant", "dept-grant", "position-principal"))));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
         CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
@@ -488,7 +492,7 @@ class RoleDataScopeCriteriaServiceTest {
         when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
                 .thenReturn(List.of(effectiveActionGrant(
                         grant(DataScopePolicy.OWNER, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-principal", "org-principal", "dept-principal", null))));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
         CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
@@ -564,17 +568,21 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldNotResolveWildcardDataScopeFromOperatorWhenActing() {
+    void shouldNotResolveInheritedDataGrantFromOperatorWhenActing() {
         RoleService roleService = mock(RoleService.class);
         BusinessPrincipal principal = BusinessPrincipal.employee(
                 "employee-principal", "org-principal", "dept-principal");
-        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
-        wildcard.setActionCode("view");
+        RoleAction inherit = grant(DataScopePolicy.INHERIT_DATA_GRANT);
+        inherit.setActionCode("view");
         when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
-                .thenReturn(List.of(effectiveActionGrant(wildcard,
-                        effectiveRoleGrant("role-1", RoleGrantSubjectType.EMPLOYEE,
+                .thenReturn(List.of(effectiveActionGrant(inherit,
+                        effectiveRoleGrant("role-1", RoleAssignmentType.EMPLOYMENT,
                                 "employee-principal", "org-principal", "dept-principal", null))));
-        when(roleService.effectiveWildcardDataScopeGrant("assistant-user", "view"))
+        when(roleService.inheritedDataGrantAction(
+                        effectiveRoleGrant("operator-role", RoleAssignmentType.EMPLOYMENT,
+                                "position-operator", "org-assistant", "dept-assistant", "position-operator"),
+                        "sales.contract",
+                        "view"))
                 .thenReturn(grant(DataScopePolicy.ALL));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
         CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
@@ -591,7 +599,7 @@ class RoleDataScopeCriteriaServiceTest {
         }
 
         assertThat(compile(scoped).getSql()).contains("\"status\" = :p0").contains("1 = 0");
-        verify(roleService, never()).effectiveWildcardDataScopeGrant("assistant-user", "view");
+        verify(roleService, never()).effectiveActionGrantsWithContext("assistant-user", "sales.contract", "view");
     }
 
     @Test
@@ -601,7 +609,7 @@ class RoleDataScopeCriteriaServiceTest {
                 "employee-principal", "org-principal", "dept-principal");
         when(roleService.effectiveActionGrantsWithContext(principal, "sales.score", "view"))
                 .thenReturn(List.of(effectiveActionGrant(referenceGrant("studentId", "view"),
-                        effectiveRoleGrant("role-1", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("role-1", RoleAssignmentType.EMPLOYMENT,
                                 "employee-principal", "org-principal", "dept-principal", null))));
         whenActionGrants(roleService, "assistant-user", "school.student", "view", grant(DataScopePolicy.ALL));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
@@ -630,9 +638,9 @@ class RoleDataScopeCriteriaServiceTest {
     void shouldDenyAccountRoleDepartmentScopeWhenContextHasNoDepartment() {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
-                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "account-role"),
-                        effectiveRoleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT,
-                                "user-1", null, null, null))
+                effectiveActionGrant(grant(DataScopePolicy.NONE, "account-role"),
+                        effectiveAccountRoleGrant("account-role", "user-1",
+                                ManagementScopeType.ORGANIZATION, null))
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
@@ -652,10 +660,10 @@ class RoleDataScopeCriteriaServiceTest {
         DepartmentService departmentService = mock(DepartmentService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
                 effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-1", "org-main", "dept-main", null)),
                 effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "position-role"),
-                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        effectiveRoleGrant("position-role", RoleAssignmentType.EMPLOYMENT,
                                 "position-1", "org-branch", "dept-branch", "position-1"))
         ));
         when(departmentService.selfAndDescendantIds("org-main", "dept-main"))
@@ -686,7 +694,7 @@ class RoleDataScopeCriteriaServiceTest {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
                 effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "employee-role"),
-                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                        effectiveRoleGrant("employee-role", RoleAssignmentType.EMPLOYMENT,
                                 "employee-1", "org-main", "dept-main", null))
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -819,13 +827,16 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldResolveWildcardDataScopeThroughBoundWildcardRole() {
+    void shouldResolveInheritedDataGrantThroughEmploymentDataGrantRole() {
         RoleService roleService = mock(RoleService.class);
-        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
-        wildcard.setActionCode("view");
+        RoleAction inherit = grant(DataScopePolicy.INHERIT_DATA_GRANT);
+        inherit.setActionCode("view");
         RoleAction actual = grant(DataScopePolicy.OWNER);
-        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
-        when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
+        EffectiveRoleGrant roleGrant = effectiveRoleGrant("role-1", RoleAssignmentType.EMPLOYMENT,
+                "position-1", "org-1", "dept-1", "position-1");
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(inherit, roleGrant)));
+        when(roleService.inheritedDataGrantAction(roleGrant, "sales.contract", "view")).thenReturn(actual);
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -843,13 +854,16 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldNotLetWildcardGrantWidenTenantScopeBeyondOriginalGrant() {
+    void shouldNotLetInheritedDataGrantWidenTenantScopeBeyondOriginalGrant() {
         RoleService roleService = mock(RoleService.class);
-        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
-        wildcard.setActionCode("view");
+        RoleAction inherit = grant(DataScopePolicy.INHERIT_DATA_GRANT);
+        inherit.setActionCode("view");
         RoleAction actual = grant(DataScopePolicy.ALL, "scope-role", TenantScopePolicy.ALL_TENANTS);
-        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
-        when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
+        EffectiveRoleGrant roleGrant = effectiveRoleGrant("role-1", RoleAssignmentType.EMPLOYMENT,
+                "position-1", "org-1", "dept-1", "position-1");
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(inherit, roleGrant)));
+        when(roleService.inheritedDataGrantAction(roleGrant, "sales.contract", "view")).thenReturn(actual);
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -865,11 +879,14 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldDenyWildcardDataScopeWhenNoWildcardRoleGrantExists() {
+    void shouldDenyInheritedDataGrantWhenNoDataGrantRoleExists() {
         RoleService roleService = mock(RoleService.class);
-        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
-        wildcard.setActionCode("view");
-        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
+        RoleAction inherit = grant(DataScopePolicy.INHERIT_DATA_GRANT);
+        inherit.setActionCode("view");
+        EffectiveRoleGrant roleGrant = effectiveRoleGrant("role-1", RoleAssignmentType.EMPLOYMENT,
+                "position-1", "org-1", "dept-1", "position-1");
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(inherit, roleGrant)));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -1025,12 +1042,20 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     private EffectiveRoleGrant effectiveRoleGrant(String roleId,
-                                                  RoleGrantSubjectType sourceType,
+                                                  RoleAssignmentType sourceType,
                                                   String sourceId,
                                                   String organizationId,
                                                   String departmentId,
                                                   String employeePositionId) {
-        return new EffectiveRoleGrant(roleId, sourceType, sourceId, organizationId, departmentId, employeePositionId);
+        return new EffectiveRoleGrant(roleId, sourceType, sourceId, organizationId, departmentId, employeePositionId,
+                null, null);
+    }
+
+    private EffectiveRoleGrant effectiveAccountRoleGrant(String roleId,
+                                                         String userId,
+                                                         ManagementScopeType scopeType,
+                                                         String scopeId) {
+        return EffectiveRoleGrant.account(roleId, userId, scopeType, scopeId);
     }
 
     private EffectiveRoleActionGrant effectiveActionGrant(RoleAction actionGrant, EffectiveRoleGrant roleGrant) {

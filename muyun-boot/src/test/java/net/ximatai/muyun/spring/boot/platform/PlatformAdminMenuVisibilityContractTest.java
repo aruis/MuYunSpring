@@ -7,11 +7,13 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleAction;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleDao;
-import net.ximatai.muyun.spring.iam.role.RoleGrant;
-import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleMenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
@@ -56,7 +58,8 @@ class PlatformAdminMenuVisibilityContractTest {
     private final TenantMemoryDao tenantDao = new TenantMemoryDao();
     private final UserAccountMemoryDao userAccountDao = new UserAccountMemoryDao();
     private final RoleMemoryDao roleDao = new RoleMemoryDao();
-    private final RoleGrantMemoryDao roleGrantDao = new RoleGrantMemoryDao();
+    private final AccountRoleGrantMemoryDao accountRoleGrantDao = new AccountRoleGrantMemoryDao();
+    private final EmploymentRoleGrantMemoryDao employmentRoleGrantDao = new EmploymentRoleGrantMemoryDao();
     private final RoleActionMemoryDao roleActionDao = new RoleActionMemoryDao();
     private final PlatformModuleMemoryDao moduleDao = new PlatformModuleMemoryDao();
     private final PlatformModuleActionMemoryDao moduleActionDao = new PlatformModuleActionMemoryDao();
@@ -76,7 +79,8 @@ class PlatformAdminMenuVisibilityContractTest {
     );
     private final RoleService roleService = new RoleService(
             roleDao,
-            roleGrantDao,
+            accountRoleGrantDao,
+            employmentRoleGrantDao,
             roleActionDao,
             tenantService,
             new PlatformRoleActionGrantVerifier(moduleService, moduleActionService),
@@ -215,7 +219,12 @@ class PlatformAdminMenuVisibilityContractTest {
             implements RoleDao {
     }
 
-    private static class RoleGrantMemoryDao extends TestMemoryDao<RoleGrant> implements RoleGrantDao {
+    private static class AccountRoleGrantMemoryDao extends TestMemoryDao<AccountRoleGrant>
+            implements AccountRoleGrantDao {
+    }
+
+    private static class EmploymentRoleGrantMemoryDao extends TestMemoryDao<EmploymentRoleGrant>
+            implements EmploymentRoleGrantDao {
     }
 
     private static class RoleActionMemoryDao extends TestMemoryDao<RoleAction> implements RoleActionDao {

@@ -20,13 +20,15 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationDao;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrantDao;
+import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleAction;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleDao;
-import net.ximatai.muyun.spring.iam.role.RoleGrant;
-import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
-import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
@@ -60,7 +62,8 @@ class DemoBootstrapTaskTest {
     private final UserAccountMemoryDao userAccountDao = new UserAccountMemoryDao();
     private final EmployeeAccountMemoryDao employeeAccountDao = new EmployeeAccountMemoryDao();
     private final RoleMemoryDao roleDao = new RoleMemoryDao();
-    private final RoleGrantMemoryDao roleGrantDao = new RoleGrantMemoryDao();
+    private final AccountRoleGrantMemoryDao accountRoleGrantDao = new AccountRoleGrantMemoryDao();
+    private final EmploymentRoleGrantMemoryDao employmentRoleGrantDao = new EmploymentRoleGrantMemoryDao();
     private final RoleActionMemoryDao roleActionDao = new RoleActionMemoryDao();
 
     private final TenantService tenantService = new TenantService(tenantDao);
@@ -73,8 +76,8 @@ class DemoBootstrapTaskTest {
             new PasswordHashingService());
     private final EmployeeAccountService employeeAccountService = new EmployeeAccountService(employeeAccountDao,
             tenantService, employeeService, userAccountService);
-    private final RoleService roleService = new RoleService(roleDao, roleGrantDao, roleActionDao, tenantService,
-            net.ximatai.muyun.spring.iam.role.RoleActionGrantVerifier.platformActionsOnly(),
+    private final RoleService roleService = new RoleService(roleDao, accountRoleGrantDao, employmentRoleGrantDao,
+            roleActionDao, tenantService, net.ximatai.muyun.spring.iam.role.RoleActionGrantVerifier.platformActionsOnly(),
             userAccountService, employeeService, null, employeeAccountService);
     private final RoleGrantableActionResolver grantableActionResolver = mock(RoleGrantableActionResolver.class);
     private final BuiltInRolePermissionTemplateService rolePermissionTemplateService =
@@ -184,19 +187,21 @@ class DemoBootstrapTaskTest {
             assertThat(userAccountDao.list(Criteria.of())).hasSize(1);
             assertThat(employeeAccountDao.list(Criteria.of())).hasSize(1);
             assertThat(roleDao.list(Criteria.of())).hasSize(1);
-            assertThat(roleGrantDao.list(Criteria.of()))
+            assertThat(accountRoleGrantDao.list(Criteria.of()))
                     .singleElement()
                     .satisfies(grant -> {
                         assertThat(grant.getRoleId()).isEqualTo(DemoBootstrapTask.TENANT_ADMIN_ROLE_ID);
-                        assertThat(grant.getSubjectType()).isEqualTo(RoleGrantSubjectType.USER_ACCOUNT);
-                        assertThat(grant.getSubjectId()).isEqualTo(DemoBootstrapTask.USER_ID);
+                        assertThat(grant.getUserId()).isEqualTo(DemoBootstrapTask.USER_ID);
+                        assertThat(grant.getManagementScopeType()).isEqualTo(ManagementScopeType.TENANT);
+                        assertThat(grant.getManagementScopeId()).isEqualTo(DemoBootstrapTask.TENANT_ALIAS);
                     });
+            assertThat(employmentRoleGrantDao.list(Criteria.of())).isEmpty();
             assertThat(roleActionDao.list(Criteria.of())).hasSize(2);
             Optional<RoleAction> queryGrant = roleActionDao.list(Criteria.of()).stream()
                     .filter(action -> PlatformAction.QUERY.permissionActionCode().equals(action.getActionCode()))
                     .findFirst();
             assertThat(queryGrant).hasValueSatisfying(action -> {
-                assertThat(action.getDataScopePolicy()).isEqualTo(DataScopePolicy.ALL);
+                assertThat(action.getDataScopePolicy()).isEqualTo(DataScopePolicy.NONE);
                 assertThat(action.getTenantScopePolicy()).isEqualTo(TenantScopePolicy.CURRENT_TENANT);
             });
         }
@@ -326,7 +331,12 @@ class DemoBootstrapTaskTest {
     private static class RoleMemoryDao extends TestMemoryDao<Role> implements RoleDao {
     }
 
-    private static class RoleGrantMemoryDao extends TestMemoryDao<RoleGrant> implements RoleGrantDao {
+    private static class AccountRoleGrantMemoryDao extends TestMemoryDao<AccountRoleGrant>
+            implements AccountRoleGrantDao {
+    }
+
+    private static class EmploymentRoleGrantMemoryDao extends TestMemoryDao<EmploymentRoleGrant>
+            implements EmploymentRoleGrantDao {
     }
 
     private static class RoleActionMemoryDao extends TestMemoryDao<RoleAction> implements RoleActionDao {

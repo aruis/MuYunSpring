@@ -9,8 +9,9 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclaration
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
-import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -132,8 +133,13 @@ class MuYunSpringIdentityConfigurationTest {
         }
 
         @Bean
-        RoleGrantDao roleGrantDao() {
-            return mock(RoleGrantDao.class);
+        AccountRoleGrantDao accountRoleGrantDao() {
+            return mock(AccountRoleGrantDao.class);
+        }
+
+        @Bean
+        EmploymentRoleGrantDao employmentRoleGrantDao() {
+            return mock(EmploymentRoleGrantDao.class);
         }
 
         @Bean

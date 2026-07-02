@@ -14,17 +14,17 @@ class CodeTitleEnumJacksonConfigurationTest {
     @Test
     void shouldSerializeCodeTitleEnumByCode() throws Exception {
         Role role = new Role();
-        role.setRoleKind(RoleKind.POSITION_TEMPLATE);
+        role.setRoleKind(RoleKind.DATA_GRANT);
 
         String json = objectMapper.writeValueAsString(role);
 
-        assertThat(json).contains("\"roleKind\":\"positionTemplate\"");
+        assertThat(json).contains("\"roleKind\":\"dataGrant\"");
     }
 
     @Test
     void shouldDeserializeCodeTitleEnumByCode() throws Exception {
-        Role role = objectMapper.readValue("{\"roleKind\":\"positionTemplate\"}", Role.class);
+        Role role = objectMapper.readValue("{\"roleKind\":\"dataGrant\"}", Role.class);
 
-        assertThat(role.getRoleKind()).isEqualTo(RoleKind.POSITION_TEMPLATE);
+        assertThat(role.getRoleKind()).isEqualTo(RoleKind.DATA_GRANT);
     }
 }
