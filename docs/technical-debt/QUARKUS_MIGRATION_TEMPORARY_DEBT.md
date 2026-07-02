@@ -22,10 +22,10 @@
 - 影响：依赖 action endpoint 上下文的授权、审计或动作解析行为可能与 Spring 版本不一致。
 - 回收方向：基于 Quarkus/Resteasy Reactive 的资源方法元数据、路径参数和过滤器上下文重建 `ActionEndpointContextResolver` 契约，并补动作端点 contract 测试。
 
-### Nested scope path variables are disabled
+### Nested scope path variables use a transitional request attribute
 
-- 现状：`NestedCrudWebSupport`、`ModuleScopedRuleTreeWebSupport` 的路径变量读取从 Spring `HandlerMapping` 迁出后，当前临时返回空 map；正式方向见 Web 迁移边界决策第 3 条。
-- 影响：依赖父子资源路径变量的嵌套 CRUD、模块范围规则树等能力可能无法正确解析 scope。
+- 现状：`NestedCrudWebSupport` 的路径变量读取已从 Spring `HandlerMapping` 改为平台自有 request attribute；真实 Quarkus HTTP 请求如何填充该 attribute 尚未收口，`ModuleScopedRuleTreeWebSupport` 等其他路径 scope 仍待迁移。
+- 影响：轻量 contract test 可以验证 scope 行为，但真实 HTTP 路由下的嵌套 CRUD、模块范围规则树等能力仍可能无法正确解析 scope。
 - 回收方向：改为显式 `@PathParam` 传递，或提供 Quarkus 请求上下文适配器，并为嵌套路径补真实 HTTP 测试。
 
 ### Duplicate route handling uses temporary override removal

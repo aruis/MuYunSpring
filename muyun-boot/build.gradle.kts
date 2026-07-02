@@ -26,6 +26,28 @@ dependencies {
 
 tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
-        "**/*WebControllerTest.java"
+        "**/WorkflowRuntimeWebControllerTest.java",
+        "**/WorkflowRuntimeAdminWebControllerTest.java",
+        "**/WorkflowConfigurationWebControllerTest.java",
+        "**/WorkflowDelegationWebControllerTest.java",
+        "**/WorkflowHistoryWebControllerTest.java",
+        "**/IamWebControllerTest.java",
+        "**/LoginWebControllerTest.java",
+        "**/UserAccountWebControllerTest.java",
+        "**/CodeRuleWebControllerTest.java",
+        "**/PlatformConfigurationWebControllerTest.java",
+        "**/MenuWebControllerTest.java",
+        "**/RecordLinkageRuleWebControllerTest.java",
+        "**/MeasureUnitConversionRuleWebControllerTest.java",
+        "**/PlatformModuleRuntimeContextWebControllerTest.java",
+        "**/LowCodeGovernanceWebControllerTest.java",
+        "**/CurrencyWebControllerTest.java",
+        "**/DynamicPageBootstrapWebControllerTest.java",
+        "**/PlatformPagePreferenceWebControllerTest.java",
+        "**/DynamicExchangeTemplateWebControllerTest.java",
+        "**/DynamicImportWebControllerTest.java",
+        "**/DynamicRecordWebControllerTest.java",
+        "**/DynamicExportWebControllerTest.java",
+        "**/DynamicModuleTaskWebControllerTest.java"
     )
 }

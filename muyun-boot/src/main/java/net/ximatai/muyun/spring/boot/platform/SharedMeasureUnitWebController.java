@@ -13,18 +13,21 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversion;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.math.BigDecimal;
 import java.util.Objects;
 
-@RestController
-@RequestMapping("/platform.measure_unit/categories/{categoryAlias}/units")
+@ApplicationScoped
+@Path("/platform.measure_unit/categories/{categoryAlias}/units")
 public class SharedMeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
 
     private final MeasureUnitConversionService conversionService;
@@ -34,41 +37,43 @@ public class SharedMeasureUnitWebController extends NestedEnabledSortableCrudWeb
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("applicationAlias", MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
         criteria.eq("categoryAlias", categoryAlias(request));
     }
 
     @Override
-    protected void bindScope(MeasureUnit record, HttpServletRequest request) {
+    protected void bindScope(MeasureUnit record, @Context HttpServletRequest request) {
         record.setApplicationAlias(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
         record.setCategoryAlias(categoryAlias(request));
     }
 
     @Override
-    protected boolean inScope(MeasureUnit record, HttpServletRequest request) {
+    protected boolean inScope(MeasureUnit record, @Context HttpServletRequest request) {
         return Objects.equals(record.getApplicationAlias(), MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS)
                 && Objects.equals(record.getCategoryAlias(), categoryAlias(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "shared measure unit does not belong to category: " + categoryAlias(request) + "." + id;
     }
 
-    @GetMapping("/options")
+    @GET
+    @Path("/options")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebListResponse<MeasureUnit> options(HttpServletRequest request,
-                                                @RequestParam(defaultValue = "true") boolean enabledOnly) {
+    public WebListResponse<MeasureUnit> options(@Context HttpServletRequest request,
+                                                @DefaultValue("true") @QueryParam("enabledOnly") boolean enabledOnly) {
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
                 service().listUnits(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, categoryAlias(request), enabledOnly),
                 FieldOutputContext.LIST)));
     }
 
-    @PostMapping("/convert")
+    @POST
+    @Path("/convert")
     @ActionEndpoint(PlatformAction.QUERY)
-    public MeasureUnitConversion convert(HttpServletRequest request,
-                                         @RequestBody MeasureUnitConversionRequest body) {
+    public MeasureUnitConversion convert(@Context HttpServletRequest request,
+                                         MeasureUnitConversionRequest body) {
         return webScope(() -> conversionService.convert(
                 MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
                 categoryAlias(request),
@@ -77,7 +82,7 @@ public class SharedMeasureUnitWebController extends NestedEnabledSortableCrudWeb
                 body.toUnitCode()));
     }
 
-    private String categoryAlias(HttpServletRequest request) {
+    private String categoryAlias(@Context HttpServletRequest request) {
         String value = pathVariable(request, "categoryAlias");
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("categoryAlias is required");

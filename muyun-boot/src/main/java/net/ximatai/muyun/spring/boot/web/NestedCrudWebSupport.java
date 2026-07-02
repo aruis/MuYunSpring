@@ -12,18 +12,19 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.servlet.HandlerMapping;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
 
 import java.util.Map;
 
 public abstract class NestedCrudWebSupport<T extends EntityContract, S extends CrudAbility<T>>
         extends WebSupport<S> implements SystemScope<S>, RecordLabelWeb<T> {
+    public static final String PATH_VARIABLES_ATTRIBUTE = NestedCrudWebSupport.class.getName() + ".PATH_VARIABLES";
+
     protected Criteria queryCriteria(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
             Criteria criteria = queryAbility.queryCriteria(WebQueryRequests.from(request));
@@ -38,11 +39,11 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         return Criteria.of();
     }
 
-    protected abstract void appendScope(Criteria criteria, HttpServletRequest request);
+    protected abstract void appendScope(Criteria criteria, @Context HttpServletRequest request);
 
-    protected abstract void bindScope(T record, HttpServletRequest request);
+    protected abstract void bindScope(T record, @Context HttpServletRequest request);
 
-    protected abstract boolean inScope(T record, HttpServletRequest request);
+    protected abstract boolean inScope(T record, @Context HttpServletRequest request);
 
     protected Sort[] querySorts(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
@@ -55,10 +56,11 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         return new Sort[0];
     }
 
-    @PostMapping("/query")
+    @POST
+    @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<T> query(HttpServletRequest servletRequest,
-                                    @RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<T> query(@Context HttpServletRequest servletRequest,
+                                    WebQueryRequest request) {
         return webScope(() -> {
             Criteria criteria = queryCriteria(request);
             appendScope(criteria, servletRequest);
@@ -69,17 +71,18 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         });
     }
 
-    @GetMapping("/view/{id}")
+    @GET
+    @Path("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
-    public T view(HttpServletRequest servletRequest, @PathVariable String id) {
+    public T view(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> WebOutputSupport.record(service(), requireScopedRecord(servletRequest, id),
                 FieldOutputContext.VIEW));
     }
 
-    @PostMapping("/insert")
+    @POST
+    @Path("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
-    @ResponseStatus(HttpStatus.CREATED)
-    public WebRecordResponse<T> insert(HttpServletRequest servletRequest, @RequestBody T record) {
+    public WebRecordResponse<T> insert(@Context HttpServletRequest servletRequest, T record) {
         return webScope(() -> {
             bindScope(record, servletRequest);
             String id = service().insert(record);
@@ -88,10 +91,11 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         });
     }
 
-    @PostMapping("/update/{id}")
+    @POST
+    @Path("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<T> update(HttpServletRequest servletRequest, @PathVariable String id,
-                                       @RequestBody T record) {
+    public WebRecordResponse<T> update(@Context HttpServletRequest servletRequest, @PathParam("id") String id,
+                                       T record) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             record.setId(id);
@@ -102,16 +106,17 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         });
     }
 
-    @PostMapping("/delete/{id}")
+    @POST
+    @Path("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse delete(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             T record = requireScopedRecord(servletRequest, id);
             return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
         });
     }
 
-    protected T requireScopedRecord(HttpServletRequest request, String id) {
+    protected T requireScopedRecord(@Context HttpServletRequest request, String id) {
         T record = service().select(id);
         if (record == null || !inScope(record, request)) {
             throw new IllegalArgumentException(scopedRecordNotFoundMessage(request, id));
@@ -119,26 +124,24 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         return record;
     }
 
-    protected String pathVariable(HttpServletRequest request, String key) {
+    protected String pathVariable(@Context HttpServletRequest request, String key) {
         Object value = pathVariables(request).get(key);
         return value == null ? null : value.toString();
     }
 
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "nested record does not belong to request scope: " + id;
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, String> pathVariables(HttpServletRequest request) {
-        Object attribute = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-        if (!(attribute instanceof Map<?, ?> variables)) {
+    private Map<String, String> pathVariables(@Context HttpServletRequest request) {
+        if (request == null) {
             return Map.of();
         }
-        return variables.entrySet().stream()
-                .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                        entry -> entry.getKey().toString(),
-                        entry -> entry.getValue().toString()
-                ));
+        Object value = request.getAttribute(PATH_VARIABLES_ATTRIBUTE);
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, String>) map;
+        }
+        return Map.of();
     }
 }

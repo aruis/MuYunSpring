@@ -10,42 +10,46 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategory;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
-@RequestMapping("/platform.measure_unit/categories")
+@ApplicationScoped
+@Path("/platform.measure_unit/categories")
 public class SharedMeasureUnitCategoryWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitCategory, MeasureUnitCategoryService> {
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("applicationAlias", MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected void bindScope(MeasureUnitCategory record, HttpServletRequest request) {
+    protected void bindScope(MeasureUnitCategory record, @Context HttpServletRequest request) {
         record.setApplicationAlias(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected boolean inScope(MeasureUnitCategory record, HttpServletRequest request) {
+    protected boolean inScope(MeasureUnitCategory record, @Context HttpServletRequest request) {
         return Objects.equals(record.getApplicationAlias(), MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "shared measure unit category does not exist: " + id;
     }
 
-    @GetMapping("/options")
+    @GET
+    @Path("/options")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebListResponse<MeasureUnitCategory> options(HttpServletRequest request,
-                                                        @RequestParam(defaultValue = "true") boolean enabledOnly) {
+    public WebListResponse<MeasureUnitCategory> options(@Context HttpServletRequest request,
+                                                        @DefaultValue("true") @QueryParam("enabledOnly") boolean enabledOnly) {
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
                 service().listCategories(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, enabledOnly),
                 FieldOutputContext.LIST)));
