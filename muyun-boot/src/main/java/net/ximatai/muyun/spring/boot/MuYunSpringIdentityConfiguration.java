@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
+import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
+import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
@@ -16,6 +18,12 @@ import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
@@ -29,6 +37,7 @@ import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
@@ -40,7 +49,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Configuration
-@EnableConfigurationProperties(MuYunSpringInitialAdminProperties.class)
+@EnableConfigurationProperties({MuYunSpringInitialAdminProperties.class, MuYunSpringDemoBootstrapProperties.class})
 public class MuYunSpringIdentityConfiguration {
     @Bean
     @Primary
@@ -119,6 +128,25 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(InitialDataBootstrapTask.class)
     public InitialDataBootstrapTask initialDataBootstrapTask(InitialDataExecutor initialDataExecutor) {
         return new InitialDataBootstrapTask(initialDataExecutor);
+    }
+
+    @Bean
+    @ConditionalOnBean({TenantService.class, OrganizationService.class, DepartmentService.class, EmployeeService.class,
+            UserAccountService.class, EmployeeAccountService.class, RoleService.class, PlatformModuleService.class,
+            RoleGrantableActionResolver.class})
+    @ConditionalOnMissingBean(DemoBootstrapTask.class)
+    public DemoBootstrapTask demoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
+                                               TenantService tenantService,
+                                               OrganizationService organizationService,
+                                               DepartmentService departmentService,
+                                               EmployeeService employeeService,
+                                               UserAccountService userAccountService,
+                                               EmployeeAccountService employeeAccountService,
+                                               RoleService roleService,
+                                               PlatformModuleService moduleService,
+                                               RoleGrantableActionResolver grantableActionResolver) {
+        return new DemoBootstrapTask(properties, tenantService, organizationService, departmentService, employeeService,
+                userAccountService, employeeAccountService, roleService, moduleService, grantableActionResolver);
     }
 
     @Bean

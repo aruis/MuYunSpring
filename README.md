@@ -137,6 +137,20 @@ npm run dev:backend
 
 初始密码可通过 `muyun.initial-admin.initial-password` 调整。平台超级管理员是系统用户，不归属默认租户。
 
+本地演示环境如需同时创建一组租户业务治理数据，可显式启用演示初始化：
+
+```properties
+muyun.demo-bootstrap.enabled=true
+muyun.demo-bootstrap.tenant-title=演示租户
+muyun.demo-bootstrap.organization-title=戏码台
+muyun.demo-bootstrap.department-title=综合管理部
+muyun.demo-bootstrap.employee-title=演示租户管理员
+muyun.demo-bootstrap.admin-username=demo_admin
+muyun.demo-bootstrap.admin-initial-password=demo123
+```
+
+该能力默认关闭，只用于裸库开发和演示启动；生产环境不应把演示租户、组织、部门、职员、租户管理员账号和租户管理员角色授权视为平台 baseline 数据。演示租户管理员是普通租户用户，默认登录时租户填写 `demo`，不要和系统超级管理员 `admin` 混用。
+
 首次登录后可进入平台工作台，查看菜单、平台配置、IAM 等静态管理入口。动态页面闭环仍以文档和测试契约为准。
 
 ## 运行验证
