@@ -27,18 +27,17 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PathParam;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 60)
-@RequestMapping("/iam.user")
+@Path("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
         EnableWeb<UserAccount, UserAccountService>,
@@ -60,18 +59,19 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         this(userSessionService, null);
     }
 
-    @Autowired
+    @Inject
     public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService,
                                     ObjectProvider<RoleService> roleService) {
         this.userSessionService = userSessionService == null ? null : userSessionService.getIfAvailable();
         this.roleService = roleService == null ? null : roleService.getIfAvailable();
     }
 
-    @PostMapping("/changePassword/{id}")
+    @POST
+    @Path("/changePassword/{id}")
     @CustomActionEndpoint(value = "changePassword", title = "修改密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WebCountResponse changePassword(@PathVariable String id,
-                                           @RequestBody ChangePasswordRequest request) {
+    public WebCountResponse changePassword(@PathParam("id") String id,
+                                           ChangePasswordRequest request) {
         return webScope(() -> {
             int changed = service().changePassword(id, request.password());
             if (changed > 0 && userSessionService != null) {
@@ -81,10 +81,11 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         });
     }
 
-    @PostMapping("/selector/query")
+    @POST
+    @Path("/selector/query")
     @CustomActionEndpoint(value = "userSelector", title = "用户选择器", level = PlatformActionLevel.LIST,
             dataAuth = true)
-    public WebPageResponse<UserSelectorItem> selector(@RequestBody(required = false) UserSelectorRequest request) {
+    public WebPageResponse<UserSelectorItem> selector(UserSelectorRequest request) {
         return webScope(() -> {
             UserSelectorRequest normalized = request == null ? UserSelectorRequest.EMPTY : request;
             Criteria criteria = selectorCriteria(normalized);
