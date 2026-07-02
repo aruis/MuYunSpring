@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
+import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.DefaultTenantMenuProvisioner;
@@ -142,7 +143,8 @@ public class MuYunSpringIdentityConfiguration {
 
     @Bean
     @ConditionalOnBean({TenantService.class, OrganizationService.class, DepartmentService.class, EmployeeService.class,
-            UserAccountService.class, EmployeeAccountService.class, RoleService.class, RoleGrantableActionResolver.class})
+            UserAccountService.class, EmployeeAccountService.class, RoleService.class,
+            BuiltInRolePermissionTemplateService.class})
     @ConditionalOnMissingBean(DemoBootstrapTask.class)
     public DemoBootstrapTask demoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
                                                TenantService tenantService,
@@ -152,9 +154,9 @@ public class MuYunSpringIdentityConfiguration {
                                                UserAccountService userAccountService,
                                                EmployeeAccountService employeeAccountService,
                                                RoleService roleService,
-                                               RoleGrantableActionResolver grantableActionResolver) {
+                                               BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
         return new DemoBootstrapTask(properties, tenantService, organizationService, departmentService, employeeService,
-                userAccountService, employeeAccountService, roleService, grantableActionResolver);
+                userAccountService, employeeAccountService, roleService, rolePermissionTemplateService);
     }
 
     @Bean

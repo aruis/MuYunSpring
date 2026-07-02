@@ -1,0 +1,52 @@
+package net.ximatai.muyun.spring.boot.iam;
+
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
+import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Objects;
+
+@Service
+public class BuiltInRolePermissionTemplateService {
+    public static final String TENANT_ADMIN_TEMPLATE_ALIAS = "tenant.admin";
+    public static final List<String> TENANT_ADMIN_MODULE_ALIASES = List.of(
+            OrganizationService.MODULE_ALIAS,
+            DepartmentService.MODULE_ALIAS,
+            EmployeeService.MODULE_ALIAS,
+            EmployeeAccountService.MODULE_ALIAS,
+            UserAccountService.MODULE_ALIAS,
+            RoleService.MODULE_ALIAS
+    );
+
+    private final RoleService roleService;
+    private final RoleGrantableActionResolver grantableActionResolver;
+
+    public BuiltInRolePermissionTemplateService(RoleService roleService,
+                                                RoleGrantableActionResolver grantableActionResolver) {
+        this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
+        this.grantableActionResolver = Objects.requireNonNull(grantableActionResolver,
+                "grantableActionResolver must not be null");
+    }
+
+    public int applyTenantAdminTemplate(String roleId) {
+        int changed = 0;
+        for (GrantableAction action : grantableActionResolver.resolve(TENANT_ADMIN_MODULE_ALIASES)) {
+            changed += roleService.grantAction(
+                    roleId,
+                    action.moduleAlias(),
+                    action.actionCode(),
+                    action.dataAuth() ? DataScopePolicy.ALL : DataScopePolicy.NONE,
+                    TenantScopePolicy.CURRENT_TENANT
+            );
+        }
+        return changed;
+    }
+}

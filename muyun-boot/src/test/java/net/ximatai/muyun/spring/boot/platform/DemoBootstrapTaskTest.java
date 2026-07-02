@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.boot.MuYunSpringDemoBootstrapProperties;
+import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -45,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DemoBootstrapTaskTest {
@@ -72,6 +75,8 @@ class DemoBootstrapTaskTest {
             net.ximatai.muyun.spring.iam.role.RoleActionGrantVerifier.platformActionsOnly(),
             userAccountService, employeeService, null, employeeAccountService);
     private final RoleGrantableActionResolver grantableActionResolver = mock(RoleGrantableActionResolver.class);
+    private final BuiltInRolePermissionTemplateService rolePermissionTemplateService =
+            new BuiltInRolePermissionTemplateService(roleService, grantableActionResolver);
 
     @AfterEach
     void tearDown() {
@@ -82,7 +87,7 @@ class DemoBootstrapTaskTest {
     void shouldDoNothingWhenDemoBootstrapIsDisabled() {
         DemoBootstrapTask task = new DemoBootstrapTask(new MuYunSpringDemoBootstrapProperties(),
                 tenantService, organizationService, departmentService, employeeService, userAccountService,
-                employeeAccountService, roleService, grantableActionResolver);
+                employeeAccountService, roleService, rolePermissionTemplateService);
 
         task.run();
 
@@ -110,10 +115,15 @@ class DemoBootstrapTaskTest {
         ));
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
                 departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                grantableActionResolver);
+                rolePermissionTemplateService);
 
         task.run();
         task.run();
+
+        assertThat(BuiltInRolePermissionTemplateService.TENANT_ADMIN_MODULE_ALIASES)
+                .doesNotContain("iam.tenant");
+        verify(grantableActionResolver, times(2))
+                .resolve(BuiltInRolePermissionTemplateService.TENANT_ADMIN_MODULE_ALIASES);
 
         Tenant tenant = tenantService.select(DemoBootstrapTask.TENANT_ALIAS);
         assertThat(tenant).isNotNull();
@@ -197,7 +207,7 @@ class DemoBootstrapTaskTest {
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
                 departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                grantableActionResolver);
+                rolePermissionTemplateService);
 
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             Tenant tenant = new Tenant();

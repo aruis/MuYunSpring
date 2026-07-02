@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.MuYunSpringDemoBootstrapProperties;
-import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
+import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -16,19 +16,15 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
-import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 
-import java.util.List;
 import java.util.Objects;
 
 public class DemoBootstrapTask implements PlatformBootstrapTask {
@@ -44,14 +40,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     public static final String TENANT_ADMIN_ROLE_ID = "demo_role_tenant_admin";
     public static final String TENANT_ADMIN_ROLE_TITLE = "租户管理员";
     private static final String SYSTEM_OPERATOR_ID = "demo-bootstrap";
-    private static final List<String> TENANT_ADMIN_MODULE_ALIASES = List.of(
-            OrganizationService.MODULE_ALIAS,
-            DepartmentService.MODULE_ALIAS,
-            EmployeeService.MODULE_ALIAS,
-            EmployeeAccountService.MODULE_ALIAS,
-            UserAccountService.MODULE_ALIAS,
-            RoleService.MODULE_ALIAS
-    );
 
     private final MuYunSpringDemoBootstrapProperties properties;
     private final TenantService tenantService;
@@ -61,7 +49,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private final UserAccountService userAccountService;
     private final EmployeeAccountService employeeAccountService;
     private final RoleService roleService;
-    private final RoleGrantableActionResolver grantableActionResolver;
+    private final BuiltInRolePermissionTemplateService rolePermissionTemplateService;
 
     public DemoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
                              TenantService tenantService,
@@ -71,7 +59,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                              UserAccountService userAccountService,
                              EmployeeAccountService employeeAccountService,
                              RoleService roleService,
-                             RoleGrantableActionResolver grantableActionResolver) {
+                             BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.tenantService = Objects.requireNonNull(tenantService, "tenantService must not be null");
         this.organizationService = Objects.requireNonNull(organizationService, "organizationService must not be null");
@@ -81,8 +69,8 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         this.employeeAccountService = Objects.requireNonNull(employeeAccountService,
                 "employeeAccountService must not be null");
         this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
-        this.grantableActionResolver = Objects.requireNonNull(grantableActionResolver,
-                "grantableActionResolver must not be null");
+        this.rolePermissionTemplateService = Objects.requireNonNull(rolePermissionTemplateService,
+                "rolePermissionTemplateService must not be null");
     }
 
     @Override
@@ -129,7 +117,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                     return;
                 }
                 ensureTenantAdminRoleGrant(role.getId(), user.getId());
-                ensureTenantAdminRoleActions(role.getId());
+                rolePermissionTemplateService.applyTenantAdminTemplate(role.getId());
             }
         }
     }
@@ -259,18 +247,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
 
     private void ensureTenantAdminRoleGrant(String roleId, String userId) {
         roleService.grantRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
-    }
-
-    private void ensureTenantAdminRoleActions(String roleId) {
-        for (GrantableAction action : grantableActionResolver.resolve(TENANT_ADMIN_MODULE_ALIASES)) {
-            roleService.grantAction(
-                    roleId,
-                    action.moduleAlias(),
-                    action.actionCode(),
-                    action.dataAuth() ? DataScopePolicy.ALL : DataScopePolicy.NONE,
-                    TenantScopePolicy.CURRENT_TENANT
-            );
-        }
     }
 
     private boolean isActive(EntityContract entity) {
