@@ -35,9 +35,6 @@ import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import net.ximatai.muyun.spring.platform.module.ModuleKind;
-import net.ximatai.muyun.spring.platform.module.PlatformModule;
-import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +42,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -72,7 +71,6 @@ class DemoBootstrapTaskTest {
     private final RoleService roleService = new RoleService(roleDao, roleGrantDao, roleActionDao, tenantService,
             net.ximatai.muyun.spring.iam.role.RoleActionGrantVerifier.platformActionsOnly(),
             userAccountService, employeeService, null, employeeAccountService);
-    private final PlatformModuleService moduleService = mock(PlatformModuleService.class);
     private final RoleGrantableActionResolver grantableActionResolver = mock(RoleGrantableActionResolver.class);
 
     @AfterEach
@@ -84,7 +82,7 @@ class DemoBootstrapTaskTest {
     void shouldDoNothingWhenDemoBootstrapIsDisabled() {
         DemoBootstrapTask task = new DemoBootstrapTask(new MuYunSpringDemoBootstrapProperties(),
                 tenantService, organizationService, departmentService, employeeService, userAccountService,
-                employeeAccountService, roleService, moduleService, grantableActionResolver);
+                employeeAccountService, roleService, grantableActionResolver);
 
         task.run();
 
@@ -106,14 +104,13 @@ class DemoBootstrapTaskTest {
         properties.setEmployeeTitle("演示租户管理员");
         properties.setAdminUsername("demo_admin");
         properties.setAdminInitialPassword("demo123");
-        when(moduleService.listSystemManagedStaticModules()).thenReturn(List.of(module("iam.user")));
-        when(grantableActionResolver.resolve(List.of("iam.user"))).thenReturn(List.of(
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of(
                 GrantableAction.ofPlatformDefaults("iam.user", PlatformAction.MENU),
                 GrantableAction.ofPlatformDefaults("iam.user", PlatformAction.QUERY)
         ));
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
                 departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                moduleService, grantableActionResolver);
+                grantableActionResolver);
 
         task.run();
         task.run();
@@ -163,6 +160,8 @@ class DemoBootstrapTaskTest {
                     PlatformAction.MENU.code())).isTrue();
             assertThat(roleService.hasActionPermission(DemoBootstrapTask.USER_ID, "iam.user",
                     PlatformAction.QUERY.code())).isTrue();
+            assertThat(roleService.hasActionPermission(DemoBootstrapTask.USER_ID, "iam.tenant",
+                    PlatformAction.QUERY.code())).isFalse();
         }
 
         assertThat(tenantDao.list(Criteria.of())).hasSize(1);
@@ -191,13 +190,59 @@ class DemoBootstrapTaskTest {
         }
     }
 
-    private PlatformModule module(String moduleAlias) {
-        PlatformModule module = new PlatformModule();
-        module.setAlias(moduleAlias);
-        module.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
-        module.setModuleKind(ModuleKind.STATIC);
-        module.setEnabled(Boolean.TRUE);
-        return module;
+    @Test
+    void shouldFailFastWhenExistingDemoAdminUserDrifts() {
+        MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
+        properties.setEnabled(true);
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
+                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
+                grantableActionResolver);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias(DemoBootstrapTask.TENANT_ALIAS);
+            tenant.setTitle("演示租户");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
+            Organization organization = new Organization();
+            organization.setId(DemoBootstrapTask.ORGANIZATION_ID);
+            organization.setCode(DemoBootstrapTask.ORGANIZATION_CODE);
+            organization.setTitle("戏码台");
+            organization.setEnabled(Boolean.TRUE);
+            organizationService.insert(organization);
+
+            Department department = new Department();
+            department.setId(DemoBootstrapTask.DEPARTMENT_ID);
+            department.setOrganizationId(DemoBootstrapTask.ORGANIZATION_ID);
+            department.setCode(DemoBootstrapTask.DEPARTMENT_CODE);
+            department.setTitle("综合管理部");
+            department.setEnabled(Boolean.TRUE);
+            departmentService.insert(department);
+
+            Employee employee = new Employee();
+            employee.setId(DemoBootstrapTask.EMPLOYEE_ID);
+            employee.setOrganizationId(DemoBootstrapTask.ORGANIZATION_ID);
+            employee.setDepartmentId(DemoBootstrapTask.DEPARTMENT_ID);
+            employee.setEmployeeNo(DemoBootstrapTask.EMPLOYEE_NO);
+            employee.setTitle("演示租户管理员");
+            employee.setEnabled(Boolean.TRUE);
+            employeeService.insert(employee);
+
+            UserAccount user = new UserAccount();
+            user.setId(DemoBootstrapTask.USER_ID);
+            user.setUsername("other_admin");
+            user.setPassword("demo123");
+            user.setOrganizationId(DemoBootstrapTask.ORGANIZATION_ID);
+            user.setEnabled(Boolean.TRUE);
+            userAccountService.insert(user);
+        }
+
+        assertThatThrownBy(task::run)
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("demo admin username drift");
     }
 
     private static class TenantMemoryDao extends TestMemoryDao<Tenant> implements TenantDao {

@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot;
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
+import net.ximatai.muyun.spring.boot.platform.DefaultTenantMenuProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
@@ -33,6 +34,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -131,9 +133,16 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean({MenuSchemeService.class, MenuService.class})
+    @ConditionalOnMissingBean(DefaultTenantMenuProvisioner.class)
+    public DefaultTenantMenuProvisioner defaultTenantMenuProvisioner(MenuSchemeService menuSchemeService,
+                                                                    MenuService menuService) {
+        return new DefaultTenantMenuProvisioner(menuSchemeService, menuService);
+    }
+
+    @Bean
     @ConditionalOnBean({TenantService.class, OrganizationService.class, DepartmentService.class, EmployeeService.class,
-            UserAccountService.class, EmployeeAccountService.class, RoleService.class, PlatformModuleService.class,
-            RoleGrantableActionResolver.class})
+            UserAccountService.class, EmployeeAccountService.class, RoleService.class, RoleGrantableActionResolver.class})
     @ConditionalOnMissingBean(DemoBootstrapTask.class)
     public DemoBootstrapTask demoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
                                                TenantService tenantService,
@@ -143,10 +152,9 @@ public class MuYunSpringIdentityConfiguration {
                                                UserAccountService userAccountService,
                                                EmployeeAccountService employeeAccountService,
                                                RoleService roleService,
-                                               PlatformModuleService moduleService,
                                                RoleGrantableActionResolver grantableActionResolver) {
         return new DemoBootstrapTask(properties, tenantService, organizationService, departmentService, employeeService,
-                userAccountService, employeeAccountService, roleService, moduleService, grantableActionResolver);
+                userAccountService, employeeAccountService, roleService, grantableActionResolver);
     }
 
     @Bean

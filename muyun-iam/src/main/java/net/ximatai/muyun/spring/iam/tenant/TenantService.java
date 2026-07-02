@@ -6,8 +6,14 @@ import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.SystemManagedAbility;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Objects;
 
 @Service
 public class TenantService extends AbstractAbilityService<Tenant> implements
@@ -18,9 +24,21 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         ActiveTenantVerifier {
 
     public static final String MODULE_ALIAS = "iam.tenant";
+    private final List<TenantCreationProvisioner> creationProvisioners;
 
     public TenantService(TenantDao tenantDao) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
+        this.creationProvisioners = List.of();
+    }
+
+    @Autowired
+    public TenantService(TenantDao tenantDao, ObjectProvider<TenantCreationProvisioner> creationProvisioners) {
+        super(MODULE_ALIAS, Tenant.class, tenantDao);
+        this.creationProvisioners = creationProvisioners == null
+                ? List.of()
+                : creationProvisioners.orderedStream()
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Override
@@ -38,6 +56,13 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     @Override
     public void beforeDelete(String id) {
         requireSystemMutationContext();
+    }
+
+    @Override
+    public void afterInsert(String id, Tenant tenant) {
+        for (TenantCreationProvisioner provisioner : creationProvisioners) {
+            provisioner.afterTenantCreated(id);
+        }
     }
 
     public Tenant requireActiveTenant(String tenantAlias) {

@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.MuYunSpringDemoBootstrapProperties;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
@@ -26,7 +27,6 @@ import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 
 import java.util.List;
 import java.util.Objects;
@@ -44,6 +44,14 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     public static final String TENANT_ADMIN_ROLE_ID = "demo_role_tenant_admin";
     public static final String TENANT_ADMIN_ROLE_TITLE = "租户管理员";
     private static final String SYSTEM_OPERATOR_ID = "demo-bootstrap";
+    private static final List<String> TENANT_ADMIN_MODULE_ALIASES = List.of(
+            OrganizationService.MODULE_ALIAS,
+            DepartmentService.MODULE_ALIAS,
+            EmployeeService.MODULE_ALIAS,
+            EmployeeAccountService.MODULE_ALIAS,
+            UserAccountService.MODULE_ALIAS,
+            RoleService.MODULE_ALIAS
+    );
 
     private final MuYunSpringDemoBootstrapProperties properties;
     private final TenantService tenantService;
@@ -53,7 +61,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private final UserAccountService userAccountService;
     private final EmployeeAccountService employeeAccountService;
     private final RoleService roleService;
-    private final PlatformModuleService moduleService;
     private final RoleGrantableActionResolver grantableActionResolver;
 
     public DemoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
@@ -64,7 +71,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                              UserAccountService userAccountService,
                              EmployeeAccountService employeeAccountService,
                              RoleService roleService,
-                             PlatformModuleService moduleService,
                              RoleGrantableActionResolver grantableActionResolver) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.tenantService = Objects.requireNonNull(tenantService, "tenantService must not be null");
@@ -75,7 +81,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         this.employeeAccountService = Objects.requireNonNull(employeeAccountService,
                 "employeeAccountService must not be null");
         this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
-        this.moduleService = Objects.requireNonNull(moduleService, "moduleService must not be null");
         this.grantableActionResolver = Objects.requireNonNull(grantableActionResolver,
                 "grantableActionResolver must not be null");
     }
@@ -132,6 +137,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private Tenant ensureTenant() {
         Tenant existing = tenantService.selectIgnoreSoftDelete(TENANT_ALIAS);
         if (existing != null) {
+            validateExistingTenant(existing);
             return existing;
         }
         Tenant tenant = new Tenant();
@@ -148,6 +154,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private Organization ensureOrganization() {
         Organization existing = organizationService.selectIgnoreSoftDelete(ORGANIZATION_ID);
         if (existing != null) {
+            validateExistingOrganization(existing);
             return existing;
         }
         Organization organization = new Organization();
@@ -163,6 +170,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private Department ensureDepartment() {
         Department existing = departmentService.selectIgnoreSoftDelete(DEPARTMENT_ID);
         if (existing != null) {
+            validateExistingDepartment(existing);
             return existing;
         }
         Department department = new Department();
@@ -179,6 +187,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private Employee ensureEmployee() {
         Employee existing = employeeService.selectIgnoreSoftDelete(EMPLOYEE_ID);
         if (existing != null) {
+            validateExistingEmployee(existing);
             return existing;
         }
         Employee employee = new Employee();
@@ -196,6 +205,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private UserAccount ensureTenantAdminUser() {
         UserAccount existing = userAccountService.selectIgnoreSoftDelete(USER_ID);
         if (existing != null) {
+            validateExistingTenantAdminUser(existing);
             return existing;
         }
         UserAccount user = new UserAccount();
@@ -213,6 +223,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private EmployeeAccount ensureEmployeeAccount() {
         EmployeeAccount existing = employeeAccountService.select(EMPLOYEE_ACCOUNT_ID);
         if (existing != null) {
+            validateExistingEmployeeAccount(existing);
             return existing;
         }
         EmployeeAccount binding = new EmployeeAccount();
@@ -228,6 +239,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private Role ensureTenantAdminRole() {
         Role existing = roleService.selectIgnoreSoftDelete(TENANT_ADMIN_ROLE_ID);
         if (existing != null) {
+            validateExistingTenantAdminRole(existing);
             return existing;
         }
         Role role = new Role();
@@ -250,13 +262,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     }
 
     private void ensureTenantAdminRoleActions(String roleId) {
-        List<String> moduleAliases = moduleService.listSystemManagedStaticModules().stream()
-                .filter(module -> module != null && Boolean.TRUE.equals(module.getEnabled()))
-                .map(net.ximatai.muyun.spring.platform.module.PlatformModule::getAlias)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        for (GrantableAction action : grantableActionResolver.resolve(moduleAliases)) {
+        for (GrantableAction action : grantableActionResolver.resolve(TENANT_ADMIN_MODULE_ALIASES)) {
             roleService.grantAction(
                     roleId,
                     action.moduleAlias(),
@@ -271,5 +277,55 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         return entity != null && !Boolean.TRUE.equals(entity.getDeleted())
                 && (!(entity instanceof EnabledCapable enabled)
                 || Boolean.TRUE.equals(enabled.getEnabled()));
+    }
+
+    private void validateExistingTenant(Tenant tenant) {
+        requireEqual("demo tenant alias", TENANT_ALIAS, tenant.getAlias());
+    }
+
+    private void validateExistingOrganization(Organization organization) {
+        requireEqual("demo organization tenant", TENANT_ALIAS, organization.getTenantId());
+        requireEqual("demo organization code", ORGANIZATION_CODE, organization.getCode());
+    }
+
+    private void validateExistingDepartment(Department department) {
+        requireEqual("demo department tenant", TENANT_ALIAS, department.getTenantId());
+        requireEqual("demo department organization", ORGANIZATION_ID, department.getOrganizationId());
+        requireEqual("demo department code", DEPARTMENT_CODE, department.getCode());
+    }
+
+    private void validateExistingEmployee(Employee employee) {
+        requireEqual("demo employee tenant", TENANT_ALIAS, employee.getTenantId());
+        requireEqual("demo employee organization", ORGANIZATION_ID, employee.getOrganizationId());
+        requireEqual("demo employee department", DEPARTMENT_ID, employee.getDepartmentId());
+        requireEqual("demo employee no", EMPLOYEE_NO, employee.getEmployeeNo());
+    }
+
+    private void validateExistingTenantAdminUser(UserAccount user) {
+        requireEqual("demo admin user tenant", TENANT_ALIAS, user.getTenantId());
+        requireEqual("demo admin username", properties.getAdminUsername(), user.getUsername());
+        requireEqual("demo admin organization", ORGANIZATION_ID, user.getOrganizationId());
+        if (!userAccountService.passwordMatches(user, properties.getAdminInitialPassword())) {
+            throw new PlatformException("demo admin initial password drift: " + user.getId());
+        }
+    }
+
+    private void validateExistingEmployeeAccount(EmployeeAccount account) {
+        requireEqual("demo employee account tenant", TENANT_ALIAS, account.getTenantId());
+        requireEqual("demo employee account employee", EMPLOYEE_ID, account.getEmployeeId());
+        requireEqual("demo employee account user", USER_ID, account.getUserId());
+    }
+
+    private void validateExistingTenantAdminRole(Role role) {
+        requireEqual("demo tenant admin role tenant", TENANT_ALIAS, role.getTenantId());
+        requireEqual("demo tenant admin role kind", RoleKind.STANDARD, role.getRoleKind());
+        requireEqual("demo tenant admin grant subject", RoleGrantSubjectType.USER_ACCOUNT.getCode(),
+                role.getGrantSubjectTypes());
+    }
+
+    private void requireEqual(String fieldName, Object expected, Object actual) {
+        if (!Objects.equals(expected, actual)) {
+            throw new PlatformException(fieldName + " drift, expected " + expected + " but was " + actual);
+        }
     }
 }
