@@ -17,18 +17,15 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegationScopeType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegationService;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Set;
 
-@RestController
-@RequestMapping({"/platform.workflow_delegation", "/workflow/delegation"})
+@ApplicationScoped
+@Path("/platform.workflow_delegation")
 @PlatformStaticModule(application = "platform",
         alias = WorkflowDelegationService.MODULE_ALIAS,
         title = "Workflow Delegation")
@@ -47,104 +44,115 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
         return service;
     }
 
-    @PostMapping("/query")
+    @POST
+    @Path("/query")
     @CustomActionEndpoint(value = "query", title = "Delegation Query", level = PlatformActionLevel.LIST)
-    public WebPageResponse<WorkflowDelegation> query(@RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<WorkflowDelegation> query(WebQueryRequest request) {
         Criteria criteria = criteria(request);
         PageRequest page = page(request);
         return WebPageResponse.from(service.pageByPrincipal(currentUserId(), criteria, page));
     }
 
-    @PostMapping("/insert")
+    @POST
+    @Path("/insert")
     @CustomActionEndpoint(value = "create", title = "Delegation Create", level = PlatformActionLevel.LIST)
-    @ResponseStatus(HttpStatus.CREATED)
-    public WorkflowDelegation insert(@RequestBody WorkflowDelegation delegation) {
+    public WorkflowDelegation insert(WorkflowDelegation delegation) {
         return service.insertForPrincipal(delegation, currentUserId());
     }
 
-    @PostMapping("/update/{id}")
+    @POST
+    @Path("/update/{id}")
     @CustomActionEndpoint(value = "update", title = "Delegation Update", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WorkflowDelegation update(@PathVariable String id, @RequestBody WorkflowDelegation delegation) {
+    public WorkflowDelegation update(@PathParam("id") String id, WorkflowDelegation delegation) {
         return service.updateForPrincipal(id, delegation, currentUserId());
     }
 
-    @PostMapping("/delete/{id}")
+    @POST
+    @Path("/delete/{id}")
     @CustomActionEndpoint(value = "delete", title = "Delegation Delete", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WebCountResponse delete(@PathVariable String id) {
+    public WebCountResponse delete(@PathParam("id") String id) {
         return new WebCountResponse(service.deleteForPrincipal(id, currentUserId()));
     }
 
-    @PostMapping("/enable/{id}")
+    @POST
+    @Path("/enable/{id}")
     @CustomActionEndpoint(value = "enable", title = "Delegation Enable", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WorkflowDelegation enable(@PathVariable String id) {
+    public WorkflowDelegation enable(@PathParam("id") String id) {
         return service.enableForPrincipal(id, currentUserId());
     }
 
-    @PostMapping("/disable/{id}")
+    @POST
+    @Path("/disable/{id}")
     @CustomActionEndpoint(value = "disable", title = "Delegation Disable", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WorkflowDelegation disable(@PathVariable String id) {
+    public WorkflowDelegation disable(@PathParam("id") String id) {
         return service.disableForPrincipal(id, currentUserId());
     }
 
-    @PostMapping("/delegatedToMe/query")
+    @POST
+    @Path("/delegatedToMe/query")
     @CustomActionEndpoint(value = "delegatedToMeQuery", title = "Delegated To Me Query",
             level = PlatformActionLevel.LIST)
-    public WebPageResponse<WorkflowDelegation> delegatedToMe(@RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<WorkflowDelegation> delegatedToMe(WebQueryRequest request) {
         Criteria criteria = criteria(request);
         PageRequest page = page(request);
         return WebPageResponse.from(service.pageByDelegate(currentUserId(), criteria, page));
     }
 
-    @PostMapping("/manage/query")
+    @POST
+    @Path("/manage/query")
     @CustomActionEndpoint(value = "manageQuery", title = "Delegation Manage Query",
             level = PlatformActionLevel.LIST)
-    public WebPageResponse<WorkflowDelegation> manageQuery(@RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<WorkflowDelegation> manageQuery(WebQueryRequest request) {
         Criteria criteria = criteria(request);
         PageRequest page = page(request);
         return WebPageResponse.from(service.pageQuery(criteria, page, Sort.desc("updatedAt"),
                 Sort.desc("createdAt")));
     }
 
-    @PostMapping("/manage/insert")
+    @POST
+    @Path("/manage/insert")
     @CustomActionEndpoint(value = "manageCreate", title = "Delegation Manage Create",
             level = PlatformActionLevel.LIST)
-    @ResponseStatus(HttpStatus.CREATED)
-    public WorkflowDelegation manageInsert(@RequestBody WorkflowDelegation delegation) {
+    public WorkflowDelegation manageInsert(WorkflowDelegation delegation) {
         String id = service.insert(delegation);
         return service.select(id);
     }
 
-    @PostMapping("/manage/update/{id}")
+    @POST
+    @Path("/manage/update/{id}")
     @CustomActionEndpoint(value = "manageUpdate", title = "Delegation Manage Update",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WorkflowDelegation manageUpdate(@PathVariable String id, @RequestBody WorkflowDelegation delegation) {
+    public WorkflowDelegation manageUpdate(@PathParam("id") String id, WorkflowDelegation delegation) {
         delegation.setId(id);
         service.update(delegation);
         return service.select(id);
     }
 
-    @PostMapping("/manage/delete/{id}")
+    @POST
+    @Path("/manage/delete/{id}")
     @CustomActionEndpoint(value = "manageDelete", title = "Delegation Manage Delete",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WebCountResponse manageDelete(@PathVariable String id) {
+    public WebCountResponse manageDelete(@PathParam("id") String id) {
         return new WebCountResponse(service.delete(id));
     }
 
-    @PostMapping("/manage/enable/{id}")
+    @POST
+    @Path("/manage/enable/{id}")
     @CustomActionEndpoint(value = "manageEnable", title = "Delegation Manage Enable",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WorkflowDelegation manageEnable(@PathVariable String id) {
+    public WorkflowDelegation manageEnable(@PathParam("id") String id) {
         return service.enable(id);
     }
 
-    @PostMapping("/manage/disable/{id}")
+    @POST
+    @Path("/manage/disable/{id}")
     @CustomActionEndpoint(value = "manageDisable", title = "Delegation Manage Disable",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WorkflowDelegation manageDisable(@PathVariable String id) {
+    public WorkflowDelegation manageDisable(@PathParam("id") String id) {
         return service.disable(id);
     }
 
