@@ -1,8 +1,17 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
+import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
+import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -16,15 +25,10 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowVersionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.servlet.HandlerMapping;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,9 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class WorkflowConfigurationWebControllerTest {
     @AfterEach
@@ -44,34 +45,54 @@ class WorkflowConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldBindWorkflowDefinitionModuleFromPathAndForceDraftOnInsert() throws Exception {
+    void shouldDeclareDefinitionAndVersionRoutesWithNestedCrudContract() throws Exception {
+        assertThat(WorkflowDefinitionWebController.class.getAnnotation(Path.class).value())
+                .isEqualTo("/platform.module/{moduleAlias}/workflow-definitions");
+        assertThat(WorkflowVersionWebController.class.getAnnotation(Path.class).value())
+                .isEqualTo("/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions");
+        assertRoute(NestedCrudWebSupport.class.getMethod("insert", HttpServletRequest.class,
+                        net.ximatai.muyun.spring.common.model.contract.EntityContract.class),
+                POST.class, "/insert");
+        assertRoute(NestedCrudWebSupport.class.getMethod("update", HttpServletRequest.class, String.class,
+                        net.ximatai.muyun.spring.common.model.contract.EntityContract.class),
+                POST.class, "/update/{id}");
+        assertRoute(NestedCrudWebSupport.class.getMethod("delete", HttpServletRequest.class, String.class),
+                POST.class, "/delete/{id}");
+        assertRoute(NestedSortableCrudWebSupport.class.getMethod("sort", HttpServletRequest.class, String.class,
+                        net.ximatai.muyun.spring.boot.web.SortWebRequest.class),
+                POST.class, "/sort/{id}");
+
+        assertActionEndpoint(WorkflowDefinitionWebController.class.getMethod("insert",
+                        HttpServletRequest.class, WorkflowDefinition.class),
+                PlatformAction.CREATE);
+        assertActionEndpoint(WorkflowVersionWebController.class.getMethod("insert",
+                        HttpServletRequest.class, WorkflowVersion.class),
+                PlatformAction.CREATE);
+        Method publish = WorkflowDefinitionWebController.class.getMethod("publish",
+                HttpServletRequest.class, String.class, String.class);
+        CustomActionEndpoint endpoint = publish.getAnnotation(CustomActionEndpoint.class);
+        assertThat(endpoint.value()).isEqualTo("publishWorkflowDefinition");
+        assertThat(endpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(endpoint.recordIdPathVariable()).isEqualTo("definitionId");
+    }
+
+    @Test
+    void shouldBindWorkflowDefinitionModuleFromPathAndForceDraftOnInsert() {
         WorkflowDefinitionService definitionService = mock(WorkflowDefinitionService.class);
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        WorkflowPublishFacade publishFacade = mock(WorkflowPublishFacade.class);
-        WorkflowDefinitionWebController controller = new WorkflowDefinitionWebController(moduleService, publishFacade);
-        ReflectionTestUtils.setField(controller, "service", definitionService);
+        TestWorkflowDefinitionWebController controller = new TestWorkflowDefinitionWebController(
+                moduleService, mock(WorkflowPublishFacade.class), definitionService);
         when(moduleService.resolveVisibleModule("sales.contract")).thenReturn(module("sales.contract"));
         WorkflowDefinition inserted = definition("def-1", "sales.contract", WorkflowDefinitionStatus.DRAFT);
         when(definitionService.insert(any(WorkflowDefinition.class))).thenReturn("def-1");
         when(definitionService.select("def-1")).thenReturn(inserted);
 
-        MockMvcBuilders.standaloneSetup(controller).build()
-                .perform(post("/platform.module/sales.contract/workflow-definitions/insert")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "applicationAlias":"other",
-                                  "moduleAlias":"other.module",
-                                  "alias":"approval",
-                                  "title":"Approval",
-                                  "definitionStatus":"PUBLISHED",
-                                  "currentVersionNo":3
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("sales"))
-                .andExpect(jsonPath("$.record.moduleAlias").value("sales.contract"));
+        WebRecordResponse<WorkflowDefinition> response = controller.insert(
+                requestVars("sales.contract", "def-1"),
+                definition(null, "other.module", WorkflowDefinitionStatus.PUBLISHED));
 
+        assertThat(response.record().getApplicationAlias()).isEqualTo("sales");
+        assertThat(response.record().getModuleAlias()).isEqualTo("sales.contract");
         ArgumentCaptor<WorkflowDefinition> captor = ArgumentCaptor.forClass(WorkflowDefinition.class);
         verify(definitionService).insert(captor.capture());
         assertThat(captor.getValue().getApplicationAlias()).isEqualTo("sales");
@@ -81,30 +102,20 @@ class WorkflowConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldRejectWorkflowDefinitionInsertWhenPathModuleDoesNotExist() {
+    void shouldRejectDefinitionOutsideModuleOrPublishedDefinitionMutation() {
         WorkflowDefinitionService definitionService = mock(WorkflowDefinitionService.class);
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        WorkflowDefinitionWebController controller = new WorkflowDefinitionWebController(
-                moduleService, mock(WorkflowPublishFacade.class));
-        ReflectionTestUtils.setField(controller, "service", definitionService);
+        TestWorkflowDefinitionWebController controller = new TestWorkflowDefinitionWebController(
+                moduleService, mock(WorkflowPublishFacade.class), definitionService);
         when(moduleService.resolveVisibleModule("sales.ghost")).thenReturn(null);
+        when(definitionService.select("def-1")).thenReturn(
+                definition("def-1", "sales.contract", WorkflowDefinitionStatus.PUBLISHED));
 
         assertThatThrownBy(() -> controller.insert(
                 requestVars("sales.ghost", "def-1"),
                 definition(null, "sales.ghost", WorkflowDefinitionStatus.DRAFT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("platform module not found");
-    }
-
-    @Test
-    void shouldRejectEditingPublishedWorkflowDefinitionThroughCrudPath() {
-        WorkflowDefinitionService definitionService = mock(WorkflowDefinitionService.class);
-        WorkflowDefinitionWebController controller = new WorkflowDefinitionWebController(
-                mock(PlatformModuleService.class), mock(WorkflowPublishFacade.class));
-        ReflectionTestUtils.setField(controller, "service", definitionService);
-        when(definitionService.select("def-1")).thenReturn(
-                definition("def-1", "sales.contract", WorkflowDefinitionStatus.PUBLISHED));
-
         assertThatThrownBy(() -> controller.update(
                 requestVars("sales.contract", "def-1"),
                 "def-1",
@@ -114,60 +125,61 @@ class WorkflowConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldBindWorkflowVersionDefinitionAndForceDraftOnInsert() throws Exception {
+    void shouldBindWorkflowVersionDefinitionAndForceDraftOnInsert() {
         WorkflowDefinitionService definitionService = mock(WorkflowDefinitionService.class);
         WorkflowVersionService versionService = mock(WorkflowVersionService.class);
-        WorkflowVersionWebController controller = new WorkflowVersionWebController(definitionService);
-        ReflectionTestUtils.setField(controller, "service", versionService);
+        TestWorkflowVersionWebController controller = new TestWorkflowVersionWebController(
+                definitionService, versionService);
         when(definitionService.select("def-1")).thenReturn(
                 definition("def-1", "sales.contract", WorkflowDefinitionStatus.DRAFT));
         WorkflowVersion inserted = version("ver-1", "def-1", 1, WorkflowPublishStatus.DRAFT);
         when(versionService.insert(any(WorkflowVersion.class))).thenReturn("ver-1");
         when(versionService.select("ver-1")).thenReturn(inserted);
 
-        MockMvcBuilders.standaloneSetup(controller).build()
-                .perform(post("/platform.module/sales.contract/workflow-definitions/def-1/versions/insert")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "definitionId":"other-def",
-                                  "versionNo":1,
-                                  "publishStatus":"PUBLISHED",
-                                  "publishedBy":"other"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.definitionId").value("def-1"))
-                .andExpect(jsonPath("$.record.publishStatus").value("DRAFT"));
+        WebRecordResponse<WorkflowVersion> response = controller.insert(
+                requestVars("sales.contract", "def-1"),
+                version(null, "other-def", 1, WorkflowPublishStatus.PUBLISHED));
 
+        assertThat(response.record().getDefinitionId()).isEqualTo("def-1");
+        assertThat(response.record().getPublishStatus()).isEqualTo(WorkflowPublishStatus.DRAFT);
         ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
         verify(versionService).insert(captor.capture());
         assertThat(captor.getValue().getDefinitionId()).isEqualTo("def-1");
         assertThat(captor.getValue().getPublishStatus()).isEqualTo(WorkflowPublishStatus.DRAFT);
         assertThat(captor.getValue().getPublishedBy()).isNull();
+        assertThat(captor.getValue().getPublishedAt()).isNull();
     }
 
     @Test
-    void shouldPublishWorkflowVersionThroughPublishFacadeWithCurrentUser() throws Exception {
+    void shouldPublishWorkflowVersionThroughFacadeWithCurrentUser() {
         WorkflowDefinitionService definitionService = mock(WorkflowDefinitionService.class);
-        PlatformModuleService moduleService = mock(PlatformModuleService.class);
         WorkflowPublishFacade publishFacade = mock(WorkflowPublishFacade.class);
-        WorkflowDefinitionWebController controller = new WorkflowDefinitionWebController(moduleService, publishFacade);
-        ReflectionTestUtils.setField(controller, "service", definitionService);
+        TestWorkflowDefinitionWebController controller = new TestWorkflowDefinitionWebController(
+                mock(PlatformModuleService.class), publishFacade, definitionService);
         when(definitionService.select("def-1")).thenReturn(
                 definition("def-1", "sales.contract", WorkflowDefinitionStatus.DRAFT));
         when(publishFacade.publish("def-1", "ver-1", "user-1"))
                 .thenReturn(version("ver-1", "def-1", 1, WorkflowPublishStatus.PUBLISHED));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .addFilters(new CurrentUserWebFilter(() -> Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant-a"))))
-                .build();
-        mvc.perform(post("/platform.module/sales.contract/workflow-definitions/def-1/versions/ver-1/publish"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publishStatus").value("PUBLISHED"));
+        WorkflowVersion response;
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            response = controller.publish(requestVars("sales.contract", "def-1"), "def-1", "ver-1");
+        }
 
+        assertThat(response.getPublishStatus()).isEqualTo(WorkflowPublishStatus.PUBLISHED);
         verify(publishFacade).publish("def-1", "ver-1", "user-1");
+    }
+
+    private void assertRoute(Method method, Class<?> httpMethod, String path) {
+        assertThat(method.getAnnotation(httpMethod.asSubclass(Annotation.class))).isNotNull();
+        assertThat(method.getAnnotation(Path.class).value()).isEqualTo(path);
+    }
+
+    private void assertActionEndpoint(Method method, PlatformAction action) {
+        ActionEndpoint endpoint = method.getAnnotation(ActionEndpoint.class);
+        assertThat(endpoint).isNotNull();
+        assertThat(endpoint.value()).isEqualTo(action);
     }
 
     private WorkflowDefinition definition(String id, String moduleAlias, WorkflowDefinitionStatus status) {
@@ -178,6 +190,7 @@ class WorkflowConfigurationWebControllerTest {
         definition.setAlias("approval");
         definition.setTitle("Approval");
         definition.setDefinitionStatus(status);
+        definition.setCurrentVersionNo(3);
         return definition;
     }
 
@@ -195,13 +208,32 @@ class WorkflowConfigurationWebControllerTest {
         version.setDefinitionId(definitionId);
         version.setVersionNo(versionNo);
         version.setPublishStatus(status);
+        version.setPublishedBy("other");
+        version.setPublishedAt(java.time.Instant.parse("2026-06-01T00:00:00Z"));
         return version;
     }
 
-    private MockHttpServletRequest requestVars(String moduleAlias, String definitionId) {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
-                Map.of("moduleAlias", moduleAlias, "definitionId", definitionId));
+    private HttpServletRequest requestVars(String moduleAlias, String definitionId) {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
+                .thenReturn(Map.of("moduleAlias", moduleAlias, "definitionId", definitionId));
         return request;
+    }
+
+    private static final class TestWorkflowDefinitionWebController extends WorkflowDefinitionWebController {
+        private TestWorkflowDefinitionWebController(PlatformModuleService moduleService,
+                                                    WorkflowPublishFacade publishFacade,
+                                                    WorkflowDefinitionService definitionService) {
+            super(moduleService, publishFacade);
+            this.service = definitionService;
+        }
+    }
+
+    private static final class TestWorkflowVersionWebController extends WorkflowVersionWebController {
+        private TestWorkflowVersionWebController(WorkflowDefinitionService definitionService,
+                                                 WorkflowVersionService versionService) {
+            super(definitionService);
+            this.service = versionService;
+        }
     }
 }

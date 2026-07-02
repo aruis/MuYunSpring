@@ -19,20 +19,18 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowVersion;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = WorkflowDefinitionService.MODULE_ALIAS,
         title = "平台工作流定义")
-@RequestMapping("/platform.module/{moduleAlias}/workflow-definitions")
+@Path("/platform.module/{moduleAlias}/workflow-definitions")
 public class WorkflowDefinitionWebController
         extends NestedSortableCrudWebSupport<WorkflowDefinition, WorkflowDefinitionService> {
 
@@ -46,93 +44,92 @@ public class WorkflowDefinitionWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("moduleAlias", moduleAlias(request));
     }
 
     @Override
-    protected void bindScope(WorkflowDefinition record, HttpServletRequest request) {
+    protected void bindScope(WorkflowDefinition record, @Context HttpServletRequest request) {
         PlatformModule module = requireModule(request);
         record.setApplicationAlias(module.getApplicationAlias());
         record.setModuleAlias(module.getAlias());
     }
 
     @Override
-    protected boolean inScope(WorkflowDefinition record, HttpServletRequest request) {
+    protected boolean inScope(WorkflowDefinition record, @Context HttpServletRequest request) {
         return moduleAlias(request).equals(record.getModuleAlias());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "workflow definition does not belong to module: " + moduleAlias(request) + "." + id;
     }
 
     @Override
-    @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
-    @ResponseStatus(HttpStatus.CREATED)
-    public WebRecordResponse<WorkflowDefinition> insert(HttpServletRequest servletRequest,
-                                                        @RequestBody WorkflowDefinition record) {
+    public WebRecordResponse<WorkflowDefinition> insert(@Context HttpServletRequest servletRequest,
+                                                        WorkflowDefinition record) {
         normalizeDraft(record);
         return super.insert(servletRequest, record);
     }
 
     @Override
-    @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<WorkflowDefinition> update(HttpServletRequest servletRequest,
-                                                        @PathVariable String id,
-                                                        @RequestBody WorkflowDefinition record) {
+    public WebRecordResponse<WorkflowDefinition> update(@Context HttpServletRequest servletRequest,
+                                                        @PathParam("id") String id,
+                                                        WorkflowDefinition record) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow definition can only edit draft definitions");
         normalizeDraft(record);
         return super.update(servletRequest, id, record);
     }
 
     @Override
-    @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse delete(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow definition can only delete draft definitions");
         return super.delete(servletRequest, id);
     }
 
-    @PostMapping("/{definitionId}/versions/{versionId}/publish")
+    @POST
+    @Path("/{definitionId}/versions/{versionId}/publish")
     @CustomActionEndpoint(value = "publishWorkflowDefinition", title = "发布工作流定义",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
-    public WorkflowVersion publish(HttpServletRequest request,
-                                   @PathVariable String definitionId,
-                                   @PathVariable String versionId) {
+    public WorkflowVersion publish(@Context HttpServletRequest request,
+                                   @PathParam("definitionId") String definitionId,
+                                   @PathParam("versionId") String versionId) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
             return publishFacade.publish(definitionId, versionId, currentOperatorIdOrNull());
         });
     }
 
-    @PostMapping("/{definitionId}/disable")
+    @POST
+    @Path("/{definitionId}/disable")
     @CustomActionEndpoint(value = "disableWorkflowDefinition", title = "停用工作流定义",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
-    public WorkflowDefinition disableDefinition(HttpServletRequest request, @PathVariable String definitionId) {
+    public WorkflowDefinition disableDefinition(@Context HttpServletRequest request, @PathParam("definitionId") String definitionId) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
             return publishFacade.disable(definitionId);
         });
     }
 
-    @PostMapping("/{definitionId}/archive")
+    @POST
+    @Path("/{definitionId}/archive")
     @CustomActionEndpoint(value = "archiveWorkflowDefinition", title = "归档工作流定义",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
-    public WorkflowDefinition archive(HttpServletRequest request, @PathVariable String definitionId) {
+    public WorkflowDefinition archive(@Context HttpServletRequest request, @PathParam("definitionId") String definitionId) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
             return publishFacade.archive(definitionId);
         });
     }
 
-    private String moduleAlias(HttpServletRequest request) {
+    private String moduleAlias(@Context HttpServletRequest request) {
         return PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
     }
 
-    private PlatformModule requireModule(HttpServletRequest request) {
+    private PlatformModule requireModule(@Context HttpServletRequest request) {
         String validModuleAlias = moduleAlias(request);
         PlatformModule module = moduleService.resolveVisibleModule(validModuleAlias);
         if (module == null) {
