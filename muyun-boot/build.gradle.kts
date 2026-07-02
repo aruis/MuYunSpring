@@ -46,7 +46,6 @@ tasks.named<JavaCompile>("compileTestJava").configure {
         "**/PlatformPagePreferenceWebControllerTest.java",
         "**/DynamicExchangeTemplateWebControllerTest.java",
         "**/DynamicImportWebControllerTest.java",
-        "**/DynamicRecordWebControllerTest.java",
         "**/DynamicExportWebControllerTest.java",
         "**/DynamicModuleTaskWebControllerTest.java"
     )

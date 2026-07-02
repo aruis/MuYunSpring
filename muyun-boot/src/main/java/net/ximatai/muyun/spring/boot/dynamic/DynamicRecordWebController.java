@@ -29,7 +29,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -90,20 +90,15 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.converter.HttpMessageConversionException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -117,8 +112,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-@RestController
-@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
+@ApplicationScoped
+@Path("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
 public class DynamicRecordWebController implements
         CrudWeb<DynamicRecord, DynamicEntityOperations>,
         EnableWeb<DynamicRecord, DynamicEntityOperations>,
@@ -132,7 +127,7 @@ public class DynamicRecordWebController implements
                 DynamicWebReferenceRequest,
                 DynamicReferenceResolveResponse> {
     private final DynamicRecordService recordService;
-    private final ActiveTenantVerifier activeTenantVerifier;
+    private final TenantService activeTenantVerifier;
     private final CodeBusinessPreviewService codeBusinessPreviewService;
     private final ReferenceRecordGenerationFacade referenceRecordGenerationFacade;
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
@@ -147,14 +142,14 @@ public class DynamicRecordWebController implements
     private static final int SUMMARY_MAX_RECORDS = 10_000;
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier) {
+                                      TenantService activeTenantVerifier) {
         this(recordService, activeTenantVerifier, (CodeBusinessPreviewService) null,
                 (ReferenceRecordGenerationFacade) null);
     }
 
-    @Autowired
+    @Inject
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider,
                                       ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider,
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
@@ -177,13 +172,13 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
@@ -191,7 +186,7 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
@@ -202,7 +197,7 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
@@ -215,7 +210,7 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
@@ -229,7 +224,7 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
@@ -244,7 +239,7 @@ public class DynamicRecordWebController implements
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
@@ -273,9 +268,10 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @GetMapping("/query/schema")
+    @GET
+    @Path("/query/schema")
     @ActionEndpoint(PlatformAction.QUERY)
-    public QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
+    public QuerySchema querySchema(@QueryParam("uiConfigId") String uiConfigId) {
         return webScope(() -> DynamicQuerySchemas.from(DynamicWebRequest.moduleAlias(),
                 service().describe(), quickSearchFieldsForSchema(uiConfigId)));
     }
@@ -364,9 +360,10 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @PostMapping("/query")
+    @POST
+    @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<DynamicRecord> query(@RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<DynamicRecord> query(WebQueryRequest request) {
         return webScope(() -> {
             if (request != null && request.unpagedEnabled()) {
                 List<DynamicRecord> records = WebOutputSupport.records(
@@ -379,9 +376,10 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/query/summary")
+    @POST
+    @Path("/query/summary")
     @ActionEndpoint(PlatformAction.QUERY)
-    public List<DynamicSummaryItem> querySummary(@RequestBody(required = false) WebQueryRequest request) {
+    public List<DynamicSummaryItem> querySummary(WebQueryRequest request) {
         return webScope(() -> {
             List<DynamicSummaryConfigItem> items = summaryConfigItems(DynamicWebRequest.moduleAlias(), request);
             if (items.isEmpty()) {
@@ -403,23 +401,26 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @GetMapping("/associations/relation-overview")
+    @GET
+    @Path("/associations/relation-overview")
     @ActionEndpoint(PlatformAction.VIEW)
     public DynamicAssociationRelationOverview associationRelationOverview() {
         return webScope(() -> recordService.associationRelationOverview(DynamicWebRequest.moduleAlias()));
     }
 
-    @GetMapping("/associations/design")
+    @GET
+    @Path("/associations/design")
     @ActionEndpoint(PlatformAction.VIEW)
     public List<DynamicAssociationViewDescriptor> associationDesignDescriptors() {
         return webScope(() -> recordService.associationViewDesignDescriptors(DynamicWebRequest.moduleAlias()));
     }
 
-    @PostMapping("/view/{id}/associations/{viewCode}/diagnose")
+    @POST
+    @Path("/view/{id}/associations/{viewCode}/diagnose")
     @ActionEndpoint(PlatformAction.QUERY)
-    public DynamicAssociationViewDiagnosis diagnoseAssociation(@PathVariable String id,
-                                                               @PathVariable String viewCode,
-                                                               @RequestBody(required = false) WebQueryRequest request) {
+    public DynamicAssociationViewDiagnosis diagnoseAssociation(@PathParam("id") String id,
+                                                               @PathParam("viewCode") String viewCode,
+                                                               WebQueryRequest request) {
         return webScope(() -> {
             String moduleAlias = DynamicWebRequest.moduleAlias();
             String entityAlias = mainEntityAlias(moduleAlias);
@@ -429,11 +430,12 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/associations/{viewCode}/query")
+    @POST
+    @Path("/view/{id}/associations/{viewCode}/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<DynamicRecord> queryAssociation(@PathVariable String id,
-                                                           @PathVariable String viewCode,
-                                                           @RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<DynamicRecord> queryAssociation(@PathParam("id") String id,
+                                                           @PathParam("viewCode") String viewCode,
+                                                           WebQueryRequest request) {
         return webScope(() -> {
             String moduleAlias = DynamicWebRequest.moduleAlias();
             String entityAlias = mainEntityAlias(moduleAlias);
@@ -450,11 +452,9 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
-    @ResponseStatus(HttpStatus.CREATED)
     @Transactional
-    public WebRecordResponse<DynamicRecord> insert(@RequestBody DynamicRecord record) {
+    public WebRecordResponse<DynamicRecord> insert(DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             validateWritableSaveFields(normalized, "");
@@ -467,10 +467,9 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
     @Transactional
-    public WebRecordResponse<DynamicRecord> update(@PathVariable String id, @RequestBody DynamicRecord record) {
+    public WebRecordResponse<DynamicRecord> update(@PathParam("id") String id, DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             normalized.setId(id);
@@ -485,9 +484,10 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/query")
+    @POST
+    @Path("/view/{id}/attachments/query")
     @ActionEndpoint(PlatformAction.VIEW)
-    public List<RecordAttachment> queryAttachments(@PathVariable String id) {
+    public List<RecordAttachment> queryAttachments(@PathParam("id") String id) {
         return webScope(() -> {
             requireAttachmentService();
             requireDataScopeRecord(PlatformAction.VIEW, id);
@@ -495,10 +495,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/add")
+    @POST
+    @Path("/view/{id}/attachments/add")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public List<RecordAttachment> addAttachment(@PathVariable String id,
-                                                @RequestBody RecordAttachmentCommand command) {
+    public List<RecordAttachment> addAttachment(@PathParam("id") String id,
+                                                RecordAttachmentCommand command) {
         return webScope(() -> {
             requireAttachmentService();
             requireDataScopeRecord(PlatformAction.UPDATE, id);
@@ -507,9 +508,10 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/upload-ticket")
+    @POST
+    @Path("/view/{id}/attachments/upload-ticket")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public RecordAttachmentAccess issueAttachmentUploadTicket(@PathVariable String id) {
+    public RecordAttachmentAccess issueAttachmentUploadTicket(@PathParam("id") String id) {
         return webScope(() -> {
             requireAttachmentAccessService();
             requireDataScopeRecord(PlatformAction.UPDATE, id);
@@ -517,10 +519,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/{attachmentId}/preview-ticket")
+    @POST
+    @Path("/view/{id}/attachments/{attachmentId}/preview-ticket")
     @ActionEndpoint(PlatformAction.VIEW)
-    public RecordAttachmentAccess issueAttachmentPreviewTicket(@PathVariable String id,
-                                                              @PathVariable String attachmentId) {
+    public RecordAttachmentAccess issueAttachmentPreviewTicket(@PathParam("id") String id,
+                                                              @PathParam("attachmentId") String attachmentId) {
         return webScope(() -> {
             requireAttachmentService();
             requireAttachmentAccessService();
@@ -531,10 +534,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/{attachmentId}/download-ticket")
+    @POST
+    @Path("/view/{id}/attachments/{attachmentId}/download-ticket")
     @ActionEndpoint(PlatformAction.VIEW)
-    public RecordAttachmentAccess issueAttachmentDownloadTicket(@PathVariable String id,
-                                                               @PathVariable String attachmentId) {
+    public RecordAttachmentAccess issueAttachmentDownloadTicket(@PathParam("id") String id,
+                                                               @PathParam("attachmentId") String attachmentId) {
         return webScope(() -> {
             requireAttachmentService();
             requireAttachmentAccessService();
@@ -545,11 +549,12 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/update/{attachmentId}")
+    @POST
+    @Path("/view/{id}/attachments/update/{attachmentId}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public List<RecordAttachment> updateAttachment(@PathVariable String id,
-                                                   @PathVariable String attachmentId,
-                                                   @RequestBody RecordAttachmentCommand command) {
+    public List<RecordAttachment> updateAttachment(@PathParam("id") String id,
+                                                   @PathParam("attachmentId") String attachmentId,
+                                                   RecordAttachmentCommand command) {
         return webScope(() -> {
             requireAttachmentService();
             requireDataScopeRecord(PlatformAction.UPDATE, id);
@@ -558,10 +563,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/view/{id}/attachments/delete/{attachmentId}")
+    @POST
+    @Path("/view/{id}/attachments/delete/{attachmentId}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public List<RecordAttachment> deleteAttachment(@PathVariable String id,
-                                                   @PathVariable String attachmentId) {
+    public List<RecordAttachment> deleteAttachment(@PathParam("id") String id,
+                                                   @PathParam("attachmentId") String attachmentId) {
         return webScope(() -> {
             requireAttachmentService();
             requireDataScopeRecord(PlatformAction.UPDATE, id);
@@ -1135,10 +1141,11 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+    public WebCountResponse sort(@PathParam("id") String id,
+                                 TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             DynamicEntityOperations operations = service();
@@ -1166,23 +1173,26 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @GetMapping("/describe")
-    public DynamicModuleDescriptor describeModule(@PathVariable String moduleAlias) {
+    @GET
+    @Path("/describe")
+    public DynamicModuleDescriptor describeModule(@PathParam("moduleAlias") String moduleAlias) {
         return tenantScope(moduleAlias, () -> permissionScopedDescriptor(moduleAlias));
     }
 
-    @GetMapping("/openapi")
-    public DynamicOpenApiDocument openApi(@PathVariable String moduleAlias) {
+    @GET
+    @Path("/openapi")
+    public DynamicOpenApiDocument openApi(@PathParam("moduleAlias") String moduleAlias) {
         return tenantScope(moduleAlias, () -> openApiGenerator.generate(
                 permissionScopedDescriptor(moduleAlias),
                 action -> recordService.actionAuthorizationAvailability(
                         moduleAlias, action.code(), Set.of()).available()));
     }
 
-    @GetMapping("/navigation/{sessionId}/{recordId}")
+    @GET
+    @Path("/navigation/{sessionId}/{recordId}")
     @ActionEndpoint(PlatformAction.VIEW)
-    public PlatformRecordNavigationMove navigation(@PathVariable String sessionId,
-                                                   @PathVariable String recordId) {
+    public PlatformRecordNavigationMove navigation(@PathParam("sessionId") String sessionId,
+                                                   @PathParam("recordId") String recordId) {
         return webScope(() -> {
             requireNavigationService();
             PlatformRecordNavigationMove move = navigationService.move(DynamicWebRequest.moduleAlias(), sessionId, recordId);
@@ -1193,10 +1203,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/code/preview")
+    @POST
+    @Path("/code/preview")
     @ActionEndpoint(PlatformAction.CREATE)
-    public List<CodeBusinessPreviewItem> previewCode(@PathVariable String moduleAlias,
-                                                     @RequestBody(required = false) DynamicRecord record) {
+    public List<CodeBusinessPreviewItem> previewCode(@PathParam("moduleAlias") String moduleAlias,
+                                                     DynamicRecord record) {
         return tenantScope(moduleAlias, () -> {
             if (codeBusinessPreviewService == null) {
                 throw new PlatformException("code business preview service is not configured");
@@ -1213,10 +1224,11 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/formula/preview")
+    @POST
+    @Path("/formula/preview")
     @ActionEndpoint(PlatformAction.CREATE)
-    public DynamicFormulaPreviewResponse previewFormula(@PathVariable String moduleAlias,
-                                                        @RequestBody(required = false) DynamicFormulaPreviewRequest request) {
+    public DynamicFormulaPreviewResponse previewFormula(@PathParam("moduleAlias") String moduleAlias,
+                                                        DynamicFormulaPreviewRequest request) {
         return tenantScope(moduleAlias, () -> {
             String entityAlias = mainEntityAlias(moduleAlias);
             DynamicFormulaPreviewRequest normalized = request == null ? new DynamicFormulaPreviewRequest(null) : request;
@@ -1280,9 +1292,10 @@ public class DynamicRecordWebController implements
         return executeAction(moduleAlias, actionCode, recordId, request);
     }
 
-    @PostMapping("/{actionCode}/duplicate/check")
-    public RecordDuplicateCheckResult checkDuplicate(@PathVariable String actionCode,
-                                                     @RequestBody(required = false) DynamicWebDuplicateCheckRequest request) {
+    @POST
+    @Path("/{actionCode}/duplicate/check")
+    public RecordDuplicateCheckResult checkDuplicate(@PathParam("actionCode") String actionCode,
+                                                     DynamicWebDuplicateCheckRequest request) {
         String moduleAlias = DynamicWebRequest.moduleAlias();
         requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.RECORD, EntityActionLevel.ANY),
                 "dynamic duplicate action must be record action: ");
@@ -1309,17 +1322,17 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    @PostMapping("/references/{fieldName}/resolve")
     @ActionEndpoint(PlatformAction.REFERENCE)
-    public DynamicReferenceResolveResponse reference(@PathVariable String fieldName,
-                                                     @RequestBody(required = false) DynamicWebReferenceRequest request) {
+    public DynamicReferenceResolveResponse reference(@PathParam("fieldName") String fieldName,
+                                                     DynamicWebReferenceRequest request) {
         return ReferenceWeb.super.reference(fieldName, request);
     }
 
-    @PostMapping("/references/{fieldName}/generate")
+    @POST
+    @Path("/references/{fieldName}/generate")
     @ActionEndpoint(PlatformAction.REFERENCE)
-    public RecordGenerationResult generateFromReference(@PathVariable String fieldName,
-                                                        @RequestBody(required = false) DynamicWebReferenceGenerationRequest request) {
+    public RecordGenerationResult generateFromReference(@PathParam("fieldName") String fieldName,
+                                                        DynamicWebReferenceGenerationRequest request) {
         return webScope(() -> {
             DynamicWebReferenceGenerationRequest normalized = request == null
                     ? new DynamicWebReferenceGenerationRequest(null)
@@ -1333,9 +1346,10 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/generation/confirm")
+    @POST
+    @Path("/generation/confirm")
     @ActionEndpoint(PlatformAction.CREATE)
-    public RecordGenerationCommitResult confirmGeneratedDraft(@RequestBody(required = false) DynamicWebGenerationConfirmRequest request) {
+    public RecordGenerationCommitResult confirmGeneratedDraft(DynamicWebGenerationConfirmRequest request) {
         return webScope(() -> {
             DynamicWebGenerationConfirmRequest normalized = request == null
                     ? new DynamicWebGenerationConfirmRequest(null, null, null, null)
