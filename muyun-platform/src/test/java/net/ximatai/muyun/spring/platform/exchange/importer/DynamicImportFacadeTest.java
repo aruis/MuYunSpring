@@ -17,9 +17,9 @@ import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol;
 import net.ximatai.muyun.spring.platform.exchange.reader.ExcelWorkbookParser;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
 import java.time.Clock;
@@ -40,7 +40,7 @@ class DynamicImportFacadeTest {
 
     @Test
     void shouldExposeTransactionalServiceFacade() throws NoSuchMethodException {
-        assertThat(DynamicImportFacade.class).hasAnnotation(Service.class);
+        assertThat(DynamicImportFacade.class).hasAnnotation(Dependent.class);
         Method method = DynamicImportFacade.class.getMethod("importWorkbook", DynamicImportCommand.class);
         assertThat(method.isAnnotationPresent(Transactional.class)).isTrue();
     }

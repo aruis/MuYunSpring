@@ -17,10 +17,9 @@ import net.ximatai.muyun.spring.platform.impact.RecordImpactRelationService;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -101,9 +100,9 @@ class RecordWriteBackRuntimeServiceTest {
         Method failure = RecordWriteBackExecutionLogService.class
                 .getMethod("saveFailureExecutionLog", RecordWriteBackExecutionLog.class);
 
-        assertThat(insert.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.REQUIRED);
-        assertThat(update.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.REQUIRED);
-        assertThat(failure.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+        assertThat(insert.getAnnotation(Transactional.class).value()).isEqualTo(Transactional.TxType.REQUIRED);
+        assertThat(update.getAnnotation(Transactional.class).value()).isEqualTo(Transactional.TxType.REQUIRED);
+        assertThat(failure.getAnnotation(Transactional.class).value()).isEqualTo(Transactional.TxType.REQUIRES_NEW);
     }
 
     @Test

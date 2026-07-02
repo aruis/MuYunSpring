@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.util.List;
 import java.util.Map;
@@ -760,22 +759,19 @@ class LowCodeModuleHealthServiceTest {
     }
 
     @Test
-    void shouldWireHealthServiceWithPackageCheckerInSpringContext() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            context.register(LowCodeModuleHealthService.class,
-                    LowCodeModulePackageHealthChecker.class,
-                    LowCodeModuleBundleIdentityHealthChecker.class,
-                    LowCodeModuleDependencyHealthChecker.class,
-                    LowCodeMoneyHealthChecker.class,
-                    LowCodeMeasureUnitHealthChecker.class);
-            context.refresh();
-            LowCodeModuleHealthService service = context.getBean(LowCodeModuleHealthService.class);
+    void shouldComposeHealthServiceWithDefaultCheckers() {
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(List.of(
+                new LowCodeModulePackageHealthChecker(),
+                new LowCodeModuleBundleIdentityHealthChecker(),
+                new LowCodeModuleDependencyHealthChecker(),
+                new LowCodeMoneyHealthChecker(),
+                new LowCodeMeasureUnitHealthChecker()
+        ));
 
-            LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(
-                    fullPackageWithPageBundle("crm.contract")));
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(
+                fullPackageWithPageBundle("crm.contract")));
 
-            assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
-        }
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
     }
 
     @Test

@@ -16,8 +16,8 @@ import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.spring.boot.sql.MuYunRepositoryFactory;
-import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
+import net.ximatai.muyun.database.quarkus.MuYunRepository;
+import net.ximatai.muyun.database.quarkus.MuYunRepositoryFactory;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
@@ -29,7 +29,6 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.mock.env.MockEnvironment;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -222,7 +221,6 @@ class OrganizationRepositoryContractTest {
         EntityMetaResolver entityMetaResolver = PlatformEntityManagers.entityMetaResolver();
         return new MuYunRepositoryFactory(
                 operations,
-                new MockEnvironment(),
                 null,
                 PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver)
         ).create(daoType);
