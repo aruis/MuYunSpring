@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.exchange.importer;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Service
+@Dependent
 public class DynamicImportErrorFileService {
     private static final Duration EXPIRE_AFTER_WRITE = Duration.ofMinutes(30);
     private static final int MAX_SIZE = 256;
@@ -19,7 +19,7 @@ public class DynamicImportErrorFileService {
     private final Clock clock;
     private final Map<String, ErrorFilePayload> payloads = new ConcurrentHashMap<>();
 
-    @Autowired
+    @Inject
     public DynamicImportErrorFileService() {
         this(Clock.systemUTC());
     }

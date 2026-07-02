@@ -6,20 +6,19 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactOriginCoordinator;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class ReferenceRecordGenerationFacade {
     private final DynamicRecordService recordService;
     private final RecordGenerationRuleService ruleService;
 
-    public ReferenceRecordGenerationFacade(@Lazy DynamicRecordService recordService,
+    public ReferenceRecordGenerationFacade(DynamicRecordService recordService,
                                            RecordGenerationRuleService ruleService) {
         this.recordService = Objects.requireNonNull(recordService, "recordService must not be null");
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");

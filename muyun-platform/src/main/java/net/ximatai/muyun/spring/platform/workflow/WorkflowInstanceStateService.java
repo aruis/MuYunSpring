@@ -2,13 +2,13 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowInstanceStateService {
     public WorkflowInstance startInstance(WorkflowDefinition definition, WorkflowVersion version,
                                           String recordId, String startedBy, Instant startedAt,

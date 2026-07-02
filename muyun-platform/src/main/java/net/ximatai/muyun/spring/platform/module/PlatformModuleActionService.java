@@ -16,8 +16,8 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -26,7 +26,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PlatformModuleActionService extends AbstractAbilityService<PlatformModuleAction> implements
         SoftDeleteAbility<PlatformModuleAction>,
         EnableAbility<PlatformModuleAction>,
@@ -44,7 +44,7 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         this(actionDao, moduleService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
                                        PlatformModuleService moduleService,
                                        Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {

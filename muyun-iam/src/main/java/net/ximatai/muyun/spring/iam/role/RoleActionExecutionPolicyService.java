@@ -10,9 +10,9 @@ import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class RoleActionExecutionPolicyService implements ActionExecutionPolicyService {
     public static final String DECISION_ANONYMOUS_ALLOWED = "ANONYMOUS_ALLOWED";
     public static final String DECISION_SYSTEM_USER = "SYSTEM_USER";

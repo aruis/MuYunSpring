@@ -12,8 +12,8 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -23,7 +23,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
         SoftDeleteAbility<MetadataFieldReferenceConfig>,
         QueryAbility<MetadataFieldReferenceConfig> {
@@ -47,7 +47,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
                 Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,
                                                MetadataService metadataService,

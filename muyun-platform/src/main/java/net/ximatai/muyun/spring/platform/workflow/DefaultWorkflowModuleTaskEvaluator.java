@@ -3,11 +3,11 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class DefaultWorkflowModuleTaskEvaluator implements WorkflowModuleTaskEvaluator {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

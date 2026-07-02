@@ -16,9 +16,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,7 +29,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMetadataField> implements
         SoftDeleteAbility<ModuleMetadataField>,
         SortAbility<ModuleMetadataField>,
@@ -69,7 +69,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 referenceGenerateRuleValidator, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,

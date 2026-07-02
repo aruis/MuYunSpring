@@ -10,14 +10,14 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> implements
         SoftDeleteAbility<PlatformUiSet>,
         EnableAbility<PlatformUiSet>,

@@ -4,11 +4,11 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldReferenceGenerateRuleValidator;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 
-@Component
+@Dependent
 public class RecordGenerationReferenceGenerateRuleValidator implements ModuleMetadataFieldReferenceGenerateRuleValidator {
     private final BaseDao<RecordGenerationRule, String> ruleDao;
 

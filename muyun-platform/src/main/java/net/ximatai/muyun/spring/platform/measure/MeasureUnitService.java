@@ -15,7 +15,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,7 +25,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> implements
         SoftDeleteAbility<MeasureUnit>,
         EnableAbility<MeasureUnit>,

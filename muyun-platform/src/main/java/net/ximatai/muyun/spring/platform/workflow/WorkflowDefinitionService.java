@@ -7,12 +7,12 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDefinition> implements
         SoftDeleteAbility<WorkflowDefinition>,
         EnableAbility<WorkflowDefinition>,

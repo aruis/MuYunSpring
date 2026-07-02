@@ -7,15 +7,15 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleEntry> implements
         SoftDeleteAbility<CodeRecycleEntry>,
         QueryAbility<CodeRecycleEntry> {
@@ -28,7 +28,7 @@ public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleE
         this(recycleEntryDao, List.of());
     }
 
-    @Autowired
+    @Inject
     public CodeRecycleEntryService(BaseDao<CodeRecycleEntry, String> recycleEntryDao,
                                    List<CodeRecycleConsumer> recycleConsumers) {
         super(MODULE_ALIAS, CodeRecycleEntry.class, recycleEntryDao);

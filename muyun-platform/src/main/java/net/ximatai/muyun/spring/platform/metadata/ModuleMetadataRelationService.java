@@ -10,15 +10,15 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Optional;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class ModuleMetadataRelationService extends AbstractAbilityService<ModuleMetadataRelation> implements
         SoftDeleteAbility<ModuleMetadataRelation>,
         SortAbility<ModuleMetadataRelation>,
@@ -35,7 +35,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         this(relationDao, moduleService, metadataService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
                                          MetadataService metadataService,

@@ -1,14 +1,14 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class WorkflowRouteRuntimeService {
     public WorkflowRouteInstance effectiveRoute(WorkflowRouteInstance route, WorkflowRouteReason reason,
                                                 String operatorId, Instant selectedAt) {

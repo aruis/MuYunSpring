@@ -11,8 +11,8 @@ import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -20,7 +20,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataFieldProtectionConfigService extends AbstractAbilityService<MetadataFieldProtectionConfig> implements
         SoftDeleteAbility<MetadataFieldProtectionConfig>,
         QueryAbility<MetadataFieldProtectionConfig> {
@@ -44,7 +44,7 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
         this(configDao, fieldService, fieldTypeService, fieldConfigDao, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
                                                 PlatformFieldTypeService fieldTypeService,

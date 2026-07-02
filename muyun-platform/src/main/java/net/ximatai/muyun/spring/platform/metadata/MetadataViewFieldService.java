@@ -12,8 +12,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,7 +22,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataViewFieldService extends AbstractAbilityService<MetadataViewField> implements
         SoftDeleteAbility<MetadataViewField>,
         EnableAbility<MetadataViewField>,
@@ -56,7 +56,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                 Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,

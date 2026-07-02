@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
 
-@Component
+@Dependent
 public class LowCodeModulePackageHealthChecker implements LowCodeModuleHealthChecker {
     private final LowCodeModulePackageValidator validator;
 
@@ -14,7 +14,7 @@ public class LowCodeModulePackageHealthChecker implements LowCodeModuleHealthChe
         this.validator = validator == null ? new LowCodeModulePackageValidator() : validator;
     }
 
-    @Autowired
+    @Inject
     public LowCodeModulePackageHealthChecker() {
         this(null);
     }

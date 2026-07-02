@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowNodeInstanceStateService {
     public void applyActivation(List<WorkflowNodeInstance> nodes, WorkflowActivationResult activation, Instant operatedAt) {
         if (nodes == null || activation == null) {

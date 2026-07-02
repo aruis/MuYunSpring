@@ -9,10 +9,10 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
-@Service
+@Dependent
 public class PlatformPagePreferenceService extends AbstractAbilityService<PlatformPagePreference> {
     public static final String MODULE_ALIAS = "platform.page_preference";
     public static final String DEFAULT_PAGE_KEY = "default";

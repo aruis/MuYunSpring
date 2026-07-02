@@ -10,8 +10,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -20,7 +20,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataViewService extends AbstractAbilityService<MetadataView> implements
         SoftDeleteAbility<MetadataView>,
         EnableAbility<MetadataView>,
@@ -38,7 +38,7 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
         this(viewDao, relationService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public MetadataViewService(BaseDao<MetadataView, String> viewDao,
                                ModuleMetadataRelationService relationService,
                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {

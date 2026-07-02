@@ -1,10 +1,10 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowModuleSubmitService {
     private final WorkflowSubmitFacade submitFacade;
 

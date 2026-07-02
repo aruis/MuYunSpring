@@ -18,8 +18,8 @@ import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -28,9 +28,9 @@ import java.util.function.Supplier;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
-import org.springframework.beans.factory.ObjectProvider;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 
-@Service
+@Dependent
 public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implements
         SoftDeleteAbility<MenuScheme>,
         EnableAbility<MenuScheme>,
@@ -54,7 +54,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         this(schemeDao, organizationHierarchyService, SystemMenuSchemeAccessPolicy.DENY_ALL, null);
     }
 
-    @Autowired
+    @Inject
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
                              Optional<OrganizationHierarchyService> organizationHierarchyService,
                              Optional<SystemMenuSchemeAccessPolicy> systemMenuSchemeAccessPolicy,

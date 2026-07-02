@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+@Dependent
 public class LowCodeModuleDependencyHealthChecker implements LowCodeModuleHealthChecker {
     private final LowCodePackageDependencyDiagnostics dependencyDiagnostics;
 
@@ -14,7 +14,7 @@ public class LowCodeModuleDependencyHealthChecker implements LowCodeModuleHealth
         this(List.of());
     }
 
-    @Autowired
+    @Inject
     public LowCodeModuleDependencyHealthChecker(List<LowCodePackageDependencyResolver> dependencyResolvers) {
         this.dependencyDiagnostics = new LowCodePackageDependencyDiagnostics(dependencyResolvers);
     }

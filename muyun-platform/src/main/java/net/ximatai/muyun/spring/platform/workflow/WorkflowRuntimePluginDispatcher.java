@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Comparator;
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowRuntimePluginDispatcher {
     private final List<WorkflowRuntimePlugin> plugins;
 

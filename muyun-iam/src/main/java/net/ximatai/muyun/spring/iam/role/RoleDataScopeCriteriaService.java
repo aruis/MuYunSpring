@@ -25,8 +25,8 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +35,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-@Service
+@Dependent
 public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
     private final RoleService roleService;
@@ -57,7 +57,7 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         this(roleService, organizationService, Optional.empty(), referenceDependencyScopeResolver);
     }
 
-    @Autowired
+    @Inject
     public RoleDataScopeCriteriaService(RoleService roleService,
                                         Optional<OrganizationService> organizationService,
                                         Optional<DepartmentService> departmentService,

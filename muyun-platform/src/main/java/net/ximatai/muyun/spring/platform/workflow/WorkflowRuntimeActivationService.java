@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowRuntimeActivationService {
     public WorkflowActivationResult activate(WorkflowActivationRequest request) {
         if (request == null || request.graph() == null) {

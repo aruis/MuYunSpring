@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.platform.config;
 
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+@Dependent
 public class LowCodeModuleHealthService {
     private final List<LowCodeModuleHealthChecker> checkers;
 

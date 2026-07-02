@@ -20,9 +20,9 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -37,7 +37,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         SoftDeleteAbility<CodeRule>,
         EnableAbility<CodeRule>,
@@ -56,7 +56,7 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
     private final Optional<MetadataFieldService> fieldService;
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
 
-    @Autowired
+    @Inject
     public CodeRuleService(BaseDao<CodeRule, String> ruleDao,
                            CodeRuleSegmentService segmentService,
                            CodeSequencePolicyService sequencePolicyService,

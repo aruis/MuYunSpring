@@ -10,9 +10,9 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -20,7 +20,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
         SoftDeleteAbility<MetadataField>,
         EnableAbility<MetadataField>,
@@ -59,7 +59,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                 provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)));
     }
 
-    @Autowired
+    @Inject
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService,

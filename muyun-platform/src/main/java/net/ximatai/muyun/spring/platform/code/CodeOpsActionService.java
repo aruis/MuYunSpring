@@ -3,13 +3,12 @@ package net.ximatai.muyun.spring.platform.code;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodeOpsActionService {
     private final CodeRuleService ruleService;
     private final CodeSequenceStateService sequenceStateService;
@@ -23,7 +22,7 @@ public class CodeOpsActionService {
                                 CodeIssueLogService issueLogService,
                                 CodeRecycleEntryService recycleEntryService,
                                 CodeLedgerEntryService ledgerEntryService,
-                                @Lazy DynamicRecordService recordService) {
+                                DynamicRecordService recordService) {
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");
         this.sequenceStateService = Objects.requireNonNull(sequenceStateService, "sequenceStateService must not be null");
         this.issueLogService = Objects.requireNonNull(issueLogService, "issueLogService must not be null");

@@ -3,9 +3,9 @@ package net.ximatai.muyun.spring.platform.dictionary;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSource;
 import net.ximatai.muyun.spring.common.option.OptionSourceProvider;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public final class DictionaryOptionSourceProvider implements OptionSourceProvider {
     private final DictionaryItemService itemService;
 

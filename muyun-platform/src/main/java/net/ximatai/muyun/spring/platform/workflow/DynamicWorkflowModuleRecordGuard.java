@@ -9,11 +9,11 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Set;
 
-@Service
+@Dependent
 public class DynamicWorkflowModuleRecordGuard implements WorkflowModuleRecordGuard {
     public static final String SUBMIT_ACTION_CODE = "submit";
     private static final ActionExecutionPolicy SUBMIT_POLICY = new ActionExecutionPolicy(

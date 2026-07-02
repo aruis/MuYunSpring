@@ -2,9 +2,9 @@ package net.ximatai.muyun.spring.platform.audit;
 
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class RuntimeAuditEventListener implements RuntimeEventListener {
     private final RuntimeAuditRecordService auditRecordService;
 

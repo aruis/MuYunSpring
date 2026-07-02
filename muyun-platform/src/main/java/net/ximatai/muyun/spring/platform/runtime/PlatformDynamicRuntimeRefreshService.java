@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class PlatformDynamicRuntimeRefreshService {
     private final PlatformDynamicRuntimeRefresher refresher;
 

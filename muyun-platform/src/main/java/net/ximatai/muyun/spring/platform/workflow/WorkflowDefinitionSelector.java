@@ -5,11 +5,11 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowDefinitionSelector {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

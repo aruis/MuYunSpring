@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.config;
 
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Component
+@Dependent
 public class LowCodeModuleBundleIdentityHealthChecker implements LowCodeModuleHealthChecker {
     @Override
     public List<LowCodeConfigHealthItem> check(LowCodeModuleHealthContext context) {

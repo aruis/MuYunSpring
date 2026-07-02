@@ -8,11 +8,11 @@ import net.ximatai.muyun.spring.ability.SystemManagedAbility;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class TenantService extends AbstractAbilityService<Tenant> implements
         SystemManagedAbility<Tenant>,
         GlobalScopedAbility<Tenant>,
@@ -28,7 +28,7 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         this.creationProvisioners = null;
     }
 
-    @Autowired
+    @Inject
     public TenantService(TenantDao tenantDao, ObjectProvider<TenantCreationProvisioner> creationProvisioners) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
         this.creationProvisioners = creationProvisioners;

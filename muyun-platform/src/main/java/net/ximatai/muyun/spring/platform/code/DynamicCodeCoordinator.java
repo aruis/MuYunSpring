@@ -8,9 +8,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicMutationContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.time.Clock;
@@ -22,7 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-@Component
+@Dependent
 public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator {
     private static final PageRequest ONE = PageRequest.of(1, 1);
 
@@ -41,11 +40,11 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
-                                  @Lazy DynamicRecordService recordService) {
+                                  DynamicRecordService recordService) {
         this(ruleService, generateService, null, null, null, null, recordService, Clock.systemDefaultZone());
     }
 
-    @Autowired
+    @Inject
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
                                   CodePreviewService previewService,
@@ -53,7 +52,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                   CodeLedgerEntryService ledgerEntryService,
                                   CodeRecycleEntryService recycleEntryService,
                                   CodeBusinessTimeService timeService,
-                                  @Lazy DynamicRecordService recordService) {
+                                  DynamicRecordService recordService) {
         this(ruleService, generateService, previewService, sequenceStateService, ledgerEntryService, recycleEntryService,
                 recordService, timeService, Clock.systemDefaultZone());
     }

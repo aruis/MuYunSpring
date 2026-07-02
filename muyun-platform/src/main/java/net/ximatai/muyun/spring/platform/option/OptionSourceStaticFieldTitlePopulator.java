@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Component
+@Dependent
 public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldTitlePopulator {
     private final OptionSourceRegistry optionSourceRegistry;
 

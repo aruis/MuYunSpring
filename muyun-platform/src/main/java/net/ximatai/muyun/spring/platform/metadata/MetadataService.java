@@ -9,9 +9,9 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -19,7 +19,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MetadataService extends AbstractAbilityService<Metadata> implements
         SoftDeleteAbility<Metadata>,
         EnableAbility<Metadata>,
@@ -49,7 +49,7 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
                 runtimeRefreshCoordinator == null ? Optional.empty() : runtimeRefreshCoordinator);
     }
 
-    @Autowired
+    @Inject
     public MetadataService(BaseDao<Metadata, String> metadataDao,
                            ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {

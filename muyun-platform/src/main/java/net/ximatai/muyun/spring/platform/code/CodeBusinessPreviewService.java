@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodeBusinessPreviewService {
     private static final DateTimeFormatter EFFECTIVE_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -20,7 +20,7 @@ public class CodeBusinessPreviewService {
     private final CodePreviewService previewService;
     private final Clock clock;
 
-    @Autowired
+    @Inject
     public CodeBusinessPreviewService(CodeRuleService ruleService, CodePreviewService previewService) {
         this(ruleService, previewService, Clock.systemDefaultZone());
     }

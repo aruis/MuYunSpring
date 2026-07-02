@@ -4,13 +4,13 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class WorkflowDelegationCompletionNoticeService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

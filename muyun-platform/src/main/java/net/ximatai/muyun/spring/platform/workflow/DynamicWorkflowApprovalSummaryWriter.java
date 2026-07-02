@@ -5,9 +5,9 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class DynamicWorkflowApprovalSummaryWriter implements WorkflowApprovalSummaryWriter {
     private final DynamicRecordService dynamicRecordService;
 

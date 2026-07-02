@@ -10,7 +10,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowDelegationService extends AbstractAbilityService<WorkflowDelegation> {
     public static final String MODULE_ALIAS = "platform.workflow_delegation";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);

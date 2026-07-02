@@ -6,16 +6,17 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class EmployeeAccountService extends TenantStandardBusinessService<EmployeeAccount> implements
         EnableAbility<EmployeeAccount> {
     public static final String MODULE_ALIAS = "iam.employee_account";
@@ -25,7 +26,6 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
     private final EmployeeService employeeService;
     private final UserAccountService userAccountService;
 
-    @Autowired
     public EmployeeAccountService(EmployeeAccountDao employeeAccountDao,
                                   ActiveTenantVerifier activeTenantVerifier,
                                   EmployeeService employeeService,
@@ -33,6 +33,14 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         super(MODULE_ALIAS, EmployeeAccount.class, employeeAccountDao, activeTenantVerifier);
         this.employeeService = employeeService;
         this.userAccountService = userAccountService;
+    }
+
+    @Inject
+    public EmployeeAccountService(EmployeeAccountDao employeeAccountDao,
+                                  TenantService activeTenantVerifier,
+                                  EmployeeService employeeService,
+                                  UserAccountService userAccountService) {
+        this(employeeAccountDao, (ActiveTenantVerifier) activeTenantVerifier, employeeService, userAccountService);
     }
 
     @Override

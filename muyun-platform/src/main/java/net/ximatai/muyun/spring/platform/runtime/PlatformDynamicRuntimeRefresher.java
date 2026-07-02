@@ -4,9 +4,9 @@ import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class PlatformDynamicRuntimeRefresher {
     private final PlatformModuleDefinitionCompiler compiler;
     private final DynamicModuleRuntimeRefresher refresher;

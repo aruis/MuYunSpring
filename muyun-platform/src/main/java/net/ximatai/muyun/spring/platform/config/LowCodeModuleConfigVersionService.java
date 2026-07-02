@@ -8,12 +8,12 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Comparator;
 import java.util.List;
 
-@Service
+@Dependent
 public class LowCodeModuleConfigVersionService extends AbstractAbilityService<LowCodeModuleConfigVersion> implements
         SoftDeleteAbility<LowCodeModuleConfigVersion> {
     public static final String MODULE_ALIAS = "platform.low_code_config_version";

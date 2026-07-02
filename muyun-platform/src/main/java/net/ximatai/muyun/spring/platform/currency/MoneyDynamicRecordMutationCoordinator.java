@@ -7,10 +7,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -20,14 +19,14 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Objects;
 
-@Component
-@Order(Ordered.LOWEST_PRECEDENCE - 90)
+@Dependent
+@Priority(Integer.MAX_VALUE - 90)
 public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutationCoordinator {
     private final CurrencyConversionService conversionService;
     private final TenantCurrencySettingService tenantCurrencySettingService;
     private final Clock clock;
 
-    @Autowired
+    @Inject
     public MoneyDynamicRecordMutationCoordinator(CurrencyConversionService conversionService,
                                                  TenantCurrencySettingService tenantCurrencySettingService) {
         this(conversionService, tenantCurrencySettingService, Clock.systemDefaultZone());

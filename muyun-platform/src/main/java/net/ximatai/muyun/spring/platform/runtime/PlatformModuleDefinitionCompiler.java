@@ -50,8 +50,8 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.workflow.DynamicWorkflowActionExecutor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -62,7 +62,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class PlatformModuleDefinitionCompiler {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -127,7 +127,7 @@ public class PlatformModuleDefinitionCompiler {
                 viewService, viewFieldService, actionService, formulaRuleService, null, null, null, validator);
     }
 
-    @Autowired
+    @Inject
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
                                             MetadataService metadataService,
                                             MetadataFieldService fieldService,

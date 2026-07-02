@@ -2,11 +2,11 @@ package net.ximatai.muyun.spring.platform.writeback;
 
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationEvent;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class RecordWriteBackMutationCoordinator implements DynamicRecordMutationCoordinator {
     private final RecordWriteBackRuntimeService runtimeService;
 

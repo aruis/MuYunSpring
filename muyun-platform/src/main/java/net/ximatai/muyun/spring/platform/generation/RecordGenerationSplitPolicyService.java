@@ -7,9 +7,9 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class RecordGenerationSplitPolicyService extends AbstractAbilityService<RecordGenerationSplitPolicy> implements SoftDeleteAbility<RecordGenerationSplitPolicy> {
     public static final String MODULE_ALIAS = "platform.record_generation_split_policy";
 

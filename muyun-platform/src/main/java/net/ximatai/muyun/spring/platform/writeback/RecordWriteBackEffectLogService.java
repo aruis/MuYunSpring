@@ -7,11 +7,11 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class RecordWriteBackEffectLogService extends AbstractAbilityService<RecordWriteBackEffectLog> implements
         SoftDeleteAbility<RecordWriteBackEffectLog> {
     public static final String MODULE_ALIAS = "platform.record_write_back_effect_log";

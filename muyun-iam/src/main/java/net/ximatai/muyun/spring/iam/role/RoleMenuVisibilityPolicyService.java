@@ -3,11 +3,11 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Optional;
 
-@Service
+@Dependent
 public class RoleMenuVisibilityPolicyService implements MenuVisibilityPolicyService {
     private final RoleService roleService;
 

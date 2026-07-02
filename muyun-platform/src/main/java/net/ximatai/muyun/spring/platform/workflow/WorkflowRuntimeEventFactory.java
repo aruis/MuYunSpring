@@ -4,13 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@Service
+@Dependent
 public class WorkflowRuntimeEventFactory {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

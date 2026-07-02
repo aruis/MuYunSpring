@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowAdminFacade {
     private final WorkflowAdminService adminService;
 

@@ -10,10 +10,11 @@ import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class EmployeeDelegationService extends TenantStandardBusinessService<EmployeeDelegation> implements
         EnableAbility<EmployeeDelegation> {
     public static final String MODULE_ALIAS = "iam.employee_delegation";
@@ -33,7 +34,6 @@ public class EmployeeDelegationService extends TenantStandardBusinessService<Emp
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
 
-    @Autowired
     public EmployeeDelegationService(EmployeeDelegationDao employeeDelegationDao,
                                      ActiveTenantVerifier activeTenantVerifier,
                                      EmployeeService employeeService,
@@ -43,6 +43,16 @@ public class EmployeeDelegationService extends TenantStandardBusinessService<Emp
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+    }
+
+    @Inject
+    public EmployeeDelegationService(EmployeeDelegationDao employeeDelegationDao,
+                                     TenantService activeTenantVerifier,
+                                     EmployeeService employeeService,
+                                     EmployeePositionService employeePositionService,
+                                     EmployeeAccountService employeeAccountService) {
+        this(employeeDelegationDao, (ActiveTenantVerifier) activeTenantVerifier, employeeService,
+                employeePositionService, employeeAccountService);
     }
 
     @Override

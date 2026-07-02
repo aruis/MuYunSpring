@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowSubmitDraftService {
     private final WorkflowInstanceSnapshotFactory snapshotFactory;
     private final WorkflowRuntimeActivationService activationService;

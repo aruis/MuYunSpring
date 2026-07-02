@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSource;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -18,7 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-@Component
+@Dependent
 public class OptionSourceStaticFieldValueValidator implements StaticOptionFieldValueValidator {
     private final OptionSourceRegistry optionSourceRegistry;
 

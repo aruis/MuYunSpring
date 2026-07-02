@@ -7,8 +7,8 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class RecordAttachmentService extends AbstractAbilityService<RecordAttachment> implements
         SoftDeleteAbility<RecordAttachment> {
     public static final String MODULE_ALIAS = "platform.record_attachment";

@@ -10,13 +10,13 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-@Service
+@Dependent
 public class StaticWorkflowModuleRecordGuard implements WorkflowModuleRecordGuard {
     public static final String SUBMIT_ACTION_CODE = "submit";
     private static final ActionExecutionPolicy SUBMIT_POLICY = new ActionExecutionPolicy(

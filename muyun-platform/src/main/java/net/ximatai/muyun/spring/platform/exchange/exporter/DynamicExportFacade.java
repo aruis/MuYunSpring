@@ -5,17 +5,17 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookPlan;
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplatePlanBuilder;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class DynamicExportFacade {
     private final DynamicExportExecutor executor;
     private final ExcelWorkbookPlanWriter workbookWriter;
 
-    @Autowired
+    @Inject
     public DynamicExportFacade(DynamicRecordService recordService, OptionSourceRegistry optionSourceRegistry) {
         this(new DynamicExportExecutor(recordService, new DynamicExchangeTemplatePlanBuilder(optionSourceRegistry)),
                 new ExcelWorkbookPlanWriter());

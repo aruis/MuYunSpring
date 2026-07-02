@@ -7,9 +7,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowTaskActionService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -53,7 +53,7 @@ public class WorkflowTaskActionService {
                 null, null);
     }
 
-    @Autowired
+    @Inject
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
                                      WorkflowInstanceDao instanceDao,
                                      WorkflowNodeInstanceDao nodeInstanceDao,

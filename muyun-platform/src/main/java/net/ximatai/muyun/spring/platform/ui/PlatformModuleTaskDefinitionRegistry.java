@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.platform.ui;
 
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-@Service
+@Dependent
 public class PlatformModuleTaskDefinitionRegistry {
     private final CopyOnWriteArrayList<PlatformModuleTaskDefinition> definitions = new CopyOnWriteArrayList<>();
 

@@ -3,14 +3,14 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowPublishFacade {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -25,7 +25,7 @@ public class WorkflowPublishFacade {
         this(definitionService, versionService, actionContributor, null);
     }
 
-    @Autowired
+    @Inject
     public WorkflowPublishFacade(WorkflowDefinitionService definitionService,
                                  WorkflowVersionService versionService,
                                  WorkflowModuleActionContributor actionContributor,

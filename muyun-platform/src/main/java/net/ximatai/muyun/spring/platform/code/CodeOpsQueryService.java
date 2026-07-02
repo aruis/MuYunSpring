@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodeOpsQueryService {
     private static final int DEFAULT_LIMIT = 20;
 

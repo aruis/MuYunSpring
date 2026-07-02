@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.iam.organization;
 
-import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
+import net.ximatai.muyun.database.quarkus.MuYunRepository;
 import net.ximatai.muyun.spring.ability.BaseDao;
 
 @MuYunRepository

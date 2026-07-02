@@ -12,13 +12,13 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Dependent
 public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
     public static final String EXECUTOR_KEY = "platform.workflow";
 

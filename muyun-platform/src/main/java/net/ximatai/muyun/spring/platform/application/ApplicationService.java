@@ -19,8 +19,8 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Map;
@@ -29,7 +29,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class ApplicationService extends StandardBusinessService<Application> implements
         SoftDeleteAbility<Application>,
         EnableAbility<Application>,
@@ -49,7 +49,7 @@ public class ApplicationService extends StandardBusinessService<Application> imp
         this(applicationDao, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public ApplicationService(BaseDao<Application, String> applicationDao,
                               Optional<PlatformModuleService> moduleService,
                               Optional<MetadataService> metadataService,

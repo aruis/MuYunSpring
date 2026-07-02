@@ -11,14 +11,14 @@ import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContribution;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistrar;
 import net.ximatai.muyun.spring.platform.module.ModuleActionSourceType;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+@Dependent
 public class WorkflowModuleActionContributor {
     private final ModuleActionContributionRegistrar actionRegistrar;
 

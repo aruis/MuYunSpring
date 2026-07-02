@@ -1,16 +1,16 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Dependent
 public class WorkflowRuntimeSubmitService {
     private final WorkflowSubmitDraftService submitDraftService;
     private final WorkflowInstanceService instanceService;
@@ -32,7 +32,7 @@ public class WorkflowRuntimeSubmitService {
                 null);
     }
 
-    @Autowired
+    @Inject
     public WorkflowRuntimeSubmitService(WorkflowSubmitDraftService submitDraftService,
                                         WorkflowInstanceService instanceService,
                                         WorkflowInstanceDao instanceDao,

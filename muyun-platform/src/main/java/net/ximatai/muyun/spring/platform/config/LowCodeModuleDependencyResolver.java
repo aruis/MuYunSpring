@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public class LowCodeModuleDependencyResolver implements LowCodePackageDependencyResolver {
     private final PlatformModuleService moduleService;
 

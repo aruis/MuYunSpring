@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class CodeGenerateService {
     private static final int DEFAULT_DUPLICATE_RETRY = 5;
 
@@ -62,7 +62,7 @@ public class CodeGenerateService {
         this(ruleService, previewService, sequenceStateService, recycleEntryService, issueLogService, null, clock);
     }
 
-    @Autowired
+    @Inject
     public CodeGenerateService(CodeRuleService ruleService,
                                CodePreviewService previewService,
                                CodeSequenceStateService sequenceStateService,

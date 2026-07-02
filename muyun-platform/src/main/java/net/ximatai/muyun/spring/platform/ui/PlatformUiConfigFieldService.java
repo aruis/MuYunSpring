@@ -19,7 +19,7 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -27,7 +27,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PlatformUiConfigFieldService extends AbstractAbilityService<PlatformUiConfigField> implements
         SoftDeleteAbility<PlatformUiConfigField>,
         EnableAbility<PlatformUiConfigField>,

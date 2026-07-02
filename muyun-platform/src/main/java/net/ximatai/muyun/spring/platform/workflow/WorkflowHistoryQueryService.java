@@ -4,10 +4,10 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class WorkflowHistoryQueryService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -31,7 +31,7 @@ public class WorkflowHistoryQueryService {
         this(historyDao, archiveService, null, WorkflowUserTitleResolver.NONE);
     }
 
-    @Autowired
+    @Inject
     public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
                                        WorkflowArchiveService archiveService,
                                        WorkflowActionPolicyService actionPolicyService,

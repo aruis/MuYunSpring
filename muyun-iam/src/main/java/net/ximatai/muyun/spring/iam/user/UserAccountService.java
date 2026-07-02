@@ -16,21 +16,22 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-@Service
+@Dependent
 public class UserAccountService extends TenantActiveScopedService<UserAccount> implements
         SoftDeleteAbility<UserAccount>,
         EnableAbility<UserAccount>,
@@ -62,9 +63,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
+                              TenantService activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
@@ -86,7 +87,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 .orElseGet(AllowAllDataScopeCriteriaService::new);
     }
 
-    @Autowired
+    @Inject
     public void setInitialAdminSettings(Optional<PlatformInitialAdminSettings> settings) {
         this.initialAdminSettings = settings.orElseGet(PlatformInitialAdminSettings::defaults);
     }

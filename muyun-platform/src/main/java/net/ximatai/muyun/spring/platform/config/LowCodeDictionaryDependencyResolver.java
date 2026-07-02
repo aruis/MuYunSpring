@@ -2,9 +2,9 @@ package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public class LowCodeDictionaryDependencyResolver implements LowCodePackageDependencyResolver {
     private final DictionaryCategoryService categoryService;
 

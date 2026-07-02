@@ -20,9 +20,9 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class PlatformDynamicRuntimeRefreshCoordinator {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -47,7 +47,7 @@ public class PlatformDynamicRuntimeRefreshCoordinator {
         this(provider(refreshService), relationServiceProvider, moduleFieldServiceProvider, viewServiceProvider);
     }
 
-    @Autowired
+    @Inject
     public PlatformDynamicRuntimeRefreshCoordinator(
             ObjectProvider<PlatformDynamicRuntimeRefreshService> refreshServiceProvider,
             ObjectProvider<ModuleMetadataRelationService> relationServiceProvider,

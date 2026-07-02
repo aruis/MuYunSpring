@@ -2,9 +2,9 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class WorkflowTaskAssignmentPolicyService {
     public boolean canProcess(WorkflowTask task, String operatorId) {
         String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");

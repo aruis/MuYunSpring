@@ -10,9 +10,9 @@ import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 import net.ximatai.muyun.spring.platform.exchange.reader.ExcelWorkbookParser;
 import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class DynamicImportFacade {
     private final ExcelWorkbookParser parser;
     private final DynamicImportPlanBuilder planBuilder;
@@ -30,7 +30,7 @@ public class DynamicImportFacade {
     private final DynamicImportErrorWorkbookBuilder errorWorkbookBuilder;
     private final ExcelWorkbookPlanWriter workbookWriter;
 
-    @Autowired
+    @Inject
     public DynamicImportFacade(DynamicRecordService recordService) {
         this(new ExcelWorkbookParser(),
                 new DynamicImportPlanBuilder(),

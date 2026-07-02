@@ -2,9 +2,9 @@ package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.currency.ExchangeRateTypeService;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public class LowCodeExchangeRateTypeDependencyResolver implements LowCodePackageDependencyResolver {
     private final ExchangeRateTypeService rateTypeService;
 

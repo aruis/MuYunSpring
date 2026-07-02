@@ -11,8 +11,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -20,7 +20,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFieldType> implements
         SoftDeleteAbility<PlatformFieldType>,
         EnableAbility<PlatformFieldType>,
@@ -33,7 +33,7 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         this(fieldTypeDao, null);
     }
 
-    @Autowired
+    @Inject
     public PlatformFieldTypeService(BaseDao<PlatformFieldType, String> fieldTypeDao,
                                     BaseDao<PlatformFieldUiType, String> fieldUiTypeDao) {
         super(MODULE_ALIAS, PlatformFieldType.class, fieldTypeDao);

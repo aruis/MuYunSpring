@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.platform.module;
 import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class ModuleActionContributionRegistrar {
     private final PlatformModuleActionService actionService;
 

@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class WorkflowRuntimeTaskFactory {
     private final WorkflowRuntimeEventFactory eventFactory;
     private final WorkflowDelegationService delegationService;
@@ -21,7 +21,7 @@ public class WorkflowRuntimeTaskFactory {
         this(eventFactory, null);
     }
 
-    @Autowired
+    @Inject
     public WorkflowRuntimeTaskFactory(WorkflowRuntimeEventFactory eventFactory,
                                       WorkflowDelegationService delegationService) {
         this.eventFactory = eventFactory;

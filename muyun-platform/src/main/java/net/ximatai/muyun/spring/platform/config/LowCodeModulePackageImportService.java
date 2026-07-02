@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.UUID;
 
-@Service
+@Dependent
 public class LowCodeModulePackageImportService {
     private final LowCodeModulePackageExchangeService exchangeService;
     private final LowCodeModuleConfigVersionService versionService;

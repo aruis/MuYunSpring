@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import io.quarkus.scheduler.Scheduled;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public class WorkflowNodeOvertimeScheduler {
     private final WorkflowNodeOvertimeScanService scanService;
 
@@ -12,8 +12,8 @@ public class WorkflowNodeOvertimeScheduler {
     }
 
     @Scheduled(
-            fixedDelayString = "${muyun.workflow.overtime-scan-delay-ms:300000}",
-            initialDelayString = "${muyun.workflow.overtime-scan-initial-delay-ms:60000}"
+            every = "{muyun.workflow.overtime-scan-interval:300s}",
+            delayed = "{muyun.workflow.overtime-scan-initial-delay:60s}"
     )
     public void scanScheduled() {
         scanService.scan(null);

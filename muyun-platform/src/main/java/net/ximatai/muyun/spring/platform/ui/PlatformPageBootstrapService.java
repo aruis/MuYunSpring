@@ -17,8 +17,8 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappin
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class PlatformPageBootstrapService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -48,7 +48,7 @@ public class PlatformPageBootstrapService {
         this(menuService, snapshotService, moduleFieldService, null, null, null);
     }
 
-    @Autowired
+    @Inject
     public PlatformPageBootstrapService(MenuService menuService,
                                         PlatformPageConfigSnapshotService snapshotService,
                                         ModuleMetadataFieldService moduleFieldService,

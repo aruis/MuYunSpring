@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class WorkflowInstanceActionFacade {
     private final WorkflowInstanceActionService actionService;
 

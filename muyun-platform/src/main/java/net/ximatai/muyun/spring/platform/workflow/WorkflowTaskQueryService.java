@@ -4,12 +4,12 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowTaskQueryService {
     private final WorkflowTaskDao taskDao;
     private final WorkflowEventDao eventDao;
@@ -19,7 +19,7 @@ public class WorkflowTaskQueryService {
         this(taskDao, eventDao, new WorkflowTaskAssignmentPolicyService());
     }
 
-    @Autowired
+    @Inject
     public WorkflowTaskQueryService(WorkflowTaskDao taskDao, WorkflowEventDao eventDao,
                                     WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
         this.taskDao = taskDao;

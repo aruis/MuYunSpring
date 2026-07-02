@@ -7,13 +7,12 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class RecordWriteBackExecutionLogService extends AbstractAbilityService<RecordWriteBackExecutionLog> implements
         SoftDeleteAbility<RecordWriteBackExecutionLog> {
     public static final String MODULE_ALIAS = "platform.record_write_back_execution_log";
@@ -33,7 +32,7 @@ public class RecordWriteBackExecutionLogService extends AbstractAbilityService<R
         update(log);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public String saveFailureExecutionLog(RecordWriteBackExecutionLog log) {
         if (log.getId() != null && selectIncludingDeleted(log.getId()) != null) {
             update(log);

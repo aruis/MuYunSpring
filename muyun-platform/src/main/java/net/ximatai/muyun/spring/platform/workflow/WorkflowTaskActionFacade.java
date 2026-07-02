@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowTaskActionFacade {
     private final WorkflowTaskActionService actionService;
     private final WorkflowTaskActionAvailabilityService availabilityService;

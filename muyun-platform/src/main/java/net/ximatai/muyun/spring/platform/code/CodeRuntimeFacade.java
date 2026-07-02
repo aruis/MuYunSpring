@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodeRuntimeFacade {
     private final CodeGenerateService generateService;
     private final CodeRuleService ruleService;

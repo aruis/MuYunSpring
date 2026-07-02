@@ -16,11 +16,12 @@ import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -29,7 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
-@Service
+@Dependent
 public class DepartmentService extends TenantStandardBusinessService<Department> implements
         SoftDeleteAbility<Department>,
         EnableAbility<Department>,
@@ -51,9 +52,9 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
         this(departmentDao, activeTenantVerifier, organizationService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public DepartmentService(DepartmentDao departmentDao,
-                             ActiveTenantVerifier activeTenantVerifier,
+                             TenantService activeTenantVerifier,
                              OrganizationService organizationService,
                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, Department.class, departmentDao, activeTenantVerifier);

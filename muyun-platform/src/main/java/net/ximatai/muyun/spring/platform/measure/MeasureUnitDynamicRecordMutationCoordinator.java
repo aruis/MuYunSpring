@@ -8,24 +8,23 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Map;
 
-@Component
-@Order(Ordered.LOWEST_PRECEDENCE - 100)
+@Dependent
+@Priority(Integer.MAX_VALUE - 100)
 public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecordMutationCoordinator {
     private final MeasureUnitConversionService linearConversionService;
     private final MeasureUnitBusinessConversionService businessConversionService;
     private final Clock clock;
 
-    @Autowired
+    @Inject
     public MeasureUnitDynamicRecordMutationCoordinator(MeasureUnitConversionService linearConversionService,
                                                        MeasureUnitBusinessConversionService businessConversionService) {
         this(linearConversionService, businessConversionService, Clock.systemDefaultZone());

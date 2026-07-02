@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.platform.currency.CurrencyCodeRules;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Component
+@Dependent
 public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
     private static final Set<String> NUMERIC_TYPES = Set.of("DECIMAL", "NUMERIC", "NUMBER", "INTEGER", "INT",
             "LONG", "BIGINT");

@@ -7,8 +7,8 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -17,7 +17,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenceState> implements
         SoftDeleteAbility<CodeSequenceState>,
         QueryAbility<CodeSequenceState> {
@@ -29,7 +29,7 @@ public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenc
         this(stateDao, List.of());
     }
 
-    @Autowired
+    @Inject
     public CodeSequenceStateService(BaseDao<CodeSequenceState, String> stateDao,
                                     List<CodeSequenceAllocator> sequenceAllocators) {
         super(MODULE_ALIAS, CodeSequenceState.class, stateDao);

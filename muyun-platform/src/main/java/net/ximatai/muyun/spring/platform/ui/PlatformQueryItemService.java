@@ -22,9 +22,9 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -39,7 +39,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PlatformQueryItemService extends AbstractAbilityService<PlatformQueryItem> implements
         SoftDeleteAbility<PlatformQueryItem>,
         EnableAbility<PlatformQueryItem>,
@@ -61,7 +61,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, null, new PlatformTimeService());
     }
 
-    @Autowired
+    @Inject
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,

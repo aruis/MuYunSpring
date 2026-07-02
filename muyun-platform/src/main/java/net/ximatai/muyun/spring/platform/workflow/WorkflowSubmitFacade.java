@@ -2,15 +2,15 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-@Service
+@Dependent
 public class WorkflowSubmitFacade {
     private final WorkflowDefinitionSelector selector;
     private final WorkflowRuntimeSubmitService runtimeSubmitService;
@@ -23,7 +23,7 @@ public class WorkflowSubmitFacade {
         this(selector, runtimeSubmitService, approvalSummaryWriter, List.of());
     }
 
-    @Autowired
+    @Inject
     public WorkflowSubmitFacade(WorkflowDefinitionSelector selector,
                                 WorkflowRuntimeSubmitService runtimeSubmitService,
                                 Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter,

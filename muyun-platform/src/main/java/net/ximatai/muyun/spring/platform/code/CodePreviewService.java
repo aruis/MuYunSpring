@@ -3,8 +3,8 @@ package net.ximatai.muyun.spring.platform.code;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeData;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -16,12 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodePreviewService {
     private final FormulaEngine formulaEngine;
     private final Clock clock;
 
-    @Autowired
+    @Inject
     public CodePreviewService() {
         this(new FormulaEngine(), Clock.systemDefaultZone());
     }

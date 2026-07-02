@@ -7,8 +7,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -16,7 +16,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class ModuleMetadataFieldFilterService extends AbstractAbilityService<ModuleMetadataFieldFilter> implements
         SoftDeleteAbility<ModuleMetadataFieldFilter>,
         SortAbility<ModuleMetadataFieldFilter>,
@@ -31,7 +31,7 @@ public class ModuleMetadataFieldFilterService extends AbstractAbilityService<Mod
         this(filterDao, moduleFieldService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public ModuleMetadataFieldFilterService(BaseDao<ModuleMetadataFieldFilter, String> filterDao,
                                             ModuleMetadataFieldService moduleFieldService,
                                             Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {

@@ -12,16 +12,17 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-@Service
+@Dependent
 public class OrganizationService extends TenantActiveScopedService<Organization> implements
         SoftDeleteAbility<Organization>,
         EnableAbility<Organization>,
@@ -39,9 +40,9 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
         this(organizationDao, activeTenantVerifier, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public OrganizationService(OrganizationDao organizationDao,
-                               ActiveTenantVerifier activeTenantVerifier,
+                               TenantService activeTenantVerifier,
                                ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, Organization.class, organizationDao, activeTenantVerifier);
         this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);

@@ -5,13 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+@Dependent
 public class LowCodeModulePackageExchangeService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule());
@@ -25,7 +25,7 @@ public class LowCodeModulePackageExchangeService {
         this(versionService, healthService, List.of());
     }
 
-    @Autowired
+    @Inject
     public LowCodeModulePackageExchangeService(LowCodeModuleConfigVersionService versionService,
                                                LowCodeModuleHealthService healthService,
                                                List<LowCodePackageDependencyResolver> dependencyResolvers) {

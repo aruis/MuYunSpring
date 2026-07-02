@@ -2,12 +2,12 @@ package net.ximatai.muyun.spring.platform.measure;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 
-@Service
+@Dependent
 public class MeasureUnitConversionService {
     private final MeasureUnitCategoryService categoryService;
     private final MeasureUnitService unitService;

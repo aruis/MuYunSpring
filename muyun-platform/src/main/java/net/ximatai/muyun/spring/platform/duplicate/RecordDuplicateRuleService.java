@@ -8,12 +8,12 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 
-@Service
+@Dependent
 public class RecordDuplicateRuleService extends AbstractAbilityService<RecordDuplicateRule> implements
         SoftDeleteAbility<RecordDuplicateRule>,
         EnableAbility<RecordDuplicateRule> {

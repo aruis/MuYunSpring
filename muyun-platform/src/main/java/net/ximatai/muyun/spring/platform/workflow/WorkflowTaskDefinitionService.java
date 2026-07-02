@@ -7,9 +7,9 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class WorkflowTaskDefinitionService extends AbstractAbilityService<WorkflowTaskDefinition> implements
         SoftDeleteAbility<WorkflowTaskDefinition>,
         EnableAbility<WorkflowTaskDefinition>,

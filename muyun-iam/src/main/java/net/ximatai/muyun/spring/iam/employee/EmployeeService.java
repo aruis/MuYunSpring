@@ -18,20 +18,21 @@ import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-@Service
+@Dependent
 public class EmployeeService extends TenantStandardBusinessService<Employee> implements
         SoftDeleteAbility<Employee>,
         EnableAbility<Employee>,
@@ -55,9 +56,9 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         this(employeeDao, activeTenantVerifier, organizationService, departmentService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public EmployeeService(EmployeeDao employeeDao,
-                           ActiveTenantVerifier activeTenantVerifier,
+                           TenantService activeTenantVerifier,
                            OrganizationService organizationService,
                            DepartmentService departmentService,
                            ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {

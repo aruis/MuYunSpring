@@ -10,18 +10,19 @@ import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class EmployeePositionService extends TenantStandardBusinessService<EmployeePosition> implements
         SoftDeleteAbility<EmployeePosition>,
         EnableAbility<EmployeePosition>,
@@ -33,7 +34,6 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
     private final DepartmentService departmentService;
     private final PositionService positionService;
 
-    @Autowired
     public EmployeePositionService(EmployeePositionDao employeePositionDao,
                                    ActiveTenantVerifier activeTenantVerifier,
                                    EmployeeService employeeService,
@@ -45,6 +45,17 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         this.organizationService = organizationService;
         this.departmentService = departmentService;
         this.positionService = positionService;
+    }
+
+    @Inject
+    public EmployeePositionService(EmployeePositionDao employeePositionDao,
+                                   TenantService activeTenantVerifier,
+                                   EmployeeService employeeService,
+                                   OrganizationService organizationService,
+                                   DepartmentService departmentService,
+                                   PositionService positionService) {
+        this(employeePositionDao, (ActiveTenantVerifier) activeTenantVerifier, employeeService,
+                organizationService, departmentService, positionService);
     }
 
     @Override

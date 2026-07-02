@@ -9,14 +9,16 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class PositionService extends TenantStandardBusinessService<Position> implements
         SoftDeleteAbility<Position>,
         EnableAbility<Position>,
@@ -35,6 +37,14 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
         super(MODULE_ALIAS, Position.class, positionDao, activeTenantVerifier);
         this.positionCategoryService = positionCategoryService;
         this.employeePositionDao = employeePositionDao;
+    }
+
+    @Inject
+    public PositionService(PositionDao positionDao,
+                           TenantService activeTenantVerifier,
+                           PositionCategoryService positionCategoryService,
+                           EmployeePositionDao employeePositionDao) {
+        this(positionDao, (ActiveTenantVerifier) activeTenantVerifier, positionCategoryService, employeePositionDao);
     }
 
     @Override

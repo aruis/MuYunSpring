@@ -25,9 +25,9 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.LinkedHashSet;
@@ -38,7 +38,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class MenuService extends AbstractAbilityService<Menu> implements
         SoftDeleteAbility<Menu>,
         EnableAbility<Menu>,
@@ -71,7 +71,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 (PlatformUiConfigService) null, null, null);
     }
 
-    @Autowired
+    @Inject
     public MenuService(BaseDao<Menu, String> menuDao,
                        MenuSchemeService schemeService,
                        PlatformModuleService moduleService,

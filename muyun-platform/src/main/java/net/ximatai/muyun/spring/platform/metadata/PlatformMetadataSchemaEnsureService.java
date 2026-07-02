@@ -3,11 +3,11 @@ package net.ximatai.muyun.spring.platform.metadata;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 
-@Service
+@Dependent
 public class PlatformMetadataSchemaEnsureService {
     private final PlatformMetadataEntityDefinitionCompiler compiler;
     private final DynamicSchemaService schemaService;

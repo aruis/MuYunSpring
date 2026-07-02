@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.code;
 
-import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
@@ -13,7 +13,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class CodeBusinessTimeService {
     private final PlatformTimeService platformTimeService;
     private final List<BusinessTimeZoneResolver> organizationTimeZoneResolvers;
@@ -34,7 +34,7 @@ public class CodeBusinessTimeService {
         this(platformTimeService, List.of());
     }
 
-    @Autowired
+    @Inject
     public CodeBusinessTimeService(PlatformTimeService platformTimeService,
                                    List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
         this.platformTimeService = platformTimeService == null ? new PlatformTimeService() : platformTimeService;

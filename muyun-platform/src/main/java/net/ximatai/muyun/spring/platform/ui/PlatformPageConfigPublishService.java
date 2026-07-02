@@ -8,12 +8,12 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class PlatformPageConfigPublishService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final java.util.Set<String> SUMMARY_AGGREGATES = java.util.Set.of(
@@ -34,7 +34,7 @@ public class PlatformPageConfigPublishService {
         this(uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService, null);
     }
 
-    @Autowired
+    @Inject
     public PlatformPageConfigPublishService(PlatformUiSetService uiSetService,
                                             PlatformUiConfigService uiConfigService,
                                             PlatformUiConfigFieldService uiConfigFieldService,

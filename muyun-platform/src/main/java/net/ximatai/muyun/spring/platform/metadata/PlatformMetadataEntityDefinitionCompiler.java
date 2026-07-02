@@ -8,13 +8,13 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class PlatformMetadataEntityDefinitionCompiler {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

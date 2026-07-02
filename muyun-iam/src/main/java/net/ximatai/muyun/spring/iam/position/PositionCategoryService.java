@@ -10,10 +10,12 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
 
-@Service
+@Dependent
 public class PositionCategoryService extends TenantStandardBusinessService<PositionCategory> implements
         SoftDeleteAbility<PositionCategory>,
         EnableAbility<PositionCategory>,
@@ -29,6 +31,13 @@ public class PositionCategoryService extends TenantStandardBusinessService<Posit
         super(MODULE_ALIAS, PositionCategory.class, positionCategoryDao, activeTenantVerifier);
         this.positionCategoryDao = positionCategoryDao;
         this.positionDao = positionDao;
+    }
+
+    @Inject
+    public PositionCategoryService(PositionCategoryDao positionCategoryDao,
+                                   TenantService activeTenantVerifier,
+                                   PositionDao positionDao) {
+        this(positionCategoryDao, (ActiveTenantVerifier) activeTenantVerifier, positionDao);
     }
 
     @Override

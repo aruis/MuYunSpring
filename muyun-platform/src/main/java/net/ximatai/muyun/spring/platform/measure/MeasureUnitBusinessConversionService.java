@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.platform.measure;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class MeasureUnitBusinessConversionService {
     private final MeasureUnitService unitService;
     private final MeasureUnitConversionRuleService ruleService;

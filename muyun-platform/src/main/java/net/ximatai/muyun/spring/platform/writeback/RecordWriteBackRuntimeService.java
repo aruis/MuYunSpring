@@ -9,8 +9,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationEvent;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicWriteBackContext;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-@Service
+@Dependent
 public class RecordWriteBackRuntimeService {
     private final List<RecordWriteBackEventListener> listeners;
     private final Optional<RecordWriteBackRuleService> ruleService;
@@ -48,7 +48,7 @@ public class RecordWriteBackRuntimeService {
         this(listeners, ruleService, executionLogService, effectLogService, Optional.empty(), dynamicRecordService);
     }
 
-    @Autowired
+    @Inject
     public RecordWriteBackRuntimeService(List<RecordWriteBackEventListener> listeners,
                                          Optional<RecordWriteBackRuleService> ruleService,
                                          Optional<RecordWriteBackExecutionLogService> executionLogService,

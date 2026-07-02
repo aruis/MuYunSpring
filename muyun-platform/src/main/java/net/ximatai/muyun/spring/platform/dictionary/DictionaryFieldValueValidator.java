@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-@Component
+@Dependent
 public class DictionaryFieldValueValidator implements DynamicFieldValueValidator {
     private final DictionaryItemService itemService;
 

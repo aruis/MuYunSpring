@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Component
+@Dependent
 public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthChecker {
     private static final Set<String> NUMERIC_TYPES = Set.of("DECIMAL", "NUMERIC", "NUMBER", "INTEGER", "INT",
             "LONG", "BIGINT");

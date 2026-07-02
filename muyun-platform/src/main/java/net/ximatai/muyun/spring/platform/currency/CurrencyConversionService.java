@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.platform.currency;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 
-@Service
+@Dependent
 public class CurrencyConversionService {
     private final CurrencyService currencyService;
     private final ExchangeRateService exchangeRateService;

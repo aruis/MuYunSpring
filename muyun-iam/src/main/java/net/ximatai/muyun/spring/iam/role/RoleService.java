@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.Employee;
@@ -32,8 +33,8 @@ import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-@Service
+@Dependent
 public class RoleService extends TenantActiveScopedService<Role> implements
         SoftDeleteAbility<Role>,
         EnableAbility<Role>,
@@ -76,7 +77,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null);
     }
 
-    @Autowired
     public RoleService(RoleDao roleDao,
                        AccountRoleGrantDao accountRoleGrantDao,
                        EmploymentRoleGrantDao employmentRoleGrantDao,
@@ -97,6 +97,22 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+    }
+
+    @Inject
+    public RoleService(RoleDao roleDao,
+                       AccountRoleGrantDao accountRoleGrantDao,
+                       EmploymentRoleGrantDao employmentRoleGrantDao,
+                       RoleActionDao roleActionDao,
+                       TenantService activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService,
+                       EmployeeAccountService employeeAccountService) {
+        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao,
+                (ActiveTenantVerifier) activeTenantVerifier, grantVerifier, userAccountService,
+                employeeService, employeePositionService, employeeAccountService);
     }
 
     @Override

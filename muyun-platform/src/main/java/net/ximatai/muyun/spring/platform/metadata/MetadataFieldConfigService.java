@@ -14,13 +14,13 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Objects;
 import java.util.Optional;
 
-@Service
+@Dependent
 public class MetadataFieldConfigService extends AbstractAbilityService<MetadataFieldConfig> implements
         SoftDeleteAbility<MetadataFieldConfig> {
     public static final String MODULE_ALIAS = "platform.metadata_field_config";
@@ -54,7 +54,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                 protectionConfigService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
                                       MetadataService metadataService,

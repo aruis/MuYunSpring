@@ -8,14 +8,14 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class PlatformUiConfigScaffoldService {
     private final PlatformUiSetService uiSetService;
     private final PlatformUiConfigService uiConfigService;

@@ -6,9 +6,9 @@ import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@Service
+@Dependent
 public class WorkflowInstanceActionService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -56,7 +56,7 @@ public class WorkflowInstanceActionService {
                 approvalSummaryWriter, null);
     }
 
-    @Autowired
+    @Inject
     public WorkflowInstanceActionService(WorkflowInstanceDao instanceDao,
                                          WorkflowNodeInstanceDao nodeDao,
                                          WorkflowRouteInstanceDao routeDao,

@@ -3,9 +3,9 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashSet;
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowTaskActionAvailabilityService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -31,7 +31,7 @@ public class WorkflowTaskActionAvailabilityService {
                 WorkflowUserTitleResolver.NONE);
     }
 
-    @Autowired
+    @Inject
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao,

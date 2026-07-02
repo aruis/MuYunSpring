@@ -12,7 +12,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-@Service
+@Dependent
 public class RecordGenerationActionExecutor implements DynamicActionExecutor {
     public static final String EXECUTOR_KEY = "platform.record_generation";
 

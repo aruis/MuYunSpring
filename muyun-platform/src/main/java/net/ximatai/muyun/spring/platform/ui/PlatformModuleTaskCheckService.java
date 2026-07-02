@@ -8,8 +8,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelation;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -19,7 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-@Service
+@Dependent
 public class PlatformModuleTaskCheckService {
     private static final PageRequest FIRST_ROW = new PageRequest(1, 1);
     private static final int GENERATED_RELATION_PAGE_SIZE = 500;
@@ -30,7 +30,7 @@ public class PlatformModuleTaskCheckService {
     private final Optional<RecordImpactRelationService> impactRelationService;
     private final PlatformModuleTaskDefinitionRegistry taskDefinitionRegistry;
 
-    @Autowired
+    @Inject
     public PlatformModuleTaskCheckService(PlatformPageConfigSnapshotService snapshotService,
                                           PlatformQueryItemService queryItemService,
                                           DynamicRecordService recordService,

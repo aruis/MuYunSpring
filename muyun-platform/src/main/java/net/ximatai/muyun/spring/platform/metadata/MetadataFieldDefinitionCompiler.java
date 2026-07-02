@@ -7,10 +7,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class MetadataFieldDefinitionCompiler {
     private final PlatformFieldTypeService fieldTypeService;
     private final MetadataFieldConfigService configService;
@@ -28,7 +28,7 @@ public class MetadataFieldDefinitionCompiler {
         this(fieldTypeService, configService, protectionConfigService, null);
     }
 
-    @Autowired
+    @Inject
     public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
                                            MetadataFieldConfigService configService,
                                            MetadataFieldProtectionConfigService protectionConfigService,

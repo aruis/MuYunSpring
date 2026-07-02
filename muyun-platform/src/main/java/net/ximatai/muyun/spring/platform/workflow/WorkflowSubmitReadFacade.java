@@ -4,12 +4,12 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowSubmitReadFacade {
     private static final PageRequest ONE = new PageRequest(0, 1);
 
@@ -24,7 +24,7 @@ public class WorkflowSubmitReadFacade {
         this(instanceDao, selector, submitFacade, List.of());
     }
 
-    @Autowired
+    @Inject
     public WorkflowSubmitReadFacade(WorkflowInstanceDao instanceDao,
                                     WorkflowDefinitionSelector selector,
                                     WorkflowSubmitFacade submitFacade,

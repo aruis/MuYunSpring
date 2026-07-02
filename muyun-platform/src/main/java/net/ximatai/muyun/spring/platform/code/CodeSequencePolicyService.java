@@ -5,9 +5,9 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class CodeSequencePolicyService extends AbstractAbilityService<CodeSequencePolicy> implements
         SoftDeleteAbility<CodeSequencePolicy> {
     public static final String MODULE_ALIAS = "platform.code_sequence_policy";

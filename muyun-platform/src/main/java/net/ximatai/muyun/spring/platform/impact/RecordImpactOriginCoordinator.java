@@ -5,13 +5,13 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicMutationContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class RecordImpactOriginCoordinator implements DynamicRecordMutationCoordinator {
     public static final String ORIGIN_CONTEXT_KEY = "originContext";
 

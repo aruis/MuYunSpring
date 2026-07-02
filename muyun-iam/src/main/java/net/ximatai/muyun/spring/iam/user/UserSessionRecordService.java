@@ -4,12 +4,12 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.List;
 
-@Service
+@Dependent
 public class UserSessionRecordService extends AbstractAbilityService<UserSession> {
     public static final String MODULE_ALIAS = "iam.user_session";
     private static final PageRequest FIRST = new PageRequest(0, 1);

@@ -12,9 +12,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -26,7 +26,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class RecordGenerationRuleService extends AbstractAbilityService<RecordGenerationRule> implements
         SoftDeleteAbility<RecordGenerationRule>,
         EnableAbility<RecordGenerationRule>,
@@ -42,7 +42,7 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
     private final Optional<GenerationModuleActionContributor> actionContributor;
     private final Optional<ModuleMetadataFieldService> moduleFieldService;
 
-    @Autowired
+    @Inject
     public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
                                        RecordGenerationObjectMappingService objectMappingService,
                                        RecordGenerationFieldMappingService fieldMappingService,

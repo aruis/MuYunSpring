@@ -9,14 +9,14 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Set;
 
-@Service
+@Dependent
 public class WorkflowActionPolicyService {
     public static final String MANAGEMENT_MODULE_ALIAS = "platform.workflow_admin";
     public static final String MANAGEMENT_QUERY_ACTION = "workflowAdminQuery";
@@ -53,7 +53,7 @@ public class WorkflowActionPolicyService {
         this(executionPolicyService, List.of(), new WorkflowTaskAssignmentPolicyService());
     }
 
-    @Autowired
+    @Inject
     public WorkflowActionPolicyService(ObjectProvider<ActionExecutionPolicyService> executionPolicyService,
                                        ObjectProvider<WorkflowModuleRecordGuard> recordGuards,
                                        ObjectProvider<WorkflowTaskAssignmentPolicyService> assignmentPolicyService) {

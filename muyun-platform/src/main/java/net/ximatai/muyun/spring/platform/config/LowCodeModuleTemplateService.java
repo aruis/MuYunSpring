@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.config;
 
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Dependent
 public class LowCodeModuleTemplateService {
     private final LowCodeModulePackageExchangeService exchangeService;
 

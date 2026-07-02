@@ -14,7 +14,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -22,7 +22,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class DynamicLocalEditActionExecutor implements DynamicActionExecutor {
     public static final String EXECUTOR_KEY = "muyun.localEdit";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

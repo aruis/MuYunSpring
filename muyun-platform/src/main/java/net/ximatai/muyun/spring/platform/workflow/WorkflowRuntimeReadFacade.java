@@ -8,9 +8,9 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
+@Dependent
 public class WorkflowRuntimeReadFacade {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -58,7 +58,7 @@ public class WorkflowRuntimeReadFacade {
                 WorkflowUserTitleResolver.NONE);
     }
 
-    @Autowired
+    @Inject
     public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
                                      WorkflowTaskDao taskDao,
                                      WorkflowNodeInstanceDao nodeDao,

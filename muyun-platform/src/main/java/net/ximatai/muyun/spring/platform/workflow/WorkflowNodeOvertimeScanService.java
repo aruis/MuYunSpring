@@ -7,15 +7,15 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Dependent
 public class WorkflowNodeOvertimeScanService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
     private static final String SYSTEM_OPERATOR = ActionAuthorizationResult.OPERATOR_SYSTEM;

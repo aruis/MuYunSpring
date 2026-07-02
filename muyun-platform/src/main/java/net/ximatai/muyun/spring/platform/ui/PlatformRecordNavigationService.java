@@ -6,14 +6,14 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class PlatformRecordNavigationService extends AbstractAbilityService<PlatformRecordNavigationSession> {
     public static final String MODULE_ALIAS = "platform.record_navigation_session";
 

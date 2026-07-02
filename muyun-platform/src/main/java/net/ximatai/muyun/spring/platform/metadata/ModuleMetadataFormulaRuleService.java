@@ -16,8 +16,8 @@ import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
@@ -26,7 +26,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
-@Service
+@Dependent
 public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<ModuleMetadataFormulaRule> implements
         SoftDeleteAbility<ModuleMetadataFormulaRule>,
         EnableAbility<ModuleMetadataFormulaRule>,
@@ -47,7 +47,7 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
         this(formulaRuleDao, relationService, fieldService, Optional.empty());
     }
 
-    @Autowired
+    @Inject
     public ModuleMetadataFormulaRuleService(BaseDao<ModuleMetadataFormulaRule, String> formulaRuleDao,
                                             ModuleMetadataRelationService relationService,
                                             MetadataFieldService fieldService,

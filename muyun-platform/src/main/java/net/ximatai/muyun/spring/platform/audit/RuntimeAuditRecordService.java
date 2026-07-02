@@ -17,21 +17,20 @@ import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAuditRecord> {
     public static final String MODULE_ALIAS = "platform.runtime_audit_record";
     private final RuntimeAuditPayloadSanitizer payloadSanitizer;
 
-    @Autowired
+    @Inject
     public RuntimeAuditRecordService(BaseDao<RuntimeAuditRecord, String> auditRecordDao) {
         this(auditRecordDao, new RuntimeAuditPayloadSanitizer());
     }
@@ -42,7 +41,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         this.payloadSanitizer = payloadSanitizer == null ? new RuntimeAuditPayloadSanitizer() : payloadSanitizer;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public String record(RuntimeEvent event) {
         Objects.requireNonNull(event, "event must not be null");
         RuntimeAuditRecord record = new RuntimeAuditRecord();

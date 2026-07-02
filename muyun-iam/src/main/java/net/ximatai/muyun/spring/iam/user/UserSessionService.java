@@ -4,9 +4,10 @@ import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,7 +22,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 
-@Service
+@Dependent
 public class UserSessionService {
     private static final int TOKEN_BYTES = 32;
     private static final Duration SESSION_IDLE_TIMEOUT = Duration.ofHours(12);
@@ -34,10 +35,10 @@ public class UserSessionService {
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    @Autowired
+    @Inject
     public UserSessionService(UserAccountService userAccountService,
                               UserSessionRecordService userSessionRecordService,
-                              ActiveTenantVerifier activeTenantVerifier) {
+                              TenantService activeTenantVerifier) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier, Clock.systemUTC());
     }
 

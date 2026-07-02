@@ -6,9 +6,9 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
-@Service
+@Dependent
 public class WorkflowInstanceService extends AbstractAbilityService<WorkflowInstance> implements
         SoftDeleteAbility<WorkflowInstance> {
     public static final String MODULE_ALIAS = "platform.workflow.instance";

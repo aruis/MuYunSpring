@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.Dependent;
 
-@Component
+@Dependent
 public class LowCodeActionDependencyResolver implements LowCodePackageDependencyResolver {
     private final PlatformModuleActionService actionService;
 

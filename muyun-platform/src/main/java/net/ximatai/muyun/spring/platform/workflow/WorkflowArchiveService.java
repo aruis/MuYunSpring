@@ -8,14 +8,14 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.Dependent;
+import jakarta.transaction.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowArchiveService {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -27,7 +27,7 @@ public class WorkflowArchiveService {
     private final WorkflowHistoryInstanceDao historyDao;
     private final ObjectMapper objectMapper;
 
-    @Autowired
+    @Inject
     public WorkflowArchiveService(WorkflowInstanceDao instanceDao,
                                   WorkflowNodeInstanceDao nodeDao,
                                   WorkflowRouteInstanceDao routeDao,

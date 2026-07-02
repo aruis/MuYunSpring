@@ -9,12 +9,12 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.util.List;
 import java.util.Objects;
 
-@Service
+@Dependent
 public class RecordGenerationSplitGroupFieldService extends AbstractAbilityService<RecordGenerationSplitGroupField> implements
         SoftDeleteAbility<RecordGenerationSplitGroupField>,
         SortAbility<RecordGenerationSplitGroupField> {

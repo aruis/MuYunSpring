@@ -2,13 +2,13 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.Dependent;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+@Dependent
 public class WorkflowInstanceSnapshotFactory {
     private final WorkflowInstanceStateService instanceStateService;
     private final WorkflowRuntimeEventFactory eventFactory;
