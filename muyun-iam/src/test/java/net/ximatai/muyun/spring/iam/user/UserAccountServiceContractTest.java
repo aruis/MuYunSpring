@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -80,7 +81,8 @@ class UserAccountServiceContractTest {
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
         when(dataScope.resolveReadScope(eq(UserAccountService.MODULE_ALIAS),
                 any(ActionExecutionPolicy.class), any(Criteria.class),
-                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any()))
+                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
+                any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService, Optional.of(dataScope));
@@ -109,7 +111,8 @@ class UserAccountServiceContractTest {
                 eq(UserAccountService.MODULE_ALIAS),
                 eq(policy),
                 any(Criteria.class),
-                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any()
+                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
+                any(DataScopeFieldMapping.class)
         );
     }
 
@@ -123,7 +126,8 @@ class UserAccountServiceContractTest {
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
         when(dataScope.resolveReadScope(eq(UserAccountService.MODULE_ALIAS),
                 any(ActionExecutionPolicy.class), any(Criteria.class),
-                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any()))
+                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
+                any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService, Optional.of(dataScope));
@@ -137,7 +141,8 @@ class UserAccountServiceContractTest {
                 org.mockito.ArgumentMatchers.<ActionExecutionPolicy>argThat(policy ->
                         "changePassword".equals(policy.actionCode()) && policy.requiresDataScope()),
                 any(Criteria.class),
-                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any()
+                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
+                any(DataScopeFieldMapping.class)
         );
     }
 
@@ -148,7 +153,8 @@ class UserAccountServiceContractTest {
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
         when(dataScope.resolveReadScope(eq(UserAccountService.MODULE_ALIAS),
                 any(ActionExecutionPolicy.class), any(Criteria.class),
-                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any()))
+                org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
+                any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService, Optional.of(dataScope));

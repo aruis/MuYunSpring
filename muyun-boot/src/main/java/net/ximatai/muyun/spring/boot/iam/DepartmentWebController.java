@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
+import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -86,7 +87,8 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
     public WebListResponse<?> tree(@RequestParam String organizationId,
                                    @RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
-            List<Department> roots = service().rootDepartments(organizationId);
+            List<Department> roots = service().departmentChildrenForAction(
+                    PlatformAction.TREE, organizationId, TreeAbility.ROOT_ID);
             if (flat) {
                 List<Department> rows = new ArrayList<>();
                 for (Department root : roots) {
@@ -105,7 +107,7 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
                                    @RequestParam(defaultValue = "false") boolean flat,
                                    @RequestParam(defaultValue = "true") boolean includeSelf) {
         return webScope(() -> {
-            Department root = service().select(id);
+            Department root = service().selectForAction(PlatformAction.TREE, id);
             if (root == null) {
                 return new WebListResponse<>(List.of());
             }
@@ -113,7 +115,8 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
                 if (includeSelf) {
                     return new WebListResponse<>(List.of(treeNode(root.getOrganizationId(), root)));
                 }
-                return new WebListResponse<>(service().departmentChildren(root.getOrganizationId(), root.getId()).stream()
+                return new WebListResponse<>(service().departmentChildrenForAction(
+                                PlatformAction.TREE, root.getOrganizationId(), root.getId()).stream()
                         .map(child -> treeNode(root.getOrganizationId(), child))
                         .toList());
             }
@@ -127,7 +130,7 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
     }
 
     private void appendDescendants(String organizationId, String parentId, List<Department> rows) {
-        for (Department child : service().departmentChildren(organizationId, parentId)) {
+        for (Department child : service().departmentChildrenForAction(PlatformAction.TREE, organizationId, parentId)) {
             rows.add(child);
             appendDescendants(organizationId, child.getId(), rows);
         }
@@ -135,7 +138,7 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
 
     private WebTreeNode<Department> treeNode(String organizationId, Department record) {
         return new WebTreeNode<>(WebOutputSupport.record(service(), record, FieldOutputContext.VIEW),
-                service().departmentChildren(organizationId, record.getId()).stream()
+                service().departmentChildrenForAction(PlatformAction.TREE, organizationId, record.getId()).stream()
                         .map(child -> treeNode(organizationId, child))
                         .toList());
     }

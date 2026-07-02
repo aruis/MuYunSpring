@@ -17,6 +17,7 @@ import java.util.Objects;
 @Service
 public class BuiltInRolePermissionTemplateService {
     public static final String TENANT_ADMIN_TEMPLATE_ALIAS = "tenant.admin";
+    public static final String ORGANIZATION_ADMIN_TEMPLATE_ALIAS = "organization.admin";
     public static final List<String> TENANT_ADMIN_MODULE_ALIASES = List.of(
             OrganizationService.MODULE_ALIAS,
             DepartmentService.MODULE_ALIAS,
@@ -24,6 +25,12 @@ public class BuiltInRolePermissionTemplateService {
             EmployeeAccountService.MODULE_ALIAS,
             UserAccountService.MODULE_ALIAS,
             RoleService.MODULE_ALIAS
+    );
+    public static final List<String> ORGANIZATION_ADMIN_MODULE_ALIASES = List.of(
+            OrganizationService.MODULE_ALIAS,
+            DepartmentService.MODULE_ALIAS,
+            EmployeeService.MODULE_ALIAS,
+            UserAccountService.MODULE_ALIAS
     );
 
     private final RoleService roleService;
@@ -37,13 +44,21 @@ public class BuiltInRolePermissionTemplateService {
     }
 
     public int applyTenantAdminTemplate(String roleId) {
+        return applyTemplate(roleId, TENANT_ADMIN_MODULE_ALIASES, DataScopePolicy.ALL);
+    }
+
+    public int applyOrganizationAdminTemplate(String roleId) {
+        return applyTemplate(roleId, ORGANIZATION_ADMIN_MODULE_ALIASES, DataScopePolicy.ORGANIZATION_AND_CHILDREN);
+    }
+
+    private int applyTemplate(String roleId, List<String> moduleAliases, DataScopePolicy dataScopePolicy) {
         int changed = 0;
-        for (GrantableAction action : grantableActionResolver.resolve(TENANT_ADMIN_MODULE_ALIASES)) {
+        for (GrantableAction action : grantableActionResolver.resolve(moduleAliases)) {
             changed += roleService.grantAction(
                     roleId,
                     action.moduleAlias(),
                     action.actionCode(),
-                    action.dataAuth() ? DataScopePolicy.ALL : DataScopePolicy.NONE,
+                    action.dataAuth() ? dataScopePolicy : DataScopePolicy.NONE,
                     TenantScopePolicy.CURRENT_TENANT
             );
         }

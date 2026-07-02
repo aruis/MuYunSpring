@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopePlan;
@@ -77,6 +78,56 @@ class RoleDataScopeCriteriaServiceTest {
                 .contains("\"authUserId\" = :p1")
                 .contains("\"authOrganizationId\" = :p2");
         assertThat(compiled.getParams()).containsEntry("p1", "user-1").containsEntry("p2", "org-1");
+    }
+
+    @Test
+    void shouldApplyMappedOrganizationScopeField() {
+        RoleService roleService = mock(RoleService.class);
+        whenActionGrants(roleService, "user-1", "iam.employee", "view",
+                grant(DataScopePolicy.ORGANIZATION)
+        );
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "iam.employee",
+                PlatformAction.QUERY.executionPolicy(),
+                Criteria.of().eq("enabled", Boolean.TRUE),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-1")),
+                DataScopeFieldMapping.of(null, "organizationId", "departmentId")
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(compiled.getSql())
+                .contains("\"enabled\" = :p0")
+                .contains("\"organizationId\" = :p1")
+                .doesNotContain("authOrganizationId");
+        assertThat(compiled.getParams()).containsEntry("p1", "org-1");
+    }
+
+    @Test
+    void shouldApplyMappedOrganizationChildrenScopeField() {
+        RoleService roleService = mock(RoleService.class);
+        OrganizationService organizationService = mock(OrganizationService.class);
+        whenActionGrants(roleService, "user-1", "iam.organization", "view",
+                grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
+        );
+        when(organizationService.selfAndDescendantIds("org-1")).thenReturn(List.of("org-1", "org-2"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService,
+                Optional.of(organizationService));
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "iam.organization",
+                PlatformAction.QUERY.executionPolicy(),
+                Criteria.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-1")),
+                DataScopeFieldMapping.of(null, "id", null)
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(compiled.getSql())
+                .contains("\"id\" IN")
+                .doesNotContain("authOrganizationId");
+        assertThat(compiled.getParams().values()).contains("org-1", "org-2");
     }
 
     @Test

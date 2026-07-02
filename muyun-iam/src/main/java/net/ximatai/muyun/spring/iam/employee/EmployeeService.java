@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.DataScopeFieldMappingAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
@@ -12,16 +14,22 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 @Service
 public class EmployeeService extends TenantStandardBusinessService<Employee> implements
@@ -29,20 +37,60 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         EnableAbility<Employee>,
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
+        DataScopeAbility<Employee>,
+        DataScopeFieldMappingAbility,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
+    private static final DataScopeFieldMapping DATA_SCOPE_FIELD_MAPPING =
+            DataScopeFieldMapping.of(null, "organizationId", "departmentId");
 
     private final OrganizationService organizationService;
     private final DepartmentService departmentService;
+    private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
+
+    public EmployeeService(EmployeeDao employeeDao,
+                           ActiveTenantVerifier activeTenantVerifier,
+                           OrganizationService organizationService,
+                           DepartmentService departmentService) {
+        this(employeeDao, activeTenantVerifier, organizationService, departmentService, Optional.empty());
+    }
 
     @Autowired
     public EmployeeService(EmployeeDao employeeDao,
                            ActiveTenantVerifier activeTenantVerifier,
                            OrganizationService organizationService,
-                           DepartmentService departmentService) {
+                           DepartmentService departmentService,
+                           ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, Employee.class, employeeDao, activeTenantVerifier);
         this.organizationService = organizationService;
         this.departmentService = departmentService;
+        this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
+    }
+
+    public EmployeeService(EmployeeDao employeeDao,
+                           ActiveTenantVerifier activeTenantVerifier,
+                           OrganizationService organizationService,
+                           DepartmentService departmentService,
+                           Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
+        super(MODULE_ALIAS, Employee.class, employeeDao, activeTenantVerifier);
+        this.organizationService = organizationService;
+        this.departmentService = departmentService;
+        Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
+                ? Optional.empty()
+                : dataScopeCriteriaService;
+        this.dataScopeCriteriaService = () -> criteriaService
+                .<DataScopeCriteriaService>map(service -> service)
+                .orElseGet(AllowAllDataScopeCriteriaService::new);
+    }
+
+    @Override
+    public DataScopeCriteriaService getDataScopeCriteriaService() {
+        return dataScopeCriteriaService.get();
+    }
+
+    @Override
+    public DataScopeFieldMapping dataScopeFieldMapping() {
+        return DATA_SCOPE_FIELD_MAPPING;
     }
 
     @Override

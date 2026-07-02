@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -139,8 +140,8 @@ class IamWebControllerIT {
         organization.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(organizationService.children(TreeAbility.ROOT_ID)).thenReturn(List.of(organization));
-        when(organizationService.children("org-1")).thenReturn(List.of());
+        when(organizationService.childrenForAction(PlatformAction.TREE, TreeAbility.ROOT_ID)).thenReturn(List.of(organization));
+        when(organizationService.childrenForAction(PlatformAction.TREE, "org-1")).thenReturn(List.of());
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
@@ -174,8 +175,10 @@ class IamWebControllerIT {
         department.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(departmentService.rootDepartments("org-1")).thenReturn(List.of(department));
-        when(departmentService.departmentChildren("org-1", "dept-1")).thenReturn(List.of());
+        when(departmentService.departmentChildrenForAction(
+                PlatformAction.TREE, "org-1", TreeAbility.ROOT_ID)).thenReturn(List.of(department));
+        when(departmentService.departmentChildrenForAction(
+                PlatformAction.TREE, "org-1", "dept-1")).thenReturn(List.of());
 
         mvc.perform(get("/iam.department/tree").param("organizationId", "org-1"))
                 .andExpect(status().isOk())
@@ -242,7 +245,7 @@ class IamWebControllerIT {
         employee.setTitle("Alice");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeService.select("employee-1")).thenReturn(employee);
+        when(employeeService.selectForAction(PlatformAction.VIEW, "employee-1")).thenReturn(employee);
 
         mvc.perform(get("/iam.employee/view/employee-1"))
                 .andExpect(status().isOk())
@@ -333,7 +336,8 @@ class IamWebControllerIT {
         wireEmployeeQueryAbility();
         when(departmentService.selfAndDescendantIds("org-1", "dept-root"))
                 .thenReturn(List.of("dept-root", "dept-child"));
-        when(employeeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+        when(employeeService.pageQueryForAction(eq(PlatformAction.QUERY),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
 
         mvc.perform(post("/iam.employee/query")
@@ -359,7 +363,8 @@ class IamWebControllerIT {
 
         org.mockito.ArgumentCaptor<Criteria> criteria = org.mockito.ArgumentCaptor.forClass(Criteria.class);
         org.mockito.ArgumentCaptor<Sort[]> sorts = org.mockito.ArgumentCaptor.forClass(Sort[].class);
-        verify(employeeService).pageQuery(criteria.capture(), any(PageRequest.class), sorts.capture());
+        verify(employeeService).pageQueryForAction(eq(PlatformAction.QUERY),
+                criteria.capture(), any(PageRequest.class), sorts.capture());
         assertThat(containsCondition(criteria.getValue(), "enabled", true)).isTrue();
         assertThat(containsCondition(criteria.getValue(), "organizationId", "org-1")).isTrue();
         assertThat(containsCondition(criteria.getValue(), "departmentId", "dept-child")).isTrue();
@@ -385,7 +390,8 @@ class IamWebControllerIT {
         wireEmployeeQueryAbility();
         when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
                 .thenReturn(Optional.of(employeeStaticModuleDefinition()));
-        when(employeeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+        when(employeeService.pageQueryForAction(eq(PlatformAction.QUERY),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
 
         mvc.perform(post("/iam.employee/query")
@@ -419,7 +425,8 @@ class IamWebControllerIT {
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
         when(staticModuleDefinitionCatalog.find(DepartmentService.MODULE_ALIAS))
                 .thenReturn(Optional.of(departmentStaticModuleDefinition()));
-        when(departmentService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+        when(departmentService.pageQueryForAction(eq(PlatformAction.QUERY),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(department), 1, PageRequest.of(1, 20)));
 
         mvc.perform(post("/iam.department/query")
