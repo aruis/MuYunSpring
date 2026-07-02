@@ -10,6 +10,7 @@ import {
   StaticManagementLayout,
   TreeRecordExplorer,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
   type RecordPickerRecord,
   type TreeRecordBase,
 } from '@muyun/platform-components';
@@ -73,8 +74,12 @@ function organizationTitle(record: RecordPickerRecord) {
   return record.title ?? record.code ?? record.id ?? '未命名机构';
 }
 
-function treeOrganizationTitle(record: TreeRecordBase) {
-  return record.title ?? record.code ?? record.id ?? '未命名机构';
+function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  return {
+    title: record.title ?? record.code ?? record.id ?? '未命名机构',
+    secondary: record.code ?? record.id,
+    muted: record.enabled === false,
+  };
 }
 
 function handleCardAction(action: RecordActionItem) {
@@ -132,7 +137,7 @@ function handleCardAction(action: RecordActionItem) {
         empty-description="暂无机构"
         loading-tip="加载机构树"
         fallback-title="未命名机构"
-        :title-of="treeOrganizationTitle"
+        :item-of="organizationItemOf"
         @select="handleSelect"
         @loaded="handleTreeLoaded($event as Organization[])"
       />

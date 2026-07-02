@@ -9,6 +9,7 @@ import {
   RecordStatusSwitch,
   StaticManagementLayout,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
 import type { Application } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
@@ -65,12 +66,12 @@ const cardActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
-function applicationTitle(record: CrudRecordListBase) {
-  return record.title ?? record.alias ?? record.id ?? '未命名应用';
-}
-
-function applicationSubtitle(record: CrudRecordListBase) {
-  return record.alias ?? record.id;
+function applicationItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
+  return {
+    title: record.title ?? record.alias ?? record.id ?? '未命名应用',
+    secondary: record.alias ?? record.id,
+    muted: record.enabled === false,
+  };
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
@@ -130,8 +131,7 @@ function handleCardAction(action: RecordActionItem) {
         empty-description="暂无应用"
         loading-tip="加载应用列表"
         fallback-title="未命名应用"
-        :title-of="applicationTitle"
-        :subtitle-of="applicationSubtitle"
+        :item-of="applicationItemOf"
         @select="handleApplicationSelect"
         @loaded="handleLoaded"
       />

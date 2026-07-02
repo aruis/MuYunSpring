@@ -12,9 +12,11 @@ import {
   TreeRecordExplorer,
   createScopedTreeModuleContext,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordFormRecord,
+  type TreeRecordBase,
   presentPlatformError,
   resolveRecordFormFields,
   resolveRecordFormFieldState,
@@ -170,6 +172,24 @@ function departmentTreeActionsOf(record: Department): UiRecordInlineAction[] {
   return actions;
 }
 
+function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  return {
+    title: organizationTitleOf(record as Organization),
+    secondary: record.code ?? record.id,
+    muted: record.enabled === false,
+  };
+}
+
+function departmentItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  const department = record as Department;
+  return {
+    title: departmentTitleOf(department),
+    secondary: department.code ?? department.id,
+    muted: department.enabled === false,
+    actions: departmentTreeActionsOf(department),
+  };
+}
+
 function handleDepartmentTreeAction(action: UiRecordInlineAction, record: Department) {
   selectDepartment(record);
   if (action.key === 'create-child') {
@@ -259,7 +279,7 @@ const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFie
         empty-description="暂无机构"
         loading-tip="加载机构树"
         fallback-title="未命名机构"
-        :title-of="organizationTitleOf"
+        :item-of="organizationItemOf"
         @loaded="handleOrganizationsLoaded"
         @select="selectOrganization"
       />
@@ -295,8 +315,7 @@ const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFie
         empty-description="当前机构暂无部门"
         loading-tip="加载部门树"
         fallback-title="未命名部门"
-        :title-of="departmentTitleOf"
-        :actions-of="departmentTreeActionsOf"
+        :item-of="departmentItemOf"
         @loaded="handleDepartmentsLoaded"
         @select="selectDepartment"
         @action="handleDepartmentTreeAction"

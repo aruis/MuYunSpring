@@ -71,9 +71,10 @@ function findNode(nodes: UiTreeNode[], key: string): UiTreeNode | undefined {
     @select="handleSelect"
     @expand="handleExpand"
   >
-    <template #title="{ key, title, tag, muted, actions }">
+    <template #title="{ key, title, secondary, tag, muted, actions }">
       <UiRecordExplorerItem
         :title="title"
+        :secondary="secondary"
         :tag="tag"
         :muted="muted"
         :selected="selectedKeys.includes(key)"

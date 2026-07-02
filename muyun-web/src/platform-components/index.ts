@@ -8,6 +8,7 @@ export { default as RecordDetailDrawer } from './RecordDetailDrawer.vue';
 export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
+export type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 export { default as RecordFormFields } from './RecordFormFields.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';

@@ -8,11 +8,53 @@ const root = resolve(import.meta.dirname, '..');
 test('record list explorer exposes visible secondary identity text', () => {
   const itemSource = readSource('src/vue-ui-antdv/components/UiRecordExplorerItem.vue');
   const listSource = readSource('src/platform-components/RecordListExplorer.vue');
+  const crudListSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
+  const treeSource = readSource('src/platform-components/TreeRecordExplorer.vue');
+  const itemModelSource = readSource('src/platform-components/recordExplorerItemModel.ts');
+  const treeTypesSource = readSource('src/vue-ui-antdv/types.ts');
+  const uiTreeSource = readSource('src/vue-ui-antdv/components/UiTree.vue');
 
+  assert.match(itemModelSource, /interface RecordExplorerItemDescriptor/);
+  assert.match(itemModelSource, /title: string/);
+  assert.match(itemModelSource, /secondary\?: string/);
+  assert.match(itemModelSource, /tag\?: string/);
+  assert.match(itemModelSource, /actions\?: UiRecordInlineAction\[\]/);
   assert.match(itemSource, /secondary\?: string/);
   assert.match(itemSource, /class="ui-record-explorer-item-secondary"/);
+  assert.match(itemSource, /\.ui-record-explorer-item:focus-within \.ui-record-explorer-item-actions/);
+  assert.match(
+    listSource,
+    /itemOf\?: \(record: RecordListExplorerRecord\) => RecordExplorerItemDescriptor \| undefined/,
+  );
   assert.match(listSource, /function recordSecondary/);
+  assert.match(listSource, /props\.codeOf \? props\.codeOf\(record\)/);
   assert.match(listSource, /:secondary="recordSecondary\(record\)"/);
+  assert.match(
+    crudListSource,
+    /itemOf\?: \(record: CrudRecordListBase\) => RecordExplorerItemDescriptor \| undefined/,
+  );
+  assert.match(crudListSource, /actionsOf\?: \(record: CrudRecordListBase\) => UiRecordInlineAction\[\]/);
+  assert.match(crudListSource, /action: \[action: UiRecordInlineAction, record: CrudRecordListBase\]/);
+  assert.match(crudListSource, /props\.subtitleOf[\s\S]*\? props\.subtitleOf\(record\)/);
+  assert.match(crudListSource, /:item-of="\(record\) => itemOf\?\.\(record as CrudRecordListBase\)"/);
+  assert.match(
+    crudListSource,
+    /:actions-of="\(record\) => actionsOf\?\.\(record as CrudRecordListBase\) \?\? \[\]"/,
+  );
+  assert.match(
+    crudListSource,
+    /@action="\(action, record\) => handleAction\(action, record as CrudRecordListBase\)"/,
+  );
+  assert.match(treeTypesSource, /secondary\?: string/);
+  assert.match(treeSource, /secondaryOf\?: \(record: TreeRecordBase\) => string \| undefined/);
+  assert.match(
+    treeSource,
+    /itemOf\?: \(record: TreeRecordBase\) => RecordExplorerItemDescriptor \| undefined/,
+  );
+  assert.match(treeSource, /const item = props\.itemOf\?\.\(record\)/);
+  assert.match(treeSource, /secondary: item\?\.secondary \?\? props\.secondaryOf\?\.\(record\)/);
+  assert.match(uiTreeSource, /#title="\{ key, title, secondary, tag, muted, actions \}"/);
+  assert.match(uiTreeSource, /:secondary="secondary"/);
 });
 
 test('record explorer panel uses a single title contract', () => {
@@ -49,8 +91,57 @@ test('record explorer panel focuses and closes search from keyboard', () => {
 
   assert.match(panelSource, /focusSearchInput/);
   assert.match(panelSource, /querySelector\('input'\)\?\.focus\(\)/);
+  assert.match(panelSource, /@mousedown\.prevent/);
   assert.match(panelSource, /@keydown\.esc="handleSearchEscape"/);
   assert.match(inputSource, /keydown: \[event: KeyboardEvent\]/);
+});
+
+test('menu management keeps scheme actions inline and delegates search to panel', () => {
+  const menuViewSource = readSource('src/views/MenuManagementView.vue');
+  const schemePanelStart = menuViewSource.indexOf('title="菜单方案"');
+  const menuTreePanelStart = menuViewSource.indexOf('title="菜单树"');
+  const schemePanelSource = menuViewSource.slice(schemePanelStart, menuTreePanelStart);
+  const menuTreePanelSource = menuViewSource.slice(menuTreePanelStart);
+
+  assert.match(menuViewSource, /function schemeActionsOf/);
+  assert.match(menuViewSource, /function schemeItemOf/);
+  assert.match(menuViewSource, /function handleSchemeInlineAction/);
+  assert.match(schemePanelSource, /:item-of="schemeItemOf"/);
+  assert.match(schemePanelSource, /@action="handleSchemeInlineAction"/);
+  assert.match(schemePanelSource, /:filter-option="schemeFilterOption"/);
+  assert.doesNotMatch(schemePanelSource, /title="编辑菜单方案"/);
+  assert.doesNotMatch(schemePanelSource, /title="删除菜单方案"/);
+  assert.match(menuTreePanelSource, /search-mode="none"/);
+  assert.match(menuTreePanelSource, /search-trigger="external"/);
+});
+
+test('static management explorers use unified item descriptors', () => {
+  const explorerViews = [
+    'ApplicationManagementView.vue',
+    'TenantManagementView.vue',
+    'OrganizationManagementView.vue',
+    'DepartmentManagementView.vue',
+    'PositionManagementView.vue',
+    'DictionaryManagementView.vue',
+    'MenuManagementView.vue',
+    'EmployeeManagementView.vue',
+  ];
+
+  for (const fileName of explorerViews) {
+    const source = readSource(`src/views/${fileName}`);
+    assert.match(source, /RecordExplorerItemDescriptor/, fileName);
+    assert.match(source, /:item-of=/, fileName);
+  }
+
+  const dictionarySource = readSource('src/views/DictionaryManagementView.vue');
+  const menuSource = readSource('src/views/MenuManagementView.vue');
+  const positionSource = readSource('src/views/PositionManagementView.vue');
+  const departmentSource = readSource('src/views/DepartmentManagementView.vue');
+
+  assert.doesNotMatch(dictionarySource, /:tag-of=|:actions-of=|:muted-of=/);
+  assert.doesNotMatch(menuSource, /:tag-of=|:actions-of=/);
+  assert.doesNotMatch(positionSource, /:actions-of=/);
+  assert.doesNotMatch(departmentSource, /:actions-of=/);
 });
 
 test('tree explorer editor is explicit edit mode instead of selected record presence', () => {
@@ -245,7 +336,9 @@ test('department management uses organization as read-only scope and department 
   assert.match(departmentViewSource, /createScopedTreeModuleContext/);
   assert.match(departmentViewSource, /treePath: '\/iam\.department\/tree'/);
   assert.match(departmentViewSource, /sortPath: '\/iam\.department\/sort'/);
-  assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
+  assert.match(departmentViewSource, /function departmentItemOf/);
+  assert.match(departmentViewSource, /actions: departmentTreeActionsOf\(department\)/);
+  assert.match(departmentViewSource, /:item-of="departmentItemOf"/);
   assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
   assert.match(departmentViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(departmentViewSource, /<RecordFormFields/);

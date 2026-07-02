@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { UiEmpty, UiRecordExplorerItem, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
+import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 
 defineOptions({ name: 'RecordListExplorer' });
 
@@ -20,6 +21,7 @@ const props = withDefaults(
     emptyDescription?: string;
     titleOf?: (record: RecordListExplorerRecord) => string;
     codeOf?: (record: RecordListExplorerRecord) => string | undefined;
+    itemOf?: (record: RecordListExplorerRecord) => RecordExplorerItemDescriptor | undefined;
     actionsOf?: (record: RecordListExplorerRecord) => UiRecordInlineAction[];
     filterOption?: (record: RecordListExplorerRecord, normalizedKeyword: string) => boolean;
     tagOf?: (record: RecordListExplorerRecord) => string | undefined;
@@ -31,6 +33,7 @@ const props = withDefaults(
     emptyDescription: '暂无记录',
     titleOf: undefined,
     codeOf: undefined,
+    itemOf: undefined,
     actionsOf: undefined,
     filterOption: undefined,
     tagOf: undefined,
@@ -52,11 +55,21 @@ const filteredRecords = computed(() => {
 });
 
 function recordTitle(record: RecordListExplorerRecord) {
-  return props.titleOf?.(record) ?? record.title ?? record.name ?? record.code ?? record.id ?? '未命名记录';
+  const item = props.itemOf?.(record);
+  return (
+    item?.title ??
+    props.titleOf?.(record) ??
+    record.title ??
+    record.name ??
+    record.code ??
+    record.id ??
+    '未命名记录'
+  );
 }
 
 function recordCode(record: RecordListExplorerRecord) {
-  return props.codeOf?.(record) ?? record.code ?? record.id;
+  const item = props.itemOf?.(record);
+  return item ? item.secondary : props.codeOf ? props.codeOf(record) : (record.code ?? record.id);
 }
 
 function recordSecondary(record: RecordListExplorerRecord) {
@@ -65,11 +78,18 @@ function recordSecondary(record: RecordListExplorerRecord) {
 }
 
 function recordMuted(record: RecordListExplorerRecord) {
-  return props.mutedOf?.(record) ?? record.enabled === false;
+  const item = props.itemOf?.(record);
+  return item?.muted ?? props.mutedOf?.(record) ?? record.enabled === false;
 }
 
 function recordTag(record: RecordListExplorerRecord) {
-  return props.tagOf?.(record) ?? (record.enabled === false ? '停用' : undefined);
+  const item = props.itemOf?.(record);
+  return item?.tag ?? props.tagOf?.(record) ?? (record.enabled === false ? '停用' : undefined);
+}
+
+function recordActions(record: RecordListExplorerRecord) {
+  const item = props.itemOf?.(record);
+  return item?.actions ?? props.actionsOf?.(record);
 }
 
 function matchesKeyword(record: RecordListExplorerRecord, keyword: string) {
@@ -102,7 +122,7 @@ function handleAction(action: UiRecordInlineAction, record: RecordListExplorerRe
         :tag="recordTag(record)"
         :muted="recordMuted(record)"
         :selected="record.id === selectedId"
-        :actions="actionsOf?.(record)"
+        :actions="recordActions(record)"
         @click="emit('select', record)"
         @keydown.enter.prevent="emit('select', record)"
         @keydown.space.prevent="emit('select', record)"

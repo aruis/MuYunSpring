@@ -9,6 +9,7 @@ import {
   RecordStatusSwitch,
   StaticManagementLayout,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
 import type { Tenant } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
@@ -68,12 +69,12 @@ const cardActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
-function tenantTitle(record: CrudRecordListBase) {
-  return record.title ?? record.alias ?? record.id ?? '未命名租户';
-}
-
-function tenantSubtitle(record: CrudRecordListBase) {
-  return record.alias ?? record.id;
+function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
+  return {
+    title: record.title ?? record.alias ?? record.id ?? '未命名租户',
+    secondary: record.alias ?? record.id,
+    muted: record.enabled === false,
+  };
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
@@ -133,8 +134,7 @@ function handleCardAction(action: RecordActionItem) {
         empty-description="暂无租户"
         loading-tip="加载租户列表"
         fallback-title="未命名租户"
-        :title-of="tenantTitle"
-        :subtitle-of="tenantSubtitle"
+        :item-of="tenantItemOf"
         @select="handleTenantSelect"
         @loaded="handleLoaded"
       />

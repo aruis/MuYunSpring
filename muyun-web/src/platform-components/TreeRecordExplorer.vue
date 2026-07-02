@@ -11,6 +11,7 @@ import {
 } from '@muyun/vue-ui-antdv';
 import type { ModuleContext } from '@muyun/web-core';
 import type { WebTreeNode } from '@muyun/web-contracts';
+import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 import {
   defaultTreeRecordMatches,
   defaultTreeRecordTitle,
@@ -39,6 +40,8 @@ const props = withDefaults(
     loadingTip?: string;
     fallbackTitle?: string;
     titleOf?: (record: TreeRecordBase) => string;
+    secondaryOf?: (record: TreeRecordBase) => string | undefined;
+    itemOf?: (record: TreeRecordBase) => RecordExplorerItemDescriptor | undefined;
     actionsOf?: (record: TreeRecordBase) => UiRecordInlineAction[];
     filterOption?: (record: TreeRecordBase, normalizedKeyword: string) => boolean;
     tagOf?: (record: TreeRecordBase) => string | undefined;
@@ -55,6 +58,8 @@ const props = withDefaults(
     loadingTip: '加载树形记录',
     fallbackTitle: '未命名记录',
     titleOf: undefined,
+    secondaryOf: undefined,
+    itemOf: undefined,
     actionsOf: undefined,
     filterOption: undefined,
     tagOf: undefined,
@@ -134,7 +139,8 @@ async function loadTree() {
 }
 
 function recordTitle(record: TreeRecordBase) {
-  return props.titleOf?.(record) ?? defaultTreeRecordTitle(record, props.fallbackTitle);
+  const item = props.itemOf?.(record);
+  return item?.title ?? props.titleOf?.(record) ?? defaultTreeRecordTitle(record, props.fallbackTitle);
 }
 
 function matchesKeyword(record: TreeRecordBase, normalized: string) {
@@ -182,12 +188,14 @@ function handleSearchBlur() {
 
 function toUiTreeNode(node: WebTreeNode<TreeRecordBase>): UiTreeNode {
   const record = node.record;
+  const item = props.itemOf?.(record);
   return {
     key: record.id ?? '',
-    title: recordTitle(record),
-    tag: props.tagOf?.(record) ?? (record.enabled === false ? '停用' : undefined),
-    muted: props.mutedOf?.(record) ?? record.enabled === false,
-    actions: props.actionsOf?.(record),
+    title: item?.title ?? recordTitle(record),
+    secondary: item?.secondary ?? props.secondaryOf?.(record),
+    tag: item?.tag ?? props.tagOf?.(record) ?? (record.enabled === false ? '停用' : undefined),
+    muted: item?.muted ?? props.mutedOf?.(record) ?? record.enabled === false,
+    actions: item?.actions ?? props.actionsOf?.(record),
     children: node.children.map(toUiTreeNode),
   };
 }
