@@ -245,6 +245,17 @@ function menuTagOf(record: TreeRecordBase) {
   return menuNodeTitle(menu);
 }
 
+function menuItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  const menu = record as MenuRecord;
+  return {
+    title: menuTitleOf(menu),
+    secondary: menu.id,
+    tag: menuTagOf(record),
+    muted: menu.enabled === false,
+    actions: menuTreeActionsOf(record),
+  };
+}
+
 function menuFilterOption(record: TreeRecordBase, keyword: string) {
   const menu = record as MenuRecord;
   return [menu.title, menu.id, menu.moduleAlias, menu.route, menu.externalUrl]
@@ -467,10 +478,8 @@ function menuNodeTitle(menu: MenuRecord) {
           empty-description="暂无菜单"
           loading-tip="加载菜单树"
           fallback-title="未命名菜单"
-          :title-of="(record) => menuTitleOf(record as MenuRecord)"
-          :tag-of="menuTagOf"
+          :item-of="menuItemOf"
           :filter-option="menuFilterOption"
-          :actions-of="menuTreeActionsOf"
           @select="handleMenuSelect"
           @action="handleMenuTreeAction"
           @loaded="handleMenuLoaded"

@@ -23,6 +23,7 @@ import {
   presentPlatformError,
   resolveRecordFormFields,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordFormRecord,
@@ -303,6 +304,17 @@ function categoryTagOf(record: DictionaryCategory) {
   return isFolderCategory(record) ? '目录' : undefined;
 }
 
+function categoryItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  const category = record as DictionaryCategory;
+  return {
+    title: dictionaryCategoryTitleOf(category),
+    secondary: category.alias ?? category.id,
+    tag: categoryTagOf(category),
+    muted: category.enabled === false,
+    actions: categoryTreeActionsOf(record),
+  };
+}
+
 function categoryMatchesKeyword(record: DictionaryCategory, normalized: string) {
   return [dictionaryCategoryTitleOf(record), record.alias, record.applicationAlias, record.id].some((value) =>
     value?.toLowerCase().includes(normalized),
@@ -321,6 +333,17 @@ function itemPickerTitle(record: RecordPickerRecord) {
 
 function itemTagOf(record: DictionaryItem) {
   return record.enabled === false ? '停用' : undefined;
+}
+
+function itemItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
+  const item = record as DictionaryItem;
+  return {
+    title: dictionaryItemTitleOf(item),
+    secondary: item.code ?? item.id,
+    tag: itemTagOf(item),
+    muted: item.enabled === false,
+    actions: itemTreeActionsOf(record),
+  };
 }
 
 function itemTreeActionsOf(record: TreeRecordBase): UiRecordInlineAction[] {
@@ -495,10 +518,8 @@ const itemFormFieldFallback: Record<DictionaryItemFormFieldName, RecordFormField
         empty-description="暂无字典类目"
         loading-tip="加载字典类目"
         fallback-title="未命名字典类目"
-        :title-of="dictionaryCategoryTitleOf"
-        :actions-of="categoryTreeActionsOf"
+        :item-of="categoryItemOf"
         :filter-option="categoryMatchesKeyword"
-        :tag-of="categoryTagOf"
         @loaded="handleCategoriesLoaded"
         @select="handleSelectCategory"
         @action="handleCategoryTreeAction"
@@ -569,11 +590,8 @@ const itemFormFieldFallback: Record<DictionaryItemFormFieldName, RecordFormField
         :empty-description="itemListEmptyDescription"
         loading-tip="加载字典项"
         fallback-title="未命名字典项"
-        :title-of="dictionaryItemTitleOf"
-        :actions-of="itemTreeActionsOf"
+        :item-of="itemItemOf"
         :filter-option="itemMatchesKeyword"
-        :tag-of="itemTagOf"
-        :muted-of="(record) => record.enabled === false"
         @loaded="handleItemsLoaded"
         @select="selectItem"
         @action="handleItemTreeAction"

@@ -99,6 +99,35 @@ test('menu management keeps scheme actions inline and delegates search to panel'
   assert.match(menuTreePanelSource, /search-trigger="external"/);
 });
 
+test('static management explorers use unified item descriptors', () => {
+  const explorerViews = [
+    'ApplicationManagementView.vue',
+    'TenantManagementView.vue',
+    'OrganizationManagementView.vue',
+    'DepartmentManagementView.vue',
+    'PositionManagementView.vue',
+    'DictionaryManagementView.vue',
+    'MenuManagementView.vue',
+    'EmployeeManagementView.vue',
+  ];
+
+  for (const fileName of explorerViews) {
+    const source = readSource(`src/views/${fileName}`);
+    assert.match(source, /RecordExplorerItemDescriptor/, fileName);
+    assert.match(source, /:item-of=/, fileName);
+  }
+
+  const dictionarySource = readSource('src/views/DictionaryManagementView.vue');
+  const menuSource = readSource('src/views/MenuManagementView.vue');
+  const positionSource = readSource('src/views/PositionManagementView.vue');
+  const departmentSource = readSource('src/views/DepartmentManagementView.vue');
+
+  assert.doesNotMatch(dictionarySource, /:tag-of=|:actions-of=|:muted-of=/);
+  assert.doesNotMatch(menuSource, /:tag-of=|:actions-of=/);
+  assert.doesNotMatch(positionSource, /:actions-of=/);
+  assert.doesNotMatch(departmentSource, /:actions-of=/);
+});
+
 test('tree explorer editor is explicit edit mode instead of selected record presence', () => {
   const positionViewSource = readSource('src/views/PositionManagementView.vue');
   const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
@@ -291,7 +320,9 @@ test('department management uses organization as read-only scope and department 
   assert.match(departmentViewSource, /createScopedTreeModuleContext/);
   assert.match(departmentViewSource, /treePath: '\/iam\.department\/tree'/);
   assert.match(departmentViewSource, /sortPath: '\/iam\.department\/sort'/);
-  assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
+  assert.match(departmentViewSource, /function departmentItemOf/);
+  assert.match(departmentViewSource, /actions: departmentTreeActionsOf\(department\)/);
+  assert.match(departmentViewSource, /:item-of="departmentItemOf"/);
   assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
   assert.match(departmentViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(departmentViewSource, /<RecordFormFields/);

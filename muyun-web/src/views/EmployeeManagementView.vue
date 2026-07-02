@@ -13,6 +13,7 @@ import {
   createScopedTreeModuleContext,
   type QueryListRecord,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordFormRecord,
@@ -620,6 +621,14 @@ function departmentTitle(record: Department) {
   return record.title ?? record.code ?? record.id ?? '未命名部门';
 }
 
+function organizationItemOf(record: Organization): RecordExplorerItemDescriptor {
+  return {
+    title: record.title ?? record.code ?? record.id ?? '未命名机构',
+    secondary: record.code ?? record.id,
+    muted: record.enabled === false,
+  };
+}
+
 const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFallback> = {
   organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
   departmentId: {
@@ -683,6 +692,7 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
         empty-description="暂无机构"
         loading-tip="加载机构树"
         fallback-title="未命名机构"
+        :item-of="(record) => organizationItemOf(record as Organization)"
         @loaded="handleOrganizationsLoaded"
         @select="selectOrganization"
       />

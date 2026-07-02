@@ -14,6 +14,7 @@ import {
   presentPlatformError,
   resolveRecordFormFields,
   type RecordActionItem,
+  type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
 } from '@muyun/platform-components';
@@ -180,6 +181,23 @@ function categoryTreeActionsOf(record: PositionCategory): UiRecordInlineAction[]
   return actions;
 }
 
+function categoryItemOf(record: PositionCategory): RecordExplorerItemDescriptor {
+  return {
+    title: positionCategoryTitleOf(record),
+    secondary: record.code ?? record.id,
+    muted: record.enabled === false,
+    actions: categoryTreeActionsOf(record),
+  };
+}
+
+function positionItemOf(record: Position): RecordExplorerItemDescriptor {
+  return {
+    title: positionTitleOf(record),
+    secondary: record.code ?? record.id,
+    muted: record.enabled === false,
+  };
+}
+
 function handleCategoryTreeAction(action: UiRecordInlineAction, record: PositionCategory) {
   handleSelectCategory(record);
   if (action.key === 'create-child') {
@@ -263,8 +281,7 @@ function updatePositionDraftField(fieldName: string, value: string | number | bo
         empty-description="暂无岗位分类"
         loading-tip="加载岗位分类"
         fallback-title="未命名分类"
-        :title-of="positionCategoryTitleOf"
-        :actions-of="categoryTreeActionsOf"
+        :item-of="categoryItemOf"
         @loaded="handleCategoriesLoaded"
         @select="handleSelectCategory"
         @action="handleCategoryTreeAction"
@@ -335,7 +352,7 @@ function updatePositionDraftField(fieldName: string, value: string | number | bo
         :selected-id="selectedPosition?.id"
         :keyword="positionSearchKeyword"
         :empty-description="positionListEmptyDescription"
-        :title-of="positionTitleOf"
+        :item-of="(record) => positionItemOf(record as Position)"
         @select="selectPosition"
       />
     </RecordExplorerPanel>
