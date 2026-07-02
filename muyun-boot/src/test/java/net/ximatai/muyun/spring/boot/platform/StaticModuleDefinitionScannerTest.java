@@ -51,10 +51,6 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.support.GenericApplicationContext;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
@@ -68,21 +64,17 @@ import static org.mockito.Mockito.mock;
 class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanIamStaticModulesAndActionsFromControllerAnnotations() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(TenantWebController.class);
-            context.registerBean(OrganizationWebController.class);
-            context.registerBean(DepartmentWebController.class);
-            context.registerBean(EmployeeWebController.class,
-                    () -> new EmployeeWebController(mock(EmployeePositionService.class),
-                            mock(EmployeeAccountService.class), mock(EmployeeDelegationService.class)));
-            context.registerBean(PositionWebController.class);
-            context.registerBean(PositionCategoryWebController.class);
-            context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
-            context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            List<StaticModuleDefinition> definitions = scanner.scan();
+            List<StaticModuleDefinition> definitions = scanner(
+                    new TenantWebController(),
+                    new OrganizationWebController(),
+                    new DepartmentWebController(),
+                    new EmployeeWebController(mock(EmployeePositionService.class),
+                            mock(EmployeeAccountService.class), mock(EmployeeDelegationService.class)),
+                    new PositionWebController(),
+                    new PositionCategoryWebController(),
+                    new RoleWebController(null),
+                    new UserAccountWebController(null)
+            ).scan();
             Map<String, StaticModuleDefinition> byAlias = definitions.stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
@@ -233,23 +225,17 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.dataAuth()).isTrue();
                         });
             });
-        }
     }
 
     @Test
     void shouldScanCodeRuleAndReadOnlyLifecycleModules() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(CodeRuleWebController.class,
-                    () -> new CodeRuleWebController(org.mockito.Mockito.mock(CodePreviewService.class)));
-            context.registerBean(CodeSequenceStateWebController.class,
-                    () -> new CodeSequenceStateWebController(org.mockito.Mockito.mock(CodeOpsActionService.class)));
-            context.registerBean(CodeLedgerEntryWebController.class);
-            context.registerBean(CodeRecycleEntryWebController.class);
-            context.registerBean(CodeIssueLogWebController.class);
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+            Map<String, StaticModuleDefinition> byAlias = scanner(
+                    new CodeRuleWebController(mock(CodePreviewService.class)),
+                    new CodeSequenceStateWebController(mock(CodeOpsActionService.class)),
+                    new CodeLedgerEntryWebController(),
+                    new CodeRecycleEntryWebController(),
+                    new CodeIssueLogWebController()
+            ).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
@@ -278,32 +264,18 @@ class StaticModuleDefinitionScannerTest {
                     .containsExactly("menu", "view", "query");
             assertThat(byAlias.get("platform.code_issue_log").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "view", "query");
-        }
     }
 
     @Test
     void shouldScanMenuMaintenanceModules() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(DictionaryCategoryService.class,
-                    () -> new DictionaryCategoryService(mock(BaseDao.class)));
-            context.registerBean(DictionaryItemService.class,
-                    () -> new DictionaryItemService(mock(BaseDao.class), context.getBean(DictionaryCategoryService.class)));
-            context.registerBean(MenuSchemeWebController.class);
-            context.registerBean(MenuManagementWebController.class);
-            context.registerBean(DictionaryCategoryWebController.class, () -> {
-                DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
-                ReflectionTestUtils.setField(controller, "service", context.getBean(DictionaryCategoryService.class));
-                return controller;
-            });
-            context.registerBean(DictionaryItemWebController.class, () -> {
-                DictionaryItemWebController controller = new DictionaryItemWebController();
-                ReflectionTestUtils.setField(controller, "service", context.getBean(DictionaryItemService.class));
-                return controller;
-            });
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+            DictionaryCategoryService categoryService = new DictionaryCategoryService(mock(BaseDao.class));
+            DictionaryItemService itemService = new DictionaryItemService(mock(BaseDao.class), categoryService);
+            Map<String, StaticModuleDefinition> byAlias = scanner(
+                    new MenuSchemeWebController(),
+                    new MenuManagementWebController(),
+                    new TestDictionaryCategoryWebController(categoryService),
+                    new TestDictionaryItemWebController(itemService)
+            ).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
@@ -364,33 +336,27 @@ class StaticModuleDefinitionScannerTest {
                                 .singleElement()
                                 .satisfies(field -> assertThat(field.uiType()).isEqualTo("enabledStatus"));
                     });
-        }
     }
 
     @Test
     void shouldRejectActionContributionConflictingWithTargetModuleAction() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(ConflictingDictionaryCategoryWeb.class);
-            context.registerBean(DictionaryItemWebController.class);
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+            StaticModuleDefinitionScanner scanner = scanner(
+                    new ConflictingDictionaryCategoryWeb(),
+                    new DictionaryItemWebController()
+            );
 
             assertThatThrownBy(scanner::scan)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("action conflicts with target module")
                     .hasMessageContaining("platform.dictionary_category.item_query");
-        }
     }
 
     @Test
     void shouldScanRecordLinkageRuleConfigurationModules() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(RecordGenerationRuleWebController.class);
-            context.registerBean(RecordWriteBackRuleWebController.class);
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+            Map<String, StaticModuleDefinition> byAlias = scanner(
+                    new RecordGenerationRuleWebController(),
+                    new RecordWriteBackRuleWebController()
+            ).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
@@ -403,15 +369,11 @@ class StaticModuleDefinitionScannerTest {
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("query", "delete", "enable", "disable",
                             "sort", "viewTree", "saveTree");
-        }
     }
 
     @Test
     void shouldAssembleWorkflowActionsFromStaticModuleCapabilities() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(WorkflowEnabledWeb.class);
-            context.refresh();
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new WorkflowEnabledWeb()).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("sales.contract");
             assertThat(definition.supports(EntityCapability.WORKFLOW)).isTrue();
@@ -427,16 +389,11 @@ class StaticModuleDefinitionScannerTest {
                         assertThat(action.executorKey()).isEqualTo("platform.workflow");
                         assertThat(action.dataAuth()).isFalse();
                     });
-        }
     }
 
     @Test
     void shouldScanWorkflowAdminManagementActions() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(WorkflowRuntimeAdminWebController.class,
-                    () -> new WorkflowRuntimeAdminWebController(null));
-            context.refresh();
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new WorkflowRuntimeAdminWebController(null)).scan().getFirst();
 
             assertThat(definition.applicationAlias()).isEqualTo("platform");
             assertThat(definition.moduleAlias()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS);
@@ -454,21 +411,16 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(action.actionAuth()).isTrue();
                 assertThat(action.dataAuth()).isFalse();
             });
-        }
     }
 
     @Test
     void shouldScanWorkflowConfigurationModules() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(WorkflowDefinitionWebController.class,
-                    () -> new WorkflowDefinitionWebController(mock(net.ximatai.muyun.spring.platform.module.PlatformModuleService.class),
-                            mock(WorkflowPublishFacade.class)));
-            context.registerBean(WorkflowVersionWebController.class,
-                    () -> new WorkflowVersionWebController(mock(WorkflowDefinitionService.class)));
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+            Map<String, StaticModuleDefinition> byAlias = scanner(
+                    new WorkflowDefinitionWebController(
+                            mock(net.ximatai.muyun.spring.platform.module.PlatformModuleService.class),
+                            mock(WorkflowPublishFacade.class)),
+                    new WorkflowVersionWebController(mock(WorkflowDefinitionService.class))
+            ).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
@@ -480,61 +432,44 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get(WorkflowVersionService.MODULE_ALIAS).actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("create", "view", "update", "delete", "query");
-        }
     }
 
     @Test
     void shouldUseLastModuleSegmentAsStaticEntityAlias() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(MultiSegmentModuleWeb.class, () -> new MultiSegmentModuleWeb(new MultiSegmentModuleService()));
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new MultiSegmentModuleWeb(new MultiSegmentModuleService()))
+                    .scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.workflow.definition");
             assertThat(definition.entities()).singleElement()
                     .satisfies(entity -> assertThat(entity.alias()).isEqualTo("definition"));
-        }
     }
 
     @Test
     void shouldScanSnakeCaseWebScopeForCamelCaseStaticAlias() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldTypeWebController.class);
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new PlatformFieldTypeWebController()).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.field_type");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "create", "view", "update", "delete", "query",
                             "sort", "enable", "disable");
-        }
     }
 
     @Test
     void shouldScanNestedResourceControllerActionsFromInheritedEndpoints() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformUiSetWebController.class);
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new PlatformUiSetWebController()).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.ui_set");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("query", "view", "create", "update", "delete",
                             "enable", "disable", "sort");
-        }
     }
 
     @Test
     void shouldScanFieldUiTypeNestedConfigurationActions() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldUiTypeAttributeWebController.class);
-            context.registerBean(PlatformFieldUiTypeFieldMappingWebController.class);
-            context.refresh();
-
-            Map<String, StaticModuleDefinition> byAlias = new StaticModuleDefinitionScanner(context).scan().stream()
+            Map<String, StaticModuleDefinition> byAlias = scanner(
+                    new PlatformFieldUiTypeAttributeWebController(),
+                    new PlatformFieldUiTypeFieldMappingWebController()
+            ).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
@@ -546,29 +481,11 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("platform.field_ui_type_field_mapping").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("query", "view", "create", "update", "delete", "sort");
-        }
-    }
-
-    @Test
-    void shouldRejectStaticModuleScopeWhenSeparatorsAreMissing() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(MissingSeparatorAliasWeb.class);
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
-
-            assertThatThrownBy(scanner::scan)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("alias must match web scope");
-        }
     }
 
     @Test
     void shouldRegisterPageConfigPublishActionsAsRecordActions() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformPageConfigPublishWebController.class);
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new PlatformPageConfigPublishWebController()).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.page_config_publish");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
@@ -576,25 +493,17 @@ class StaticModuleDefinitionScannerTest {
                             "publishQueryTemplate", "unpublishQueryTemplate");
             assertThat(definition.actions()).allSatisfy(action ->
                     assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD));
-        }
     }
 
     @Test
     void shouldRegisterLowCodeGovernanceActionsAsStaticModuleActions() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(LowCodeModuleConfigArchiveFacade.class,
-                    () -> mock(LowCodeModuleConfigArchiveFacade.class));
-            context.registerBean(LowCodeModuleHealthService.class, () -> mock(LowCodeModuleHealthService.class));
-            context.registerBean(LowCodeModulePackageExchangeService.class,
-                    () -> mock(LowCodeModulePackageExchangeService.class));
-            context.registerBean(LowCodeModulePackageImportService.class,
-                    () -> mock(LowCodeModulePackageImportService.class));
-            context.registerBean(LowCodeModuleTemplateService.class,
-                    () -> mock(LowCodeModuleTemplateService.class));
-            context.registerBean(LowCodeGovernanceWebController.class);
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new LowCodeGovernanceWebController(
+                    mock(LowCodeModuleConfigArchiveFacade.class),
+                    mock(LowCodeModuleHealthService.class),
+                    mock(LowCodeModulePackageExchangeService.class),
+                    mock(LowCodeModulePackageImportService.class),
+                    mock(LowCodeModuleTemplateService.class)
+            )).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.low_code_governance");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
@@ -615,17 +524,12 @@ class StaticModuleDefinitionScannerTest {
             assertThat(actions.get("switchCurrentPackageVersion").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportCurrentPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportVersionPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
-        }
     }
 
     @Test
     void shouldCompileStaticServiceModelMeasureUnitFieldsIntoModuleDefinition() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
             StaticMeasureOrderService service = new StaticMeasureOrderService();
-            context.registerBean(StaticMeasureOrderWeb.class, () -> new StaticMeasureOrderWeb(service));
-            context.refresh();
-
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+            StaticModuleDefinition definition = scanner(new StaticMeasureOrderWeb(service)).scan().getFirst();
 
             assertThat(definition.moduleAlias()).isEqualTo("sales.order_line");
             assertThat(definition.entities()).singleElement().satisfies(entity -> {
@@ -645,7 +549,6 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(measureUnit.conversionScopeFieldName()).isEqualTo("skuId");
                         }));
             });
-        }
     }
 
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
@@ -659,38 +562,27 @@ class StaticModuleDefinitionScannerTest {
         assertThat(action.defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.NONE);
     }
 
-    @Test
-    void shouldRejectStaticModuleAliasDifferentFromWebScope() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(BadAliasWeb.class);
-            context.refresh();
-            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+    private StaticModuleDefinitionScanner scanner(Object... beans) {
+        return new StaticModuleDefinitionScanner(List.of(beans));
+    }
 
-            assertThatThrownBy(scanner::scan)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("alias must match web scope");
+    private static class TestDictionaryCategoryWebController extends DictionaryCategoryWebController {
+        TestDictionaryCategoryWebController(DictionaryCategoryService service) {
+            this.service = service;
         }
     }
 
-    @RestController
-    @PlatformStaticModule(application = "iam", alias = "iam.bad", title = "Bad")
-    @RequestMapping("/iam.good")
-    static class BadAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    private static class TestDictionaryItemWebController extends DictionaryItemWebController {
+        TestDictionaryItemWebController(DictionaryItemService service) {
+            this.service = service;
+        }
     }
 
-    @RestController
-    @PlatformStaticModule(application = "platform", alias = "platform.field_type", title = "Bad")
-    @RequestMapping("/platform.fieldtype")
-    static class MissingSeparatorAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
-    }
-
-    @RestController
     @PlatformStaticModule(application = "sales", alias = "sales.contract", title = "合同",
             capabilities = EntityCapability.APPROVAL)
     static class WorkflowEnabledWeb {
     }
 
-    @RestController
     @PlatformStaticModule(application = "platform", alias = "platform.dictionary_category", title = "字典管理")
     static class ConflictingDictionaryCategoryWeb {
         @CustomActionEndpoint("item_query")
@@ -698,7 +590,6 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
-    @RestController
     @PlatformStaticModule(application = "sales", alias = "sales.order_line", title = "订单明细")
     static class StaticMeasureOrderWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<StaticMeasureOrderService> {
         StaticMeasureOrderWeb(StaticMeasureOrderService service) {
@@ -713,9 +604,7 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
-    @RestController
     @PlatformStaticModule(application = "platform", alias = "platform.workflow.definition", title = "流程定义")
-    @RequestMapping("/platform.workflow.definition")
     static class MultiSegmentModuleWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<MultiSegmentModuleService> {
         MultiSegmentModuleWeb(MultiSegmentModuleService service) {
             this.service = service;

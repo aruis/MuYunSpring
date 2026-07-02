@@ -27,7 +27,6 @@ dependencies {
 tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
         "**/*WebControllerTest.java",
-        "**/PlatformAdminMenuVisibilityContractTest.java",
-        "**/StaticModuleDefinitionScannerTest.java"
+        "**/PlatformAdminMenuVisibilityContractTest.java"
     )
 }

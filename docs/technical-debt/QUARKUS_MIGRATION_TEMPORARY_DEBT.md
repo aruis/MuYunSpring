@@ -76,6 +76,12 @@
 - 影响：组合注解、继承注解、代理类解析等 Spring merged annotation 语义可能丢失。
 - 回收方向：确认平台允许的声明模型；如需要组合注解能力，建立 Quarkus/Jandex 或统一 annotation resolver，并补扫描契约测试。
 
+### Static module route alias validation is deferred
+
+- 现状：静态模块扫描器不再读取 Spring MVC `@RequestMapping`，原有 web scope 与 `@PlatformStaticModule.alias` 一致性校验暂时移出 scanner。
+- 影响：静态模块 alias 与 JAX-RS 路由不一致时，当前扫描测试不会直接失败。
+- 回收方向：在 Quarkus Web 路由契约恢复后，以 JAX-RS `@Path`/资源方法元数据补回静态模块入口校验，或明确把模块 alias 与 URL 解耦为正式架构决策。
+
 ## HTTP Payloads
 
 ### Multipart and download APIs are transitional
