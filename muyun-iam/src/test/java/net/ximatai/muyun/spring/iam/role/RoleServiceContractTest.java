@@ -6,10 +6,13 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
@@ -33,6 +36,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleServiceContractTest {
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+        CurrentUserContext.clear();
+    }
+
     @Test
     void shouldExposeRoleKindEnumOptionBindingInQuerySchema() {
         RoleService service = service(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class));
@@ -102,6 +111,64 @@ class RoleServiceContractTest {
         }
 
         assertThat(positionTemplate.getGrantSubjectTypes()).isEqualTo("employeePosition");
+    }
+
+    @Test
+    void shouldRejectSystemManagedRoleMutationWithoutSystemUser() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleGrantDao roleGrantDao = mock(RoleGrantDao.class);
+        RoleActionDao roleActionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(systemManagedRole("managed-1")));
+        RoleService service = service(roleDao, roleGrantDao, roleActionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            Role created = standardRole("managed-2");
+            created.setSystemManaged(Boolean.TRUE);
+            assertThatThrownBy(() -> service.insert(created))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+            assertThatThrownBy(() -> service.update(standardRole("managed-1")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+            assertThatThrownBy(() -> service.delete("managed-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+            assertThatThrownBy(() -> service.grantRole("managed-1", RoleGrantSubjectType.USER_ACCOUNT, "user-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+            assertThatThrownBy(() -> service.grantAction("managed-1", "sales.contract", "query"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+            assertThatThrownBy(() -> service.revokeAction("managed-1", "sales.contract", "query"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system managed role");
+        }
+    }
+
+    @Test
+    void shouldAllowSystemUserToMaintainSystemManagedRoleInTenantContext() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.insert(any())).thenReturn("managed-1");
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(systemManagedRole("managed-1")));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("ra1");
+        RoleService service = service(roleDao, mock(RoleGrantDao.class), actionDao);
+
+        try (TenantContext.Scope ignoredTenant = TenantContext.use("tenant_a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.systemUser("bootstrap", "Bootstrap"))) {
+            Role role = systemManagedRole("managed-1");
+            assertThat(service.insert(role)).isEqualTo("managed-1");
+            assertThat(service.grantAction("managed-1", "sales.contract", "query")).isEqualTo(1);
+        }
+
+        verify(roleDao).insert(argThat(role ->
+                Boolean.TRUE.equals(role.getSystemManaged()) && "tenant_a".equals(role.getTenantId())));
+        verify(actionDao).insert(argThat(action ->
+                "managed-1".equals(action.getRoleId()) && "tenant_a".equals(action.getTenantId())));
     }
 
     @Test
@@ -265,6 +332,7 @@ class RoleServiceContractTest {
     void shouldRevokeActionByPermissionActionCodeResolvedFromGrantVerifier() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
         when(actionDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(enabledAction("ra1", "r1", "sales.contract", "create")));
         when(actionDao.updateById(any())).thenReturn(1);
@@ -975,6 +1043,12 @@ class RoleServiceContractTest {
 
     private Role standardRole(String id) {
         return role(id, "Role " + id, RoleKind.STANDARD);
+    }
+
+    private Role systemManagedRole(String id) {
+        Role role = standardRole(id);
+        role.setSystemManaged(Boolean.TRUE);
+        return role;
     }
 
     private Role role(String id, String title, RoleKind kind) {

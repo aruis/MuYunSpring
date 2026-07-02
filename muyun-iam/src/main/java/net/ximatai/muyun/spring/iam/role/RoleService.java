@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -180,6 +181,23 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
     }
 
+    @Override
+    public void beforeInsert(Role role) {
+        requireSystemManagedMutationAllowed(role, "create");
+    }
+
+    @Override
+    public void beforeUpdate(Role role) {
+        Role existing = role == null || role.getId() == null ? null : select(role.getId());
+        requireSystemManagedMutationAllowed(existing, "update");
+        requireSystemManagedMutationAllowed(role, "update");
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        requireSystemManagedMutationAllowed(select(id), "delete");
+    }
+
     public String bindUser(String roleId, String userId) {
         return grantRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
     }
@@ -230,6 +248,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     public int revokeRole(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
         Role role = requireEnabledRole(roleId);
+        requireSystemManagedMutationAllowed(role, "revoke role");
         RoleGrant grant = findRoleGrant(role.getId(), requireSubjectType(subjectType), requireSubjectId(subjectId));
         if (grant == null) {
             return 0;
@@ -239,6 +258,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     public int deleteGrant(String roleId, String grantId) {
         Role role = requireEnabledRole(roleId);
+        requireSystemManagedMutationAllowed(role, "delete grant");
         RoleGrant grant = roleGrantDao.query(scopedChildCriteria(Criteria.of()
                         .eq("id", Preconditions.requireText(grantId, "grantId"))),
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
@@ -284,6 +304,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                            String referenceFieldId,
                            String referenceActionCode) {
         Role role = requireStandardRoleForActionGrant(roleId);
+        requireSystemManagedMutationAllowed(role, "grant action");
 
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String requestedActionCode = requireActionCode(actionCode);
@@ -340,6 +361,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                             DataScopePolicy dataScopePolicy,
                                             TenantScopePolicy tenantScopePolicy) {
         Role role = requireEnabledRole(roleId);
+        requireSystemManagedMutationAllowed(role, "grant wildcard data scope action");
         if (role.getRoleKind() != RoleKind.WILDCARD_DATA_SCOPE) {
             throw new PlatformException("role is not wildcard data scope role: " + roleId);
         }
@@ -374,6 +396,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public int revokeAction(String roleId, String moduleAlias, String actionCode) {
+        Role role = requireEnabledRole(roleId);
+        requireSystemManagedMutationAllowed(role, "revoke action");
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, actionCode);
         RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
@@ -683,6 +707,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return role;
     }
 
+    private void requireSystemManagedMutationAllowed(Role role, String operation) {
+        if (role != null && Boolean.TRUE.equals(role.getSystemManaged()) && !CurrentUserContext.isSystem()) {
+            throw new PlatformException("system managed role cannot be modified by " + operation + ": " + role.getId());
+        }
+    }
+
     private void validateGroupMembers(String memberRoleIds) {
         for (String memberRoleId : parseRoleIds(memberRoleIds)) {
             Role member = select(memberRoleId);
@@ -775,6 +805,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private GrantResult grantRoleIfAbsent(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
         Role role = requireEnabledRole(roleId);
+        requireSystemManagedMutationAllowed(role, "grant role");
         RoleGrantSubjectType validSubjectType = requireSubjectType(subjectType);
         String validSubjectId = requireSubjectId(subjectId);
         ensureRoleCanGrantTo(role, validSubjectType);

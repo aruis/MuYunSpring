@@ -6,11 +6,11 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
-public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> extends CrudAbility<T> {
+public interface DataScopeAbility<T extends EntityContract> extends CrudAbility<T> {
     DataScopeCriteriaService getDataScopeCriteriaService();
 
     default DataScopeCriteriaResult readScope(PlatformAction action, Criteria criteria) {
@@ -29,7 +29,8 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
                 getModuleAlias(),
                 action.executionPolicy(),
                 criteria == null ? Criteria.of() : criteria,
-                CurrentUserContext.currentUser()
+                CurrentUserContext.currentUser(),
+                dataScopeFieldMapping()
         );
     }
 
@@ -108,8 +109,17 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
                 getModuleAlias(),
                 policy,
                 criteria == null ? Criteria.of() : criteria,
-                CurrentUserContext.currentUser()
+                CurrentUserContext.currentUser(),
+                dataScopeFieldMapping()
         );
+    }
+
+    default DataScopeFieldMapping dataScopeFieldMapping() {
+        if (this instanceof DataScopeFieldMappingAbility mappingAbility) {
+            DataScopeFieldMapping mapping = mappingAbility.dataScopeFieldMapping();
+            return mapping == null ? DataScopeFieldMapping.STANDARD : mapping;
+        }
+        return DataScopeFieldMapping.STANDARD;
     }
 
     default List<T> sortedListForAction(PlatformAction action, Criteria criteria) {
@@ -142,7 +152,7 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
     }
 
     @SuppressWarnings("unchecked")
-    static <T extends EntityContract & DataScopeCapable> DataScopeAbility<T> cast(CrudAbility<?> ability) {
+    static <T extends EntityContract> DataScopeAbility<T> cast(CrudAbility<?> ability) {
         return (DataScopeAbility<T>) ability;
     }
 

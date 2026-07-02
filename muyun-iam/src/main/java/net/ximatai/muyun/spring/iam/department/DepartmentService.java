@@ -1,40 +1,88 @@
 package net.ximatai.muyun.spring.iam.department;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.DataScopeFieldMappingAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Service
 public class DepartmentService extends TenantStandardBusinessService<Department> implements
         SoftDeleteAbility<Department>,
         EnableAbility<Department>,
         TreeAbility<Department>,
+        DataScopeAbility<Department>,
+        DataScopeFieldMappingAbility,
         ReferenceAbility<Department> {
 
     public static final String MODULE_ALIAS = "iam.department";
+    private static final DataScopeFieldMapping DATA_SCOPE_FIELD_MAPPING =
+            DataScopeFieldMapping.of(null, "organizationId", "id");
 
     private final OrganizationService organizationService;
+    private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
+
+    public DepartmentService(DepartmentDao departmentDao,
+                             ActiveTenantVerifier activeTenantVerifier,
+                             OrganizationService organizationService) {
+        this(departmentDao, activeTenantVerifier, organizationService, Optional.empty());
+    }
 
     @Autowired
     public DepartmentService(DepartmentDao departmentDao,
                              ActiveTenantVerifier activeTenantVerifier,
-                             OrganizationService organizationService) {
+                             OrganizationService organizationService,
+                             ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, Department.class, departmentDao, activeTenantVerifier);
         this.organizationService = organizationService;
+        this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
+    }
+
+    public DepartmentService(DepartmentDao departmentDao,
+                             ActiveTenantVerifier activeTenantVerifier,
+                             OrganizationService organizationService,
+                             Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
+        super(MODULE_ALIAS, Department.class, departmentDao, activeTenantVerifier);
+        this.organizationService = organizationService;
+        Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
+                ? Optional.empty()
+                : dataScopeCriteriaService;
+        this.dataScopeCriteriaService = () -> criteriaService
+                .<DataScopeCriteriaService>map(service -> service)
+                .orElseGet(AllowAllDataScopeCriteriaService::new);
+    }
+
+    @Override
+    public DataScopeCriteriaService getDataScopeCriteriaService() {
+        return dataScopeCriteriaService.get();
+    }
+
+    @Override
+    public DataScopeFieldMapping dataScopeFieldMapping() {
+        return DATA_SCOPE_FIELD_MAPPING;
     }
 
     @Override
@@ -72,6 +120,13 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
     public List<Department> departmentChildren(String organizationId, String parentId) {
         String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
         return children(organizationScope(validOrganizationId), parentId);
+    }
+
+    public List<Department> departmentChildrenForAction(PlatformAction action, String organizationId, String parentId) {
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        String validParentId = Preconditions.requireText(parentId, "parentId");
+        Criteria criteria = scopedTreeCriteria(organizationScope(validOrganizationId), validParentId);
+        return listForAction(action, criteria, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     public List<String> selfAndDescendantIds(String organizationId, String departmentId) {

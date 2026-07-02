@@ -277,7 +277,7 @@ class IamWebControllerTest {
     void shouldExposeOrganizationTreeUnderTenantScope() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any()))
+        when(organizationDao.list(any(Criteria.class), any()))
                 .thenAnswer(invocation -> {
                     assertThat(TenantContext.currentTenantId()).contains("tenant_a");
                     Organization organization = organization("org-1", "HQ", "Headquarters");
@@ -304,9 +304,10 @@ class IamWebControllerTest {
         Organization child = organization("org-2", "BR", "Branch");
         child.setTenantId("tenant_a");
         child.setParentId("org-1");
+        when(organizationDao.count(any(Criteria.class))).thenReturn(1L);
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(root), List.of(child));
-        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any()))
+        when(organizationDao.list(any(Criteria.class), any()))
                 .thenReturn(List.of(root), List.of(child), List.of());
 
         mvc.perform(get("/iam.organization/tree"))

@@ -185,6 +185,7 @@ class OrganizationRepositoryContractTest {
     void abilityServiceShouldUseVersionConditionForStaticWrites() {
         IDatabaseOperations<Object> operations = mockedOperations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("org-1", "Headquarters", 10, 2)));
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
         when(operations.patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap(), eq("id"))).thenReturn(1);
         OrganizationService service = organizationService(operations);
         Organization update = new Organization();

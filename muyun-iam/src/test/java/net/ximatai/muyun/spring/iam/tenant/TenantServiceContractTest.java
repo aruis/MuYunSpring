@@ -4,14 +4,19 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class TenantServiceContractTest {
@@ -98,6 +103,24 @@ class TenantServiceContractTest {
             service.beforeUpdate(disabledTenant("platform", "平台租户"));
             service.beforeDelete("platform");
         }
+    }
+
+    @Test
+    void shouldAllowTenantProvisioningReplay() {
+        TenantDao dao = mock(TenantDao.class);
+        when(dao.insert(any())).thenAnswer(invocation -> invocation.<Tenant>getArgument(0).getId());
+        TenantCreationProvisioner provisioner = mock(TenantCreationProvisioner.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<TenantCreationProvisioner> provisioners = mock(ObjectProvider.class);
+        when(provisioners.orderedStream()).thenAnswer(invocation -> Stream.of(provisioner));
+        TenantService service = new TenantService(dao, provisioners);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
+            service.insert(tenant("ximatai", "Ximatai"));
+        }
+        service.provisionTenant("ximatai");
+
+        verify(provisioner, times(2)).afterTenantCreated("ximatai");
     }
 
     private Tenant tenant(String alias, String title) {

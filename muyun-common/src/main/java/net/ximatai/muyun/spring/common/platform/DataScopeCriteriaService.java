@@ -16,6 +16,14 @@ public interface DataScopeCriteriaService {
                                              Criteria criteria,
                                              Optional<CurrentUser> currentUser);
 
+    default DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                     ActionExecutionPolicy policy,
+                                                     Criteria criteria,
+                                                     Optional<CurrentUser> currentUser,
+                                                     DataScopeFieldMapping fieldMapping) {
+        return resolveReadScope(moduleAlias, policy, criteria, currentUser);
+    }
+
     default Criteria applyReadScope(String moduleAlias,
                                     String actionCode,
                                     Criteria criteria,
