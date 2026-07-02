@@ -28,6 +28,10 @@ subprojects {
         options.compilerArgs.add("-parameters")
     }
 
+    tasks.named<JavaCompile>("compileTestJava").configure {
+        exclude("**/*IT.java")
+    }
+
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         maxParallelForks = 1

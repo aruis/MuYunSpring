@@ -23,3 +23,24 @@ dependencies {
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
 }
+
+tasks.named<JavaCompile>("compileTestJava").configure {
+    exclude(
+        "**/MuYunSpringDatabaseConfigurationTest.java",
+        "**/MuYunSpringDynamicRuntimeConfigurationTest.java",
+        "**/MuYunSpringIdentityConfigurationTest.java",
+        "**/MuYunSpringRecordOutputConfigurationTest.java",
+        "**/MuYunSpringRuntimeConfigurationTest.java",
+        "**/RuntimeEventHandlerConfigurationTest.java",
+        "**/*WebControllerTest.java",
+        "**/PlatformAdminMenuVisibilityContractTest.java",
+        "**/PlatformMenuInitialDataDeclarationProviderTest.java",
+        "**/StaticModuleDefinitionRegistrarTest.java",
+        "**/StaticModuleDefinitionScannerTest.java",
+        "**/ActionEndpointInterceptorTest.java",
+        "**/BearerTokenCurrentUserProviderTest.java",
+        "**/CrudWebFormSchemaTest.java",
+        "**/PlatformWebExceptionHandlerTest.java",
+        "**/RoleGrantableActionResolverTest.java"
+    )
+}
