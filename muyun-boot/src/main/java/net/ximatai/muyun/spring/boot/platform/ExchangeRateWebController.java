@@ -9,18 +9,18 @@ import net.ximatai.muyun.spring.platform.currency.CurrencyConversion;
 import net.ximatai.muyun.spring.platform.currency.CurrencyConversionService;
 import net.ximatai.muyun.spring.platform.currency.ExchangeRate;
 import net.ximatai.muyun.spring.platform.currency.ExchangeRateService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.function.Supplier;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = ExchangeRateService.MODULE_ALIAS, title = "平台汇率")
-@RequestMapping({"/platform.exchange_rate", "/platform.exchange-rates"})
+@Path("/platform.exchange_rate")
 public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSupport<ExchangeRate, ExchangeRateService> {
 
     private final CurrencyConversionService conversionService;
@@ -35,26 +35,27 @@ public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSuppo
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
     }
 
     @Override
-    protected void bindScope(ExchangeRate record, HttpServletRequest request) {
+    protected void bindScope(ExchangeRate record, @Context HttpServletRequest request) {
     }
 
     @Override
-    protected boolean inScope(ExchangeRate record, HttpServletRequest request) {
+    protected boolean inScope(ExchangeRate record, @Context HttpServletRequest request) {
         return true;
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "exchange rate not found: " + id;
     }
 
-    @PostMapping("/convert")
+    @POST
+    @Path("/convert")
     @ActionEndpoint(PlatformAction.QUERY)
-    public CurrencyConversion convert(@RequestBody CurrencyConversionRequest body) {
+    public CurrencyConversion convert(CurrencyConversionRequest body) {
         return webScope(() -> conversionService.convert(
                 body.amount(), body.fromCurrencyCode(), body.toCurrencyCode(), body.rateTypeCode(), body.rateDate()));
     }

@@ -10,16 +10,18 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.platform.currency.Currency;
 import net.ximatai.muyun.spring.platform.currency.CurrencyService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 
 import java.util.function.Supplier;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = CurrencyService.MODULE_ALIAS, title = "平台币种")
-@RequestMapping({"/platform.currency", "/platform.currencies"})
+@Path("/platform.currency")
 public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<Currency, CurrencyService> {
 
     @Override
@@ -28,26 +30,27 @@ public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<C
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
     }
 
     @Override
-    protected void bindScope(Currency record, HttpServletRequest request) {
+    protected void bindScope(Currency record, @Context HttpServletRequest request) {
     }
 
     @Override
-    protected boolean inScope(Currency record, HttpServletRequest request) {
+    protected boolean inScope(Currency record, @Context HttpServletRequest request) {
         return true;
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "currency not found: " + id;
     }
 
-    @GetMapping("/options")
+    @GET
+    @Path("/options")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebListResponse<Currency> options(@RequestParam(defaultValue = "true") boolean enabledOnly) {
+    public WebListResponse<Currency> options(@DefaultValue("true") @QueryParam("enabledOnly") boolean enabledOnly) {
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
                 service().listVisibleCurrencies(enabledOnly), FieldOutputContext.LIST)));
     }
