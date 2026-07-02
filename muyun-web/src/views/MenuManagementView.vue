@@ -249,7 +249,6 @@ function menuItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
   const menu = record as MenuRecord;
   return {
     title: menuTitleOf(menu),
-    secondary: menu.id,
     tag: menuTagOf(record),
     muted: menu.enabled === false,
     actions: menuTreeActionsOf(record),
