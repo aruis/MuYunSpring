@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import jakarta.ws.rs.Path;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -9,8 +10,11 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.form.FormAbility;
+import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.form.FormDescriptor;
 import net.ximatai.muyun.spring.ability.form.FormField;
+import net.ximatai.muyun.spring.ability.form.FormSchema;
+import net.ximatai.muyun.spring.ability.form.FormValueType;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -18,6 +22,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -27,109 +32,102 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class CrudWebFormSchemaTest {
+public class CrudWebFormSchemaTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
     }
 
     @Test
-    void shouldExposeFormSchemaThroughCrudWebEndpoint() throws Exception {
-        MockMvc mvc = MockMvcBuilders
-                .standaloneSetup(new DemoRecordController(new DemoRecordService()))
-                .build();
+    void shouldExposeFormSchemaThroughCrudWebContract() {
+        DemoRecordController controller = new DemoRecordController(new DemoRecordService());
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/demo.record/form/schema"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.scopeName").value("demo.record"))
-                    .andExpect(jsonPath("$.title").value("Demo Record"))
-                    .andExpect(jsonPath("$.fields[0].name").value("title"))
-                    .andExpect(jsonPath("$.fields[0].title").value("名称"))
-                    .andExpect(jsonPath("$.fields[0].required").value(true));
+            FormSchema schema = controller.formSchema(null);
+
+            assertThat(schema.scopeName()).isEqualTo("demo.record");
+            assertThat(schema.title()).isEqualTo("Demo Record");
+            assertThat(schema.fields()).singleElement().satisfies(field -> {
+                assertThat(field.name()).isEqualTo("title");
+                assertThat(field.title()).isEqualTo("名称");
+                assertThat(field.required()).isTrue();
+            });
         }
     }
 
     @Test
-    void shouldPreferStaticModuleUiDefinitionForFormSchemaEndpoint() throws Exception {
-        MockMvc mvc = MockMvcBuilders
-                .standaloneSetup(new DemoRecordUiController(new DemoRecordService()))
-                .build();
+    void shouldPreferStaticModuleUiDefinitionForFormSchemaContract() {
+        DemoRecordUiController controller = new DemoRecordUiController(new DemoRecordService());
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/demo.record.ui/form/schema"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.scopeName").value("demo.record.ui"))
-                    .andExpect(jsonPath("$.title").value("UI Demo Record"))
-                    .andExpect(jsonPath("$.fields[0].name").value("title"))
-                    .andExpect(jsonPath("$.fields[0].title").value("UI 名称"))
-                    .andExpect(jsonPath("$.fields[0].required").value(true))
-                    .andExpect(jsonPath("$.fields[0].readOnly").value(true))
-                    .andExpect(jsonPath("$.fields[1].name").value("status"))
-                    .andExpect(jsonPath("$.fields[1].controlType").value("SELECT"))
-                    .andExpect(jsonPath("$.fields[1].optionBinding.sourceType").value("dictionary"))
-                    .andExpect(jsonPath("$.fields[1].optionBinding.source").value("demo.status"))
-                    .andExpect(jsonPath("$.fields[1].optionTitleField").value("statusTitle"))
-                    .andExpect(jsonPath("$.fields[2].name").value("enabled"))
-                    .andExpect(jsonPath("$.fields[2].valueType").value("BOOLEAN"))
-                    .andExpect(jsonPath("$.fields[2].controlType").value("SWITCH"));
+            FormSchema schema = controller.formSchema(null);
+
+            assertThat(schema.scopeName()).isEqualTo("demo.record.ui");
+            assertThat(schema.title()).isEqualTo("UI Demo Record");
+            assertThat(schema.fields()).hasSize(3);
+            assertThat(schema.fields().get(0)).satisfies(field -> {
+                assertThat(field.name()).isEqualTo("title");
+                assertThat(field.title()).isEqualTo("UI 名称");
+                assertThat(field.required()).isTrue();
+                assertThat(field.readOnly()).isTrue();
+            });
+            assertThat(schema.fields().get(1)).satisfies(field -> {
+                assertThat(field.name()).isEqualTo("status");
+                assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
+                assertThat(field.optionBinding()).isEqualTo(new OptionBinding("dictionary", "demo.status"));
+                assertThat(field.optionTitleField()).isEqualTo("statusTitle");
+            });
+            assertThat(schema.fields().get(2)).satisfies(field -> {
+                assertThat(field.name()).isEqualTo("enabled");
+                assertThat(field.valueType()).isEqualTo(FormValueType.BOOLEAN);
+                assertThat(field.controlType()).isEqualTo(FormControlType.SWITCH);
+            });
         }
     }
 
     @Test
-    void shouldIgnoreParentModuleUiContributionForFormSchemaEndpoint() throws Exception {
-        MockMvc mvc = MockMvcBuilders
-                .standaloneSetup(new DemoRecordChildUiController(new DemoRecordService()))
-                .build();
+    void shouldIgnoreParentModuleUiContributionForFormSchemaContract() {
+        DemoRecordChildUiController controller = new DemoRecordChildUiController(new DemoRecordService());
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/demo.record.child/form/schema"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.scopeName").value("demo.record"))
-                    .andExpect(jsonPath("$.title").value("Demo Record"))
-                    .andExpect(jsonPath("$.fields[0].name").value("title"))
-                    .andExpect(jsonPath("$.fields[0].title").value("名称"));
+            FormSchema schema = controller.formSchema(null);
+
+            assertThat(schema.scopeName()).isEqualTo("demo.record");
+            assertThat(schema.title()).isEqualTo("Demo Record");
+            assertThat(schema.fields()).singleElement().satisfies(field -> {
+                assertThat(field.name()).isEqualTo("title");
+                assertThat(field.title()).isEqualTo("名称");
+            });
         }
     }
 
     @Test
-    void shouldProjectStaticModuleQueryThroughCrudWebEndpoint() throws Exception {
+    @SuppressWarnings("unchecked")
+    void shouldProjectStaticModuleQueryThroughCrudWebContract() {
         DemoRecordUiController controller = new DemoRecordUiController(new DemoRecordService());
         controller.setStaticRecordReadProjectionService(new StaticRecordReadProjectionService(
                 new StaticModuleDefinitionCatalog(List.of(demoStaticModuleDefinition()))
         ));
-        MockMvc mvc = MockMvcBuilders
-                .standaloneSetup(controller)
-                .build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(post("/demo.record.ui/query")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.records[0].id").value("demo-1"))
-                    .andExpect(jsonPath("$.records[0].title").value("Demo One"))
-                    .andExpect(jsonPath("$.records[0].status").doesNotExist());
+            WebPageResponse<?> response = controller.query(null);
+
+            Map<String, Object> projected = (Map<String, Object>) response.records().getFirst();
+            assertThat(projected).containsEntry("id", "demo-1");
+            assertThat(projected).containsEntry("title", "Demo One");
+            assertThat(projected).doesNotContainKey("status");
         }
     }
 
-    @RestController
-    @RequestMapping("/demo.record")
+    @Path("/demo.record")
     private static final class DemoRecordController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService> {
         private DemoRecordController(DemoRecordService service) {
@@ -137,8 +135,7 @@ class CrudWebFormSchemaTest {
         }
     }
 
-    @RestController
-    @RequestMapping("/demo.record.ui")
+    @Path("/demo.record.ui")
     private static final class DemoRecordUiController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService>, StaticModuleUiContributor {
         private StaticRecordReadProjectionService staticRecordReadProjectionService;
@@ -170,8 +167,7 @@ class CrudWebFormSchemaTest {
         }
     }
 
-    @RestController
-    @RequestMapping("/demo.record.child")
+    @Path("/demo.record.child")
     private static final class DemoRecordChildUiController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService>, StaticModuleUiContributor {
         private DemoRecordChildUiController(DemoRecordService service) {
@@ -240,7 +236,7 @@ class CrudWebFormSchemaTest {
     }
 
     @Table(name = "demo_record", comment = "Demo Record")
-    private static final class DemoRecord extends StandardEntity {
+    public static final class DemoRecord extends StandardEntity {
         @Column(name = "title", comment = "名称")
         private String title;
 
