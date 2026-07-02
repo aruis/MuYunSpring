@@ -6,14 +6,14 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.core.Context;
 
-@RestController
-@RequestMapping("/iam.auth")
+@ApplicationScoped
+@Path("/iam.auth")
 public class LoginWebController {
     private final UserSessionService userSessionService;
 
@@ -21,17 +21,20 @@ public class LoginWebController {
         this.userSessionService = userSessionService;
     }
 
-    @PostMapping("/login")
-    public LoginResult login(@RequestBody LoginRequest request) {
+    @POST
+    @Path("/login")
+    public LoginResult login(LoginRequest request) {
         return userSessionService.login(request.tenantId(), request.username(), request.password());
     }
 
-    @PostMapping("/logout")
-    public void logout(HttpServletRequest request) {
+    @POST
+    @Path("/logout")
+    public void logout(@Context HttpServletRequest request) {
         userSessionService.logout(bearerToken(request));
     }
 
-    @GetMapping("/context")
+    @GET
+    @Path("/context")
     public CurrentUser context() {
         return CurrentUserContext.currentUser()
                 .orElseThrow(() -> new AuthenticationRequiredException("current user context is not available"));

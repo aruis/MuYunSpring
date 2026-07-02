@@ -1,31 +1,33 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.Optional;
+import java.lang.reflect.Method;
+import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class LoginWebControllerTest {
+    private final UserSessionService userSessionService = mock(UserSessionService.class);
+    private final LoginWebController controller = new LoginWebController(userSessionService);
+
     @AfterEach
     void tearDown() {
         CurrentUserContext.clear();
@@ -33,100 +35,98 @@ class LoginWebControllerTest {
     }
 
     @Test
-    void shouldExposeCurrentUserContext() throws Exception {
-        LoginWebController controller = new LoginWebController(mock(UserSessionService.class));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .addFilters(new CurrentUserWebFilter(() -> Optional.of(
-                        CurrentUser.tenantUser("user-1", "Alice", "tenant-a", "org-1"))))
-                .build();
+    void shouldDeclareAuthRoutes() throws Exception {
+        assertThat(LoginWebController.class.getAnnotation(Path.class).value()).isEqualTo("/iam.auth");
 
-        mvc.perform(get("/iam.auth/context"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value("user-1"))
-                .andExpect(jsonPath("$.username").value("Alice"))
-                .andExpect(jsonPath("$.tenantId").value("tenant-a"))
-                .andExpect(jsonPath("$.organizationId").value("org-1"));
+        assertRoute("login", new Class<?>[]{LoginWebController.LoginRequest.class}, POST.class, "/login");
+        assertRoute("logout", new Class<?>[]{HttpServletRequest.class}, POST.class, "/logout");
+        assertRoute("context", new Class<?>[]{}, GET.class, "/context");
     }
 
     @Test
-    void shouldReturnUnauthorizedWhenCurrentUserContextIsMissing() throws Exception {
-        LoginWebController controller = new LoginWebController(mock(UserSessionService.class));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .build();
+    void shouldLoginWithRequestPayload() {
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "Alice", "tenant-a", "org-1");
+        LoginResult result = LoginResult.bearer("token-1", Instant.parse("2026-01-01T00:00:00Z"), currentUser);
+        when(userSessionService.login("tenant-a", "alice", "secret1")).thenReturn(result);
 
-        mvc.perform(get("/iam.auth/context"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.AUTH_REQUIRED))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("current user context is not available"));
+        LoginResult response = controller.login(new LoginWebController.LoginRequest(
+                "tenant-a", "alice", "secret1"));
+
+        assertThat(response).isSameAs(result);
+        verify(userSessionService).login("tenant-a", "alice", "secret1");
     }
 
     @Test
-    void shouldReturnUnauthorizedWhenLoginCredentialsAreInvalid() throws Exception {
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(anyString(), anyString(), anyString()))
-                .thenThrow(new AuthenticationFailedException("invalid username or password"));
-        LoginWebController controller = new LoginWebController(userSessionService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .build();
+    void shouldLogoutWithBearerToken() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer token-1");
 
-        mvc.perform(post("/iam.auth/login")
-                        .contentType(APPLICATION_JSON)
-                        .content("""
-                                {"tenantId":"tenant-a","username":"alice","password":"wrong-password"}
-                """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.LOGIN_BAD_CREDENTIALS))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("invalid username or password"));
+        controller.logout(request);
+
+        verify(userSessionService).logout("token-1");
     }
 
     @Test
-    void shouldReturnAuthenticationFailedWithoutLeakingInactiveTenantReason() throws Exception {
-        UserSessionService userSessionService = mock(UserSessionService.class);
+    void shouldLogoutWithNullTokenWhenAuthorizationHeaderIsMissingOrUnsupported() {
+        HttpServletRequest missing = mock(HttpServletRequest.class);
+        HttpServletRequest unsupported = mock(HttpServletRequest.class);
+        when(unsupported.getHeader("Authorization")).thenReturn("Basic credential");
+
+        controller.logout(missing);
+        controller.logout(unsupported);
+
+        verify(userSessionService, org.mockito.Mockito.times(2)).logout(null);
+    }
+
+    @Test
+    void shouldExposeCurrentUserContext() {
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "Alice", "tenant-a", "org-1");
+
+        CurrentUser response;
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(currentUser)) {
+            response = controller.context();
+        }
+
+        assertThat(response).isSameAs(currentUser);
+    }
+
+    @Test
+    void shouldRequireCurrentUserContext() {
+        assertThatThrownBy(controller::context)
+                .isInstanceOf(AuthenticationRequiredException.class)
+                .hasMessage("current user context is not available");
+    }
+
+    @Test
+    void shouldPropagateAuthenticationFailuresWithoutLeakingCauseMessage() {
         when(userSessionService.login(anyString(), anyString(), anyString()))
                 .thenThrow(new AuthenticationFailedException("invalid username or password",
                         new RuntimeException("Tenant is not active: tenant-a")));
-        LoginWebController controller = new LoginWebController(userSessionService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .build();
 
-        mvc.perform(post("/iam.auth/login")
-                        .contentType(APPLICATION_JSON)
-                        .content("""
-                                {"tenantId":"tenant-a","username":"alice","password":"secret1"}
-                """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.LOGIN_BAD_CREDENTIALS))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("invalid username or password"));
+        assertThatThrownBy(() -> controller.login(new LoginWebController.LoginRequest(
+                "tenant-a", "alice", "secret1")))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("invalid username or password")
+                .hasRootCauseMessage("Tenant is not active: tenant-a");
     }
 
     @Test
-    void shouldReturnBadRequestWhenLoginRequestIsMalformed() throws Exception {
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(isNull(), anyString(), anyString()))
+    void shouldPropagateMalformedLoginRequestAsValidationFailure() {
+        when(userSessionService.login(null, "alice", "secret1"))
                 .thenThrow(new IllegalArgumentException("tenantId must not be null"));
-        LoginWebController controller = new LoginWebController(userSessionService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .build();
 
-        mvc.perform(post("/iam.auth/login")
-                        .contentType(APPLICATION_JSON)
-                        .content("""
-                                {"username":"alice","password":"secret1"}
-                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("tenantId must not be null"));
+        assertThatThrownBy(() -> controller.login(new LoginWebController.LoginRequest(
+                null, "alice", "secret1")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("tenantId must not be null");
+    }
+
+    private void assertRoute(String methodName,
+                             Class<?>[] parameterTypes,
+                             Class<?> httpMethod,
+                             String path) throws Exception {
+        Method method = LoginWebController.class.getMethod(methodName, parameterTypes);
+        assertThat(method.getAnnotation(httpMethod.asSubclass(java.lang.annotation.Annotation.class))).isNotNull();
+        assertThat(method.getAnnotation(Path.class).value()).isEqualTo(path);
     }
 }
