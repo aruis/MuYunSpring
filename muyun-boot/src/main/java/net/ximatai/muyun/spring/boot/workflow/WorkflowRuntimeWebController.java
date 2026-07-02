@@ -44,22 +44,18 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitStatusView;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
 import java.util.List;
 
-@RestController
-@RequestMapping("/workflow/runtime")
+@ApplicationScoped
+@Path("/workflow/runtime")
 public class WorkflowRuntimeWebController {
     private final WorkflowRuntimeReadFacade runtimeReadFacade;
     private final WorkflowTaskActionFacade taskActionFacade;
@@ -82,87 +78,99 @@ public class WorkflowRuntimeWebController {
         this.submitReadFacade = submitReadFacade;
     }
 
-    @GetMapping("/instance/{instanceId}/bundle")
-    public WorkflowRuntimeRenderBundle renderBundle(@PathVariable String instanceId) {
+    @GET
+    @Path("/instance/{instanceId}/bundle")
+    public WorkflowRuntimeRenderBundle renderBundle(@PathParam("instanceId") String instanceId) {
         return runtimeReadFacade.renderBundle(instanceId);
     }
 
-    @GetMapping("/instance/{instanceId}/manual-branches")
-    public WebListResponse<WorkflowManualBranchCandidateView> manualBranchCandidates(@PathVariable String instanceId) {
+    @GET
+    @Path("/instance/{instanceId}/manual-branches")
+    public WebListResponse<WorkflowManualBranchCandidateView> manualBranchCandidates(@PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.manualBranchCandidates(instanceId));
     }
 
-    @GetMapping("/instance/{instanceId}/manual-branch-candidate-prechecks")
+    @GET
+    @Path("/instance/{instanceId}/manual-branch-candidate-prechecks")
     public WebListResponse<WorkflowManualBranchCandidatePrecheckView> manualBranchCandidatePrechecks(
-            @PathVariable String instanceId,
-            @RequestParam(required = false) String operatorId) {
+            @PathParam("instanceId") String instanceId,
+            @QueryParam("operatorId") String operatorId) {
         return new WebListResponse<>(runtimeReadFacade.manualBranchCandidatePrechecks(instanceId,
                 currentOperatorId()));
     }
 
-    @GetMapping("/instance/{instanceId}/tasks")
-    public WebListResponse<WorkflowTask> instanceTasks(@PathVariable String instanceId) {
+    @GET
+    @Path("/instance/{instanceId}/tasks")
+    public WebListResponse<WorkflowTask> instanceTasks(@PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.instanceTasks(instanceId));
     }
 
-    @GetMapping("/instance/{instanceId}/events")
-    public WebListResponse<WorkflowEvent> instanceEvents(@PathVariable String instanceId) {
+    @GET
+    @Path("/instance/{instanceId}/events")
+    public WebListResponse<WorkflowEvent> instanceEvents(@PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.instanceEvents(instanceId));
     }
 
-    @GetMapping("/instance/{instanceId}/add-sign-explanations")
+    @GET
+    @Path("/instance/{instanceId}/add-sign-explanations")
     public WebListResponse<WorkflowRuntimeAddSignExplanationView> addSignExplanations(
-            @PathVariable String instanceId) {
+            @PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.addSignExplanations(instanceId));
     }
 
-    @PostMapping("/record/{moduleAlias}/{recordId}/submit/status")
-    public WorkflowSubmitStatusView submitStatus(@PathVariable String moduleAlias,
-                                                 @PathVariable String recordId,
-                                                 @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+    @POST
+    @Path("/record/{moduleAlias}/{recordId}/submit/status")
+    public WorkflowSubmitStatusView submitStatus(@PathParam("moduleAlias") String moduleAlias,
+                                                 @PathParam("recordId") String recordId,
+                                                 WorkflowSubmitWebRequest request) {
         return submitReadFacade.status(submitRequest(moduleAlias, recordId, request, false));
     }
 
-    @PostMapping("/record/{moduleAlias}/{recordId}/submit/preview")
-    public WorkflowSubmitPreviewView submitPreview(@PathVariable String moduleAlias,
-                                                   @PathVariable String recordId,
-                                                   @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+    @POST
+    @Path("/record/{moduleAlias}/{recordId}/submit/preview")
+    public WorkflowSubmitPreviewView submitPreview(@PathParam("moduleAlias") String moduleAlias,
+                                                   @PathParam("recordId") String recordId,
+                                                   WorkflowSubmitWebRequest request) {
         return submitReadFacade.preview(submitRequest(moduleAlias, recordId, request, true));
     }
 
     @CustomActionEndpoint(value = "submitApproval", title = "Submit Approval",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "recordId")
-    @PostMapping("/record/{moduleAlias}/{recordId}/actions/submitApproval")
-    public WorkflowSubmitResult submitApproval(@PathVariable String moduleAlias,
-                                               @PathVariable String recordId,
-                                               @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+    @POST
+    @Path("/record/{moduleAlias}/{recordId}/actions/submitApproval")
+    public WorkflowSubmitResult submitApproval(@PathParam("moduleAlias") String moduleAlias,
+                                               @PathParam("recordId") String recordId,
+                                               WorkflowSubmitWebRequest request) {
         return submitFacade.submit(submitRequest(moduleAlias, recordId, request, true));
     }
 
-    @PostMapping("/instance/{instanceId}/actions")
+    @POST
+    @Path("/instance/{instanceId}/actions")
     public WebListResponse<WorkflowTaskAvailableAction> instanceAvailableActions(
-            @PathVariable String instanceId,
-            @RequestBody(required = false) WorkflowOperatorWebRequest request) {
+            @PathParam("instanceId") String instanceId,
+            WorkflowOperatorWebRequest request) {
         return new WebListResponse<>(runtimeReadFacade.instanceAvailableActions(instanceId,
                 currentOperatorIdOrNull()));
     }
 
-    @PostMapping("/instance/{instanceId}/actions/{actionCode}")
+    @POST
+    @Path("/instance/{instanceId}/actions/{actionCode}")
     public WorkflowInstanceActionResult executeInstanceAction(
-            @PathVariable String instanceId,
-            @PathVariable String actionCode,
-            @RequestBody(required = false) WorkflowInstanceActionWebRequest request) {
+            @PathParam("instanceId") String instanceId,
+            @PathParam("actionCode") String actionCode,
+            WorkflowInstanceActionWebRequest request) {
         return instanceActionFacade.execute(actionCode, new WorkflowInstanceActionRequest(instanceId,
                 currentOperatorId(),
                 request == null ? null : request.reason(),
                 null));
     }
 
-    @PostMapping("/task/{taskId}/actions/{actionCode}")
+    @POST
+    @Path("/task/{taskId}/actions/{actionCode}")
     public WorkflowTaskActionResult executeTaskAction(
-            @PathVariable String taskId,
-            @PathVariable String actionCode,
-            @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
+            @PathParam("taskId") String taskId,
+            @PathParam("actionCode") String actionCode,
+            WorkflowTaskActionWebRequest request) {
         return taskActionFacade.execute(actionCode, new WorkflowTaskActionRequest(taskId,
                 currentOperatorId(),
                 request == null ? null : request.targetAssigneeId(),
@@ -178,10 +186,11 @@ public class WorkflowRuntimeWebController {
                 request == null ? null : jsonText(request.layoutJson())));
     }
 
-    @PostMapping("/task/{taskId}/read")
+    @POST
+    @Path("/task/{taskId}/read")
     public WorkflowTaskActionResult readNoticeTask(
-            @PathVariable String taskId,
-            @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
+            @PathParam("taskId") String taskId,
+            WorkflowTaskActionWebRequest request) {
         return taskActionFacade.execute("read", new WorkflowTaskActionRequest(taskId,
                 currentOperatorId(),
                 null,
@@ -194,64 +203,72 @@ public class WorkflowRuntimeWebController {
                 null));
     }
 
-    @PostMapping("/workbench/todo/query")
+    @POST
+    @Path("/workbench/todo/query")
     public WebListResponse<WorkflowWorkbenchCard> todoCards(
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.todoCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
-    @PostMapping("/workbench/done/query")
+    @POST
+    @Path("/workbench/done/query")
     public WebListResponse<WorkflowWorkbenchCard> doneCards(
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.doneCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
-    @PostMapping("/workbench/notice/query")
+    @POST
+    @Path("/workbench/notice/query")
     public WebListResponse<WorkflowWorkbenchCard> noticeCards(
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.noticeCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
-    @PostMapping("/workbench/tracking/query")
+    @POST
+    @Path("/workbench/tracking/query")
     public WebListResponse<WorkflowWorkbenchCard> trackingCards(
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.trackingCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
-    @PostMapping("/workbench/delegation/query")
+    @POST
+    @Path("/workbench/delegation/query")
     public WebListResponse<WorkflowWorkbenchCard> delegationCards(
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.delegationCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
-    @PostMapping("/workbench/{board}/stats")
+    @POST
+    @Path("/workbench/{board}/stats")
     public WorkflowWorkbenchStats workbenchStats(
-            @PathVariable String board,
-            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+            @PathParam("board") String board,
+            WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return runtimeReadFacade.workbenchStats(board, currentOperatorId(),
                 normalized.toQueryRequest());
     }
 
-    @GetMapping("/task/{taskId}/module-task/prepare")
-    public WorkflowModuleTaskProcessBundle prepareModuleTask(@PathVariable String taskId) {
+    @GET
+    @Path("/task/{taskId}/module-task/prepare")
+    public WorkflowModuleTaskProcessBundle prepareModuleTask(@PathParam("taskId") String taskId) {
         return moduleTaskRuntimeService.prepare(taskId, currentOperatorId());
     }
 
-    @PostMapping("/task/{taskId}/module-task/check-and-continue")
+    @POST
+    @Path("/task/{taskId}/module-task/check-and-continue")
     public WorkflowModuleTaskContinueResult checkAndContinueModuleTask(
-            @PathVariable String taskId,
-            @RequestBody(required = false) WorkflowModuleTaskContinueWebRequest request) {
+            @PathParam("taskId") String taskId,
+            WorkflowModuleTaskContinueWebRequest request) {
         String operatorId = currentOperatorId();
         if (request != null && request.manualRouteSelections() != null && !request.manualRouteSelections().isEmpty()) {
             return moduleTaskRuntimeService.checkAndContinue(taskId, operatorId, request.reason(),
