@@ -26,7 +26,6 @@ dependencies {
 
 tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
-        "**/WorkflowRuntimeAdminWebControllerTest.java",
         "**/WorkflowConfigurationWebControllerTest.java",
         "**/WorkflowDelegationWebControllerTest.java",
         "**/WorkflowHistoryWebControllerTest.java",

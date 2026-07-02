@@ -29,18 +29,14 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@RestController
-@RequestMapping("/workflow/runtime/admin")
+@ApplicationScoped
+@Path("/workflow/runtime/admin")
 @PlatformStaticModule(application = "platform",
         alias = WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS,
         title = "Workflow Admin")
@@ -52,25 +48,28 @@ public class WorkflowRuntimeAdminWebController {
         this.adminFacade = adminFacade;
     }
 
-    @GetMapping("/instance/{instanceId}/todo-tasks")
+    @GET
+    @Path("/instance/{instanceId}/todo-tasks")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
             title = "Todo Task Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowTask> currentTodoTasks(@PathVariable String instanceId) {
+    public WebListResponse<WorkflowTask> currentTodoTasks(@PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTasks(instanceId));
     }
 
-    @GetMapping("/instance/{instanceId}/active-tasks")
+    @GET
+    @Path("/instance/{instanceId}/active-tasks")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
             title = "Force Handle Candidate Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowAdminActiveTaskView> currentTodoTaskViews(@PathVariable String instanceId) {
+    public WebListResponse<WorkflowAdminActiveTaskView> currentTodoTaskViews(@PathParam("instanceId") String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTaskViews(instanceId));
     }
 
-    @PostMapping("/instance/query")
+    @POST
+    @Path("/instance/query")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowAdminInstanceView> queryCurrentInstances(
-            @RequestBody(required = false) WorkflowAdminInstanceQueryWebRequest request) {
+            WorkflowAdminInstanceQueryWebRequest request) {
         WorkflowAdminInstanceQueryWebRequest payload = request == null
                 ? new WorkflowAdminInstanceQueryWebRequest(null, null, null, null, null, null, null, null)
                 : request;
@@ -78,60 +77,66 @@ public class WorkflowRuntimeAdminWebController {
                 page(payload.page())));
     }
 
-    @PostMapping({"/instance/{instanceId}/bundle", "/instance/{instanceId}/render"})
+    @POST
+    @Path("/instance/{instanceId}/bundle")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WorkflowRuntimeRenderBundle renderCurrentBundle(@PathVariable String instanceId,
-                                                           @RequestBody(required = false) Object ignored) {
+    public WorkflowRuntimeRenderBundle renderCurrentBundle(@PathParam("instanceId") String instanceId,
+                                                           Object ignored) {
         return adminFacade.renderCurrentBundle(instanceId);
     }
 
-    @PostMapping("/instance/{instanceId}/events")
+    @POST
+    @Path("/instance/{instanceId}/events")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowEvent> currentEvents(@PathVariable String instanceId,
-                                                        @RequestBody(required = false) Object ignored) {
+    public WebListResponse<WorkflowEvent> currentEvents(@PathParam("instanceId") String instanceId,
+                                                        Object ignored) {
         return new WebListResponse<>(adminFacade.currentEvents(instanceId));
     }
 
-    @PostMapping("/instance/{instanceId}/tasks")
+    @POST
+    @Path("/instance/{instanceId}/tasks")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowTask> currentTasks(@PathVariable String instanceId,
-                                                      @RequestBody(required = false) Object ignored) {
+    public WebListResponse<WorkflowTask> currentTasks(@PathParam("instanceId") String instanceId,
+                                                      Object ignored) {
         return new WebListResponse<>(adminFacade.currentTasks(instanceId));
     }
 
-    @PostMapping("/instance/{instanceId}/actions/forceTerminate")
+    @POST
+    @Path("/instance/{instanceId}/actions/forceTerminate")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_TERMINATE_ACTION,
             title = "Force Terminate", level = PlatformActionLevel.LIST)
     public WorkflowInstanceActionResult forceTerminate(
-            @PathVariable String instanceId,
-            @RequestBody(required = false) WorkflowAdminActionWebRequest request) {
+            @PathParam("instanceId") String instanceId,
+            WorkflowAdminActionWebRequest request) {
         return adminFacade.forceTerminate(new WorkflowInstanceActionRequest(instanceId,
                 operatorId(request == null ? null : request.operatorId()),
                 request == null ? null : request.reason(),
                 null));
     }
 
-    @PostMapping("/instance/{instanceId}/actions/reset")
+    @POST
+    @Path("/instance/{instanceId}/actions/reset")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_RESET_ACTION,
             title = "Reset Workflow", level = PlatformActionLevel.LIST)
     public WorkflowInstanceActionResult reset(
-            @PathVariable String instanceId,
-            @RequestBody(required = false) WorkflowAdminActionWebRequest request) {
+            @PathParam("instanceId") String instanceId,
+            WorkflowAdminActionWebRequest request) {
         return adminFacade.reset(new WorkflowInstanceActionRequest(instanceId,
                 operatorId(request == null ? null : request.operatorId()),
                 request == null ? null : request.reason(),
                 null));
     }
 
-    @PostMapping("/task/{taskId}/actions/forceApprove")
+    @POST
+    @Path("/task/{taskId}/actions/forceApprove")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
             title = "Force Handle", level = PlatformActionLevel.LIST)
     public WorkflowTaskActionResult forceApprove(
-            @PathVariable String taskId,
-            @RequestBody(required = false) WorkflowAdminTaskActionWebRequest request) {
+            @PathParam("taskId") String taskId,
+            WorkflowAdminTaskActionWebRequest request) {
         return adminFacade.forceApprove(new WorkflowTaskActionRequest(taskId,
                 operatorId(request == null ? null : request.operatorId()),
                 null,
@@ -145,11 +150,12 @@ public class WorkflowRuntimeAdminWebController {
                 request == null ? null : request.manualRouteSelections()));
     }
 
-    @PostMapping("/history/query")
+    @POST
+    @Path("/history/query")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowHistoryInstance> queryHistory(
-            @RequestBody(required = false) WorkflowAdminHistoryQueryWebRequest request) {
+            WorkflowAdminHistoryQueryWebRequest request) {
         WorkflowAdminHistoryQueryWebRequest payload = request == null
                 ? new WorkflowAdminHistoryQueryWebRequest(null, null, null, null)
                 : request;
@@ -157,35 +163,39 @@ public class WorkflowRuntimeAdminWebController {
                 payload.moduleAlias(), payload.recordId(), payload.startedBy(), page(payload.page())));
     }
 
-    @PostMapping({"/history/{historyInstanceId}/bundle", "/history/{historyInstanceId}/render"})
+    @POST
+    @Path("/history/{historyInstanceId}/bundle")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WorkflowRuntimeRenderBundle renderHistoryBundle(@PathVariable String historyInstanceId,
-                                                           @RequestBody(required = false) Object ignored) {
+    public WorkflowRuntimeRenderBundle renderHistoryBundle(@PathParam("historyInstanceId") String historyInstanceId,
+                                                           Object ignored) {
         return adminFacade.renderHistoryBundle(historyInstanceId);
     }
 
-    @PostMapping("/history/{historyInstanceId}/events")
+    @POST
+    @Path("/history/{historyInstanceId}/events")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowEvent> historyEvents(@PathVariable String historyInstanceId,
-                                                        @RequestBody(required = false) Object ignored) {
+    public WebListResponse<WorkflowEvent> historyEvents(@PathParam("historyInstanceId") String historyInstanceId,
+                                                        Object ignored) {
         return new WebListResponse<>(adminFacade.historyEvents(historyInstanceId));
     }
 
-    @PostMapping("/history/{historyInstanceId}/events/view")
+    @POST
+    @Path("/history/{historyInstanceId}/events/view")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
             title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
-    public WebListResponse<WorkflowHistoryEventView> historyEventViews(@PathVariable String historyInstanceId,
-                                                                       @RequestBody(required = false) Object ignored) {
+    public WebListResponse<WorkflowHistoryEventView> historyEventViews(@PathParam("historyInstanceId") String historyInstanceId,
+                                                                       Object ignored) {
         return new WebListResponse<>(adminFacade.historyEventViews(historyInstanceId));
     }
 
-    @PostMapping("/history/{historyInstanceId}/delete")
+    @POST
+    @Path("/history/{historyInstanceId}/delete")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION,
             title = "Delete Workflow History", level = PlatformActionLevel.LIST)
-    public WebCountResponse deleteHistory(@PathVariable String historyInstanceId,
-                                          @RequestBody(required = false) Object ignored) {
+    public WebCountResponse deleteHistory(@PathParam("historyInstanceId") String historyInstanceId,
+                                          Object ignored) {
         return new WebCountResponse(adminFacade.deleteHistory(historyInstanceId));
     }
 
