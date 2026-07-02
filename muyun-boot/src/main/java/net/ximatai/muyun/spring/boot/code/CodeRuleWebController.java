@@ -23,22 +23,21 @@ import net.ximatai.muyun.spring.platform.code.CodeRuleService;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceBaselineResult;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceStateLocation;
 import net.ximatai.muyun.spring.platform.code.PreviewCodeRuleCommand;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = CodeRuleService.MODULE_ALIAS, title = "编码规则")
 @PlatformMenu(parent = PlatformMenuGroups.OPS, order = 10)
-@RequestMapping({"/platform.code_rule", "/platform/code/rule"})
+@Path("/platform.code_rule")
 public class CodeRuleWebController extends WebSupport<CodeRuleService> implements
         ReadOnlyWeb<CodeRule, CodeRuleService>,
         EnableWeb<CodeRule, CodeRuleService>,
@@ -52,7 +51,7 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         this(previewService, null, null);
     }
 
-    @Autowired
+    @Inject
     public CodeRuleWebController(CodePreviewService previewService,
                                  CodeOpsQueryService opsQueryService,
                                  CodeOpsActionService opsActionService) {
@@ -61,24 +60,27 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         this.opsActionService = opsActionService;
     }
 
-    @GetMapping("/viewTree/{id}")
+    @GET
+    @Path("/viewTree/{id}")
     @CustomActionEndpoint(value = "viewTree", title = "查看规则树",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeRule viewTree(@PathVariable String id) {
+    public CodeRule viewTree(@PathParam("id") String id) {
         return webScope(() -> service().viewRuleTree(id));
     }
 
-    @PostMapping("/saveTree")
+    @POST
+    @Path("/saveTree")
     @CustomActionEndpoint(value = "saveTree", title = "保存规则树",
             level = PlatformActionLevel.ANY, dataAuth = false)
-    public CodeRule saveTree(@RequestBody CodeRule rule) {
+    public CodeRule saveTree(CodeRule rule) {
         return webScope(() -> service().saveRuleTree(rule));
     }
 
-    @PostMapping("/preview")
+    @POST
+    @Path("/preview")
     @CustomActionEndpoint(value = "preview", title = "预览编码",
             level = PlatformActionLevel.ANY, dataAuth = false)
-    public CodePreviewResult preview(@RequestBody PreviewRequest request) {
+    public CodePreviewResult preview(PreviewRequest request) {
         return webScope(() -> {
             PreviewRequest normalized = request == null ? PreviewRequest.empty() : request;
             CodeRule rule = normalized.rule();
@@ -95,21 +97,23 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         });
     }
 
-    @PostMapping("/ops/view/{id}")
+    @POST
+    @Path("/ops/view/{id}")
     @CustomActionEndpoint(value = "opsQuery", title = "编码运维查询",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeRuleOpsSnapshot viewOpsSnapshot(@PathVariable String id,
-                                               @RequestBody(required = false) OpsSnapshotRequest request) {
+    public CodeRuleOpsSnapshot viewOpsSnapshot(@PathParam("id") String id,
+                                               OpsSnapshotRequest request) {
         return webScope(() -> requireOpsQueryService().viewRuleSnapshot(
                 id,
                 request == null ? null : request.limitPerCategory()
         ));
     }
 
-    @PostMapping("/ops/queryByBizObject")
+    @POST
+    @Path("/ops/queryByBizObject")
     @CustomActionEndpoint(value = "opsQuery", title = "编码运维查询",
             level = PlatformActionLevel.LIST, dataAuth = false)
-    public List<CodeRuleOpsSnapshot> queryOpsSnapshots(@RequestBody OpsSnapshotRequest request) {
+    public List<CodeRuleOpsSnapshot> queryOpsSnapshots(OpsSnapshotRequest request) {
         return webScope(() -> {
             OpsSnapshotRequest normalized = request == null ? OpsSnapshotRequest.empty() : request;
             return requireOpsQueryService().queryBusinessObjectSnapshots(
@@ -120,10 +124,11 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         });
     }
 
-    @PostMapping("/ops/sequenceState/locate")
+    @POST
+    @Path("/ops/sequenceState/locate")
     @CustomActionEndpoint(value = "opsQuery", title = "编码运维查询",
             level = PlatformActionLevel.LIST, dataAuth = false)
-    public CodeSequenceStateLocation locateSequenceState(@RequestBody SequenceBucketRequest request) {
+    public CodeSequenceStateLocation locateSequenceState(SequenceBucketRequest request) {
         return webScope(() -> requireOpsQueryService().locateSequenceState(
                 request.ruleId(),
                 request.basisKey(),
@@ -131,10 +136,11 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         ));
     }
 
-    @PostMapping("/ops/sequenceState/baseline")
+    @POST
+    @Path("/ops/sequenceState/baseline")
     @CustomActionEndpoint(value = "opsManage", title = "编码运维管理",
             level = PlatformActionLevel.LIST, dataAuth = false)
-    public CodeSequenceBaselineResult setSequenceBaseline(@RequestBody SequenceBaselineRequest request) {
+    public CodeSequenceBaselineResult setSequenceBaseline(SequenceBaselineRequest request) {
         return webScope(() -> requireOpsActionService().setSequenceBaseline(
                 request.ruleId(),
                 request.basisKey(),
@@ -144,11 +150,12 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         ));
     }
 
-    @PostMapping("/ops/recycleEntry/{id}/adjust")
+    @POST
+    @Path("/ops/recycleEntry/{id}/adjust")
     @CustomActionEndpoint(value = "opsManage", title = "编码运维管理",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeRecycleEntry adjustRecycleEntry(@PathVariable String id,
-                                               @RequestBody RecycleAdjustRequest request) {
+    public CodeRecycleEntry adjustRecycleEntry(@PathParam("id") String id,
+                                               RecycleAdjustRequest request) {
         return webScope(() -> requireOpsActionService().adjustRecycleEntry(
                 id,
                 request.status(),
@@ -156,18 +163,20 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         ));
     }
 
-    @PostMapping("/ops/ledgerEntry/{id}/inspect")
+    @POST
+    @Path("/ops/ledgerEntry/{id}/inspect")
     @CustomActionEndpoint(value = "opsQuery", title = "编码运维查询",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeLedgerInspection inspectLedgerEntry(@PathVariable String id) {
+    public CodeLedgerInspection inspectLedgerEntry(@PathParam("id") String id) {
         return webScope(() -> requireOpsActionService().inspectLedgerEntry(id));
     }
 
-    @PostMapping("/ops/ledgerEntry/{id}/release")
+    @POST
+    @Path("/ops/ledgerEntry/{id}/release")
     @CustomActionEndpoint(value = "opsManage", title = "编码运维管理",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeLedgerEntry releaseLedgerEntry(@PathVariable String id,
-                                              @RequestBody(required = false) ReleaseLedgerRequest request) {
+    public CodeLedgerEntry releaseLedgerEntry(@PathParam("id") String id,
+                                              ReleaseLedgerRequest request) {
         return webScope(() -> requireOpsActionService().releaseStaleLedgerEntry(
                 id,
                 request == null ? null : request.reason()
