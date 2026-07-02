@@ -12,9 +12,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Objects;
-
 @Service
 public class TenantService extends AbstractAbilityService<Tenant> implements
         SystemManagedAbility<Tenant>,
@@ -24,21 +21,17 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         ActiveTenantVerifier {
 
     public static final String MODULE_ALIAS = "iam.tenant";
-    private final List<TenantCreationProvisioner> creationProvisioners;
+    private final ObjectProvider<TenantCreationProvisioner> creationProvisioners;
 
     public TenantService(TenantDao tenantDao) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
-        this.creationProvisioners = List.of();
+        this.creationProvisioners = null;
     }
 
     @Autowired
     public TenantService(TenantDao tenantDao, ObjectProvider<TenantCreationProvisioner> creationProvisioners) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
-        this.creationProvisioners = creationProvisioners == null
-                ? List.of()
-                : creationProvisioners.orderedStream()
-                .filter(Objects::nonNull)
-                .toList();
+        this.creationProvisioners = creationProvisioners;
     }
 
     @Override
@@ -60,8 +53,8 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
 
     @Override
     public void afterInsert(String id, Tenant tenant) {
-        for (TenantCreationProvisioner provisioner : creationProvisioners) {
-            provisioner.afterTenantCreated(id);
+        if (creationProvisioners != null) {
+            creationProvisioners.orderedStream().forEach(provisioner -> provisioner.afterTenantCreated(id));
         }
     }
 
