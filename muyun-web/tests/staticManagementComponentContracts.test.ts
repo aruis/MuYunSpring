@@ -21,6 +21,7 @@ test('record list explorer exposes visible secondary identity text', () => {
   assert.match(itemModelSource, /actions\?: UiRecordInlineAction\[\]/);
   assert.match(itemSource, /secondary\?: string/);
   assert.match(itemSource, /class="ui-record-explorer-item-secondary"/);
+  assert.match(itemSource, /\.ui-record-explorer-item:focus-within \.ui-record-explorer-item-actions/);
   assert.match(listSource, /itemOf\?: \(record: RecordListExplorerRecord\) => RecordExplorerItemDescriptor \| undefined/);
   assert.match(listSource, /function recordSecondary/);
   assert.match(listSource, /props\.codeOf \? props\.codeOf\(record\)/);

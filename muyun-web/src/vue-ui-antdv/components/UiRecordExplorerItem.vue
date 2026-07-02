@@ -152,6 +152,7 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
 }
 
 .ui-record-explorer-item:hover .ui-record-explorer-item-actions,
+.ui-record-explorer-item:focus-within .ui-record-explorer-item-actions,
 .ui-record-explorer-item-selected .ui-record-explorer-item-actions {
   opacity: 1;
 }
