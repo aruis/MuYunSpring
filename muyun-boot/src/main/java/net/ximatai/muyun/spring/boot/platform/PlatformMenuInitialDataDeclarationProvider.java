@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import jakarta.enterprise.context.spi.CreationalContext;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.spi.Bean;
 import jakarta.enterprise.inject.spi.BeanManager;
@@ -14,15 +13,30 @@ import jakarta.enterprise.inject.spi.BeanManager;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDeclarationProvider {
     private final MenuService menuService;
     private final BeanManager beanManager;
+    private final List<Class<?>> beanClasses;
 
     public PlatformMenuInitialDataDeclarationProvider(MenuService menuService,
                                                       BeanManager beanManager) {
         this.menuService = menuService;
         this.beanManager = beanManager;
+        this.beanClasses = List.of();
+    }
+
+    public PlatformMenuInitialDataDeclarationProvider(MenuService menuService,
+                                                      List<?> beanInstances) {
+        this.menuService = menuService;
+        this.beanManager = null;
+        this.beanClasses = beanInstances == null
+                ? List.of()
+                : beanInstances.stream()
+                .filter(Objects::nonNull)
+                .map(Object::getClass)
+                .toList();
     }
 
     @Override
@@ -42,8 +56,7 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
 
     private List<InitialDataDeclaration<?>> contributedMenus(String schemeId) {
         List<InitialDataDeclaration<?>> declarations = new ArrayList<>();
-        for (Bean<?> cdiBean : beansWithAnnotation(PlatformMenu.class)) {
-            Class<?> beanClass = cdiBean.getBeanClass();
+        for (Class<?> beanClass : beanClassesWithAnnotation(PlatformMenu.class)) {
             PlatformMenu menu = findAnnotation(beanClass, PlatformMenu.class);
             if (menu == null) {
                 continue;
@@ -94,9 +107,15 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
                 .toList();
     }
 
-    private Object reference(Bean<?> bean) {
-        CreationalContext<?> context = beanManager.createCreationalContext(bean);
-        return beanManager.getReference(bean, bean.getBeanClass(), context);
+    private List<Class<?>> beanClassesWithAnnotation(Class<? extends Annotation> annotationType) {
+        if (beanManager == null) {
+            return beanClasses.stream()
+                    .filter(beanClass -> findAnnotation(beanClass, annotationType) != null)
+                    .toList();
+        }
+        return beansWithAnnotation(annotationType).stream()
+                .map(Bean::getBeanClass)
+                .toList();
     }
 
     private static <A extends Annotation> A findAnnotation(Class<?> type, Class<A> annotationType) {

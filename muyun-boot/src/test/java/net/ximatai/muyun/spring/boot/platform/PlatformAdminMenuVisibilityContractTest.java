@@ -43,9 +43,6 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.context.support.GenericApplicationContext;
-import org.springframework.core.annotation.AnnotationUtils;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -109,79 +106,86 @@ class PlatformAdminMenuVisibilityContractTest {
 
     @Test
     void platformMenuModulesShouldRegisterMenuActionAndBecomeVisibleForSystemAdmin() {
-        try (GenericApplicationContext context = platformEntryContext()) {
-            registerStaticModules(context);
-            initializePlatformData(context);
+        List<Object> platformEntries = platformEntries();
+        registerStaticModules(platformEntries);
+        initializePlatformData(platformEntries);
 
-            Set<String> menuModuleAliases = menuModuleAliases(context);
-            assertThat(menuModuleAliases).contains(
-                    "platform.application",
-                    "platform.low_code_governance",
-                    WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS
-            );
+        Set<String> menuModuleAliases = menuModuleAliases(platformEntries);
+        assertThat(menuModuleAliases).contains(
+                "platform.application",
+                "platform.low_code_governance",
+                WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS
+        );
 
-            assertThat(menuModuleAliases)
-                    .allSatisfy(moduleAlias -> assertThat(moduleActionService.findByModuleAliasAndActionCode(
-                            moduleAlias,
-                            PlatformAction.MENU.code()
-                    )).as(moduleAlias + " menu action").isNotNull());
+        assertThat(menuModuleAliases)
+                .allSatisfy(moduleAlias -> assertThat(moduleActionService.findByModuleAliasAndActionCode(
+                        moduleAlias,
+                        PlatformAction.MENU.code()
+                )).as(moduleAlias + " menu action").isNotNull());
 
-            try (TenantContext.Scope ignoredTenant = TenantContext.system("system admin menu test");
-                 CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(platformSuperAdmin())) {
-                assertThat(visibleModuleAliases()).containsAll(menuModuleAliases);
-            }
+        try (TenantContext.Scope ignoredTenant = TenantContext.system("system admin menu test");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(platformSuperAdmin())) {
+            assertThat(visibleModuleAliases()).containsAll(menuModuleAliases);
         }
     }
 
-    private GenericApplicationContext platformEntryContext() {
-        GenericApplicationContext context = new GenericApplicationContext();
-        context.registerBean(ApplicationWebController.class);
-        context.registerBean(DictionaryCategoryWebController.class);
-        context.registerBean(WorkflowRuntimeAdminWebController.class,
-                () -> new WorkflowRuntimeAdminWebController(null));
-        context.registerBean(LowCodeModuleConfigArchiveFacade.class,
-                () -> mock(LowCodeModuleConfigArchiveFacade.class));
-        context.registerBean(LowCodeModuleHealthService.class, () -> mock(LowCodeModuleHealthService.class));
-        context.registerBean(LowCodeModulePackageExchangeService.class,
-                () -> mock(LowCodeModulePackageExchangeService.class));
-        context.registerBean(LowCodeModulePackageImportService.class,
-                () -> mock(LowCodeModulePackageImportService.class));
-        context.registerBean(LowCodeModuleTemplateService.class,
-                () -> mock(LowCodeModuleTemplateService.class));
-        context.registerBean(LowCodeGovernanceWebController.class);
-        context.refresh();
-        return context;
+    private List<Object> platformEntries() {
+        return List.of(
+                new ApplicationWebController(),
+                new DictionaryCategoryWebController(),
+                new WorkflowRuntimeAdminWebController(null),
+                new LowCodeGovernanceWebController(
+                        mock(LowCodeModuleConfigArchiveFacade.class),
+                        mock(LowCodeModuleHealthService.class),
+                        mock(LowCodeModulePackageExchangeService.class),
+                        mock(LowCodeModulePackageImportService.class),
+                        mock(LowCodeModuleTemplateService.class)
+                )
+        );
     }
 
-    private Set<String> menuModuleAliases(GenericApplicationContext context) {
+    private Set<String> menuModuleAliases(List<Object> platformEntries) {
         LinkedHashSet<String> aliases = new LinkedHashSet<>();
-        for (String beanName : context.getBeanNamesForAnnotation(PlatformMenu.class)) {
-            Class<?> beanClass = AopUtils.getTargetClass(context.getBean(beanName));
-            PlatformStaticModule module = AnnotationUtils.findAnnotation(beanClass, PlatformStaticModule.class);
-            if (module != null) {
+        for (Object platformEntry : platformEntries) {
+            Class<?> beanClass = platformEntry.getClass();
+            PlatformMenu menu = findAnnotation(beanClass, PlatformMenu.class);
+            PlatformStaticModule module = findAnnotation(beanClass, PlatformStaticModule.class);
+            if (menu != null && module != null) {
                 aliases.add(module.alias());
             }
         }
         return aliases;
     }
 
-    private void registerStaticModules(GenericApplicationContext context) {
+    private <A extends java.lang.annotation.Annotation> A findAnnotation(Class<?> type, Class<A> annotationType) {
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            A annotation = current.getAnnotation(annotationType);
+            if (annotation != null) {
+                return annotation;
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private void registerStaticModules(List<Object> platformEntries) {
         new StaticModuleDefinitionRegistrar(
                 moduleService,
                 moduleActionService,
                 List.of(),
-                List.of(new StaticModuleDefinitionScanner(context))
+                List.of(new StaticModuleDefinitionScanner(platformEntries))
         ).registerAll();
     }
 
-    private void initializePlatformData(GenericApplicationContext context) {
+    private void initializePlatformData(List<Object> platformEntries) {
         new InitialDataExecutor(
                 List.<InitialDataAbility<?>>of(
                         schemeService,
                         menuService,
                         userAccountService
                 ),
-                List.of(new PlatformMenuInitialDataDeclarationProvider(menuService, context))
+                List.of(new PlatformMenuInitialDataDeclarationProvider(menuService, platformEntries))
         ).initializeAll();
     }
 
