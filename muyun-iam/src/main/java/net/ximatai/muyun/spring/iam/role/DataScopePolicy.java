@@ -4,7 +4,7 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
 public enum DataScopePolicy implements CodeTitleEnum {
     NONE("none", "无数据权限"),
-    WILDCARD("wildcard", "通配数据权限"),
+    INHERIT_DATA_GRANT("inheritDataGrant", "继承数据授权"),
     ALL("all", "全部"),
     OWNER("owner", "本人负责"),
     ASSIGNEE("assignee", "负责人"),

@@ -198,6 +198,8 @@
 
 根路径：`/iam.role`
 
+角色授权设计见 [角色授权设计](ROLE_AUTHORIZATION_DESIGN.md)。账号授权落到 `AccountRoleGrant`，任职授权落到 `EmploymentRoleGrant`；不开放职员级角色授权和账号级通配数据范围入口。
+
 | 方法 | URL | 功能 |
 | --- | --- | --- |
 | `POST` | `/iam.role/query` | 查询角色。 |
@@ -208,23 +210,32 @@
 | `POST` | `/iam.role/enable/{id}` | 启用角色。 |
 | `POST` | `/iam.role/disable/{id}` | 停用角色。 |
 | `POST` | `/iam.role/sort/{id}` | 调整角色排序。 |
-| `GET` | `/iam.role/{roleId}/grants` | 查询角色授权实例，包含授权主体类型和主体 ID。 |
-| `POST` | `/iam.role/{roleId}/grants` | 新增角色授权实例，可授给账号、职员或具体任岗。 |
-| `POST` | `/iam.role/{roleId}/grants/{grantId}/delete` | 删除角色授权实例。 |
+| `GET` | `/iam.role/{roleId}/account-grants` | 查询账号角色授权实例。 |
+| `POST` | `/iam.role/{roleId}/account-grants` | 给用户账号授予账号角色，可携带管理作用域。 |
+| `POST` | `/iam.role/{roleId}/account-grants/{grantId}/delete` | 删除账号角色授权实例。 |
+| `GET` | `/iam.role/{roleId}/employment-grants` | 查询任职角色授权实例。 |
+| `POST` | `/iam.role/{roleId}/employment-grants` | 给职员任职授予任职角色、角色组或数据授权角色。 |
+| `POST` | `/iam.role/{roleId}/employment-grants/{grantId}/delete` | 删除任职角色授权实例。 |
 | `POST` | `/iam.role/grant/{roleId}` | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
 | `POST` | `/iam.role/grant/{roleId}/batch` | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。 |
-| `POST` | `/iam.role/wildcard-data-scope/{roleId}/grant` | 为数据权限通配角色授予账号级通配数据范围动作；不承载部门相对策略。 |
 | `POST` | `/iam.role/revoke/{roleId}` | 撤销角色某个模块动作授权。 |
 | `POST` | `/iam.role/revoke/{roleId}/batch` | 批量撤销角色多个模块动作授权。 |
 | `POST` | `/iam.role/permissionMatrix/{roleId}` | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。 |
 | `GET` | `/iam.role/menuMatrix/{roleId}/{schemeId}` | 按菜单方案返回菜单树和角色对模块菜单的授权状态。 |
 
-授权实例请求中常见字段：
+账号授权请求字段：
 
 | 字段 | 说明 |
 | --- | --- |
-| `subjectType` | 授权主体类型，当前 JSON 使用业务 code：`userAccount`、`employee`、`employeePosition`。 |
-| `subjectId` | 授权主体 ID。账号、职员、任岗授权分别指向对应记录。 |
+| `userId` | 被授权用户账号 ID。 |
+| `managementScopeType` | 管理作用域类型：`platform`、`tenant`、`organization`。 |
+| `managementScopeId` | 管理作用域 ID。平台级可为空，租户级为租户 ID，机构级为机构 ID。 |
+
+任职授权请求字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `employeePositionId` | 被授权的职员任职 ID。 |
 
 授权请求中常见字段：
 
@@ -232,7 +243,7 @@
 | --- | --- |
 | `moduleAlias` | 平台模块别名，如 `iam.user`。 |
 | `actionCode` | 动作编码。标准动作和配置动作最终都归到权限动作。 |
-| `dataScopePolicy` | 数据范围策略，当前 JSON 使用业务 code，如 `all`、`owner`、`organizationAndChildren`、`departmentAndChildren`。 |
+| `dataScopePolicy` | 数据范围策略，JSON 使用业务 code，如 `all`、`owner`、`organizationAndChildren`、`departmentAndChildren`、`inheritDataGrant`。账号角色动作只能使用 `none`；任职角色可按动作数据权限配置具体范围或“继承数据授权”。 |
 | `tenantScopePolicy` | 租户范围策略，当前 JSON 使用业务 code，如 `currentTenant`、`allTenants`。 |
 | `scopeCondition` | 自定义条件保留字段；当前不开放可执行自定义条件授权。 |
 | `referenceFieldId` | 引用依赖数据权限使用的引用字段。 |

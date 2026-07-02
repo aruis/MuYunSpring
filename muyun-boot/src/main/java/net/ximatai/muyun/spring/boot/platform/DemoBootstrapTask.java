@@ -16,8 +16,9 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
-import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
+import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
@@ -233,8 +234,8 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         }
         Role role = new Role();
         role.setId(TENANT_ADMIN_ROLE_ID);
+        role.setAssignmentType(RoleAssignmentType.ACCOUNT);
         role.setRoleKind(RoleKind.STANDARD);
-        role.setGrantSubjectTypes(RoleGrantSubjectType.USER_ACCOUNT.getCode());
         role.setTitle(TENANT_ADMIN_ROLE_TITLE);
         role.setPublicRole(Boolean.FALSE);
         role.setBuiltIn(Boolean.TRUE);
@@ -247,7 +248,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     }
 
     private void ensureTenantAdminRoleGrant(String roleId, String userId) {
-        roleService.grantRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
+        roleService.grantAccountRole(roleId, userId, ManagementScopeType.TENANT, TENANT_ALIAS);
     }
 
     private boolean isActive(EntityContract entity) {
@@ -292,9 +293,8 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
 
     private void validateExistingTenantAdminRole(Role role) {
         requireEqual("demo tenant admin role tenant", TENANT_ALIAS, role.getTenantId());
+        requireEqual("demo tenant admin assignment type", RoleAssignmentType.ACCOUNT, role.getAssignmentType());
         requireEqual("demo tenant admin role kind", RoleKind.STANDARD, role.getRoleKind());
-        requireEqual("demo tenant admin grant subject", RoleGrantSubjectType.USER_ACCOUNT.getCode(),
-                role.getGrantSubjectTypes());
     }
 
     private void requireEqual(String fieldName, Object expected, Object actual) {

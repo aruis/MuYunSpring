@@ -48,11 +48,11 @@ public class BuiltInRolePermissionTemplateService {
     }
 
     public int applyTenantAdminTemplate(String roleId) {
-        return applyTemplate(roleId, TENANT_ADMIN_MODULE_ALIASES, DataScopePolicy.ALL, Set.of());
+        return applyTemplate(roleId, TENANT_ADMIN_MODULE_ALIASES, DataScopePolicy.NONE, Set.of());
     }
 
     public int applyOrganizationAdminTemplate(String roleId) {
-        return applyTemplate(roleId, ORGANIZATION_ADMIN_MODULE_ALIASES, DataScopePolicy.ORGANIZATION_AND_CHILDREN,
+        return applyTemplate(roleId, ORGANIZATION_ADMIN_MODULE_ALIASES, DataScopePolicy.NONE,
                 ORGANIZATION_ADMIN_EXCLUDED_ACTIONS);
     }
 

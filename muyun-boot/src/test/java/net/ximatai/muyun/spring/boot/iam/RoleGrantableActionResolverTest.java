@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleAction;
@@ -10,8 +12,8 @@ import net.ximatai.muyun.spring.iam.role.RoleDao;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
+import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
 import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleActionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -122,13 +124,13 @@ class RoleGrantableActionResolverTest {
         when(roleActionDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(List.of(rolePermissionsGrant));
         RoleService roleService = new RoleService(
-                roleDao, mock(RoleGrantDao.class), roleActionDao, tenantId -> {
+                roleDao, mock(AccountRoleGrantDao.class), mock(EmploymentRoleGrantDao.class), roleActionDao, tenantId -> {
         });
 
         RolePermissionMatrix matrix = roleService.permissionMatrix("role-1", grantableActions);
 
         assertThat(grantableActions).extracting(GrantableAction::actionCode)
-                .contains("menu", "roleGrants", "rolePermissions");
+                .contains("menu", "accountRoleGrants", "employmentRoleGrants", "rolePermissions");
         assertThat(matrix.modules()).singleElement()
                 .satisfies(module -> {
                     assertThat(module.moduleAlias()).isEqualTo("iam.role");
@@ -145,12 +147,12 @@ class RoleGrantableActionResolverTest {
                                     RolePermissionAction::dataScopePolicy,
                                     RolePermissionAction::dataAuth)
                             .containsExactly("rolePermissions", true, DataScopePolicy.ORGANIZATION, true);
-                    assertThat(module.actions()).filteredOn(action -> "roleGrants".equals(action.actionCode()))
+                    assertThat(module.actions()).filteredOn(action -> "accountRoleGrants".equals(action.actionCode()))
                             .singleElement()
                             .extracting(RolePermissionAction::permissionActionCode,
                                     RolePermissionAction::granted,
                                     RolePermissionAction::dataAuth)
-                            .containsExactly("roleGrants", false, true);
+                            .containsExactly("accountRoleGrants", false, true);
                 });
     }
 
@@ -238,6 +240,7 @@ class RoleGrantableActionResolverTest {
         Role role = new Role();
         role.setId(id);
         role.setTitle("Role " + id);
+        role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
         role.setRoleKind(RoleKind.STANDARD);
         role.setEnabled(Boolean.TRUE);
         return role;

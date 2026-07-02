@@ -200,10 +200,14 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("角色管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "roleGrants", "rolePermissions");
-                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("roleGrants"))
+                                "sort", "enable", "disable", "accountRoleGrants", "employmentRoleGrants",
+                                "rolePermissions");
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("accountRoleGrants"))
                         .singleElement()
-                        .satisfies(action -> assertCustomRecordAction(action, "roleGrants", "角色授权实例"));
+                        .satisfies(action -> assertCustomRecordAction(action, "accountRoleGrants", "账号角色授权"));
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employmentRoleGrants"))
+                        .singleElement()
+                        .satisfies(action -> assertCustomRecordAction(action, "employmentRoleGrants", "任职角色授权"));
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("rolePermissions"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "rolePermissions", "角色授权"));

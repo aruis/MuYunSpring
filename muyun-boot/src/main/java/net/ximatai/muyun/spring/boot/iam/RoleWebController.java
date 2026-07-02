@@ -13,10 +13,11 @@ import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
+import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
+import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
-import net.ximatai.muyun.spring.iam.role.RoleGrant;
-import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -65,27 +66,54 @@ public class RoleWebController extends WebSupport<RoleService> implements
         this.menuService = menuService;
     }
 
-    @GetMapping("/{roleId}/grants")
-    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
+    @GetMapping("/{roleId}/account-grants")
+    @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public List<RoleGrant> roleGrants(@PathVariable String roleId) {
-        return webScope(() -> service().roleGrants(roleId));
+    public List<AccountRoleGrant> accountRoleGrants(@PathVariable String roleId) {
+        return webScope(() -> service().accountRoleGrants(roleId));
     }
 
-    @PostMapping("/{roleId}/grants")
-    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
+    @PostMapping("/{roleId}/account-grants")
+    @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public String grantRole(@PathVariable String roleId,
-                            @RequestBody RoleGrantRequest request) {
-        return webScope(() -> service().grantRole(roleId, request.subjectType(), request.subjectId()));
+    public String grantAccountRole(@PathVariable String roleId,
+                                   @RequestBody AccountRoleGrantRequest request) {
+        return webScope(() -> service().grantAccountRole(
+                roleId,
+                request.userId(),
+                request.managementScopeType(),
+                request.managementScopeId()));
     }
 
-    @PostMapping("/{roleId}/grants/{grantId}/delete")
-    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
+    @PostMapping("/{roleId}/account-grants/{grantId}/delete")
+    @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public WebCountResponse deleteGrant(@PathVariable String roleId,
-                                        @PathVariable String grantId) {
-        return webScope(() -> new WebCountResponse(service().deleteGrant(roleId, grantId)));
+    public WebCountResponse deleteAccountRoleGrant(@PathVariable String roleId,
+                                                   @PathVariable String grantId) {
+        return webScope(() -> new WebCountResponse(service().deleteAccountRoleGrant(roleId, grantId)));
+    }
+
+    @GetMapping("/{roleId}/employment-grants")
+    @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public List<EmploymentRoleGrant> employmentRoleGrants(@PathVariable String roleId) {
+        return webScope(() -> service().employmentRoleGrants(roleId));
+    }
+
+    @PostMapping("/{roleId}/employment-grants")
+    @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public String grantEmploymentRole(@PathVariable String roleId,
+                                      @RequestBody EmploymentRoleGrantRequest request) {
+        return webScope(() -> service().grantEmploymentRole(roleId, request.employeePositionId()));
+    }
+
+    @PostMapping("/{roleId}/employment-grants/{grantId}/delete")
+    @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public WebCountResponse deleteEmploymentRoleGrant(@PathVariable String roleId,
+                                                      @PathVariable String grantId) {
+        return webScope(() -> new WebCountResponse(service().deleteEmploymentRoleGrant(roleId, grantId)));
     }
 
     @PostMapping("/grant/{roleId}")
@@ -115,19 +143,6 @@ public class RoleWebController extends WebSupport<RoleService> implements
                 request.actions().stream()
                         .map(GrantActionRequest::toCommand)
                         .toList()
-        )));
-    }
-
-    @PostMapping("/wildcard-data-scope/{roleId}/grant")
-    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
-            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public WebCountResponse grantWildcardDataScopeAction(@PathVariable String roleId,
-                                                         @RequestBody GrantWildcardDataScopeRequest request) {
-        return webScope(() -> new WebCountResponse(service().grantWildcardDataScopeAction(
-                roleId,
-                request.actionCode(),
-                request.dataScopePolicy(),
-                request.tenantScopePolicy()
         )));
     }
 
@@ -181,9 +196,15 @@ public class RoleWebController extends WebSupport<RoleService> implements
         });
     }
 
-    public record RoleGrantRequest(
-            RoleGrantSubjectType subjectType,
-            String subjectId
+    public record AccountRoleGrantRequest(
+            String userId,
+            ManagementScopeType managementScopeType,
+            String managementScopeId
+    ) {
+    }
+
+    public record EmploymentRoleGrantRequest(
+            String employeePositionId
     ) {
     }
 
@@ -228,13 +249,6 @@ public class RoleWebController extends WebSupport<RoleService> implements
         public RevokeActionsRequest {
             actions = actions == null ? List.of() : List.copyOf(actions);
         }
-    }
-
-    public record GrantWildcardDataScopeRequest(
-            String actionCode,
-            DataScopePolicy dataScopePolicy,
-            TenantScopePolicy tenantScopePolicy
-    ) {
     }
 
     public record PermissionMatrixRequest(List<String> moduleAliases) {

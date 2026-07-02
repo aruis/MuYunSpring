@@ -22,7 +22,7 @@ class BuiltInRolePermissionTemplateServiceTest {
             new BuiltInRolePermissionTemplateService(roleService, grantableActionResolver);
 
     @Test
-    void shouldApplyOrganizationAdminTemplateWithOrganizationAndChildrenDataScope() {
+    void shouldApplyOrganizationAdminTemplateWithoutActionDataScope() {
         when(grantableActionResolver.resolve(BuiltInRolePermissionTemplateService.ORGANIZATION_ADMIN_MODULE_ALIASES))
                 .thenReturn(List.of(
                         GrantableAction.ofPlatformDefaults("iam.employee", PlatformAction.QUERY),
@@ -37,10 +37,10 @@ class BuiltInRolePermissionTemplateServiceTest {
                 .containsExactly("iam.organization", "iam.department", "iam.employee", "iam.user")
                 .doesNotContain("iam.role", "iam.employee_account", "iam.tenant");
         verify(roleService).grantAction("role-org-admin", "iam.employee", PlatformAction.QUERY.code(),
-                DataScopePolicy.ORGANIZATION_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT);
+                DataScopePolicy.NONE, TenantScopePolicy.CURRENT_TENANT);
         verify(roleService).grantAction("role-org-admin", "iam.employee", PlatformAction.MENU.code(),
                 DataScopePolicy.NONE, TenantScopePolicy.CURRENT_TENANT);
         verify(roleService, never()).grantAction("role-org-admin", "iam.employee", "employeeAccounts",
-                DataScopePolicy.ORGANIZATION_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT);
+                DataScopePolicy.NONE, TenantScopePolicy.CURRENT_TENANT);
     }
 }

@@ -254,14 +254,16 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                                          Set<String> visiting) {
         RoleAction grant = effectiveGrant.actionGrant();
         DataScopePolicy policy = normalizePolicy(grant);
+        if (effectiveGrant.roleGrant() != null
+                && effectiveGrant.roleGrant().sourceType() == RoleAssignmentType.ACCOUNT) {
+            return resolveAccountManagementScope(effectiveGrant.roleGrant(), user, fieldMapping, grant);
+        }
         if (policy == DataScopePolicy.ALL) {
             return GrantScope.all(allowsCrossTenant(grant));
         }
-        if (policy == DataScopePolicy.WILDCARD) {
-            if (principal != null) {
-                return GrantScope.none();
-            }
-            return resolveWildcardScope(moduleAlias, grant, user, fieldMapping, visiting);
+        if (policy == DataScopePolicy.INHERIT_DATA_GRANT) {
+            return resolveInheritedDataGrantScope(moduleAlias, grant, effectiveGrant.roleGrant(), user, principal,
+                    fieldMapping, visiting);
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             if (principal != null) {
@@ -273,23 +275,54 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         return GrantScope.restricted(criteria, allowsCrossTenant(grant));
     }
 
-    private GrantScope resolveWildcardScope(String moduleAlias,
-                                            RoleAction grant,
-                                            CurrentUser user,
-                                            DataScopeFieldMapping fieldMapping,
-                                            Set<String> visiting) {
-        RoleAction wildcardGrant = roleService.effectiveWildcardDataScopeGrant(user.userId(), grant.getActionCode());
-        if (wildcardGrant == null) {
+    private GrantScope resolveAccountManagementScope(EffectiveRoleGrant roleGrant,
+                                                     CurrentUser user,
+                                                     DataScopeFieldMapping fieldMapping,
+                                                     RoleAction actionGrant) {
+        ManagementScopeType scopeType = roleGrant.managementScopeType();
+        if (scopeType == ManagementScopeType.PLATFORM) {
+            return GrantScope.all(allowsCrossTenant(actionGrant));
+        }
+        if (scopeType == ManagementScopeType.TENANT) {
+            return GrantScope.all(false);
+        }
+        if (scopeType == ManagementScopeType.ORGANIZATION) {
+            String organizationId = roleGrant.managementScopeId();
+            String field = fieldMapping.organizationField();
+            if (organizationId == null || field == null) {
+                return GrantScope.none();
+            }
+            OrganizationService service = organizationService.orElseThrow(() ->
+                    new PlatformException("organization management scope requires organization hierarchy support"));
+            Criteria scope = Criteria.of();
+            List<String> organizationIds = service.selfAndDescendantIds(organizationId);
+            if (!organizationIds.isEmpty()) {
+                scope.orIn(field, organizationIds);
+            }
+            return GrantScope.restricted(scope, false);
+        }
+        return GrantScope.none();
+    }
+
+    private GrantScope resolveInheritedDataGrantScope(String moduleAlias,
+                                                      RoleAction grant,
+                                                      EffectiveRoleGrant roleGrant,
+                                                      CurrentUser user,
+                                                      BusinessPrincipal principal,
+                                                      DataScopeFieldMapping fieldMapping,
+                                                      Set<String> visiting) {
+        RoleAction inheritedGrant = roleService.inheritedDataGrantAction(roleGrant, moduleAlias, grant.getActionCode());
+        if (inheritedGrant == null) {
             return GrantScope.none();
         }
-        DataScopePolicy wildcardPolicy = normalizePolicy(wildcardGrant);
-        if (wildcardPolicy == DataScopePolicy.WILDCARD
-                || wildcardPolicy == DataScopePolicy.CUSTOM
-                || wildcardPolicy == DataScopePolicy.REFERENCE_DEPENDENCY) {
+        DataScopePolicy inheritedPolicy = normalizePolicy(inheritedGrant);
+        if (inheritedPolicy == DataScopePolicy.INHERIT_DATA_GRANT
+                || inheritedPolicy == DataScopePolicy.CUSTOM
+                || inheritedPolicy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             return GrantScope.none();
         }
-        GrantScope resolved = resolveGrantScope(moduleAlias, new EffectiveRoleActionGrant(wildcardGrant, null),
-                user, null, fieldMapping, visiting);
+        GrantScope resolved = resolveGrantScope(moduleAlias, new EffectiveRoleActionGrant(inheritedGrant, roleGrant),
+                user, principal, fieldMapping, visiting);
         if (!resolved.contributes()) {
             return GrantScope.none();
         }
@@ -433,7 +466,8 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
             case DEPARTMENT_AND_CHILDREN -> appendDepartmentAndChildrenScope(scope, principal, roleGrant, fieldMapping);
             case CUSTOM ->
                     throw new PlatformException("custom data scope condition is not supported yet");
-            case WILDCARD -> throw new PlatformException("wildcard data scope must be resolved before append scope");
+            case INHERIT_DATA_GRANT ->
+                    throw new PlatformException("inherited data grant must be resolved before append scope");
             case REFERENCE_DEPENDENCY -> {
             }
             case NONE, ALL -> {

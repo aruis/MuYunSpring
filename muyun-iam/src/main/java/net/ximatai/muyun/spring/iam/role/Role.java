@@ -16,13 +16,20 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Getter
 @Setter
 @Table(name = "iam_role", comment = "Role")
-@CompositeIndex(columns = {"tenant_id", "role_kind", "title"}, unique = true)
+@CompositeIndex(columns = {"tenant_id", "assignment_type", "role_kind", "title"}, unique = true)
 @InitialDataFields(
-        managed = {"roleKind", "memberRoleIds", "grantSubjectTypes", "publicRole", "builtIn", "systemManaged",
+        managed = {"assignmentType", "roleKind", "memberRoleIds", "publicRole", "builtIn", "systemManaged",
                 "description"},
         operator = {"title", "enabled", "sortOrder"}
 )
 public class Role extends StandardEnabledSortableEntity {
+    @OptionField(type = OptionSourceType.ENUM)
+    @Column(name = "assignment_type", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Role assignment type", defaultVal = @Default(varchar = "employment"))
+    private RoleAssignmentType assignmentType = RoleAssignmentType.EMPLOYMENT;
+
+    private String assignmentTypeTitle;
+
     @OptionField(type = OptionSourceType.ENUM)
     @Column(name = "role_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role kind",
             defaultVal = @Default(varchar = "standard"))
@@ -32,10 +39,6 @@ public class Role extends StandardEnabledSortableEntity {
 
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;
-
-    @Column(name = "grant_subject_types", type = ColumnType.VARCHAR, length = 128, nullable = false,
-            comment = "Allowed grant subject types", defaultVal = @Default(varchar = "userAccount"))
-    private String grantSubjectTypes = RoleGrantSubjectType.USER_ACCOUNT.getCode();
 
     @Column(name = "public_role", type = ColumnType.BOOLEAN, comment = "Visible to child management scopes",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
