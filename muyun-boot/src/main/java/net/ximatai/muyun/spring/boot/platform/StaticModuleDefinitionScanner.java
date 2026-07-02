@@ -27,20 +27,30 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class StaticModuleDefinitionScanner {
     private final BeanManager beanManager;
+    private final List<Object> beanInstances;
 
     public StaticModuleDefinitionScanner(BeanManager beanManager) {
         this.beanManager = beanManager;
+        this.beanInstances = List.of();
+    }
+
+    public StaticModuleDefinitionScanner(List<?> beanInstances) {
+        this.beanManager = null;
+        this.beanInstances = beanInstances == null
+                ? List.of()
+                : beanInstances.stream().filter(Objects::nonNull).map(Object.class::cast).toList();
     }
 
     public List<StaticModuleDefinition> scan() {
         LinkedHashMap<String, StaticModuleDefinition> definitions = new LinkedHashMap<>();
-        for (Bean<?> cdiBean : beansWithAnnotation(PlatformStaticModule.class)) {
-            Object bean = reference(cdiBean);
-            Class<?> beanClass = cdiBean.getBeanClass();
+        for (ScannedBean scannedBean : beansWithAnnotation(PlatformStaticModule.class)) {
+            Object bean = scannedBean.instance();
+            Class<?> beanClass = scannedBean.beanClass();
             PlatformStaticModule module = findAnnotation(beanClass, PlatformStaticModule.class);
             if (module == null) {
                 continue;
@@ -126,6 +136,15 @@ public class StaticModuleDefinitionScanner {
     }
 
     private Object service(Class<?> beanClass) {
+        if (beanManager == null) {
+            return beanInstances.stream()
+                    .filter(beanClass::isInstance)
+                    .findFirst()
+                    .filter(ScopedWeb.class::isInstance)
+                    .map(ScopedWeb.class::cast)
+                    .map(ScopedWeb::service)
+                    .orElse(null);
+        }
         try {
             Set<Bean<?>> beans = beanManager.getBeans(beanClass, Any.Literal.INSTANCE);
             if (beans.isEmpty()) {
@@ -166,9 +185,9 @@ public class StaticModuleDefinitionScanner {
     }
 
     private void addActionContributions(LinkedHashMap<String, StaticModuleDefinition> definitions) {
-        for (Bean<?> cdiBean : beansWithAnnotation(PlatformStaticActionContribution.class)) {
-            Object bean = reference(cdiBean);
-            Class<?> beanClass = cdiBean.getBeanClass();
+        for (ScannedBean scannedBean : beansWithAnnotation(PlatformStaticActionContribution.class)) {
+            Object bean = scannedBean.instance();
+            Class<?> beanClass = scannedBean.beanClass();
             PlatformStaticActionContribution contribution =
                     findAnnotation(beanClass, PlatformStaticActionContribution.class);
             if (contribution == null) {
@@ -452,9 +471,16 @@ public class StaticModuleDefinitionScanner {
         };
     }
 
-    private List<Bean<?>> beansWithAnnotation(Class<? extends Annotation> annotationType) {
+    private List<ScannedBean> beansWithAnnotation(Class<? extends Annotation> annotationType) {
+        if (beanManager == null) {
+            return beanInstances.stream()
+                    .filter(bean -> findAnnotation(bean.getClass(), annotationType) != null)
+                    .map(bean -> new ScannedBean(bean, bean.getClass()))
+                    .toList();
+        }
         return beanManager.getBeans(Object.class, Any.Literal.INSTANCE).stream()
                 .filter(bean -> findAnnotation(bean.getBeanClass(), annotationType) != null)
+                .map(bean -> new ScannedBean(reference(bean), bean.getBeanClass()))
                 .toList();
     }
 
@@ -483,5 +509,8 @@ public class StaticModuleDefinitionScanner {
             current = current.getSuperclass();
         }
         return methods;
+    }
+
+    private record ScannedBean(Object instance, Class<?> beanClass) {
     }
 }

@@ -27,7 +27,6 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.support.GenericApplicationContext;
 
 import java.util.List;
 import java.util.Map;
@@ -196,17 +195,14 @@ class RoleGrantableActionResolverTest {
     }
 
     private List<PlatformModuleAction> scannedRoleModuleActions() {
-        try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
-            context.refresh();
-            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().stream()
-                    .filter(candidate -> "iam.role".equals(candidate.moduleAlias()))
-                    .findFirst()
-                    .orElseThrow();
-            return definition.actions().stream()
-                    .map(action -> moduleAction(definition.moduleAlias(), action))
-                    .toList();
-        }
+        StaticModuleDefinition definition = new StaticModuleDefinitionScanner(List.of(new RoleWebController(null)))
+                .scan().stream()
+                .filter(candidate -> "iam.role".equals(candidate.moduleAlias()))
+                .findFirst()
+                .orElseThrow();
+        return definition.actions().stream()
+                .map(action -> moduleAction(definition.moduleAlias(), action))
+                .toList();
     }
 
     private PlatformModuleAction moduleAction(String actionCode, String permissionActionCode, String title, boolean dataAuth) {
