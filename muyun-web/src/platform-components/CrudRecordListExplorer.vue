@@ -93,7 +93,11 @@ function recordTitle(record: CrudRecordListBase) {
 
 function recordCode(record: CrudRecordListBase) {
   const item = props.itemOf?.(record);
-  return item ? item.secondary : props.subtitleOf ? props.subtitleOf(record) : (record.alias ?? record.code ?? record.id);
+  return item
+    ? item.secondary
+    : props.subtitleOf
+      ? props.subtitleOf(record)
+      : (record.alias ?? record.code ?? record.id);
 }
 
 function matchesKeyword(record: CrudRecordListBase, normalized: string) {

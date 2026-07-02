@@ -22,20 +22,35 @@ test('record list explorer exposes visible secondary identity text', () => {
   assert.match(itemSource, /secondary\?: string/);
   assert.match(itemSource, /class="ui-record-explorer-item-secondary"/);
   assert.match(itemSource, /\.ui-record-explorer-item:focus-within \.ui-record-explorer-item-actions/);
-  assert.match(listSource, /itemOf\?: \(record: RecordListExplorerRecord\) => RecordExplorerItemDescriptor \| undefined/);
+  assert.match(
+    listSource,
+    /itemOf\?: \(record: RecordListExplorerRecord\) => RecordExplorerItemDescriptor \| undefined/,
+  );
   assert.match(listSource, /function recordSecondary/);
   assert.match(listSource, /props\.codeOf \? props\.codeOf\(record\)/);
   assert.match(listSource, /:secondary="recordSecondary\(record\)"/);
-  assert.match(crudListSource, /itemOf\?: \(record: CrudRecordListBase\) => RecordExplorerItemDescriptor \| undefined/);
+  assert.match(
+    crudListSource,
+    /itemOf\?: \(record: CrudRecordListBase\) => RecordExplorerItemDescriptor \| undefined/,
+  );
   assert.match(crudListSource, /actionsOf\?: \(record: CrudRecordListBase\) => UiRecordInlineAction\[\]/);
   assert.match(crudListSource, /action: \[action: UiRecordInlineAction, record: CrudRecordListBase\]/);
-  assert.match(crudListSource, /props\.subtitleOf \? props\.subtitleOf\(record\)/);
+  assert.match(crudListSource, /props\.subtitleOf[\s\S]*\? props\.subtitleOf\(record\)/);
   assert.match(crudListSource, /:item-of="\(record\) => itemOf\?\.\(record as CrudRecordListBase\)"/);
-  assert.match(crudListSource, /:actions-of="\(record\) => actionsOf\?\.\(record as CrudRecordListBase\) \?\? \[\]"/);
-  assert.match(crudListSource, /@action="\(action, record\) => handleAction\(action, record as CrudRecordListBase\)"/);
+  assert.match(
+    crudListSource,
+    /:actions-of="\(record\) => actionsOf\?\.\(record as CrudRecordListBase\) \?\? \[\]"/,
+  );
+  assert.match(
+    crudListSource,
+    /@action="\(action, record\) => handleAction\(action, record as CrudRecordListBase\)"/,
+  );
   assert.match(treeTypesSource, /secondary\?: string/);
   assert.match(treeSource, /secondaryOf\?: \(record: TreeRecordBase\) => string \| undefined/);
-  assert.match(treeSource, /itemOf\?: \(record: TreeRecordBase\) => RecordExplorerItemDescriptor \| undefined/);
+  assert.match(
+    treeSource,
+    /itemOf\?: \(record: TreeRecordBase\) => RecordExplorerItemDescriptor \| undefined/,
+  );
   assert.match(treeSource, /const item = props\.itemOf\?\.\(record\)/);
   assert.match(treeSource, /secondary: item\?\.secondary \?\? props\.secondaryOf\?\.\(record\)/);
   assert.match(uiTreeSource, /#title="\{ key, title, secondary, tag, muted, actions \}"/);
