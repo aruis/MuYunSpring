@@ -281,9 +281,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         requireEqual("demo admin user tenant", TENANT_ALIAS, user.getTenantId());
         requireEqual("demo admin username", properties.getAdminUsername(), user.getUsername());
         requireEqual("demo admin organization", ORGANIZATION_ID, user.getOrganizationId());
-        if (!userAccountService.passwordMatches(user, properties.getAdminInitialPassword())) {
-            throw new PlatformException("demo admin initial password drift: " + user.getId());
-        }
     }
 
     private void validateExistingEmployeeAccount(EmployeeAccount account) {

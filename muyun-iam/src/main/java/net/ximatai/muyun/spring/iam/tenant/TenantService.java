@@ -53,8 +53,12 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
 
     @Override
     public void afterInsert(String id, Tenant tenant) {
+        provisionTenant(id);
+    }
+
+    public void provisionTenant(String tenantId) {
         if (creationProvisioners != null) {
-            creationProvisioners.orderedStream().forEach(provisioner -> provisioner.afterTenantCreated(id));
+            creationProvisioners.orderedStream().forEach(provisioner -> provisioner.afterTenantCreated(tenantId));
         }
     }
 

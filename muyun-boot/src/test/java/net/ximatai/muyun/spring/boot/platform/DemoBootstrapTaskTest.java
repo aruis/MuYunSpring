@@ -201,6 +201,30 @@ class DemoBootstrapTaskTest {
     }
 
     @Test
+    void shouldAllowExistingDemoAdminPasswordRotation() {
+        MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
+        properties.setEnabled(true);
+        properties.setAdminInitialPassword("demo123");
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
+                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
+                rolePermissionTemplateService);
+
+        task.run();
+        try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
+            assertThat(userAccountService.changePassword(DemoBootstrapTask.USER_ID, "rotated123")).isEqualTo(1);
+        }
+
+        task.run();
+
+        try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
+            UserAccount user = userAccountService.select(DemoBootstrapTask.USER_ID);
+            assertThat(userAccountService.passwordMatches(user, "rotated123")).isTrue();
+            assertThat(userAccountService.passwordMatches(user, "demo123")).isFalse();
+        }
+    }
+
+    @Test
     void shouldFailFastWhenExistingDemoAdminUserDrifts() {
         MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
         properties.setEnabled(true);
