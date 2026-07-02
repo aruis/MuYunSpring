@@ -32,7 +32,6 @@ tasks.named<JavaCompile>("compileTestJava").configure {
         "**/ActionEndpointInterceptorTest.java",
         "**/BearerTokenCurrentUserProviderTest.java",
         "**/CrudWebFormSchemaTest.java",
-        "**/PlatformWebExceptionHandlerTest.java",
         "**/RoleGrantableActionResolverTest.java"
     )
 }
