@@ -4,23 +4,33 @@
 
 本文只记录需要后续处理的稳定债务，不记录探索过程和执行流水。
 
+## Web Migration Boundary Decisions
+
+以下决策用于约束后续 Web 迁移，避免把 Spring MVC 机械翻译成 JAX-RS 后形成新的长期耦合。
+
+1. CRUD Web 入口短期保留继承式 controller/resource 形态，用于降低迁移面；长期只允许基类承载稳定、无业务分支的协议模板。子类存在个性化路径、参数或响应语义时，应拆成明确的 JAX-RS resource 方法，不能依赖 override 注解合并。
+2. `ActionEndpoint` 不再复刻 Spring `HandlerMethod` 拦截模型。Quarkus 侧以资源方法注解和显式 endpoint context 为边界：过滤器只负责提取 HTTP 请求事实，动作授权、acting/delegation scope 和审计上下文由独立 resolver 组合，便于单测和 HTTP contract 测试分别覆盖。
+3. 嵌套资源 scope 不以 ThreadLocal 路径变量作为长期模型。父级 scope 应通过显式 `@PathParam` 或资源方法参数传入 service/support；只有过渡期允许请求上下文适配器承接旧基类签名，且必须在测试恢复后删除。
+4. 当前用户、租户、trace 等请求上下文优先收敛为 request-scoped 上下文对象或显式上下文参数。ThreadLocal 只作为现有平台上下文门面的边界实现，不能成为 Web 层解析 HTTP 请求数据的长期入口。
+5. 统一异常响应以 JAX-RS `ExceptionMapper` 为正式入口，保持既有平台错误码、message、traceId 语义。Validation error 需要单独映射为稳定响应结构，不混入普通 `PlatformException` 的处理分支。
+
 ## Web Endpoint Semantics
 
 ### Action endpoint context is incomplete
 
-- 现状：`ActionEndpointInterceptor` 已迁移为 JAX-RS 过滤器骨架，但原 Spring `HandlerMethod` 注解解析、动作上下文、授权上下文、acting/delegation scope 等语义尚未恢复。
+- 现状：`ActionEndpointInterceptor` 已迁移为 JAX-RS 过滤器骨架，但原 Spring `HandlerMethod` 注解解析、动作上下文、授权上下文、acting/delegation scope 等语义尚未恢复；正式方向见 Web 迁移边界决策第 2 条。
 - 影响：依赖 action endpoint 上下文的授权、审计或动作解析行为可能与 Spring 版本不一致。
 - 回收方向：基于 Quarkus/Resteasy Reactive 的资源方法元数据、路径参数和过滤器上下文重建 `ActionEndpointContextResolver` 契约，并补动作端点 contract 测试。
 
 ### Nested scope path variables are disabled
 
-- 现状：`NestedCrudWebSupport`、`ModuleScopedRuleTreeWebSupport` 的路径变量读取从 Spring `HandlerMapping` 迁出后，当前临时返回空 map。
+- 现状：`NestedCrudWebSupport`、`ModuleScopedRuleTreeWebSupport` 的路径变量读取从 Spring `HandlerMapping` 迁出后，当前临时返回空 map；正式方向见 Web 迁移边界决策第 3 条。
 - 影响：依赖父子资源路径变量的嵌套 CRUD、模块范围规则树等能力可能无法正确解析 scope。
 - 回收方向：改为显式 `@PathParam` 传递，或提供 Quarkus 请求上下文适配器，并为嵌套路径补真实 HTTP 测试。
 
 ### Duplicate route handling uses temporary override removal
 
-- 现状：为避免 Quarkus 构建期识别到重复 JAX-RS endpoint，部分 override 方法上的路由注解被移除，暂时依赖父类资源方法。
+- 现状：为避免 Quarkus 构建期识别到重复 JAX-RS endpoint，部分 override 方法上的路由注解被移除，暂时依赖父类资源方法；正式方向见 Web 迁移边界决策第 1 条。
 - 影响：子类 override 中的个性化路径、参数或响应语义存在遗漏风险。
 - 回收方向：逐个核对继承式 Web controller，必要时拆成明确的 Quarkus resource 方法，确保每个路由只有一个声明来源。
 
@@ -40,7 +50,7 @@
 
 ### Request data uses ThreadLocal adapters
 
-- 现状：`BearerTokenCurrentUserProvider` 和 `DynamicWebRequest` 通过 JAX-RS filter 写入 ThreadLocal 来读取授权头和请求路径。
+- 现状：`BearerTokenCurrentUserProvider` 和 `DynamicWebRequest` 通过 JAX-RS filter 写入 ThreadLocal 来读取授权头和请求路径；正式方向见 Web 迁移边界决策第 4 条。
 - 影响：虽然可用于迁移期解耦 Spring `RequestContextHolder`，但需要严格清理生命周期，异步执行或上下文传播场景存在风险。
 - 回收方向：改为 `@RequestScoped` 上下文对象、JAX-RS `ContainerRequestContext` 适配器或 Quarkus 安全上下文，并补并发/请求隔离测试。
 
