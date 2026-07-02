@@ -45,7 +45,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -222,6 +224,30 @@ class DemoBootstrapTaskTest {
             assertThat(userAccountService.passwordMatches(user, "rotated123")).isTrue();
             assertThat(userAccountService.passwordMatches(user, "demo123")).isFalse();
         }
+    }
+
+    @Test
+    void shouldReplayTenantProvisioningWhenDemoTenantAlreadyExists() {
+        MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
+        properties.setEnabled(true);
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        TenantService replayingTenantService = spy(new TenantService(tenantDao));
+        DemoBootstrapTask task = new DemoBootstrapTask(properties, replayingTenantService, organizationService,
+                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
+                rolePermissionTemplateService);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias(DemoBootstrapTask.TENANT_ALIAS);
+            tenant.setTitle("演示租户");
+            tenant.setEnabled(Boolean.TRUE);
+            replayingTenantService.insert(tenant);
+        }
+        clearInvocations(replayingTenantService);
+
+        task.run();
+
+        verify(replayingTenantService).provisionTenant(DemoBootstrapTask.TENANT_ALIAS);
     }
 
     @Test

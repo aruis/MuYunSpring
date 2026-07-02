@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +26,8 @@ class BuiltInRolePermissionTemplateServiceTest {
         when(grantableActionResolver.resolve(BuiltInRolePermissionTemplateService.ORGANIZATION_ADMIN_MODULE_ALIASES))
                 .thenReturn(List.of(
                         GrantableAction.ofPlatformDefaults("iam.employee", PlatformAction.QUERY),
+                        new GrantableAction("iam.employee", "employeeAccounts", "employeeAccounts",
+                                "职员账号", true, true),
                         GrantableAction.ofPlatformDefaults("iam.employee", PlatformAction.MENU)
                 ));
 
@@ -37,5 +40,7 @@ class BuiltInRolePermissionTemplateServiceTest {
                 DataScopePolicy.ORGANIZATION_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT);
         verify(roleService).grantAction("role-org-admin", "iam.employee", PlatformAction.MENU.code(),
                 DataScopePolicy.NONE, TenantScopePolicy.CURRENT_TENANT);
+        verify(roleService, never()).grantAction("role-org-admin", "iam.employee", "employeeAccounts",
+                DataScopePolicy.ORGANIZATION_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT);
     }
 }

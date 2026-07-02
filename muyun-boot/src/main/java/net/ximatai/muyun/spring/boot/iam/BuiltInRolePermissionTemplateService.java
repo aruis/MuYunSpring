@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class BuiltInRolePermissionTemplateService {
@@ -32,6 +33,9 @@ public class BuiltInRolePermissionTemplateService {
             EmployeeService.MODULE_ALIAS,
             UserAccountService.MODULE_ALIAS
     );
+    private static final Set<String> ORGANIZATION_ADMIN_EXCLUDED_ACTIONS = Set.of(
+            actionKey(EmployeeService.MODULE_ALIAS, "employeeAccounts")
+    );
 
     private final RoleService roleService;
     private final RoleGrantableActionResolver grantableActionResolver;
@@ -44,16 +48,23 @@ public class BuiltInRolePermissionTemplateService {
     }
 
     public int applyTenantAdminTemplate(String roleId) {
-        return applyTemplate(roleId, TENANT_ADMIN_MODULE_ALIASES, DataScopePolicy.ALL);
+        return applyTemplate(roleId, TENANT_ADMIN_MODULE_ALIASES, DataScopePolicy.ALL, Set.of());
     }
 
     public int applyOrganizationAdminTemplate(String roleId) {
-        return applyTemplate(roleId, ORGANIZATION_ADMIN_MODULE_ALIASES, DataScopePolicy.ORGANIZATION_AND_CHILDREN);
+        return applyTemplate(roleId, ORGANIZATION_ADMIN_MODULE_ALIASES, DataScopePolicy.ORGANIZATION_AND_CHILDREN,
+                ORGANIZATION_ADMIN_EXCLUDED_ACTIONS);
     }
 
-    private int applyTemplate(String roleId, List<String> moduleAliases, DataScopePolicy dataScopePolicy) {
+    private int applyTemplate(String roleId,
+                              List<String> moduleAliases,
+                              DataScopePolicy dataScopePolicy,
+                              Set<String> excludedActions) {
         int changed = 0;
         for (GrantableAction action : grantableActionResolver.resolve(moduleAliases)) {
+            if (excludedActions.contains(actionKey(action.moduleAlias(), action.permissionActionCode()))) {
+                continue;
+            }
             changed += roleService.grantAction(
                     roleId,
                     action.moduleAlias(),
@@ -63,5 +74,9 @@ public class BuiltInRolePermissionTemplateService {
             );
         }
         return changed;
+    }
+
+    private static String actionKey(String moduleAlias, String actionCode) {
+        return moduleAlias + ":" + actionCode;
     }
 }
