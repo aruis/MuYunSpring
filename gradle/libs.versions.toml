@@ -2,9 +2,11 @@
 spring-boot = "4.1.0"
 spring-framework = "7.0.8"
 spring-dependency-management = "1.1.7"
+quarkus = "3.37.0"
 muyun-database = "3.26.14"
 junit = "6.1.1"
 assertj = "3.27.7"
+mockito = "5.20.0"
 postgresql = "42.7.11"
 testcontainers = "1.21.4"
 lombok = "1.18.46"
@@ -15,10 +17,20 @@ poi = "5.5.1"
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
 muyun-database-spring-boot-starter = { module = "net.ximatai.muyun.database:muyun-database-spring-boot-starter", version.ref = "muyun-database" }
+muyun-database-quarkus = { module = "net.ximatai.muyun.database:muyun-database-quarkus", version.ref = "muyun-database" }
+quarkus-bom = { module = "io.quarkus.platform:quarkus-bom", version.ref = "quarkus" }
+quarkus-arc = { module = "io.quarkus:quarkus-arc" }
+quarkus-rest-jackson = { module = "io.quarkus:quarkus-rest-jackson" }
+quarkus-jdbc-postgresql = { module = "io.quarkus:quarkus-jdbc-postgresql" }
+quarkus-narayana-jta = { module = "io.quarkus:quarkus-narayana-jta" }
+quarkus-scheduler = { module = "io.quarkus:quarkus-scheduler" }
+quarkus-junit5 = { module = "io.quarkus:quarkus-junit5" }
+jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version = "6.1.0" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring-boot" }
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc", version.ref = "spring-boot" }
@@ -40,3 +52,4 @@ poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+quarkus = { id = "io.quarkus", version.ref = "quarkus" }

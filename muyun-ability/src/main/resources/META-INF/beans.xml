@@ -1,0 +1,3 @@
+<beans xmlns="https://jakarta.ee/xml/ns/jakartaee"
+       bean-discovery-mode="annotated"
+       version="4.0"/>

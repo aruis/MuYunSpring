@@ -1,27 +1,25 @@
 plugins {
-    alias(libs.plugins.spring.boot)
-    alias(libs.plugins.spring.dependency.management)
-}
-
-configurations.configureEach {
-    exclude(group = "org.springframework.boot", module = "spring-boot-starter-jackson")
-    exclude(group = "org.springframework.boot", module = "spring-boot-starter-jackson-test")
-    exclude(group = "org.springframework.boot", module = "spring-boot-jackson")
+    alias(libs.plugins.quarkus)
 }
 
 dependencies {
     implementation(project(":muyun-platform"))
     implementation(project(":muyun-iam"))
-    implementation(libs.spring.boot.starter.web)
-    implementation(libs.spring.boot.jackson2)
-    implementation(libs.spring.boot.starter.jdbc)
-    implementation(libs.spring.tx)
-    implementation(libs.muyun.database.spring.boot.starter)
+    implementation(platform(libs.quarkus.bom))
+    implementation(libs.quarkus.arc)
+    implementation(libs.quarkus.rest.jackson)
+    implementation(libs.quarkus.jdbc.postgresql)
+    implementation(libs.quarkus.narayana.jta)
+    implementation(libs.quarkus.scheduler)
+    implementation(libs.jakarta.servlet.api)
+    implementation(libs.muyun.database.quarkus)
     runtimeOnly(libs.postgresql)
 
-    testImplementation(libs.spring.boot.starter.test)
-    testImplementation(libs.spring.boot.starter.webmvc.test)
-    testImplementation(libs.spring.boot.starter.restclient.test)
+    testImplementation(platform(libs.quarkus.bom))
+    testImplementation(libs.quarkus.junit5)
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.mockito.core)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
 }
