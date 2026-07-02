@@ -11,17 +11,17 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionContext;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRule;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRuleService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-@RestController
-@RequestMapping("/platform.measure_unit/conversion-rules")
+@ApplicationScoped
+@Path("/platform.measure_unit/conversion-rules")
 public class SharedMeasureUnitConversionRuleWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitConversionRule, MeasureUnitConversionRuleService> {
 
@@ -32,29 +32,30 @@ public class SharedMeasureUnitConversionRuleWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("applicationAlias", MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected void bindScope(MeasureUnitConversionRule record, HttpServletRequest request) {
+    protected void bindScope(MeasureUnitConversionRule record, @Context HttpServletRequest request) {
         record.setApplicationAlias(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected boolean inScope(MeasureUnitConversionRule record, HttpServletRequest request) {
+    protected boolean inScope(MeasureUnitConversionRule record, @Context HttpServletRequest request) {
         return Objects.equals(record.getApplicationAlias(), MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "shared measure unit conversion rule does not exist: " + id;
     }
 
-    @PostMapping("/convert")
+    @POST
+    @Path("/convert")
     @ActionEndpoint(PlatformAction.QUERY)
-    public MeasureUnitBusinessConversion convert(HttpServletRequest request,
-                                                 @RequestBody MeasureBusinessConversionRequest body) {
+    public MeasureUnitBusinessConversion convert(@Context HttpServletRequest request,
+                                                 MeasureBusinessConversionRequest body) {
         return webScope(() -> conversionService.convert(
                 new MeasureUnitConversionContext(applicationAlias(body),
                         body.moduleAlias(), body.contextObjectType(), body.contextObjectId(), body.operatedAt()),

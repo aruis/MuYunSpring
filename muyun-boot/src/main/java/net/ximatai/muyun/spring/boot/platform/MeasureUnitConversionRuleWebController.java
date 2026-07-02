@@ -10,19 +10,19 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversionSe
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionContext;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRule;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRuleService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = MeasureUnitConversionRuleService.MODULE_ALIAS,
         title = "平台计量单位换算规则")
-@RequestMapping("/platform.application/{applicationAlias}/measure-unit-conversion-rules")
+@Path("/platform.application/{applicationAlias}/measure-unit-conversion-rules")
 public class MeasureUnitConversionRuleWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitConversionRule, MeasureUnitConversionRuleService> {
 
@@ -33,30 +33,31 @@ public class MeasureUnitConversionRuleWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("applicationAlias", applicationAlias(request));
     }
 
     @Override
-    protected void bindScope(MeasureUnitConversionRule record, HttpServletRequest request) {
+    protected void bindScope(MeasureUnitConversionRule record, @Context HttpServletRequest request) {
         record.setApplicationAlias(applicationAlias(request));
     }
 
     @Override
-    protected boolean inScope(MeasureUnitConversionRule record, HttpServletRequest request) {
+    protected boolean inScope(MeasureUnitConversionRule record, @Context HttpServletRequest request) {
         return Objects.equals(record.getApplicationAlias(), applicationAlias(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "measure unit conversion rule does not belong to application: "
                 + applicationAlias(request) + "." + id;
     }
 
-    @PostMapping("/convert")
+    @POST
+    @Path("/convert")
     @ActionEndpoint(PlatformAction.QUERY)
-    public MeasureUnitBusinessConversion convert(HttpServletRequest request,
-                                                 @RequestBody MeasureBusinessConversionRequest body) {
+    public MeasureUnitBusinessConversion convert(@Context HttpServletRequest request,
+                                                 MeasureBusinessConversionRequest body) {
         return webScope(() -> conversionService.convert(
                 new MeasureUnitConversionContext(applicationAlias(request), body.moduleAlias(),
                         body.contextObjectType(), body.contextObjectId(), body.operatedAt()),
@@ -67,7 +68,7 @@ public class MeasureUnitConversionRuleWebController
                 body.toUnitCode()));
     }
 
-    private String applicationAlias(HttpServletRequest request) {
+    private String applicationAlias(@Context HttpServletRequest request) {
         String value = pathVariable(request, "applicationAlias");
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("applicationAlias is required");
