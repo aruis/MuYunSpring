@@ -29,7 +29,6 @@ tasks.named<JavaCompile>("compileTestJava").configure {
         "**/*WebControllerTest.java",
         "**/PlatformAdminMenuVisibilityContractTest.java",
         "**/StaticModuleDefinitionScannerTest.java",
-        "**/ActionEndpointInterceptorTest.java",
         "**/RoleGrantableActionResolverTest.java"
     )
 }

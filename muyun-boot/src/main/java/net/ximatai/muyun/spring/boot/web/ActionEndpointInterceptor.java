@@ -1,28 +1,22 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.identity.ActingContext;
-import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import jakarta.annotation.Priority;
+import jakarta.ws.rs.Priorities;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
-import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.lang.NonNull;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.AsyncHandlerInterceptor;
 
-import java.util.Optional;
-
-public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
-    private static final String ACTION_CONTEXT_SCOPE_ATTRIBUTE =
-            ActionEndpointInterceptor.class.getName() + ".ACTION_CONTEXT_SCOPE";
-    private static final String ACTING_CONTEXT_SCOPE_ATTRIBUTE =
-            ActionEndpointInterceptor.class.getName() + ".ACTING_CONTEXT_SCOPE";
+@Provider
+@Priority(Priorities.AUTHORIZATION)
+public class ActionEndpointInterceptor implements ContainerRequestFilter, ContainerResponseFilter {
+    static final String ACTION_CONTEXT_PROPERTY = ActionEndpointInterceptor.class.getName() + ".ACTION_CONTEXT";
+    private static final String ACTION_SCOPE_PROPERTY = ActionEndpointInterceptor.class.getName() + ".ACTION_SCOPE";
 
     private final ActionExecutionPolicyService policyService;
     private final ActionEndpointContextResolver contextResolver;
@@ -42,84 +36,30 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(@NonNull HttpServletRequest request,
-                             @NonNull HttpServletResponse response,
-                             @NonNull Object handler) {
-        if (!(handler instanceof HandlerMethod handlerMethod)) {
-            return true;
+    public void filter(ContainerRequestContext requestContext) {
+        Object value = requestContext.getProperty(ACTION_CONTEXT_PROPERTY);
+        if (!(value instanceof ActionExecutionContext context)) {
+            return;
         }
-        ActionEndpoint endpoint = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), ActionEndpoint.class);
-        CustomActionEndpoint customEndpoint = AnnotatedElementUtils.findMergedAnnotation(
-                handlerMethod.getMethod(), CustomActionEndpoint.class);
-        if (endpoint != null && customEndpoint != null) {
-            throw new IllegalStateException("method cannot declare both standard and custom action endpoint: "
-                    + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
-        }
-        if (endpoint == null && customEndpoint == null) {
-            return true;
-        }
-        Optional<ActionExecutionContext> context = endpoint == null
-                ? contextResolver.resolve(request, handlerMethod, customEndpoint)
-                : contextResolver.resolve(request, handlerMethod, endpoint);
-        if (context.isEmpty()) {
-            throw new IllegalStateException("action endpoint requires module alias: "
-                    + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
-        }
-        ActionExecutionContext resolved = context.get();
-        ActingContextHolder.Scope actingScope = null;
+        ActionExecutionContextHolder.Scope scope = ActionExecutionContextHolder.use(context);
         try {
-            if (actingRequestResolver != null) {
-                Optional<ActingContext> actingContext = actingRequestResolver.resolve(request, resolved);
-                if (actingContext.isPresent()) {
-                    actingScope = ActingContextHolder.use(actingContext.get());
-                    request.setAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE, actingScope);
-                }
-            } else if (ActingRequestResolver.hasActingRequest(request)) {
-                throw new PlatformException("employee delegation service is not available");
-            }
-            ActionAuthorizationResult authorization = policyService.authorize(resolved);
-            request.setAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE,
-                    ActionExecutionContextHolder.use(resolved.withAuthorizationResult(authorization)));
-            return true;
-        } catch (RuntimeException ex) {
-            if (actingScope != null) {
-                request.removeAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
-                actingScope.close();
-            }
-            throw ex;
+            ActionAuthorizationResult result = policyService.authorize(context);
+            ActionExecutionContext authorized = context.withAuthorizationResult(result);
+            scope.close();
+            scope = ActionExecutionContextHolder.use(authorized);
+            requestContext.setProperty(ACTION_CONTEXT_PROPERTY, authorized);
+            requestContext.setProperty(ACTION_SCOPE_PROPERTY, scope);
+        } catch (RuntimeException exception) {
+            scope.close();
+            throw exception;
         }
     }
 
     @Override
-    public void afterCompletion(@NonNull HttpServletRequest request,
-                                @NonNull HttpServletResponse response,
-                                @NonNull Object handler,
-                                Exception ex) {
-        closeActionContext(request);
-        closeActingContext(request);
-    }
-
-    @Override
-    public void afterConcurrentHandlingStarted(@NonNull HttpServletRequest request,
-                                               @NonNull HttpServletResponse response,
-                                               @NonNull Object handler) {
-        closeActionContext(request);
-        closeActingContext(request);
-    }
-
-    private void closeActionContext(HttpServletRequest request) {
-        Object scope = request.getAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE);
-        request.removeAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE);
-        if (scope instanceof ActionExecutionContextHolder.Scope contextScope) {
-            contextScope.close();
-        }
-    }
-
-    private void closeActingContext(HttpServletRequest request) {
-        Object scope = request.getAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
-        request.removeAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
-        if (scope instanceof ActingContextHolder.Scope actingScope) {
-            actingScope.close();
+    public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
+        Object scope = requestContext.getProperty(ACTION_SCOPE_PROPERTY);
+        if (scope instanceof ActionExecutionContextHolder.Scope actionScope) {
+            actionScope.close();
         }
     }
 }
