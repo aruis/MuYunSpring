@@ -1,3 +1,13 @@
+plugins {
+    alias(libs.plugins.quarkus)
+}
+
+tasks.matching {
+    it.name in setOf("quarkusBuild", "quarkusAppPartsBuild", "quarkusDependenciesBuild")
+}.configureEach {
+    enabled = false
+}
+
 dependencies {
     api(project(":muyun-ability"))
     api(project(":muyun-dynamic"))

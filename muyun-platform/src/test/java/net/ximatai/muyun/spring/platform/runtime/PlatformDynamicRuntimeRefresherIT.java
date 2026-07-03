@@ -1,5 +1,10 @@
 package net.ximatai.muyun.spring.platform.runtime;
 
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -54,45 +59,41 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.support.PostgresQuarkusTestResource;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.eclipse.microprofile.config.Config;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = PlatformDynamicRuntimeRefresherIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(PlatformDynamicRuntimeRefresherIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class PlatformDynamicRuntimeRefresherIT {
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.default-schema", () -> "public");
-    }
+    @Inject
+    Config config;
 
-    private final IDatabaseOperations<?> operations;
-    private final DynamicSchemaService schemaService;
+    @Inject
+    @SuppressWarnings("rawtypes")
+    IDatabaseOperations operations;
 
-    @Autowired
-    PlatformDynamicRuntimeRefresherIT(IDatabaseOperations<?> operations, DynamicSchemaService schemaService) {
-        this.operations = operations;
-        this.schemaService = schemaService;
+    private DynamicSchemaService schemaService;
+
+    @BeforeEach
+    void setUp() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+        schemaService = new DynamicSchemaService(operations);
     }
 
     @Test
@@ -497,22 +498,50 @@ class PlatformDynamicRuntimeRefresherIT {
                                     ModuleMetadataFormulaRuleService formulaRuleService) {
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    static class TestApplication {
-        @Bean
-        DataSource dataSource() {
-            return DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
-        }
-
-        @Bean
-        DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
-            return new DynamicSchemaService(operations);
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("quarkus.arc.exclude-types", String.join(",",
+                    "net.ximatai.muyun.spring.platform.application.**",
+                    "net.ximatai.muyun.spring.platform.attachment.**",
+                    "net.ximatai.muyun.spring.platform.audit.**",
+                    "net.ximatai.muyun.spring.platform.code.**",
+                    "net.ximatai.muyun.spring.platform.config.**",
+                    "net.ximatai.muyun.spring.platform.currency.**",
+                    "net.ximatai.muyun.spring.platform.dictionary.**",
+                    "net.ximatai.muyun.spring.platform.duplicate.**",
+                    "net.ximatai.muyun.spring.platform.exchange.**",
+                    "net.ximatai.muyun.spring.platform.generation.**",
+                    "net.ximatai.muyun.spring.platform.impact.**",
+                    "net.ximatai.muyun.spring.platform.initialdata.**",
+                    "net.ximatai.muyun.spring.platform.measure.**",
+                    "net.ximatai.muyun.spring.platform.menu.**",
+                    "net.ximatai.muyun.spring.platform.metadata.**",
+                    "net.ximatai.muyun.spring.platform.module.**",
+                    "net.ximatai.muyun.spring.platform.option.**",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefresher",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformModuleDefinitionCompiler",
+                    "net.ximatai.muyun.spring.platform.ui.**",
+                    "net.ximatai.muyun.spring.platform.workflow.**",
+                    "net.ximatai.muyun.spring.platform.writeback.**"
+            ));
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                return config;
+            }
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 }

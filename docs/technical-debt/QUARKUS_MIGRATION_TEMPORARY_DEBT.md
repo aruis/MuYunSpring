@@ -97,3 +97,9 @@
 - 现状：首个 Quarkus IT profile 临时设置 `quarkus.arc.remove-unused-beans=false`，避免迁移期通过运行时类型查找的 Web filter 在测试启动时被 Arc 裁剪。
 - 影响：该 profile 与生产构建优化策略不完全一致，只适合作为恢复集成测试迁移通道的临时措施。
 - 回收方向：把运行时查找的 Web/filter/provider 收敛为明确 CDI 引用或标注 `@Unremovable`，确认生产和测试启动行为一致后移除该 profile 配置。
+
+### Platform library module uses Quarkus plugin only for IT model generation
+
+- 现状：`muyun-platform` 为运行 `@QuarkusTest` 集成测试临时应用 Quarkus Gradle 插件，但该模块仍是库模块，不是独立 Quarkus 应用；因此禁用了 platform 模块自身的 Quarkus 应用打包任务。
+- 影响：platform 集成测试可以获得 Quarkus ApplicationModel 和 MuYunDatabase Quarkus 注入能力，但 `:muyun-platform:quarkusBuild` 不作为有效验证入口。
+- 回收方向：将平台 Quarkus IT 迁到正式测试宿主模块，或为库模块建立独立 Quarkus test fixture/source set；届时移除 platform 模块的临时插件/任务禁用配置。
