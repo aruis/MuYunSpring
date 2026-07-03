@@ -62,6 +62,9 @@ public class OrganizationWebController extends WebSupport<OrganizationService> i
                 ? null
                 : requestedTenantId.trim();
         if (TenantContext.isSystem()) {
+            if (normalized == null) {
+                throw new PlatformException("iam.organization tree requires tenantId under system context");
+            }
             return normalized;
         }
         String currentTenantId = TenantContext.currentTenantId()

@@ -321,6 +321,15 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldRejectOrganizationTreeWithoutTenantUnderSystemScope() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+
+        mvc.perform(get("/iam.organization/tree"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("iam.organization tree requires tenantId under system context"));
+    }
+
+    @Test
     void shouldRejectOrganizationTreeForDifferentTenantUnderTenantScope() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));

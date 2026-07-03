@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -86,7 +87,7 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
         if (parentId == null || parentId.isBlank()) {
             return List.of();
         }
-        String normalizedTenantId = normalizeTenantScope(tenantId);
+        String normalizedTenantId = requireTenantScope(tenantId);
         if (!TreeAbility.ROOT_ID.equals(parentId)
                 && organizationForAction(action, normalizedTenantId, parentId) == null) {
             return List.of();
@@ -102,14 +103,17 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
             return null;
         }
         List<Organization> records = listForAction(action,
-                organizationTenantScope(normalizeTenantScope(tenantId))
+                organizationTenantScope(requireTenantScope(tenantId))
                         .eq(StandardEntitySchema.ID_FIELD, organizationId),
                 PageRequest.of(1, 1));
         return records.isEmpty() ? null : records.getFirst();
     }
 
     public void moveInOrganizationTree(String tenantId, String id, String previousId, String nextId, String parentId) {
-        moveInTree(organizationTenantScope(normalizeTenantScope(tenantId)), id, previousId, nextId, parentId);
+        String normalizedTenantId = requireTenantScope(tenantId);
+        try (TenantContext.Scope ignored = TenantContext.use(normalizedTenantId)) {
+            moveInTree(organizationTenantScope(normalizedTenantId), id, previousId, nextId, parentId);
+        }
     }
 
     @Override
@@ -130,6 +134,10 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
             return null;
         }
         return tenantId.trim();
+    }
+
+    private String requireTenantScope(String tenantId) {
+        return Preconditions.requireText(normalizeTenantScope(tenantId), "tenantId");
     }
 
 }
