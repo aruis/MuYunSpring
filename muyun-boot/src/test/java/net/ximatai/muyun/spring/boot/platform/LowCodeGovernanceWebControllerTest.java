@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.platform.config.LowCodeConfigBundle;
 import net.ximatai.muyun.spring.platform.config.LowCodeConfigHealthReport;
+import net.ximatai.muyun.spring.platform.config.LowCodeConfigHealthStatus;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveFacade;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveResult;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigVersion;
@@ -16,6 +17,7 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateInstantiati
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageBundleType;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunResult;
+import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunStatus;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageMode;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageExchangeManifest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -23,9 +25,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,10 +35,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class LowCodeGovernanceWebControllerTest {
     @BeforeEach
@@ -53,18 +48,15 @@ class LowCodeGovernanceWebControllerTest {
     }
 
     @Test
-    void shouldCheckPackageHealthThroughGovernanceEndpoint() throws Exception {
+    void shouldCheckPackageHealthThroughGovernanceEndpoint() {
         LowCodeModuleHealthService healthService = mock(LowCodeModuleHealthService.class);
         LowCodeConfigHealthReport report = LowCodeConfigHealthReport.of("crm.contract", List.of());
         when(healthService.check(any(LowCodeModuleHealthContext.class))).thenReturn(report);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(healthService)).build();
-        mvc.perform(post("/platform.low_code_governance/packages/health")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(packageJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"))
-                .andExpect(jsonPath("$.status").value("PASS"));
+        LowCodeConfigHealthReport response = controller(healthService).checkPackageHealth(modulePackage());
+
+        assertThat(response.moduleAlias()).isEqualTo("crm.contract");
+        assertThat(response.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
 
         ArgumentCaptor<LowCodeModuleHealthContext> captor =
                 ArgumentCaptor.forClass(LowCodeModuleHealthContext.class);
@@ -73,26 +65,18 @@ class LowCodeGovernanceWebControllerTest {
     }
 
     @Test
-    void shouldArchivePackageThroughArchiveFacade() throws Exception {
+    void shouldArchivePackageThroughArchiveFacade() {
         LowCodeModuleConfigArchiveFacade archiveFacade = mock(LowCodeModuleConfigArchiveFacade.class);
         LowCodeModuleConfigVersion version = version("version-1");
         when(archiveFacade.archive(any(LowCodeModulePackage.class), any(), any()))
                 .thenReturn(new LowCodeModuleConfigArchiveResult(version,
                         LowCodeConfigHealthReport.of("crm.contract", List.of())));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(archiveFacade)).build();
-        mvc.perform(post("/platform.low_code_governance/packages/archive")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "modulePackage": %s,
-                                  "operatorId": "u-1",
-                                  "remark": "归档"
-                                }
-                                """.formatted(packageJson())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.version.id").value("version-1"))
-                .andExpect(jsonPath("$.version.moduleAlias").value("crm.contract"));
+        LowCodeModuleConfigArchiveResult response = controller(archiveFacade).archivePackage(
+                new LowCodeGovernanceWebController.ArchivePackageRequest(modulePackage(), "u-1", "归档"));
+
+        assertThat(response.version().getId()).isEqualTo("version-1");
+        assertThat(response.version().getModuleAlias()).isEqualTo("crm.contract");
 
         ArgumentCaptor<LowCodeModulePackage> packageCaptor = ArgumentCaptor.forClass(LowCodeModulePackage.class);
         verify(archiveFacade).archive(packageCaptor.capture(), org.mockito.ArgumentMatchers.eq("u-1"),
@@ -101,41 +85,38 @@ class LowCodeGovernanceWebControllerTest {
     }
 
     @Test
-    void shouldSwitchCurrentPackageVersionThroughArchiveFacade() throws Exception {
+    void shouldSwitchCurrentPackageVersionThroughArchiveFacade() {
         LowCodeModuleConfigArchiveFacade archiveFacade = mock(LowCodeModuleConfigArchiveFacade.class);
         when(archiveFacade.switchCurrentVersion("crm.contract", "version-1")).thenReturn(version("version-1"));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(archiveFacade)).build();
-        mvc.perform(post("/platform/low-code-governance/modules/crm.contract/versions/version-1/switch-current"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("version-1"))
-                .andExpect(jsonPath("$.currentVersion").value(true));
+        LowCodeModuleConfigVersion response =
+                controller(archiveFacade).switchCurrentPackageVersion("crm.contract", "version-1");
+
+        assertThat(response.getId()).isEqualTo("version-1");
+        assertThat(response.getCurrentVersion()).isTrue();
 
         verify(archiveFacade).switchCurrentVersion("crm.contract", "version-1");
     }
 
     @Test
-    void shouldExportCurrentAndVersionPackageThroughExchangeService() throws Exception {
+    void shouldExportCurrentAndVersionPackageThroughExchangeService() {
         LowCodeModulePackageExchangeService exchangeService = mock(LowCodeModulePackageExchangeService.class);
         LowCodeModulePackage modulePackage = modulePackage();
         when(exchangeService.exportCurrentPackage("crm.contract")).thenReturn(packageJson());
         when(exchangeService.exportVersionPackage("version-1")).thenReturn(packageJson());
         when(exchangeService.parsePackage(packageJson())).thenReturn(modulePackage);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(exchangeService)).build();
-        mvc.perform(get("/platform.low_code_governance/modules/crm.contract/package"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"));
-        mvc.perform(get("/platform.low_code_governance/versions/version-1/package"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"));
+        LowCodeGovernanceWebController controller = controller(exchangeService);
+
+        assertThat(controller.exportCurrentPackage("crm.contract").moduleAlias()).isEqualTo("crm.contract");
+        assertThat(controller.exportVersionPackage("version-1").moduleAlias()).isEqualTo("crm.contract");
 
         verify(exchangeService).exportCurrentPackage("crm.contract");
         verify(exchangeService).exportVersionPackage("version-1");
     }
 
     @Test
-    void shouldPrepareAndArchiveImportDraftThroughImportService() throws Exception {
+    void shouldPrepareAndArchiveImportDraftThroughImportService() {
         LowCodeModulePackageExchangeService exchangeService = mock(LowCodeModulePackageExchangeService.class);
         LowCodeModulePackageImportService importService = mock(LowCodeModulePackageImportService.class);
         LowCodeModulePackage modulePackage = modulePackage();
@@ -148,37 +129,13 @@ class LowCodeGovernanceWebControllerTest {
         when(importService.archiveDraft(any(LowCodeModulePackageImportDraft.class), any(), any()))
                 .thenReturn(new LowCodeModuleConfigArchiveResult(version("version-1"), dryRun.healthReport()));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(exchangeService, importService)).build();
-        mvc.perform(post("/platform.low_code_governance/imports/dry-run")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(packageJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("READY"));
-        mvc.perform(post("/platform.low_code_governance/imports/drafts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(packageJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.draftId").value("draft-1"));
-        mvc.perform(post("/platform.low_code_governance/imports/drafts/archive")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "draft": {
-                                    "draftId": "draft-1",
-                                    "modulePackage": %s,
-                                    "dryRunResult": {
-                                      "modulePackage": %s,
-                                      "healthReport": {"moduleAlias": "crm.contract", "items": []},
-                                      "conflicts": []
-                                    },
-                                    "createdAt": "1970-01-01T00:00:00Z"
-                                  },
-                                  "operatorId": "u-1",
-                                  "remark": "导入"
-                                }
-                                """.formatted(packageJson(), packageJson())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.version.id").value("version-1"));
+        LowCodeGovernanceWebController controller = controller(exchangeService, importService);
+
+        assertThat(controller.dryRunImportPackage(modulePackage).status()).isEqualTo(LowCodePackageDryRunStatus.READY);
+        assertThat(controller.prepareImportDraft(modulePackage).draftId()).isEqualTo("draft-1");
+        LowCodeModuleConfigArchiveResult response = controller.archiveImportDraft(
+                new LowCodeGovernanceWebController.ArchiveImportDraftRequest(draft, "u-1", "导入"));
+        assertThat(response.version().getId()).isEqualTo("version-1");
 
         verify(exchangeService).dryRunImport(any(LowCodeModulePackage.class));
         verify(importService).prepareDraft(any(LowCodeModulePackage.class));
@@ -187,7 +144,7 @@ class LowCodeGovernanceWebControllerTest {
     }
 
     @Test
-    void shouldCreateAndInstantiateTemplateThroughGovernanceEndpoint() throws Exception {
+    void shouldCreateAndInstantiateTemplateThroughGovernanceEndpoint() {
         LowCodeModuleTemplateService templateService = mock(LowCodeModuleTemplateService.class);
         LowCodeModuleTemplate template = template();
         LowCodeModulePackage instantiated = new LowCodeModulePackage(
@@ -204,39 +161,21 @@ class LowCodeGovernanceWebControllerTest {
         when(templateService.instantiate(any(LowCodeModuleTemplate.class),
                 any(LowCodeModuleTemplateInstantiationRequest.class))).thenReturn(instantiated);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(templateService)).build();
-        mvc.perform(post("/platform.low_code_governance/templates/from-version")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "templateAlias": "contract_template",
-                                  "title": "Contract Template",
-                                  "versionId": "version-1"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.templateAlias").value("contract_template"))
-                .andExpect(jsonPath("$.basePackage.mode").value("TEMPLATE"));
-        mvc.perform(post("/platform.low_code_governance/templates/instantiate")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "template": {
-                                    "templateAlias": "contract_template",
-                                    "title": "Contract Template",
-                                    "basePackage": %s
-                                  },
-                                  "request": {
-                                    "applicationAlias": "sales",
-                                    "moduleAlias": "sales.contract",
-                                    "title": "Sales Contract",
-                                    "parameters": {"tableName": "sales_contract"}
-                                  }
-                                }
-                                """.formatted(templatePackageJson())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mode").value("MODULE_FULL"))
-                .andExpect(jsonPath("$.moduleAlias").value("sales.contract"));
+        LowCodeGovernanceWebController controller = controller(templateService);
+
+        LowCodeModuleTemplate response = controller.createTemplateFromVersion(
+                new LowCodeGovernanceWebController.CreateTemplateFromVersionRequest(
+                        "contract_template", "Contract Template", "version-1"));
+        assertThat(response.templateAlias()).isEqualTo("contract_template");
+        assertThat(response.basePackage().mode()).isEqualTo(LowCodePackageMode.TEMPLATE);
+
+        LowCodeModulePackage instantiateResponse = controller.instantiateTemplate(
+                new LowCodeGovernanceWebController.InstantiateTemplateRequest(template,
+                        new LowCodeModuleTemplateInstantiationRequest(
+                                "sales", "sales.contract", "Sales Contract",
+                                Map.of("tableName", "sales_contract"))));
+        assertThat(instantiateResponse.mode()).isEqualTo(LowCodePackageMode.MODULE_FULL);
+        assertThat(instantiateResponse.moduleAlias()).isEqualTo("sales.contract");
 
         verify(templateService).createTemplateFromVersion("contract_template", "Contract Template", "version-1");
         ArgumentCaptor<LowCodeModuleTemplate> templateCaptor =

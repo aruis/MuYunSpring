@@ -18,17 +18,16 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplate;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateInstantiationRequest;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = "platform.low_code_governance", title = "平台低代码治理")
 @PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "低代码治理", order = 80)
-@RequestMapping({"/platform.low_code_governance", "/platform/low-code-governance"})
+@Path("/platform.low_code_governance")
 public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConfigArchiveFacade>
         implements SystemScope<LowCodeModuleConfigArchiveFacade> {
     private final LowCodeModuleHealthService healthService;
@@ -48,72 +47,82 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
         this.templateService = templateService;
     }
 
-    @PostMapping("/packages/health")
+    @POST
+    @Path("/packages/health")
     @CustomActionEndpoint(value = "checkPackageHealth", title = "检查配置包健康度",
             level = PlatformActionLevel.LIST)
-    public LowCodeConfigHealthReport checkPackageHealth(@RequestBody LowCodeModulePackage modulePackage) {
+    public LowCodeConfigHealthReport checkPackageHealth(LowCodeModulePackage modulePackage) {
         return webScope(() -> healthService.check(LowCodeModuleHealthContext.ofPackage(modulePackage)));
     }
 
-    @PostMapping("/packages/archive")
+    @POST
+    @Path("/packages/archive")
     @CustomActionEndpoint(value = "archivePackage", title = "归档配置包", level = PlatformActionLevel.LIST)
-    public LowCodeModuleConfigArchiveResult archivePackage(@RequestBody ArchivePackageRequest request) {
+    public LowCodeModuleConfigArchiveResult archivePackage(ArchivePackageRequest request) {
         return webScope(() -> service().archive(request.modulePackage(), request.operatorId(), request.remark()));
     }
 
-    @PostMapping("/modules/{moduleAlias}/versions/{versionId}/switch-current")
+    @POST
+    @Path("/modules/{moduleAlias}/versions/{versionId}/switch-current")
     @CustomActionEndpoint(value = "switchCurrentPackageVersion", title = "切换当前配置包版本",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "versionId")
-    public LowCodeModuleConfigVersion switchCurrentPackageVersion(@PathVariable String moduleAlias,
-                                                            @PathVariable String versionId) {
+    public LowCodeModuleConfigVersion switchCurrentPackageVersion(@PathParam("moduleAlias") String moduleAlias,
+                                                            @PathParam("versionId") String versionId) {
         return webScope(() -> service().switchCurrentVersion(moduleAlias, versionId));
     }
 
-    @GetMapping("/modules/{moduleAlias}/package")
+    @GET
+    @Path("/modules/{moduleAlias}/package")
     @CustomActionEndpoint(value = "exportCurrentPackage", title = "导出当前配置包",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public LowCodeModulePackage exportCurrentPackage(@PathVariable String moduleAlias) {
+    public LowCodeModulePackage exportCurrentPackage(@PathParam("moduleAlias") String moduleAlias) {
         return webScope(() -> exchangeService.parsePackage(exchangeService.exportCurrentPackage(moduleAlias)));
     }
 
-    @GetMapping("/versions/{versionId}/package")
+    @GET
+    @Path("/versions/{versionId}/package")
     @CustomActionEndpoint(value = "exportVersionPackage", title = "导出指定版本配置包",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "versionId")
-    public LowCodeModulePackage exportVersionPackage(@PathVariable String versionId) {
+    public LowCodeModulePackage exportVersionPackage(@PathParam("versionId") String versionId) {
         return webScope(() -> exchangeService.parsePackage(exchangeService.exportVersionPackage(versionId)));
     }
 
-    @PostMapping("/imports/dry-run")
+    @POST
+    @Path("/imports/dry-run")
     @CustomActionEndpoint(value = "dryRunImportPackage", title = "导入配置包预检",
             level = PlatformActionLevel.LIST)
-    public LowCodePackageDryRunResult dryRunImportPackage(@RequestBody LowCodeModulePackage modulePackage) {
+    public LowCodePackageDryRunResult dryRunImportPackage(LowCodeModulePackage modulePackage) {
         return webScope(() -> exchangeService.dryRunImport(modulePackage));
     }
 
-    @PostMapping("/imports/drafts")
+    @POST
+    @Path("/imports/drafts")
     @CustomActionEndpoint(value = "prepareImportDraft", title = "准备导入草稿", level = PlatformActionLevel.LIST)
-    public LowCodeModulePackageImportDraft prepareImportDraft(@RequestBody LowCodeModulePackage modulePackage) {
+    public LowCodeModulePackageImportDraft prepareImportDraft(LowCodeModulePackage modulePackage) {
         return webScope(() -> importService.prepareDraft(modulePackage));
     }
 
-    @PostMapping("/imports/drafts/archive")
+    @POST
+    @Path("/imports/drafts/archive")
     @CustomActionEndpoint(value = "archiveImportDraft", title = "归档导入草稿", level = PlatformActionLevel.LIST)
-    public LowCodeModuleConfigArchiveResult archiveImportDraft(@RequestBody ArchiveImportDraftRequest request) {
+    public LowCodeModuleConfigArchiveResult archiveImportDraft(ArchiveImportDraftRequest request) {
         return webScope(() -> importService.archiveDraft(request.draft(), request.operatorId(), request.remark()));
     }
 
-    @PostMapping("/templates/from-version")
+    @POST
+    @Path("/templates/from-version")
     @CustomActionEndpoint(value = "createTemplateFromVersion", title = "从版本创建模板",
             level = PlatformActionLevel.LIST)
-    public LowCodeModuleTemplate createTemplateFromVersion(@RequestBody CreateTemplateFromVersionRequest request) {
+    public LowCodeModuleTemplate createTemplateFromVersion(CreateTemplateFromVersionRequest request) {
         return webScope(() -> templateService.createTemplateFromVersion(
                 request.templateAlias(), request.title(), request.versionId()));
     }
 
-    @PostMapping("/templates/instantiate")
+    @POST
+    @Path("/templates/instantiate")
     @CustomActionEndpoint(value = "instantiateTemplate", title = "实例化模板",
             level = PlatformActionLevel.LIST)
-    public LowCodeModulePackage instantiateTemplate(@RequestBody InstantiateTemplateRequest request) {
+    public LowCodeModulePackage instantiateTemplate(InstantiateTemplateRequest request) {
         return webScope(() -> templateService.instantiate(request.template(), request.request()));
     }
 
