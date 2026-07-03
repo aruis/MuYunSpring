@@ -1,22 +1,31 @@
-package net.ximatai.muyun.spring.dynamic.schema;
+package net.ximatai.muyun.spring.boot.dynamic;
 
+import io.agroal.api.AgroalDataSource;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.OrmException;
-import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.boot.platform.PostgresQuarkusTestResource;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -28,25 +37,17 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordDao;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaMigrationException;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
+import org.eclipse.microprofile.config.Config;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,33 +55,35 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = DynamicSchemaServiceIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(DynamicSchemaServiceIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class DynamicSchemaServiceIT {
 
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    @Inject
+    Config config;
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.default-schema", () -> "public");
-    }
+    @Inject
+    DynamicSchemaService schemaService;
 
-    private final DynamicSchemaService schemaService;
-    private final IDatabaseOperations<?> operations;
-    private final DataSource dataSource;
-    private final DynamicTransactionProbe transactionProbe;
+    @Inject
+    @SuppressWarnings("rawtypes")
+    IDatabaseOperations operations;
 
-    @Autowired
-    DynamicSchemaServiceIT(DynamicSchemaService schemaService,
-                           IDatabaseOperations<?> operations,
-                           DataSource dataSource,
-                           DynamicTransactionProbe transactionProbe) {
-        this.schemaService = schemaService;
-        this.operations = operations;
-        this.dataSource = dataSource;
-        this.transactionProbe = transactionProbe;
+    @Inject
+    AgroalDataSource dataSource;
+
+    @Inject
+    DynamicTransactionProbe transactionProbe;
+
+    @BeforeEach
+    void requirePostgres() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
     }
 
     @Test
@@ -881,32 +884,32 @@ class DynamicSchemaServiceIT {
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE, EntityCapability.ENABLE);
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EnableTransactionManagement
-    static class TestApplication {
+    public static class PostgresProfile implements QuarkusTestProfile {
 
-        @Bean
-        DataSource dataSource() {
-            return org.springframework.boot.jdbc.DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
-        }
-
-        @Bean
-        DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
-            return new DynamicSchemaService(operations);
-        }
-
-        @Bean
-        DynamicTransactionProbe dynamicTransactionProbe() {
-            return new DynamicTransactionProbe();
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("muyun.platform-bootstrap.enabled", "false");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                return config;
+            }
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 
+    @ApplicationScoped
     static class DynamicTransactionProbe {
 
         @Transactional
