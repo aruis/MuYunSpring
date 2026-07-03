@@ -223,6 +223,17 @@
 | `POST` | `/iam.role/permissionMatrix/{roleId}` | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。 |
 | `GET` | `/iam.role/menuMatrix/{roleId}/{schemeId}` | 按菜单方案返回菜单树和角色对模块菜单的授权状态。 |
 
+角色基础字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `assignmentType` | 授权层级：`account` 表示账号角色，`employment` 表示任职角色。 |
+| `roleKind` | 角色类型：标准角色、角色组、数据授权角色或系统角色。 |
+| `ownerScopeType` | 角色定义归属：`platform`、`tenant`、`organization`。 |
+| `ownerScopeId` | 归属对象 ID。平台归属为空，租户归属为租户 ID，机构归属为机构 ID。 |
+| `ownerScopeKey` | 服务端派生的只读归属键，用于唯一约束和诊断，不由前端写入。 |
+| `sharePolicy` | 共享策略：`private`、`ownerAndChildren`、`tenant`、`platform`。平台角色只允许私有或全局公开；租户角色只允许私有或租户公开；机构角色只允许私有或本机构及下级公开。 |
+
 账号授权请求字段：
 
 | 字段 | 说明 |

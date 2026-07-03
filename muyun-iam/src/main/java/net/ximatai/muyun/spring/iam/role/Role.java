@@ -16,10 +16,11 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Getter
 @Setter
 @Table(name = "iam_role", comment = "Role")
-@CompositeIndex(columns = {"tenant_id", "assignment_type", "role_kind", "title"}, unique = true)
+@CompositeIndex(columns = {"tenant_id", "owner_scope_type", "owner_scope_key", "assignment_type", "role_kind", "title"},
+        unique = true)
 @InitialDataFields(
-        managed = {"assignmentType", "roleKind", "memberRoleIds", "publicRole", "builtIn", "systemManaged",
-                "description"},
+        managed = {"assignmentType", "roleKind", "memberRoleIds", "ownerScopeType", "ownerScopeId",
+                "sharePolicy", "builtIn", "systemManaged", "description"},
         operator = {"title", "enabled", "sortOrder"}
 )
 public class Role extends StandardEnabledSortableEntity {
@@ -40,9 +41,26 @@ public class Role extends StandardEnabledSortableEntity {
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;
 
-    @Column(name = "public_role", type = ColumnType.BOOLEAN, comment = "Visible to child management scopes",
-            defaultVal = @Default(bool = TrueOrFalse.FALSE))
-    private Boolean publicRole = Boolean.FALSE;
+    @OptionField(type = OptionSourceType.ENUM)
+    @Column(name = "owner_scope_type", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Role owner scope type", defaultVal = @Default(varchar = "tenant"))
+    private RoleOwnerScopeType ownerScopeType = RoleOwnerScopeType.TENANT;
+
+    private String ownerScopeTypeTitle;
+
+    @Column(name = "owner_scope_id", type = ColumnType.VARCHAR, length = 64, comment = "Role owner scope id")
+    private String ownerScopeId;
+
+    @Column(name = "owner_scope_key", type = ColumnType.VARCHAR, length = 96, nullable = false,
+            comment = "Stable non-null role owner scope key", defaultVal = @Default(varchar = "tenant:"))
+    private String ownerScopeKey;
+
+    @OptionField(type = OptionSourceType.ENUM)
+    @Column(name = "share_policy", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Role share policy", defaultVal = @Default(varchar = "private"))
+    private RoleSharePolicy sharePolicy = RoleSharePolicy.PRIVATE;
+
+    private String sharePolicyTitle;
 
     @Column(name = "built_in", type = ColumnType.BOOLEAN, comment = "Built-in role flag",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))

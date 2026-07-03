@@ -24,7 +24,15 @@
 ```text
 Role
   assignmentType = ACCOUNT / EMPLOYMENT
+  ownerScopeType = PLATFORM / TENANT / ORGANIZATION
+  ownerScopeId = null / tenantId / organizationId
+  ownerScopeKey = platform / tenant:{tenantId} / organization:{organizationId}
+  sharePolicy = PRIVATE / OWNER_AND_CHILDREN / TENANT / PLATFORM
 ```
+
+`ownerScopeType` 和 `ownerScopeId` 表达角色定义归属，也就是角色由平台、租户或机构维护。`ownerScopeKey` 是服务端派生的非空归属键，用于稳定唯一约束，不作为业务自由字段。`sharePolicy` 表达角色定义的共享范围：平台角色可平台私有或全局公开，租户角色可租户私有或租户内公开，机构角色可机构私有或本机构及下级机构公开。
+
+角色定义归属不等于授权生效上下文。账号管理员的管理作用域仍落在 `AccountRoleGrant.managementScopeType + managementScopeId`，任职角色的数据范围上下文仍来自 `EmploymentRoleGrant.employeePositionId` 指向的任职机构和部门。
 
 账号角色和任职角色的授权事实分表承载：
 
