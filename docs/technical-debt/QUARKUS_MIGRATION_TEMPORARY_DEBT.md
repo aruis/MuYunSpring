@@ -68,6 +68,12 @@
 - 影响：能降低迁移面，但长期会形成类 Spring 注入习惯，模糊平台正式门面。
 - 回收方向：保留确有价值的稳定门面，移除只为迁移存在的 provider；关键 producer 补注入行为测试。
 
+### Tenant verifier injection is disambiguated by concrete service
+
+- 现状：多个租户域 service 都实现 `ActiveTenantVerifier`，Quarkus CDI 按接口注入会出现 ambiguous dependency。动态 Web controller 迁移期暂时注入 `TenantService` 作为租户有效性校验入口。
+- 影响：Web 层对 IAM 具体服务存在额外耦合，和“请求上下文/租户校验用稳定门面承接”的长期方向不完全一致。
+- 回收方向：引入专门 qualifier 或独立 `TenantVerifier` 门面 producer，只暴露唯一默认 bean；完成后把动态 Web controller 从 `TenantService` 收回到稳定接口。
+
 ## Static Scanning
 
 ### Spring merged annotation semantics are not preserved

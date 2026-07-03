@@ -1,6 +1,11 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -10,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.ui.PlatformActionBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
@@ -19,19 +25,17 @@ import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class DynamicPageBootstrapWebControllerTest {
     @AfterEach
@@ -40,13 +44,26 @@ class DynamicPageBootstrapWebControllerTest {
     }
 
     @Test
-    void shouldExposeMenuBootstrapWithDynamicDescriptor() throws Exception {
+    void shouldDeclareMenuBootstrapRoute() throws Exception {
+        assertThat(DynamicPageBootstrapWebController.class.getAnnotation(Path.class).value())
+                .isEqualTo("/platform.menu");
+
+        Method entry = DynamicPageBootstrapWebController.class.getMethod(
+                "entry", String.class, PlatformUiClientType.class);
+        assertThat(entry.getAnnotation(GET.class)).isNotNull();
+        assertThat(entry.getAnnotation(Path.class).value()).isEqualTo("/{menuId}/entry");
+        assertThat(entry.getParameters()[0].getAnnotation(PathParam.class).value()).isEqualTo("menuId");
+        assertThat(entry.getParameters()[1].getAnnotation(QueryParam.class).value()).isEqualTo("clientType");
+        assertThat(entry.getParameters()[1].getAnnotation(DefaultValue.class).value()).isEqualTo("WEB");
+    }
+
+    @Test
+    void shouldExposeMenuBootstrapWithDynamicDescriptor() {
         PlatformPageBootstrapService bootstrapService = mock(PlatformPageBootstrapService.class);
         DynamicRecordService recordService = mock(DynamicRecordService.class);
-        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        TenantService activeTenantVerifier = mock(TenantService.class);
         DynamicPageBootstrapWebController controller =
                 new DynamicPageBootstrapWebController(bootstrapService, recordService, activeTenantVerifier);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         PlatformPageBootstrap bootstrap = new PlatformPageBootstrap(
                 new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
                         "ui-1", "query-1", "{\"source\":\"menu\"}"),
@@ -75,27 +92,39 @@ class DynamicPageBootstrapWebControllerTest {
                 .thenReturn(DynamicActionAvailability.unavailable("delete", "denied"));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/platform.menu/menu-1/entry").param("clientType", "APP"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.entry.menuId").value("menu-1"))
-                    .andExpect(jsonPath("$.entry.moduleAlias").value("crm.customer"))
-                    .andExpect(jsonPath("$.clientType").value("APP"))
-                    .andExpect(jsonPath("$.moduleDescriptor.moduleAlias").value("crm.customer"))
-                    .andExpect(jsonPath("$.moduleDescriptor.actions.length()").value(1))
-                    .andExpect(jsonPath("$.moduleDescriptor.actions[0].code").value("query"))
-                    .andExpect(jsonPath("$.mainEntityAlias").value("customer"))
-                    .andExpect(jsonPath("$.openApiPath").value("/crm.customer/openapi"))
-                    .andExpect(jsonPath("$.pageConfig").doesNotExist())
-                    .andExpect(jsonPath("$.resolvedConfig.uiFields.length()").value(0))
-                    .andExpect(jsonPath("$.resolvedConfig.actionBlocks.length()").value(1))
-                    .andExpect(jsonPath("$.resolvedConfig.actionBlocks[0].actionCode").value("query"));
-            mvc.perform(get("/platform.menu/menu-1/entry"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.clientType").value("WEB"))
-                    .andExpect(jsonPath("$.entry.defaultUiConfigId").value("ui-web"));
+            DynamicPageBootstrapResponse appResponse = controller.entry("menu-1", PlatformUiClientType.APP);
+            DynamicPageBootstrapResponse webResponse = controller.entry("menu-1", PlatformUiClientType.WEB);
+
+            assertThat(appResponse.entry().menuId()).isEqualTo("menu-1");
+            assertThat(appResponse.entry().moduleAlias()).isEqualTo("crm.customer");
+            assertThat(appResponse.clientType()).isEqualTo(PlatformUiClientType.APP);
+            assertThat(appResponse.moduleDescriptor().moduleAlias()).isEqualTo("crm.customer");
+            assertThat(appResponse.moduleDescriptor().actions()).singleElement()
+                    .extracting(DynamicActionDescriptor::code)
+                    .isEqualTo("query");
+            assertThat(appResponse.mainEntityAlias()).isEqualTo("customer");
+            assertThat(appResponse.openApiPath()).isEqualTo("/crm.customer/openapi");
+            assertThat(appResponse.resolvedConfig().uiFields()).isEmpty();
+            assertThat(appResponse.resolvedConfig().actionBlocks()).singleElement()
+                    .extracting(PlatformActionBlock::actionCode)
+                    .isEqualTo("query");
+            assertThat(webResponse.clientType()).isEqualTo(PlatformUiClientType.WEB);
+            assertThat(webResponse.entry().defaultUiConfigId()).isEqualTo("ui-web");
         }
 
         verify(activeTenantVerifier, times(2)).verifyActiveTenant("tenant-a");
+    }
+
+    @Test
+    void shouldRequireTenantContext() {
+        DynamicPageBootstrapWebController controller = new DynamicPageBootstrapWebController(
+                mock(PlatformPageBootstrapService.class),
+                mock(DynamicRecordService.class),
+                mock(TenantService.class));
+
+        assertThatThrownBy(() -> controller.entry("menu-1", PlatformUiClientType.WEB))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("page bootstrap requires tenant context");
     }
 
     private DynamicActionDescriptor action(String code) {

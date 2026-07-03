@@ -1,44 +1,46 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.ui.PlatformActionBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
 import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Set;
 
-@RestController
-@RequestMapping("/platform.menu")
+@ApplicationScoped
+@Path("/platform.menu")
 public class DynamicPageBootstrapWebController {
     private final PlatformPageBootstrapService bootstrapService;
     private final DynamicRecordService recordService;
-    private final ActiveTenantVerifier activeTenantVerifier;
+    private final TenantService activeTenantVerifier;
 
     public DynamicPageBootstrapWebController(PlatformPageBootstrapService bootstrapService,
                                              DynamicRecordService recordService,
-                                             ActiveTenantVerifier activeTenantVerifier) {
+                                             TenantService activeTenantVerifier) {
         this.bootstrapService = bootstrapService;
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
     }
 
-    @GetMapping("/{menuId}/entry")
-    public DynamicPageBootstrapResponse entry(@PathVariable String menuId,
-                                              @RequestParam(defaultValue = "WEB") PlatformUiClientType clientType) {
+    @GET
+    @Path("/{menuId}/entry")
+    public DynamicPageBootstrapResponse entry(@PathParam("menuId") String menuId,
+                                              @DefaultValue("WEB") @QueryParam("clientType") PlatformUiClientType clientType) {
         requireTenantContext();
         PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu(menuId, clientType);
         return response(bootstrap);
