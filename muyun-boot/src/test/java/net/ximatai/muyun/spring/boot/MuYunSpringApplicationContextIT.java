@@ -1,76 +1,74 @@
 package net.ximatai.muyun.spring.boot;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agroal.api.AgroalDataSource;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.common.http.TestHTTPResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.boot.platform.PostgresQuarkusTestResource;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
 import net.ximatai.muyun.spring.iam.user.UserSessionDao;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.resttestclient.TestRestTemplate;
-import org.springframework.boot.restclient.RestTemplateBuilder;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.eclipse.microprofile.config.Config;
+import org.junit.jupiter.api.Test;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers
-@SpringBootTest(
-        classes = MuYunSpringApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@QuarkusTest
+@TestProfile(MuYunSpringApplicationContextIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class MuYunSpringApplicationContextIT {
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
-    @Autowired
-    private UserSessionService userSessionService;
+    @Inject
+    Config config;
 
-    @Autowired
-    private UserSessionDao userSessionDao;
+    @Inject
+    UserSessionService userSessionService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    @Inject
+    UserSessionDao userSessionDao;
 
-    private TestRestTemplate restTemplate;
+    @Inject
+    AgroalDataSource dataSource;
 
-    @LocalServerPort
-    private int port;
+    @Inject
+    ObjectMapper objectMapper;
+
+    @TestHTTPResource
+    URI baseUri;
+
+    private HttpClient httpClient;
 
     @BeforeEach
-    void setUpRestTemplate() {
-        restTemplate = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + port));
-    }
-
-    @DynamicPropertySource
-    static void applicationProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.driver-class-name", postgres::getDriverClassName);
-        registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
+    void setUp() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+        httpClient = HttpClient.newHttpClient();
     }
 
     @Test
@@ -78,7 +76,7 @@ class MuYunSpringApplicationContextIT {
     }
 
     @Test
-    void shouldPersistAndRevokeLoginSessionWithRealDatabase() {
+    void shouldPersistAndRevokeLoginSessionWithRealDatabase() throws Exception {
         assertThat(columnExists("iam_user_session", "max_expires_at")).isTrue();
 
         LoginResult login = userSessionService.login(
@@ -112,15 +110,13 @@ class MuYunSpringApplicationContextIT {
     }
 
     @Test
-    void shouldLoadCurrentUserAndMenusThroughRealHttpLogin() {
-        ResponseEntity<JsonNode> login = restTemplate.postForEntity("/iam.auth/login",
-                Map.of(
-                        "username", UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
-                        "password", "admin123"
-                ),
-                JsonNode.class);
-        assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
-        JsonNode loginBody = login.getBody();
+    void shouldLoadCurrentUserAndMenusThroughRealHttpLogin() throws Exception {
+        HttpResponse<String> login = post("/iam.auth/login", Map.of(
+                "username", UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
+                "password", "admin123"
+        ), null);
+        assertThat(login.statusCode()).isEqualTo(200);
+        JsonNode loginBody = objectMapper.readTree(login.body());
         assertThat(loginBody).isNotNull();
         String token = loginBody.path("token").asText();
         assertThat(token).isNotBlank();
@@ -129,30 +125,41 @@ class MuYunSpringApplicationContextIT {
         assertThat(loginBody.path("currentUser").path("system").asBoolean()).isTrue();
         assertThat(loginBody.path("currentUser").has("tenantId")).isFalse();
 
-        HttpEntity<Void> bearerRequest = new HttpEntity<>(bearerHeaders(token));
-        ResponseEntity<JsonNode> context = restTemplate.exchange(
-                "/iam.auth/context", HttpMethod.GET, bearerRequest, JsonNode.class);
-        assertThat(context.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(context.getBody()).isNotNull();
-        assertThat(context.getBody().path("userId").asText())
+        HttpResponse<String> context = get("/iam.auth/context", token);
+        assertThat(context.statusCode()).isEqualTo(200);
+        JsonNode contextBody = objectMapper.readTree(context.body());
+        assertThat(contextBody).isNotNull();
+        assertThat(contextBody.path("userId").asText())
                 .isEqualTo(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID);
 
-        ResponseEntity<JsonNode> menus = restTemplate.exchange(
-                "/platform.menu/mine", HttpMethod.GET, bearerRequest, JsonNode.class);
-        assertThat(menus.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(menus.getBody()).isNotNull();
-        assertThat(menus.getBody().path("records").isArray()).isTrue();
-        assertThat(menus.getBody().path("records")).isNotEmpty();
+        HttpResponse<String> menus = get("/platform.menu/mine", token);
+        assertThat(menus.statusCode()).isEqualTo(200);
+        JsonNode menusBody = objectMapper.readTree(menus.body());
+        assertThat(menusBody).isNotNull();
+        assertThat(menusBody.path("records").isArray()).isTrue();
+        assertThat(menusBody.path("records")).isNotEmpty();
 
-        ResponseEntity<Void> logout = restTemplate.exchange(
-                "/iam.auth/logout", HttpMethod.POST, bearerRequest, Void.class);
-        assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> logout = post("/iam.auth/logout", Map.of(), token);
+        assertThat(logout.statusCode()).isEqualTo(200);
     }
 
-    private HttpHeaders bearerHeaders(String token) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
+    private HttpResponse<String> get(String path, String bearerToken) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(baseUri.resolve(path))
+                .GET();
+        if (bearerToken != null) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> post(String path, Object body, String bearerToken) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(baseUri.resolve(path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)));
+        if (bearerToken != null) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private UserSession onlyActiveSession(List<UserSession> sessions) {
@@ -163,17 +170,46 @@ class MuYunSpringApplicationContextIT {
         return activeSessions.getFirst();
     }
 
-    private boolean columnExists(String tableName, String columnName) {
-        Integer count = jdbcTemplate.queryForObject("""
+    private boolean columnExists(String tableName, String columnName) throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
                         select count(*)
                         from information_schema.columns
                         where table_schema = current_schema()
                           and table_name = ?
                           and column_name = ?
-                        """,
-                Integer.class,
-                tableName,
-                columnName);
-        return count != null && count > 0;
+                        """)) {
+            statement.setString(1, tableName);
+            statement.setString(2, columnName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() && resultSet.getInt(1) > 0;
+            }
+        }
+    }
+
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("muyun.database.repository-schema-mode", "ENSURE");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                config.put("muyun.platform-bootstrap.enabled", "true");
+                return config;
+            }
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.platform-bootstrap.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
+        }
     }
 }
