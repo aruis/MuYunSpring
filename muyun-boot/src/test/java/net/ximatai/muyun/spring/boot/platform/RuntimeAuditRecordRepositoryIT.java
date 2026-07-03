@@ -1,60 +1,57 @@
-package net.ximatai.muyun.spring.platform.audit;
+package net.ximatai.muyun.spring.boot.platform;
 
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
+import jakarta.transaction.UserTransaction;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.audit.RuntimeAuditEventListener;
+import net.ximatai.muyun.spring.platform.audit.RuntimeAuditRecord;
+import net.ximatai.muyun.spring.platform.audit.RuntimeAuditRecordDao;
+import net.ximatai.muyun.spring.platform.audit.RuntimeAuditRecordService;
+import org.eclipse.microprofile.config.Config;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = RuntimeAuditRecordRepositoryIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(RuntimeAuditRecordRepositoryIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class RuntimeAuditRecordRepositoryIT {
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
-    }
+    @Inject
+    Config config;
 
-    private final RuntimeAuditRecordService service;
-    private final RuntimeAuditEventListener listener;
-    private final TransactionTemplate transactionTemplate;
+    @Inject
+    RuntimeAuditRecordDao auditRecordDao;
 
-    @Autowired
-    RuntimeAuditRecordRepositoryIT(RuntimeAuditRecordService service,
-                                   RuntimeAuditEventListener listener,
-                                   PlatformTransactionManager transactionManager) {
-        this.service = service;
-        this.listener = listener;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
+    @Inject
+    RuntimeAuditRecordService service;
+
+    @Inject
+    RuntimeAuditEventListener listener;
+
+    @Inject
+    UserTransaction userTransaction;
 
     @Test
     void shouldPersistRuntimeAuditRecordThroughRepository() {
+        requirePostgres();
+        auditRecordDao.ensureTable();
+
         listener.onRuntimeEvent(event("audit-it-event-1"));
 
         RuntimeAuditRecord record = service.list(Criteria.of().eq("eventId", "audit-it-event-1"),
@@ -72,6 +69,9 @@ class RuntimeAuditRecordRepositoryIT {
 
     @Test
     void shouldPersistActionResultColumnsThroughRepository() {
+        requirePostgres();
+        auditRecordDao.ensureTable();
+
         listener.onRuntimeEvent(actionEvent("audit-it-action-event"));
 
         RuntimeAuditRecord record = service.list(Criteria.of().eq("eventId", "audit-it-action-event"),
@@ -89,11 +89,16 @@ class RuntimeAuditRecordRepositoryIT {
     }
 
     @Test
-    void shouldPersistActionFailureAuditWhenOuterTransactionRollsBack() {
-        transactionTemplate.executeWithoutResult(status -> {
+    void shouldPersistActionFailureAuditWhenOuterTransactionRollsBack() throws Exception {
+        requirePostgres();
+        auditRecordDao.ensureTable();
+
+        userTransaction.begin();
+        try {
             listener.onRuntimeEvent(actionFailedEvent("audit-it-action-failed-rollback"));
-            status.setRollbackOnly();
-        });
+        } finally {
+            userTransaction.rollback();
+        }
 
         RuntimeAuditRecord record = service.list(Criteria.of().eq("eventId", "audit-it-action-failed-rollback"),
                         PageRequest.of(1, 10))
@@ -109,6 +114,8 @@ class RuntimeAuditRecordRepositoryIT {
 
     @Test
     void shouldRejectDuplicateRuntimeEventIdThroughRepositoryService() {
+        requirePostgres();
+        auditRecordDao.ensureTable();
         RuntimeEvent event = event("audit-it-event-duplicate");
         listener.onRuntimeEvent(event);
 
@@ -184,28 +191,35 @@ class RuntimeAuditRecordRepositoryIT {
         );
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EnableMuYunRepositories(basePackageClasses = RuntimeAuditRecordDao.class)
-    static class TestApplication {
-        @Bean
-        DataSource dataSource() {
-            return DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
-        }
+    private void requirePostgres() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+    }
 
-        @Bean
-        RuntimeAuditRecordService runtimeAuditRecordService(RuntimeAuditRecordDao auditRecordDao) {
-            return new RuntimeAuditRecordService(auditRecordDao);
-        }
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("muyun.platform-bootstrap.enabled", "false");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                return config;
+            }
 
-        @Bean
-        RuntimeAuditEventListener runtimeAuditEventListener(RuntimeAuditRecordService service) {
-            return new RuntimeAuditEventListener(service);
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 }

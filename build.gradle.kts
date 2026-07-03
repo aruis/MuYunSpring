@@ -10,7 +10,10 @@ allprojects {
 
 val testcontainersVersion = libs.versions.testcontainers.get()
 val migratedQuarkusIntegrationTests = mapOf(
-    "muyun-boot" to setOf("net/ximatai/muyun/spring/boot/platform/PlatformFieldTypeRepositoryIT.java")
+    "muyun-boot" to setOf(
+        "net/ximatai/muyun/spring/boot/platform/PlatformFieldTypeRepositoryIT.java",
+        "net/ximatai/muyun/spring/boot/platform/RuntimeAuditRecordRepositoryIT.java"
+    )
 )
 
 subprojects {
