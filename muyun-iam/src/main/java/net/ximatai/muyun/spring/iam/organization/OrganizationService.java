@@ -12,6 +12,8 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.OrganizationCreationProvisioner;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,6 +36,7 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
     public static final String MODULE_ALIAS = "iam.organization";
     private static final DataScopeFieldMapping DATA_SCOPE_FIELD_MAPPING = DataScopeFieldMapping.of(null, "id", null);
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
+    private final ObjectProvider<OrganizationCreationProvisioner> creationProvisioners;
 
     public OrganizationService(OrganizationDao organizationDao, ActiveTenantVerifier activeTenantVerifier) {
         this(organizationDao, activeTenantVerifier, Optional.empty());
@@ -42,14 +45,23 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
     @Autowired
     public OrganizationService(OrganizationDao organizationDao,
                                ActiveTenantVerifier activeTenantVerifier,
-                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
+                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
+                               ObjectProvider<OrganizationCreationProvisioner> creationProvisioners) {
         super(MODULE_ALIAS, Organization.class, organizationDao, activeTenantVerifier);
         this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
+        this.creationProvisioners = creationProvisioners;
     }
 
     public OrganizationService(OrganizationDao organizationDao,
                                ActiveTenantVerifier activeTenantVerifier,
                                Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
+        this(organizationDao, activeTenantVerifier, dataScopeCriteriaService, null);
+    }
+
+    public OrganizationService(OrganizationDao organizationDao,
+                               ActiveTenantVerifier activeTenantVerifier,
+                               Optional<DataScopeCriteriaService> dataScopeCriteriaService,
+                               ObjectProvider<OrganizationCreationProvisioner> creationProvisioners) {
         super(MODULE_ALIAS, Organization.class, organizationDao, activeTenantVerifier);
         Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
                 ? Optional.empty()
@@ -57,6 +69,7 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
         this.dataScopeCriteriaService = () -> criteriaService
                 .<DataScopeCriteriaService>map(service -> service)
                 .orElseGet(AllowAllDataScopeCriteriaService::new);
+        this.creationProvisioners = creationProvisioners;
     }
 
     @Override
@@ -72,6 +85,23 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
     @Override
     public void normalizeBeforeMutation(Organization organization) {
         organization.setCode(Preconditions.requireText(organization.getCode(), "organizationCode"));
+    }
+
+    @Override
+    public void afterInsert(String id, Organization organization) {
+        provisionOrganization(id);
+    }
+
+    public void provisionOrganization(String organizationId) {
+        if (creationProvisioners == null) {
+            return;
+        }
+        Organization organization = selectIgnoreSoftDelete(organizationId);
+        String tenantId = TenantContext.currentTenantId()
+                .orElseGet(() -> Preconditions.requireText(organization == null ? null : organization.getTenantId(),
+                        "tenantId"));
+        creationProvisioners.orderedStream()
+                .forEach(provisioner -> provisioner.afterOrganizationCreated(tenantId, organizationId));
     }
 
     @Override

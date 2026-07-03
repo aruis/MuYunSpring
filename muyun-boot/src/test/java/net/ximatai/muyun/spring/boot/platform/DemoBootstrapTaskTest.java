@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.boot.MuYunSpringDemoBootstrapProperties;
 import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.tenant.OrganizationCreationProvisioner;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentDao;
@@ -28,9 +29,12 @@ import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleAction;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
+import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
 import net.ximatai.muyun.spring.iam.role.RoleDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.RoleSharePolicy;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantDao;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
@@ -40,9 +44,11 @@ import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -82,6 +88,10 @@ class DemoBootstrapTaskTest {
     private final RoleGrantableActionResolver grantableActionResolver = mock(RoleGrantableActionResolver.class);
     private final BuiltInRolePermissionTemplateService rolePermissionTemplateService =
             new BuiltInRolePermissionTemplateService(roleService, grantableActionResolver);
+    private final DefaultTenantRoleProvisioner tenantRoleProvisioner =
+            new DefaultTenantRoleProvisioner(roleService, rolePermissionTemplateService);
+    private final DefaultOrganizationRoleProvisioner organizationRoleProvisioner =
+            new DefaultOrganizationRoleProvisioner(roleService, rolePermissionTemplateService);
 
     @AfterEach
     void tearDown() {
@@ -92,7 +102,7 @@ class DemoBootstrapTaskTest {
     void shouldDoNothingWhenDemoBootstrapIsDisabled() {
         DemoBootstrapTask task = new DemoBootstrapTask(new MuYunSpringDemoBootstrapProperties(),
                 tenantService, organizationService, departmentService, employeeService, userAccountService,
-                employeeAccountService, roleService, rolePermissionTemplateService);
+                employeeAccountService, tenantRoleProvisioner);
 
         task.run();
 
@@ -102,6 +112,105 @@ class DemoBootstrapTaskTest {
         assertThat(employeeDao.list(Criteria.of())).isEmpty();
         assertThat(userAccountDao.list(Criteria.of())).isEmpty();
         assertThat(roleDao.list(Criteria.of())).isEmpty();
+    }
+
+    @Test
+    void shouldProvisionTenantAdminRoleWhenTenantIsCreated() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of(
+                GrantableAction.ofPlatformDefaults("iam.user", PlatformAction.QUERY)
+        ));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner> provisioners =
+                mock(ObjectProvider.class);
+        when(provisioners.orderedStream()).thenAnswer(invocation -> Stream.of(tenantRoleProvisioner));
+        TenantService provisioningTenantService = new TenantService(tenantDao, provisioners);
+        Tenant tenant = new Tenant();
+        tenant.setAlias("acme");
+        tenant.setTitle("Acme");
+        tenant.setEnabled(Boolean.TRUE);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            provisioningTenantService.insert(tenant);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("acme")) {
+            Role role = roleService.select(DefaultTenantRoleProvisioner.tenantAdminRoleId("acme"));
+            assertThat(role).isNotNull();
+            assertThat(role.getTitle()).isEqualTo(RoleService.TENANT_ADMIN_ROLE_TITLE);
+            assertThat(role.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.TENANT);
+            assertThat(role.getOwnerScopeId()).isEqualTo("acme");
+            assertThat(role.getOwnerScopeKey()).isEqualTo("tenant:acme");
+            assertThat(role.getSystemManaged()).isTrue();
+            assertThat(roleActionDao.list(Criteria.of())).hasSize(1);
+        }
+    }
+
+    @Test
+    void shouldRepairExistingTenantAdminRoleScopeDuringProvisioning() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias("acme");
+            tenant.setTitle("Acme");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        Role legacy = new Role();
+        legacy.setId(DefaultTenantRoleProvisioner.tenantAdminRoleId("acme"));
+        legacy.setTenantId("acme");
+        legacy.setTitle(RoleService.TENANT_ADMIN_ROLE_TITLE);
+        legacy.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        legacy.setOwnerScopeKey("tenant:");
+        legacy.setSystemManaged(Boolean.TRUE);
+        legacy.setBuiltIn(Boolean.TRUE);
+        legacy.setEnabled(Boolean.TRUE);
+        legacy.setVersion(0);
+        roleDao.insert(legacy);
+
+        Role repaired = tenantRoleProvisioner.ensureTenantAdminRole("acme");
+
+        assertThat(repaired.getOwnerScopeId()).isEqualTo("acme");
+        assertThat(repaired.getOwnerScopeKey()).isEqualTo("tenant:acme");
+        assertThat(repaired.getAssignmentType()).isEqualTo(RoleAssignmentType.ACCOUNT);
+        assertThat(roleDao.findById(repaired.getId()).getOwnerScopeId()).isEqualTo("acme");
+    }
+
+    @Test
+    void shouldProvisionOrganizationAdminRoleWhenOrganizationIsCreated() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of(
+                GrantableAction.ofPlatformDefaults("iam.employee", PlatformAction.QUERY)
+        ));
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias("acme");
+            tenant.setTitle("Acme");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        @SuppressWarnings("unchecked")
+        ObjectProvider<OrganizationCreationProvisioner> provisioners = mock(ObjectProvider.class);
+        when(provisioners.orderedStream()).thenAnswer(invocation -> Stream.of(organizationRoleProvisioner));
+        OrganizationService provisioningOrganizationService =
+                new OrganizationService(organizationDao, tenantService, Optional.empty(), provisioners);
+        Organization organization = new Organization();
+        organization.setId("org-1");
+        organization.setCode("HQ");
+        organization.setTitle("Headquarters");
+
+        try (TenantContext.Scope ignored = TenantContext.use("acme")) {
+            provisioningOrganizationService.insert(organization);
+            Role role = roleService.select(DefaultOrganizationRoleProvisioner.organizationAdminRoleId("acme", "org-1"));
+
+            assertThat(role).isNotNull();
+            assertThat(role.getTitle()).isEqualTo(DefaultOrganizationRoleProvisioner.ORGANIZATION_ADMIN_ROLE_TITLE);
+            assertThat(role.getAssignmentType()).isEqualTo(RoleAssignmentType.EMPLOYMENT);
+            assertThat(role.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.ORGANIZATION);
+            assertThat(role.getOwnerScopeId()).isEqualTo("org-1");
+            assertThat(role.getOwnerScopeKey()).isEqualTo("organization:org-1");
+            assertThat(role.getSharePolicy()).isEqualTo(RoleSharePolicy.OWNER_AND_CHILDREN);
+            assertThat(role.getSystemManaged()).isTrue();
+            assertThat(roleActionDao.list(Criteria.of())).hasSize(1);
+        }
     }
 
     @Test
@@ -119,8 +228,7 @@ class DemoBootstrapTaskTest {
                 GrantableAction.ofPlatformDefaults("iam.user", PlatformAction.QUERY)
         ));
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
-                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                rolePermissionTemplateService);
+                departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);
 
         task.run();
         task.run();
@@ -141,7 +249,7 @@ class DemoBootstrapTaskTest {
             Employee employee = employeeService.select(DemoBootstrapTask.EMPLOYEE_ID);
             UserAccount user = userAccountService.select(DemoBootstrapTask.USER_ID);
             EmployeeAccount binding = employeeAccountService.select(DemoBootstrapTask.EMPLOYEE_ACCOUNT_ID);
-            Role role = roleService.select(DemoBootstrapTask.TENANT_ADMIN_ROLE_ID);
+            Role role = roleService.select(DefaultTenantRoleProvisioner.tenantAdminRoleId(DemoBootstrapTask.TENANT_ALIAS));
 
             assertThat(organization).isNotNull();
             assertThat(organization.getCode()).isEqualTo(DemoBootstrapTask.ORGANIZATION_CODE);
@@ -170,7 +278,10 @@ class DemoBootstrapTaskTest {
             assertThat(binding.getPrimaryAccount()).isTrue();
 
             assertThat(role).isNotNull();
-            assertThat(role.getTitle()).isEqualTo(DemoBootstrapTask.TENANT_ADMIN_ROLE_TITLE);
+            assertThat(role.getTitle()).isEqualTo(RoleService.TENANT_ADMIN_ROLE_TITLE);
+            assertThat(role.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.TENANT);
+            assertThat(role.getOwnerScopeId()).isEqualTo(DemoBootstrapTask.TENANT_ALIAS);
+            assertThat(role.getOwnerScopeKey()).isEqualTo("tenant:" + DemoBootstrapTask.TENANT_ALIAS);
             assertThat(roleService.hasActionPermission(DemoBootstrapTask.USER_ID, "iam.user",
                     PlatformAction.MENU.code())).isTrue();
             assertThat(roleService.hasActionPermission(DemoBootstrapTask.USER_ID, "iam.user",
@@ -190,7 +301,8 @@ class DemoBootstrapTaskTest {
             assertThat(accountRoleGrantDao.list(Criteria.of()))
                     .singleElement()
                     .satisfies(grant -> {
-                        assertThat(grant.getRoleId()).isEqualTo(DemoBootstrapTask.TENANT_ADMIN_ROLE_ID);
+                        assertThat(grant.getRoleId()).isEqualTo(
+                                DefaultTenantRoleProvisioner.tenantAdminRoleId(DemoBootstrapTask.TENANT_ALIAS));
                         assertThat(grant.getUserId()).isEqualTo(DemoBootstrapTask.USER_ID);
                         assertThat(grant.getManagementScopeType()).isEqualTo(ManagementScopeType.TENANT);
                         assertThat(grant.getManagementScopeId()).isEqualTo(DemoBootstrapTask.TENANT_ALIAS);
@@ -214,8 +326,7 @@ class DemoBootstrapTaskTest {
         properties.setAdminInitialPassword("demo123");
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
-                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                rolePermissionTemplateService);
+                departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);
 
         task.run();
         try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
@@ -238,8 +349,7 @@ class DemoBootstrapTaskTest {
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         TenantService replayingTenantService = spy(new TenantService(tenantDao));
         DemoBootstrapTask task = new DemoBootstrapTask(properties, replayingTenantService, organizationService,
-                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                rolePermissionTemplateService);
+                departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);
 
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             Tenant tenant = new Tenant();
@@ -261,8 +371,7 @@ class DemoBootstrapTaskTest {
         properties.setEnabled(true);
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
-                departmentService, employeeService, userAccountService, employeeAccountService, roleService,
-                rolePermissionTemplateService);
+                departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);
 
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             Tenant tenant = new Tenant();

@@ -59,6 +59,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     public static final String MODULE_ALIAS = "iam.role";
     public static final String PLATFORM_SUPER_ADMIN_ROLE_ID = "platform.role.super_admin";
     public static final String PLATFORM_SUPER_ADMIN_ROLE_TITLE = "平台超级管理员";
+    public static final String TENANT_ADMIN_ROLE_TITLE = "租户管理员";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -232,6 +233,44 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     @Override
     public void beforeInsert(Role role) {
         requireSystemManagedMutationAllowed(role, "create");
+    }
+
+    public Role ensureSystemManagedTenantAdminRole(String tenantId,
+                                                   String roleId,
+                                                   String title,
+                                                   String description) {
+        String validTenantId = Preconditions.requireText(tenantId, "tenantId");
+        String validRoleId = Preconditions.requireText(roleId, "roleId");
+        String validTitle = Preconditions.requireText(title, "title");
+        try (TenantContext.Scope ignored = TenantContext.use(validTenantId)) {
+            Role existing = selectIgnoreSoftDelete(validRoleId);
+            if (existing == null) {
+                Role role = tenantAdminRole(validRoleId, validTitle, description);
+                insert(role);
+                return role;
+            }
+            return repairSystemManagedTenantAdminRole(existing, validTitle, description);
+        }
+    }
+
+    public Role ensureSystemManagedOrganizationAdminRole(String tenantId,
+                                                         String organizationId,
+                                                         String roleId,
+                                                         String title,
+                                                         String description) {
+        String validTenantId = Preconditions.requireText(tenantId, "tenantId");
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        String validRoleId = Preconditions.requireText(roleId, "roleId");
+        String validTitle = Preconditions.requireText(title, "title");
+        try (TenantContext.Scope ignored = TenantContext.use(validTenantId)) {
+            Role existing = selectIgnoreSoftDelete(validRoleId);
+            if (existing == null) {
+                Role role = organizationAdminRole(validRoleId, validOrganizationId, validTitle, description);
+                insert(role);
+                return role;
+            }
+            return repairSystemManagedOrganizationAdminRole(existing, validOrganizationId, validTitle, description);
+        }
     }
 
     @Override
@@ -795,6 +834,100 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         validateSharePolicy(role.getOwnerScopeType(), role.getSharePolicy(), role.getId());
         validateOwnerScope(role);
+    }
+
+    private Role tenantAdminRole(String roleId, String title, String description) {
+        Role role = new Role();
+        role.setId(roleId);
+        role.setAssignmentType(RoleAssignmentType.ACCOUNT);
+        role.setRoleKind(RoleKind.STANDARD);
+        role.setTitle(title);
+        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        role.setOwnerScopeId(TenantContext.currentTenantId()
+                .orElseThrow(() -> new PlatformException("tenant admin role requires tenant context")));
+        role.setSharePolicy(RoleSharePolicy.TENANT);
+        role.setBuiltIn(Boolean.TRUE);
+        role.setSystemManaged(Boolean.TRUE);
+        role.setDescription(description);
+        role.setEnabled(Boolean.TRUE);
+        role.setSortOrder(1);
+        return role;
+    }
+
+    private Role organizationAdminRole(String roleId, String organizationId, String title, String description) {
+        Role role = new Role();
+        role.setId(roleId);
+        role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
+        role.setRoleKind(RoleKind.STANDARD);
+        role.setTitle(title);
+        role.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        role.setOwnerScopeId(Preconditions.requireText(organizationId, "organizationId"));
+        role.setSharePolicy(RoleSharePolicy.OWNER_AND_CHILDREN);
+        role.setBuiltIn(Boolean.TRUE);
+        role.setSystemManaged(Boolean.TRUE);
+        role.setDescription(description);
+        role.setEnabled(Boolean.TRUE);
+        role.setSortOrder(1);
+        return role;
+    }
+
+    private Role repairSystemManagedTenantAdminRole(Role role, String title, String description) {
+        Role desired = tenantAdminRole(role.getId(), title, description);
+        return repairSystemManagedAdminRole(role, desired, description);
+    }
+
+    private Role repairSystemManagedOrganizationAdminRole(Role role,
+                                                          String organizationId,
+                                                          String title,
+                                                          String description) {
+        Role desired = organizationAdminRole(role.getId(), organizationId, title, description);
+        return repairSystemManagedAdminRole(role, desired, description);
+    }
+
+    private Role repairSystemManagedAdminRole(Role role, Role desired, String description) {
+        boolean changed = false;
+        String currentTenantId = TenantContext.currentTenantId()
+                .orElseThrow(() -> new PlatformException("admin role repair requires tenant context"));
+        changed |= setIfChanged(role::getTenantId, role::setTenantId, currentTenantId);
+        changed |= setIfChanged(role::getAssignmentType, role::setAssignmentType, desired.getAssignmentType());
+        changed |= setIfChanged(role::getRoleKind, role::setRoleKind, desired.getRoleKind());
+        changed |= setIfChanged(role::getTitle, role::setTitle, desired.getTitle());
+        changed |= setIfChanged(role::getOwnerScopeType, role::setOwnerScopeType, desired.getOwnerScopeType());
+        changed |= setIfChanged(role::getOwnerScopeId, role::setOwnerScopeId, desired.getOwnerScopeId());
+        changed |= setIfChanged(role::getOwnerScopeKey, role::setOwnerScopeKey,
+                ownerScopeKey(desired.getOwnerScopeType(), desired.getOwnerScopeId()));
+        changed |= setIfChanged(role::getSharePolicy, role::setSharePolicy, desired.getSharePolicy());
+        changed |= setIfChanged(role::getBuiltIn, role::setBuiltIn, Boolean.TRUE);
+        changed |= setIfChanged(role::getSystemManaged, role::setSystemManaged, Boolean.TRUE);
+        changed |= setIfChanged(role::getEnabled, role::setEnabled, Boolean.TRUE);
+        if (role.getSortOrder() == null) {
+            role.setSortOrder(1);
+            changed = true;
+        }
+        changed |= setIfChanged(role::getDescription, role::setDescription, description);
+        if (!changed) {
+            return role;
+        }
+        Integer expectedVersion = role.getVersion();
+        EntityLifecycle.prepareUpdate(role, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
+        int updated = expectedVersion == null
+                ? getDao().updateById(role)
+                : getDao().updateByIdAndVersion(role, expectedVersion);
+        if (updated <= 0) {
+            throw new PlatformException("Failed to repair admin role: " + role.getId());
+        }
+        afterChanged(role);
+        return role;
+    }
+
+    private <V> boolean setIfChanged(java.util.function.Supplier<V> getter,
+                                     java.util.function.Consumer<V> setter,
+                                     V desired) {
+        if (Objects.equals(getter.get(), desired)) {
+            return false;
+        }
+        setter.accept(desired);
+        return true;
     }
 
     private RoleOwnerScopeType defaultOwnerScopeType() {

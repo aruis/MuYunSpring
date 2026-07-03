@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.MuYunSpringDemoBootstrapProperties;
-import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -16,13 +15,7 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
-import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
-import net.ximatai.muyun.spring.iam.role.RoleKind;
-import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
-import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.iam.role.RoleSharePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
@@ -40,8 +33,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     public static final String EMPLOYEE_NO = "DEMO-ADMIN";
     public static final String USER_ID = "demo_user_admin";
     public static final String EMPLOYEE_ACCOUNT_ID = "demo_employee_account_admin";
-    public static final String TENANT_ADMIN_ROLE_ID = "demo_role_tenant_admin";
-    public static final String TENANT_ADMIN_ROLE_TITLE = "租户管理员";
     private static final String SYSTEM_OPERATOR_ID = "demo-bootstrap";
 
     private final MuYunSpringDemoBootstrapProperties properties;
@@ -51,8 +42,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private final EmployeeService employeeService;
     private final UserAccountService userAccountService;
     private final EmployeeAccountService employeeAccountService;
-    private final RoleService roleService;
-    private final BuiltInRolePermissionTemplateService rolePermissionTemplateService;
+    private final DefaultTenantRoleProvisioner tenantRoleProvisioner;
 
     public DemoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
                              TenantService tenantService,
@@ -61,8 +51,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                              EmployeeService employeeService,
                              UserAccountService userAccountService,
                              EmployeeAccountService employeeAccountService,
-                             RoleService roleService,
-                             BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
+                             DefaultTenantRoleProvisioner tenantRoleProvisioner) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.tenantService = Objects.requireNonNull(tenantService, "tenantService must not be null");
         this.organizationService = Objects.requireNonNull(organizationService, "organizationService must not be null");
@@ -71,9 +60,8 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         this.userAccountService = Objects.requireNonNull(userAccountService, "userAccountService must not be null");
         this.employeeAccountService = Objects.requireNonNull(employeeAccountService,
                 "employeeAccountService must not be null");
-        this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
-        this.rolePermissionTemplateService = Objects.requireNonNull(rolePermissionTemplateService,
-                "rolePermissionTemplateService must not be null");
+        this.tenantRoleProvisioner = Objects.requireNonNull(tenantRoleProvisioner,
+                "tenantRoleProvisioner must not be null");
     }
 
     @Override
@@ -103,6 +91,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                 if (!isActive(organization)) {
                     return;
                 }
+                organizationService.provisionOrganization(ORGANIZATION_ID);
                 Department department = ensureDepartment();
                 if (!isActive(department)) {
                     return;
@@ -116,12 +105,10 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                     return;
                 }
                 ensureEmployeeAccount();
-                Role role = ensureTenantAdminRole();
+                Role role = ensureTenantAdminRoleGrant(user.getId());
                 if (!isActive(role)) {
                     return;
                 }
-                ensureTenantAdminRoleGrant(role.getId(), user.getId());
-                rolePermissionTemplateService.applyTenantAdminTemplate(role.getId());
             }
         }
     }
@@ -228,31 +215,8 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         return binding;
     }
 
-    private Role ensureTenantAdminRole() {
-        Role existing = roleService.selectIgnoreSoftDelete(TENANT_ADMIN_ROLE_ID);
-        if (existing != null) {
-            validateExistingTenantAdminRole(existing);
-            return existing;
-        }
-        Role role = new Role();
-        role.setId(TENANT_ADMIN_ROLE_ID);
-        role.setAssignmentType(RoleAssignmentType.ACCOUNT);
-        role.setRoleKind(RoleKind.STANDARD);
-        role.setTitle(TENANT_ADMIN_ROLE_TITLE);
-        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
-        role.setOwnerScopeId(TENANT_ALIAS);
-        role.setSharePolicy(RoleSharePolicy.TENANT);
-        role.setBuiltIn(Boolean.TRUE);
-        role.setSystemManaged(Boolean.TRUE);
-        role.setDescription("演示租户内置管理员角色，拥有当前租户内平台可授权动作和全部数据范围。");
-        role.setEnabled(Boolean.TRUE);
-        role.setSortOrder(1);
-        roleService.insert(role);
-        return role;
-    }
-
-    private void ensureTenantAdminRoleGrant(String roleId, String userId) {
-        roleService.grantAccountRole(roleId, userId, ManagementScopeType.TENANT, TENANT_ALIAS);
+    private Role ensureTenantAdminRoleGrant(String userId) {
+        return tenantRoleProvisioner.grantTenantAdminRoleToUser(TENANT_ALIAS, userId);
     }
 
     private boolean isActive(EntityContract entity) {
@@ -293,15 +257,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         requireEqual("demo employee account tenant", TENANT_ALIAS, account.getTenantId());
         requireEqual("demo employee account employee", EMPLOYEE_ID, account.getEmployeeId());
         requireEqual("demo employee account user", USER_ID, account.getUserId());
-    }
-
-    private void validateExistingTenantAdminRole(Role role) {
-        requireEqual("demo tenant admin role tenant", TENANT_ALIAS, role.getTenantId());
-        requireEqual("demo tenant admin assignment type", RoleAssignmentType.ACCOUNT, role.getAssignmentType());
-        requireEqual("demo tenant admin role kind", RoleKind.STANDARD, role.getRoleKind());
-        requireEqual("demo tenant admin owner scope type", RoleOwnerScopeType.TENANT, role.getOwnerScopeType());
-        requireEqual("demo tenant admin owner scope id", TENANT_ALIAS, role.getOwnerScopeId());
-        requireEqual("demo tenant admin share policy", RoleSharePolicy.TENANT, role.getSharePolicy());
     }
 
     private void requireEqual(String fieldName, Object expected, Object actual) {
