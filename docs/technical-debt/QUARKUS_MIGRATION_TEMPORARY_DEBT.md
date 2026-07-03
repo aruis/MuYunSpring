@@ -40,12 +40,6 @@
 - 影响：兼容别名路径或历史路径可能不可用。
 - 回收方向：明确哪些多路径是正式契约；对正式契约补充独立 JAX-RS 方法或统一路由层测试。
 
-### CORS is not restored
-
-- 现状：Spring MVC CORS 配置已移除，尚未用 Quarkus `quarkus.http.cors.*` 或等价机制恢复。
-- 影响：浏览器跨域访问策略可能与原配置不同。
-- 回收方向：确认部署侧 CORS 契约，迁移到 Quarkus 配置并补配置说明或集成测试。
-
 ## Request Context
 
 ### Request data uses ThreadLocal adapters
