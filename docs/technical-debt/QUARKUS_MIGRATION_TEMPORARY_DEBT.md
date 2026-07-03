@@ -28,6 +28,12 @@
 - 影响：子类 override 中的个性化路径、参数或响应语义存在遗漏风险。
 - 回收方向：逐个核对继承式 Web controller，必要时拆成明确的 Quarkus resource 方法，确保每个路由只有一个声明来源。
 
+### Dynamic Web route precedence and inherited default routes are not fully restored
+
+- 现状：`DynamicRecordWebControllerIT` 已迁移为 Quarkus HTTP 测试，但当前 RESTEasy Reactive 路由下，静态 exact alias resource 仍会被动态模块 regex resource 抢占；部分接口 default method 声明的动态记录路由仍返回 404。
+- 影响：动态模块 Web 入口与旧 Spring MVC 路由优先级、接口继承路由暴露语义不完全等价。
+- 回收方向：把动态 Web 入口从接口 default route 迁到显式 JAX-RS resource 方法或专门路由层，明确静态模块 exact path 优先于动态 fallback，并补真实 HTTP contract 测试。
+
 ### Spring multi-path mappings were collapsed
 
 - 现状：部分 Spring `@RequestMapping` 多路径数组迁移为 JAX-RS `@Path` 时只保留了主路径。

@@ -12,6 +12,7 @@ val testcontainersVersion = libs.versions.testcontainers.get()
 val migratedQuarkusIntegrationTests = mapOf(
     "muyun-boot" to setOf(
         "net/ximatai/muyun/spring/boot/MuYunSpringApplicationContextIT.java",
+        "net/ximatai/muyun/spring/boot/dynamic/DynamicRecordWebControllerIT.java",
         "net/ximatai/muyun/spring/boot/dynamic/DynamicSchemaServiceIT.java",
         "net/ximatai/muyun/spring/boot/iam/OrganizationRepositoryIT.java",
         "net/ximatai/muyun/spring/boot/platform/CodeRepositoryIT.java",

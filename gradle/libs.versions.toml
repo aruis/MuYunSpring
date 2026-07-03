@@ -21,6 +21,7 @@ quarkus-jdbc-postgresql = { module = "io.quarkus:quarkus-jdbc-postgresql" }
 quarkus-narayana-jta = { module = "io.quarkus:quarkus-narayana-jta" }
 quarkus-scheduler = { module = "io.quarkus:quarkus-scheduler" }
 quarkus-junit5 = { module = "io.quarkus:quarkus-junit5" }
+quarkus-junit5-mockito = { module = "io.quarkus:quarkus-junit5-mockito" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version = "6.1.0" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }

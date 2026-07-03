@@ -17,6 +17,7 @@ dependencies {
 
     testImplementation(platform(libs.quarkus.bom))
     testImplementation(libs.quarkus.junit5)
+    testImplementation(libs.quarkus.junit5.mockito)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
     testImplementation(libs.mockito.core)
