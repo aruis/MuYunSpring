@@ -10,10 +10,12 @@ import net.ximatai.muyun.spring.iam.role.RoleAction;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleDao;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
+import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.RoleSharePolicy;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleActionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -242,6 +244,10 @@ class RoleGrantableActionResolverTest {
         role.setTitle("Role " + id);
         role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
         role.setRoleKind(RoleKind.STANDARD);
+        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        role.setOwnerScopeId("tenant_a");
+        role.setOwnerScopeKey("tenant:tenant_a");
+        role.setSharePolicy(RoleSharePolicy.PRIVATE);
         role.setEnabled(Boolean.TRUE);
         return role;
     }

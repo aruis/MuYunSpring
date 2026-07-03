@@ -19,6 +19,8 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.junit.jupiter.api.AfterEach;
@@ -45,7 +47,7 @@ class RoleServiceContractTest {
     }
 
     @Test
-    void shouldExposeAssignmentAndRoleKindEnumBindings() {
+    void shouldExposeRoleEnumBindings() {
         RoleService service = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
                 mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
 
@@ -59,6 +61,18 @@ class RoleServiceContractTest {
             assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleKind.class));
             assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
             assertThat(field.optionTitleField()).isEqualTo("roleKindTitle");
+        });
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("ownerScopeType");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleOwnerScopeType.class));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
+            assertThat(field.optionTitleField()).isEqualTo("ownerScopeTypeTitle");
+        });
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("sharePolicy");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleSharePolicy.class));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
+            assertThat(field.optionTitleField()).isEqualTo("sharePolicyTitle");
         });
     }
 
@@ -85,9 +99,149 @@ class RoleServiceContractTest {
         assertThat(role.getRoleKind()).isEqualTo(RoleKind.STANDARD);
         assertThat(group.getAssignmentType()).isEqualTo(RoleAssignmentType.EMPLOYMENT);
         assertThat(group.getMemberRoleIds()).isEqualTo("r1,r2");
+        assertThat(role.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.TENANT);
+        assertThat(role.getOwnerScopeId()).isEqualTo("tenant_a");
+        assertThat(role.getOwnerScopeKey()).isEqualTo("tenant:tenant_a");
+        assertThat(role.getSharePolicy()).isEqualTo(RoleSharePolicy.PRIVATE);
         assertThat(group.getEnabled()).isTrue();
         assertThat(group.getBuiltIn()).isFalse();
         assertThat(group.getSystemManaged()).isFalse();
+    }
+
+    @Test
+    void shouldAllowPlatformRoleOnlyInSystemTenantContext() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.insert(any())).thenReturn("platform-role");
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role role = accountRole("platform-role", RoleKind.STANDARD);
+        role.setOwnerScopeType(RoleOwnerScopeType.PLATFORM);
+        role.setSharePolicy(RoleSharePolicy.PLATFORM);
+
+        assertThatThrownBy(() -> service.insert(role))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform role management requires system tenant context");
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            assertThat(service.insert(role)).isEqualTo("platform-role");
+        }
+
+        verify(roleDao).insert(argThat(inserted ->
+                inserted.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM
+                        && inserted.getOwnerScopeId() == null
+                        && "platform".equals(inserted.getOwnerScopeKey())
+                        && inserted.getSharePolicy() == RoleSharePolicy.PLATFORM
+                        && inserted.getTenantId() == null));
+    }
+
+    @Test
+    void shouldBindPlatformSharedRoleInsideTenantAndResolvePermission() {
+        RoleDao roleDao = mock(RoleDao.class);
+        AccountRoleGrantDao accountGrantDao = mock(AccountRoleGrantDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        Role platformRole = platformRole("platform-account", RoleAssignmentType.ACCOUNT, RoleKind.STANDARD,
+                RoleSharePolicy.PLATFORM);
+        RoleAction action = enabledAction("ra1", "platform-account", "sales.contract", "view");
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of())
+                .thenReturn(List.of(platformRole))
+                .thenReturn(List.of())
+                .thenReturn(List.of(platformRole));
+        when(accountGrantDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of())
+                .thenReturn(List.of(accountGrant("platform-account", "user-1", ManagementScopeType.TENANT,
+                        "tenant_a")));
+        when(accountGrantDao.insert(any())).thenReturn("grant-1");
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(action));
+        RoleService service = service(roleDao, accountGrantDao, mock(EmploymentRoleGrantDao.class), actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantAccountRole("platform-account", "user-1", ManagementScopeType.TENANT,
+                    "tenant_a")).isEqualTo("grant-1");
+            assertThat(service.hasActionPermission("user-1", "sales.contract", "query")).isTrue();
+        }
+
+        verify(accountGrantDao).insert(argThat(grant ->
+                "tenant_a".equals(grant.getTenantId())
+                        && "platform-account".equals(grant.getRoleId())
+                        && "user-1".equals(grant.getUserId())));
+    }
+
+    @Test
+    void shouldRejectTenantBindingOfPlatformPrivateRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        Role privateRole = platformRole("platform-private", RoleAssignmentType.ACCOUNT, RoleKind.STANDARD,
+                RoleSharePolicy.PRIVATE);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(privateRole));
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantAccountRole(
+                    "platform-private", "user-1", ManagementScopeType.TENANT, "tenant_a"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("platform private role cannot be bound by tenant");
+        }
+    }
+
+    @Test
+    void shouldRejectSharePolicyOutsideOwnerScope() {
+        RoleService service = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role tenantRole = employmentRole("tenant-role", RoleKind.STANDARD);
+        tenantRole.setSharePolicy(RoleSharePolicy.PLATFORM);
+        Role organizationRole = employmentRole("org-role", RoleKind.STANDARD);
+        organizationRole.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        organizationRole.setOwnerScopeId("org-1");
+        organizationRole.setSharePolicy(RoleSharePolicy.TENANT);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(tenantRole))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("tenant role only supports private or tenant share policy");
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(organizationRole))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("organization role only supports private or owner-and-children share policy");
+        }
+    }
+
+    @Test
+    void shouldRejectTenantOwnerScopeDifferentFromCurrentTenant() {
+        RoleService service = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role role = employmentRole("tenant-role", RoleKind.STANDARD);
+        role.setOwnerScopeId("tenant_b");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(role))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("tenant role owner scope id must match current tenant");
+        }
+    }
+
+    @Test
+    void shouldRejectOrganizationOwnerOutsideCurrentTenant() {
+        OrganizationService organizationService = mock(OrganizationService.class);
+        Organization organization = new Organization();
+        organization.setId("org-1");
+        organization.setTenantId("tenant_b");
+        organization.setEnabled(Boolean.TRUE);
+        when(organizationService.requireEnabled("org-1", "role owner organization is not active: org-1"))
+                .thenReturn(organization);
+        RoleService service = new RoleService(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null, organizationService);
+        Role role = employmentRole("org-role", RoleKind.STANDARD);
+        role.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        role.setOwnerScopeId("org-1");
+        role.setSharePolicy(RoleSharePolicy.OWNER_AND_CHILDREN);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(role))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("role owner organization does not belong to current tenant");
+        }
     }
 
     @Test
@@ -100,9 +254,11 @@ class RoleServiceContractTest {
         Role group = employmentRole("group-1", RoleKind.GROUP);
         group.setMemberRoleIds("account-role");
 
-        assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role group can only contain employment roles");
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("role group can only contain employment roles");
+        }
     }
 
     @Test
@@ -348,9 +504,11 @@ class RoleServiceContractTest {
         Role group = employmentRole("group-1", RoleKind.GROUP);
         group.setMemberRoleIds("data-2");
 
-        assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("employment can have at most one data grant role");
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("employment can have at most one data grant role");
+        }
     }
 
     @Test
@@ -546,14 +704,23 @@ class RoleServiceContractTest {
         doReturn(accountRole("role-1", RoleKind.STANDARD)).when(service).select("role-1");
 
         Role changedAssignment = employmentRole("role-1", RoleKind.STANDARD);
-        assertThatThrownBy(() -> service.beforeUpdate(changedAssignment))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role assignment type cannot be changed");
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeUpdate(changedAssignment))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("role assignment type cannot be changed");
 
-        Role changedKind = accountRole("role-1", RoleKind.SYSTEM);
-        assertThatThrownBy(() -> service.beforeUpdate(changedKind))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role kind cannot be changed");
+            Role changedKind = accountRole("role-1", RoleKind.SYSTEM);
+            assertThatThrownBy(() -> service.beforeUpdate(changedKind))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("role kind cannot be changed");
+
+            Role changedOwner = accountRole("role-1", RoleKind.STANDARD);
+            changedOwner.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+            changedOwner.setOwnerScopeId("org-1");
+            assertThatThrownBy(() -> service.beforeUpdate(changedOwner))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("role owner scope type cannot be changed");
+        }
     }
 
     @Test
@@ -723,12 +890,29 @@ class RoleServiceContractTest {
         return role;
     }
 
+    private Role platformRole(String id,
+                              RoleAssignmentType assignmentType,
+                              RoleKind kind,
+                              RoleSharePolicy sharePolicy) {
+        Role role = role(id, "Role " + id, assignmentType, kind);
+        role.setTenantId(null);
+        role.setOwnerScopeType(RoleOwnerScopeType.PLATFORM);
+        role.setOwnerScopeId(null);
+        role.setOwnerScopeKey("platform");
+        role.setSharePolicy(sharePolicy);
+        return role;
+    }
+
     private Role role(String id, String title, RoleAssignmentType assignmentType, RoleKind kind) {
         Role role = new Role();
         role.setId(id);
         role.setTitle(title);
         role.setAssignmentType(assignmentType);
         role.setRoleKind(kind);
+        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        role.setOwnerScopeId("tenant_a");
+        role.setOwnerScopeKey("tenant:tenant_a");
+        role.setSharePolicy(RoleSharePolicy.PRIVATE);
         role.setEnabled(Boolean.TRUE);
         return role;
     }

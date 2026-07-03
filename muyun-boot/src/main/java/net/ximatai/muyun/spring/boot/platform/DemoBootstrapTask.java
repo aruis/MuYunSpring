@@ -20,7 +20,9 @@ import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleAssignmentType;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
+import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.RoleSharePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
@@ -237,7 +239,9 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         role.setAssignmentType(RoleAssignmentType.ACCOUNT);
         role.setRoleKind(RoleKind.STANDARD);
         role.setTitle(TENANT_ADMIN_ROLE_TITLE);
-        role.setPublicRole(Boolean.FALSE);
+        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        role.setOwnerScopeId(TENANT_ALIAS);
+        role.setSharePolicy(RoleSharePolicy.TENANT);
         role.setBuiltIn(Boolean.TRUE);
         role.setSystemManaged(Boolean.TRUE);
         role.setDescription("演示租户内置管理员角色，拥有当前租户内平台可授权动作和全部数据范围。");
@@ -295,6 +299,9 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         requireEqual("demo tenant admin role tenant", TENANT_ALIAS, role.getTenantId());
         requireEqual("demo tenant admin assignment type", RoleAssignmentType.ACCOUNT, role.getAssignmentType());
         requireEqual("demo tenant admin role kind", RoleKind.STANDARD, role.getRoleKind());
+        requireEqual("demo tenant admin owner scope type", RoleOwnerScopeType.TENANT, role.getOwnerScopeType());
+        requireEqual("demo tenant admin owner scope id", TENANT_ALIAS, role.getOwnerScopeId());
+        requireEqual("demo tenant admin share policy", RoleSharePolicy.TENANT, role.getSharePolicy());
     }
 
     private void requireEqual(String fieldName, Object expected, Object actual) {

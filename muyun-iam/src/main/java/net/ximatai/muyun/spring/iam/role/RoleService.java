@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.Employee;
@@ -31,8 +32,11 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -66,6 +70,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private final EmployeeService employeeService;
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
+    private final OrganizationService organizationService;
 
     public RoleService(RoleDao roleDao,
                        AccountRoleGrantDao accountRoleGrantDao,
@@ -73,7 +78,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        RoleActionDao roleActionDao,
                        ActiveTenantVerifier activeTenantVerifier) {
         this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
-                RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null);
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null,
+                (OrganizationService) null);
     }
 
     @Autowired
@@ -86,7 +92,39 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        UserAccountService userAccountService,
                        EmployeeService employeeService,
                        EmployeePositionService employeePositionService,
+                       EmployeeAccountService employeeAccountService,
+                       ObjectProvider<OrganizationService> organizationService) {
+        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
+                grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
+                organizationService == null ? null : organizationService.getIfAvailable());
+    }
+
+    public RoleService(RoleDao roleDao,
+                       AccountRoleGrantDao accountRoleGrantDao,
+                       EmploymentRoleGrantDao employmentRoleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService,
                        EmployeeAccountService employeeAccountService) {
+        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
+                grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
+                (OrganizationService) null);
+    }
+
+    public RoleService(RoleDao roleDao,
+                       AccountRoleGrantDao accountRoleGrantDao,
+                       EmploymentRoleGrantDao employmentRoleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService,
+                       EmployeeAccountService employeeAccountService,
+                       OrganizationService organizationService) {
         super(MODULE_ALIAS, Role.class, roleDao, activeTenantVerifier);
         this.accountRoleGrantDao = Objects.requireNonNull(accountRoleGrantDao, "accountRoleGrantDao must not be null");
         this.employmentRoleGrantDao = Objects.requireNonNull(employmentRoleGrantDao,
@@ -97,6 +135,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+        this.organizationService = organizationService;
     }
 
     @Override
@@ -107,7 +146,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .field(FormField.of("roleKind").withTitle("角色类型").asRequired())
                 .field(FormField.of("title").withTitle("角色名称").asRequired())
                 .field(FormField.of("memberRoleIds").withTitle("成员角色"))
-                .field(FormField.of("publicRole", FormValueType.BOOLEAN).withTitle("公开角色"))
+                .field(FormField.of("ownerScopeType").withTitle("定义归属").asRequired())
+                .field(FormField.of("ownerScopeId").withTitle("归属对象"))
+                .field(FormField.of("ownerScopeKey").withTitle("归属键").asReadOnly())
+                .field(FormField.of("sharePolicy").withTitle("共享策略").asRequired())
                 .field(FormField.of("builtIn", FormValueType.BOOLEAN).withTitle("内置角色").asReadOnly())
                 .field(FormField.of("systemManaged", FormValueType.BOOLEAN).withTitle("系统托管").asReadOnly())
                 .field(FormField.of("description", FormValueType.TEXT).withTitle("角色描述"))
@@ -124,8 +166,15 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         .withTitle("角色类型"))
                 .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("角色名称").withQuickSearch().withSortable())
+                .field(QueryField.of("ownerScopeType", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("定义归属"))
+                .field(QueryField.of("ownerScopeId", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("归属对象"))
+                .field(QueryField.of("ownerScopeKey", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("归属键"))
+                .field(QueryField.of("sharePolicy", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("共享策略"))
                 .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
-                .field(QueryField.of("publicRole", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("公开角色"))
                 .field(QueryField.of("builtIn", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("内置角色"))
                 .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("系统托管"))
                 .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
@@ -154,9 +203,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getRoleKind() == RoleKind.GROUP || role.getRoleKind() == RoleKind.DATA_GRANT) {
             role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
         }
-        if (role.getPublicRole() == null) {
-            role.setPublicRole(false);
-        }
+        normalizeOwnerAndSharePolicy(role);
         if (role.getBuiltIn() == null) {
             role.setBuiltIn(false);
         }
@@ -173,6 +220,16 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     @Override
+    public void beforePrepareInsert(Role role) {
+        normalizeBeforeMutation(role);
+        if (role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            requirePlatformRoleSystemContext();
+            return;
+        }
+        requireActiveTenantMutationContext();
+    }
+
+    @Override
     public void beforeInsert(Role role) {
         requireSystemManagedMutationAllowed(role, "create");
     }
@@ -180,6 +237,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     @Override
     public void beforeUpdate(Role role) {
         Role existing = role == null || role.getId() == null ? null : select(role.getId());
+        if (existing != null && existing.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            requirePlatformRoleSystemContext();
+        } else {
+            requireActiveTenantMutationContext();
+        }
+        normalizeBeforeMutation(role);
         requireSystemManagedMutationAllowed(existing, "update");
         requireSystemManagedMutationAllowed(role, "update");
         requireStructuralFieldsUnchanged(existing, role);
@@ -187,7 +250,13 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     @Override
     public void beforeDelete(String id) {
-        requireSystemManagedMutationAllowed(select(id), "delete");
+        Role role = select(id);
+        if (role != null && role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            requirePlatformRoleSystemContext();
+        } else {
+            requireActiveTenantMutationContext();
+        }
+        requireSystemManagedMutationAllowed(role, "delete");
     }
 
     public String grantAccountRole(String roleId,
@@ -201,7 +270,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                  String userId,
                                  ManagementScopeType managementScopeType,
                                  String managementScopeId) {
-        Role role = requireEnabledRole(roleId);
+        Role role = requireBindableRole(roleId);
         requireAccountRole(role);
         requireSystemManagedMutationAllowed(role, "revoke account role");
         AccountRoleGrant grant = findAccountRoleGrant(role.getId(), userId, managementScopeType, managementScopeId);
@@ -240,7 +309,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public int revokeEmploymentRole(String roleId, String employeePositionId) {
-        Role role = requireEnabledRole(roleId);
+        Role role = requireBindableRole(roleId);
         requireEmploymentAssignableRole(role);
         requireSystemManagedMutationAllowed(role, "revoke employment role");
         EmploymentRoleGrant grant = findEmploymentRoleGrant(role.getId(), employeePositionId);
@@ -316,7 +385,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             prepareChildUpdate(roleAction);
             return roleActionDao.updateById(roleAction);
         }
-        prepareChildInsert(roleAction);
+        prepareRoleActionInsert(role, roleAction);
         roleActionDao.insert(roleAction);
         return 1;
     }
@@ -604,13 +673,68 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private Role requireEnabledRole(String roleId) {
         Role role = requireEnabled(Preconditions.requireText(roleId, "roleId"), "role is not active: " + roleId);
+        normalizeLoadedRoleDefaults(role);
+        return role;
+    }
+
+    private Role requireBindableRole(String roleId) {
+        String validRoleId = Preconditions.requireText(roleId, "roleId");
+        Role role = select(validRoleId);
+        if (role == null && TenantContext.currentTenantId().isPresent()) {
+            role = selectPlatformSharedRole(validRoleId);
+        }
+        if (role == null || !Boolean.TRUE.equals(role.getEnabled())) {
+            throw new PlatformException("role is not active: " + roleId);
+        }
+        normalizeLoadedRoleDefaults(role);
+        if (role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM
+                && role.getSharePolicy() != RoleSharePolicy.PLATFORM
+                && TenantContext.currentTenantId().isPresent()) {
+            throw new PlatformException("platform private role cannot be bound by tenant: " + roleId);
+        }
+        return role;
+    }
+
+    private Role selectPlatformSharedRole(String roleId) {
+        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("resolve platform shared role")) {
+            return getDao().query(activeCriteria(Criteria.of()
+                            .eq("id", Preconditions.requireText(roleId, "roleId"))
+                            .eq("ownerScopeType", RoleOwnerScopeType.PLATFORM)
+                            .eq("sharePolicy", RoleSharePolicy.PLATFORM)),
+                    new PageRequest(0, 1)).stream().findFirst().orElse(null);
+        }
+    }
+
+    private Role selectGrantedRole(String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        Role role = select(roleId);
+        if (role == null && TenantContext.currentTenantId().isPresent()) {
+            role = selectPlatformSharedRole(roleId);
+        }
+        if (role != null) {
+            normalizeLoadedRoleDefaults(role);
+        }
+        return role;
+    }
+
+    private void normalizeLoadedRoleDefaults(Role role) {
         if (role.getAssignmentType() == null) {
             role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
         }
         if (role.getRoleKind() == null) {
             role.setRoleKind(RoleKind.STANDARD);
         }
-        return role;
+        if (role.getOwnerScopeType() == null) {
+            role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        }
+        if (role.getSharePolicy() == null) {
+            role.setSharePolicy(RoleSharePolicy.PRIVATE);
+        }
+        if (role.getOwnerScopeKey() == null || role.getOwnerScopeKey().isBlank()) {
+            role.setOwnerScopeKey(ownerScopeKey(role.getOwnerScopeType(), role.getOwnerScopeId()));
+        }
     }
 
     private Role requireConfigurableRole(String roleId) {
@@ -652,12 +776,102 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (updated.getRoleKind() != null && existing.getRoleKind() != updated.getRoleKind()) {
             throw new PlatformException("role kind cannot be changed after creation: " + existing.getId());
         }
+        if (updated.getOwnerScopeType() != null && existing.getOwnerScopeType() != updated.getOwnerScopeType()) {
+            throw new PlatformException("role owner scope type cannot be changed after creation: " + existing.getId());
+        }
+        if (updated.getOwnerScopeId() != null && !Objects.equals(existing.getOwnerScopeId(), updated.getOwnerScopeId())) {
+            throw new PlatformException("role owner scope id cannot be changed after creation: " + existing.getId());
+        }
+    }
+
+    private void normalizeOwnerAndSharePolicy(Role role) {
+        if (role.getOwnerScopeType() == null) {
+            role.setOwnerScopeType(defaultOwnerScopeType());
+        }
+        role.setOwnerScopeId(normalizeOwnerScopeId(role.getOwnerScopeType(), role.getOwnerScopeId()));
+        role.setOwnerScopeKey(ownerScopeKey(role.getOwnerScopeType(), role.getOwnerScopeId()));
+        if (role.getSharePolicy() == null) {
+            role.setSharePolicy(RoleSharePolicy.PRIVATE);
+        }
+        validateSharePolicy(role.getOwnerScopeType(), role.getSharePolicy(), role.getId());
+        validateOwnerScope(role);
+    }
+
+    private RoleOwnerScopeType defaultOwnerScopeType() {
+        return TenantContext.isSystem() ? RoleOwnerScopeType.PLATFORM : RoleOwnerScopeType.TENANT;
+    }
+
+    private void requirePlatformRoleSystemContext() {
+        if (!TenantContext.isSystem()) {
+            throw new PlatformException("platform role management requires system tenant context");
+        }
+    }
+
+    private String normalizeOwnerScopeId(RoleOwnerScopeType ownerScopeType, String ownerScopeId) {
+        if (ownerScopeType == RoleOwnerScopeType.PLATFORM) {
+            return null;
+        }
+        if (ownerScopeType == RoleOwnerScopeType.TENANT) {
+            String normalized = normalizeBlank(ownerScopeId);
+            String currentTenantId = TenantContext.currentTenantId()
+                    .orElseThrow(() -> new PlatformException("tenant role requires tenant owner scope id"));
+            if (normalized != null && !Objects.equals(normalized, currentTenantId)) {
+                throw new PlatformException("tenant role owner scope id must match current tenant: " + normalized);
+            }
+            return currentTenantId;
+        }
+        return Preconditions.requireText(ownerScopeId, "ownerScopeId");
+    }
+
+    private String ownerScopeKey(RoleOwnerScopeType ownerScopeType, String ownerScopeId) {
+        if (ownerScopeType == RoleOwnerScopeType.PLATFORM) {
+            return "platform";
+        }
+        if (ownerScopeType == RoleOwnerScopeType.TENANT) {
+            return "tenant:" + Preconditions.requireText(ownerScopeId, "ownerScopeId");
+        }
+        return "organization:" + Preconditions.requireText(ownerScopeId, "ownerScopeId");
+    }
+
+    private void validateOwnerScope(Role role) {
+        if (role.getOwnerScopeType() != RoleOwnerScopeType.ORGANIZATION || organizationService == null) {
+            return;
+        }
+        Organization organization = organizationService.requireEnabled(
+                role.getOwnerScopeId(),
+                "role owner organization is not active: " + role.getOwnerScopeId());
+        String currentTenantId = TenantContext.currentTenantId()
+                .orElseThrow(() -> new PlatformException("organization role requires tenant context"));
+        if (!Objects.equals(currentTenantId, organization.getTenantId())) {
+            throw new PlatformException("role owner organization does not belong to current tenant: "
+                    + role.getOwnerScopeId());
+        }
+    }
+
+    private void validateSharePolicy(RoleOwnerScopeType ownerScopeType, RoleSharePolicy sharePolicy, String roleId) {
+        if (ownerScopeType == RoleOwnerScopeType.PLATFORM) {
+            if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.PLATFORM) {
+                return;
+            }
+            throw new PlatformException("platform role only supports private or platform share policy: " + roleId);
+        }
+        if (ownerScopeType == RoleOwnerScopeType.TENANT) {
+            if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.TENANT) {
+                return;
+            }
+            throw new PlatformException("tenant role only supports private or tenant share policy: " + roleId);
+        }
+        if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.OWNER_AND_CHILDREN) {
+            return;
+        }
+        throw new PlatformException("organization role only supports private or owner-and-children share policy: "
+                + roleId);
     }
 
     private void validateGroupMembers(String memberRoleIds) {
         int dataGrantMembers = 0;
         for (String memberRoleId : parseRoleIds(memberRoleIds)) {
-            Role member = select(memberRoleId);
+            Role member = selectGrantedRole(memberRoleId);
             if (member == null) {
                 throw new PlatformException("role group contains missing role: " + memberRoleId);
             }
@@ -682,7 +896,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private Set<String> expandGroupRoleIds(String memberRoleIds) {
         LinkedHashSet<String> expanded = new LinkedHashSet<>();
         for (String memberRoleId : parseRoleIds(memberRoleIds)) {
-            Role member = select(memberRoleId);
+            Role member = selectGrantedRole(memberRoleId);
             if (member != null
                     && member.getAssignmentType() == RoleAssignmentType.EMPLOYMENT
                     && (member.getRoleKind() == RoleKind.STANDARD || member.getRoleKind() == RoleKind.DATA_GRANT)
@@ -697,7 +911,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                                  String userId,
                                                  ManagementScopeType managementScopeType,
                                                  String managementScopeId) {
-        Role role = requireEnabledRole(roleId);
+        Role role = requireBindableRole(roleId);
         requireAccountRole(role);
         requireSystemManagedMutationAllowed(role, "grant account role");
         String validUserId = Preconditions.requireText(userId, "userId");
@@ -726,7 +940,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     private GrantResult grantEmploymentRoleIfAbsent(String roleId, String employeePositionId) {
-        Role role = requireEnabledRole(roleId);
+        Role role = requireBindableRole(roleId);
         requireEmploymentAssignableRole(role);
         requireSystemManagedMutationAllowed(role, "grant employment role");
         String validEmployeePositionId = Preconditions.requireText(employeePositionId, "employeePositionId");
@@ -782,7 +996,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         LinkedHashSet<String> dataGrantRoleIds = new LinkedHashSet<>();
         for (String roleId : roleIds) {
-            Role role = extraRole != null && SortAbility.sameValue(extraRole.getId(), roleId) ? extraRole : select(roleId);
+            Role role = extraRole != null && SortAbility.sameValue(extraRole.getId(), roleId)
+                    ? extraRole
+                    : selectGrantedRole(roleId);
             collectDataGrantRoleIds(dataGrantRoleIds, role);
         }
         return List.copyOf(dataGrantRoleIds);
@@ -800,7 +1016,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             return;
         }
         for (String memberRoleId : parseRoleIds(role.getMemberRoleIds())) {
-            Role member = select(memberRoleId);
+            Role member = selectGrantedRole(memberRoleId);
             if (member != null && member.getRoleKind() == RoleKind.DATA_GRANT
                     && Boolean.TRUE.equals(member.getEnabled())) {
                 dataGrantRoleIds.add(member.getId());
@@ -824,7 +1040,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (grant == null || !Boolean.TRUE.equals(grant.getEnabled())) {
             return;
         }
-        Role role = select(grant.getRoleId());
+        Role role = selectGrantedRole(grant.getRoleId());
         if (role == null || role.getAssignmentType() != RoleAssignmentType.ACCOUNT
                 || !Boolean.TRUE.equals(role.getEnabled())) {
             return;
@@ -842,7 +1058,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (grant == null || !Boolean.TRUE.equals(grant.getEnabled()) || position == null) {
             return;
         }
-        Role role = select(grant.getRoleId());
+        Role role = selectGrantedRole(grant.getRoleId());
         if (role == null || role.getAssignmentType() != RoleAssignmentType.EMPLOYMENT
                 || !Boolean.TRUE.equals(role.getEnabled())) {
             return;
@@ -909,7 +1125,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     private boolean dataGrantRole(String roleId) {
-        Role role = select(roleId);
+        Role role = selectGrantedRole(roleId);
         return role != null && role.getRoleKind() == RoleKind.DATA_GRANT;
     }
 
@@ -1033,6 +1249,16 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         String tenantId = requireActiveTenantMutationContext();
         entity.setTenantId(tenantId);
         EntityLifecycle.prepareInsert(entity, Instant.now());
+    }
+
+    private void prepareRoleActionInsert(Role role, EntityContract entity) {
+        if (role != null && role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            requirePlatformRoleSystemContext();
+            entity.setTenantId(null);
+            EntityLifecycle.prepareInsert(entity, Instant.now());
+            return;
+        }
+        prepareChildInsert(entity);
     }
 
     private void prepareChildUpdate(EntityContract entity) {
