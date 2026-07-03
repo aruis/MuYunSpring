@@ -13,14 +13,15 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = ModuleMetadataFieldService.MODULE_ALIAS, title = "平台模块字段配置")
-@RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields")
+@Path("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields")
 public class PlatformModuleMetadataFieldWebController
         extends NestedSortableCrudWebSupport<ModuleMetadataField, ModuleMetadataFieldService> {
 
@@ -31,32 +32,33 @@ public class PlatformModuleMetadataFieldWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         requireRelation(request);
         criteria.eq("relationId", relationId(request));
     }
 
     @Override
-    protected void bindScope(ModuleMetadataField record, HttpServletRequest request) {
+    protected void bindScope(ModuleMetadataField record, @Context HttpServletRequest request) {
         requireRelation(request);
         record.setRelationId(relationId(request));
     }
 
     @Override
-    protected boolean inScope(ModuleMetadataField record, HttpServletRequest request) {
+    protected boolean inScope(ModuleMetadataField record, @Context HttpServletRequest request) {
         requireRelation(request);
         return relationId(request).equals(record.getRelationId());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "module metadata field does not belong to relation: " + relationId(request) + "." + id;
     }
 
-    @PostMapping("/ensure")
+    @POST
+    @Path("/ensure")
     @CustomActionEndpoint(value = "ensureFields", title = "同步模块字段配置",
             level = PlatformActionLevel.LIST, dataAuth = false)
-    public WebListResponse<ModuleMetadataField> ensure(HttpServletRequest request) {
+    public WebListResponse<ModuleMetadataField> ensure(@Context HttpServletRequest request) {
         return webScope(() -> {
             requireRelation(request);
             return new WebListResponse<>(WebOutputSupport.records(service(),
@@ -64,7 +66,7 @@ public class PlatformModuleMetadataFieldWebController
         });
     }
 
-    private ModuleMetadataRelation requireRelation(HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -74,7 +76,7 @@ public class PlatformModuleMetadataFieldWebController
         return relation;
     }
 
-    private String relationId(HttpServletRequest request) {
+    private String relationId(@Context HttpServletRequest request) {
         return pathVariable(request, "relationId");
     }
 }

@@ -10,15 +10,16 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterServi
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = ModuleMetadataFieldFilterService.MODULE_ALIAS,
         title = "平台模块字段引用过滤")
-@RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters")
+@Path("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters")
 public class PlatformModuleMetadataFieldFilterWebController
         extends NestedSortableCrudWebSupport<ModuleMetadataFieldFilter, ModuleMetadataFieldFilterService> {
 
@@ -32,29 +33,29 @@ public class PlatformModuleMetadataFieldFilterWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         requireField(request);
         criteria.eq("moduleMetadataFieldId", fieldId(request));
     }
 
     @Override
-    protected void bindScope(ModuleMetadataFieldFilter record, HttpServletRequest request) {
+    protected void bindScope(ModuleMetadataFieldFilter record, @Context HttpServletRequest request) {
         requireField(request);
         record.setModuleMetadataFieldId(fieldId(request));
     }
 
     @Override
-    protected boolean inScope(ModuleMetadataFieldFilter record, HttpServletRequest request) {
+    protected boolean inScope(ModuleMetadataFieldFilter record, @Context HttpServletRequest request) {
         requireField(request);
         return Objects.equals(record.getModuleMetadataFieldId(), fieldId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "module metadata field filter does not belong to field: " + fieldId(request) + "." + id;
     }
 
-    private ModuleMetadataField requireField(HttpServletRequest request) {
+    private ModuleMetadataField requireField(@Context HttpServletRequest request) {
         requireRelation(request);
         ModuleMetadataField field = fieldService.select(fieldId(request));
         if (field == null || !Objects.equals(field.getRelationId(), relationId(request))) {
@@ -64,7 +65,7 @@ public class PlatformModuleMetadataFieldFilterWebController
         return field;
     }
 
-    private ModuleMetadataRelation requireRelation(HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -74,11 +75,11 @@ public class PlatformModuleMetadataFieldFilterWebController
         return relation;
     }
 
-    private String relationId(HttpServletRequest request) {
+    private String relationId(@Context HttpServletRequest request) {
         return pathVariable(request, "relationId");
     }
 
-    private String fieldId(HttpServletRequest request) {
+    private String fieldId(@Context HttpServletRequest request) {
         return pathVariable(request, "fieldId");
     }
 }

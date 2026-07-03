@@ -8,15 +8,16 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = ModuleMetadataFormulaRuleService.MODULE_ALIAS,
         title = "平台模块公式规则")
-@RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules")
+@Path("/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules")
 public class PlatformModuleMetadataFormulaRuleWebController
         extends NestedEnabledSortableCrudWebSupport<ModuleMetadataFormulaRule, ModuleMetadataFormulaRuleService> {
 
@@ -27,29 +28,29 @@ public class PlatformModuleMetadataFormulaRuleWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         requireRelation(request);
         criteria.eq("relationId", relationId(request));
     }
 
     @Override
-    protected void bindScope(ModuleMetadataFormulaRule record, HttpServletRequest request) {
+    protected void bindScope(ModuleMetadataFormulaRule record, @Context HttpServletRequest request) {
         requireRelation(request);
         record.setRelationId(relationId(request));
     }
 
     @Override
-    protected boolean inScope(ModuleMetadataFormulaRule record, HttpServletRequest request) {
+    protected boolean inScope(ModuleMetadataFormulaRule record, @Context HttpServletRequest request) {
         requireRelation(request);
         return Objects.equals(record.getRelationId(), relationId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "module metadata formula rule does not belong to relation: " + relationId(request) + "." + id;
     }
 
-    private ModuleMetadataRelation requireRelation(HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -59,7 +60,7 @@ public class PlatformModuleMetadataFormulaRuleWebController
         return relation;
     }
 
-    private String relationId(HttpServletRequest request) {
+    private String relationId(@Context HttpServletRequest request) {
         return pathVariable(request, "relationId");
     }
 }

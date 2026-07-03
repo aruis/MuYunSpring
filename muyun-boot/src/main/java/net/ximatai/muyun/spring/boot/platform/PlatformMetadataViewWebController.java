@@ -8,14 +8,15 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = MetadataViewService.MODULE_ALIAS, title = "平台元数据视图")
-@RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/views")
+@Path("/platform.module/{moduleAlias}/metadata-relations/{relationId}/views")
 public class PlatformMetadataViewWebController
         extends NestedEnabledSortableCrudWebSupport<MetadataView, MetadataViewService> {
 
@@ -26,29 +27,29 @@ public class PlatformMetadataViewWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         requireRelation(request);
         criteria.eq("relationId", relationId(request));
     }
 
     @Override
-    protected void bindScope(MetadataView record, HttpServletRequest request) {
+    protected void bindScope(MetadataView record, @Context HttpServletRequest request) {
         requireRelation(request);
         record.setRelationId(relationId(request));
     }
 
     @Override
-    protected boolean inScope(MetadataView record, HttpServletRequest request) {
+    protected boolean inScope(MetadataView record, @Context HttpServletRequest request) {
         requireRelation(request);
         return Objects.equals(record.getRelationId(), relationId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "metadata view does not belong to relation: " + relationId(request) + "." + id;
     }
 
-    private ModuleMetadataRelation requireRelation(HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -58,7 +59,7 @@ public class PlatformMetadataViewWebController
         return relation;
     }
 
-    private String relationId(HttpServletRequest request) {
+    private String relationId(@Context HttpServletRequest request) {
         return pathVariable(request, "relationId");
     }
 }
