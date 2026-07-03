@@ -46,6 +46,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -203,7 +204,7 @@ class DemoBootstrapTaskTest {
 
             assertThat(role).isNotNull();
             assertThat(role.getTitle()).isEqualTo(DefaultOrganizationRoleProvisioner.ORGANIZATION_ADMIN_ROLE_TITLE);
-            assertThat(role.getAssignmentType()).isEqualTo(RoleAssignmentType.EMPLOYMENT);
+            assertThat(role.getAssignmentType()).isEqualTo(RoleAssignmentType.ACCOUNT);
             assertThat(role.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.ORGANIZATION);
             assertThat(role.getOwnerScopeId()).isEqualTo("org-1");
             assertThat(role.getOwnerScopeKey()).isEqualTo("organization:org-1");
@@ -211,6 +212,108 @@ class DemoBootstrapTaskTest {
             assertThat(role.getSystemManaged()).isTrue();
             assertThat(roleActionDao.list(Criteria.of())).hasSize(1);
         }
+    }
+
+    @Test
+    void shouldGrantOrganizationAdminRoleToAccountWithOrganizationScope() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias("acme");
+            tenant.setTitle("Acme");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("acme")) {
+            UserAccount user = new UserAccount();
+            user.setId("user-1");
+            user.setUsername("org_admin");
+            user.setPassword("secret");
+            user.setEnabled(Boolean.TRUE);
+            userAccountService.insert(user);
+        }
+
+        Role role = organizationRoleProvisioner.grantOrganizationAdminRoleToUser("acme", "org-1", "user-1");
+
+        assertThat(role.getAssignmentType()).isEqualTo(RoleAssignmentType.ACCOUNT);
+        try (TenantContext.Scope ignored = TenantContext.use("acme")) {
+            assertThat(accountRoleGrantDao.list(Criteria.of()))
+                    .singleElement()
+                    .satisfies(grant -> {
+                        assertThat(grant.getRoleId()).isEqualTo(role.getId());
+                        assertThat(grant.getUserId()).isEqualTo("user-1");
+                        assertThat(grant.getManagementScopeType()).isEqualTo(ManagementScopeType.ORGANIZATION);
+                        assertThat(grant.getManagementScopeId()).isEqualTo("org-1");
+                    });
+        }
+    }
+
+    @Test
+    void shouldRejectNonSystemManagedRoleWhenProvisioningAdminRoleId() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias("acme");
+            tenant.setTitle("Acme");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        Role existing = new Role();
+        existing.setId(DefaultTenantRoleProvisioner.tenantAdminRoleId("acme"));
+        existing.setTenantId("acme");
+        existing.setAssignmentType(RoleAssignmentType.ACCOUNT);
+        existing.setRoleKind(net.ximatai.muyun.spring.iam.role.RoleKind.STANDARD);
+        existing.setTitle("业务角色");
+        existing.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        existing.setOwnerScopeId("acme");
+        existing.setOwnerScopeKey("tenant:acme");
+        existing.setSystemManaged(Boolean.FALSE);
+        existing.setBuiltIn(Boolean.FALSE);
+        existing.setEnabled(Boolean.TRUE);
+        existing.setVersion(0);
+        roleDao.insert(existing);
+
+        assertThatThrownBy(() -> tenantRoleProvisioner.ensureTenantAdminRole("acme"))
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("non system managed role");
+    }
+
+    @Test
+    void shouldRestoreSoftDeletedSystemManagedAdminRoleDuringProvisioning() {
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias("acme");
+            tenant.setTitle("Acme");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        Role deleted = new Role();
+        deleted.setId(DefaultOrganizationRoleProvisioner.organizationAdminRoleId("acme", "org-1"));
+        deleted.setTenantId("acme");
+        deleted.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
+        deleted.setRoleKind(net.ximatai.muyun.spring.iam.role.RoleKind.STANDARD);
+        deleted.setTitle(DefaultOrganizationRoleProvisioner.ORGANIZATION_ADMIN_ROLE_TITLE);
+        deleted.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        deleted.setOwnerScopeId("org-1");
+        deleted.setOwnerScopeKey("organization:org-1");
+        deleted.setSharePolicy(RoleSharePolicy.OWNER_AND_CHILDREN);
+        deleted.setSystemManaged(Boolean.TRUE);
+        deleted.setBuiltIn(Boolean.TRUE);
+        deleted.setEnabled(Boolean.TRUE);
+        deleted.setDeleted(Boolean.TRUE);
+        deleted.setDeletedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        deleted.setVersion(0);
+        roleDao.insert(deleted);
+
+        Role repaired = organizationRoleProvisioner.ensureOrganizationAdminRole("acme", "org-1");
+
+        assertThat(repaired.getAssignmentType()).isEqualTo(RoleAssignmentType.ACCOUNT);
+        assertThat(repaired.getDeleted()).isFalse();
+        assertThat(repaired.getDeletedAt()).isNull();
+        Role persisted = roleDao.findById(repaired.getId());
+        assertThat(persisted.getDeleted()).isFalse();
+        assertThat(persisted.getDeletedAt()).isNull();
     }
 
     @Test

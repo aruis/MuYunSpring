@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -52,6 +53,20 @@ public class DefaultOrganizationRoleProvisioner implements OrganizationCreationP
                     ORGANIZATION_ADMIN_ROLE_DESCRIPTION
             );
             rolePermissionTemplateService.applyOrganizationAdminTemplate(role.getId());
+            return role;
+        }
+    }
+
+    public Role grantOrganizationAdminRoleToUser(String tenantId, String organizationId, String userId) {
+        String validTenantId = Preconditions.requireText(tenantId, "tenantId");
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        String validUserId = Preconditions.requireText(userId, "userId");
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.systemUser(SYSTEM_OPERATOR_ID, "Organization Provisioner"));
+             TenantContext.Scope ignoredTenant = TenantContext.use(validTenantId)) {
+            Role role = ensureOrganizationAdminRole(validTenantId, validOrganizationId);
+            roleService.grantAccountRole(role.getId(), validUserId, ManagementScopeType.ORGANIZATION,
+                    validOrganizationId);
             return role;
         }
     }

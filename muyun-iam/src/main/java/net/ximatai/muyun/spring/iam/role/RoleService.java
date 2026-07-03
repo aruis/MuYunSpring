@@ -857,7 +857,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private Role organizationAdminRole(String roleId, String organizationId, String title, String description) {
         Role role = new Role();
         role.setId(roleId);
-        role.setAssignmentType(RoleAssignmentType.EMPLOYMENT);
+        role.setAssignmentType(RoleAssignmentType.ACCOUNT);
         role.setRoleKind(RoleKind.STANDARD);
         role.setTitle(title);
         role.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
@@ -885,6 +885,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     private Role repairSystemManagedAdminRole(Role role, Role desired, String description) {
+        requireRepairableSystemManagedAdminRole(role, desired);
         boolean changed = false;
         String currentTenantId = TenantContext.currentTenantId()
                 .orElseThrow(() -> new PlatformException("admin role repair requires tenant context"));
@@ -900,6 +901,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         changed |= setIfChanged(role::getBuiltIn, role::setBuiltIn, Boolean.TRUE);
         changed |= setIfChanged(role::getSystemManaged, role::setSystemManaged, Boolean.TRUE);
         changed |= setIfChanged(role::getEnabled, role::setEnabled, Boolean.TRUE);
+        changed |= setIfChanged(role::getDeleted, role::setDeleted, Boolean.FALSE);
+        changed |= setIfChanged(role::getDeletedAt, role::setDeletedAt, null);
         if (role.getSortOrder() == null) {
             role.setSortOrder(1);
             changed = true;
@@ -918,6 +921,31 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         afterChanged(role);
         return role;
+    }
+
+    private void requireRepairableSystemManagedAdminRole(Role role, Role desired) {
+        if (role == null || desired == null) {
+            throw new PlatformException("admin role repair requires role");
+        }
+        if (!Boolean.TRUE.equals(role.getSystemManaged()) || !Boolean.TRUE.equals(role.getBuiltIn())) {
+            throw new PlatformException("admin role id is already used by non system managed role: " + role.getId());
+        }
+        String currentTenantId = TenantContext.currentTenantId()
+                .orElseThrow(() -> new PlatformException("admin role repair requires tenant context"));
+        if (role.getTenantId() != null && !role.getTenantId().isBlank()
+                && !Objects.equals(role.getTenantId(), currentTenantId)) {
+            throw new PlatformException("admin role tenant mismatch: " + role.getId());
+        }
+        if (role.getRoleKind() != null && role.getRoleKind() != desired.getRoleKind()) {
+            throw new PlatformException("admin role kind mismatch: " + role.getId());
+        }
+        if (role.getOwnerScopeType() != null && role.getOwnerScopeType() != desired.getOwnerScopeType()) {
+            throw new PlatformException("admin role owner scope type mismatch: " + role.getId());
+        }
+        if (role.getOwnerScopeId() != null && !role.getOwnerScopeId().isBlank()
+                && !Objects.equals(role.getOwnerScopeId(), desired.getOwnerScopeId())) {
+            throw new PlatformException("admin role owner scope id mismatch: " + role.getId());
+        }
     }
 
     private <V> boolean setIfChanged(java.util.function.Supplier<V> getter,
