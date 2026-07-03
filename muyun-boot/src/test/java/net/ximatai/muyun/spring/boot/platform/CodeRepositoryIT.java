@@ -1,33 +1,41 @@
-package net.ximatai.muyun.spring.platform.code;
+package net.ximatai.muyun.spring.boot.platform;
 
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
+import jakarta.transaction.UserTransaction;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.spring.boot.JdbiConfigurer;
-import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.core.argument.AbstractArgumentFactory;
-import org.jdbi.v3.core.argument.Argument;
-import org.jdbi.v3.core.config.ConfigRegistry;
+import net.ximatai.muyun.spring.platform.code.CodeFieldRole;
+import net.ximatai.muyun.spring.platform.code.CodeGenerateService;
+import net.ximatai.muyun.spring.platform.code.CodeIssueLogService;
+import net.ximatai.muyun.spring.platform.code.CodeIssueLogStatus;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerAction;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerEntry;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerEntryService;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerStatus;
+import net.ximatai.muyun.spring.platform.code.CodeMode;
+import net.ximatai.muyun.spring.platform.code.CodeRecycleEntry;
+import net.ximatai.muyun.spring.platform.code.CodeRecycleEntryService;
+import net.ximatai.muyun.spring.platform.code.CodeRecycleStatus;
+import net.ximatai.muyun.spring.platform.code.CodeRule;
+import net.ximatai.muyun.spring.platform.code.CodeRuleSegment;
+import net.ximatai.muyun.spring.platform.code.CodeRuleService;
+import net.ximatai.muyun.spring.platform.code.CodeSegmentType;
+import net.ximatai.muyun.spring.platform.code.CodeSequencePolicy;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceResetPolicy;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceStateService;
+import net.ximatai.muyun.spring.platform.code.GenerateCodeCommand;
+import net.ximatai.muyun.spring.platform.code.GenerateCodeResult;
+import org.eclipse.microprofile.config.Config;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
-import java.math.BigInteger;
-import java.sql.Types;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,45 +47,40 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = CodeRepositoryIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(CodeRepositoryIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class CodeRepositoryIT {
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
-    }
+    @Inject
+    Config config;
 
-    private final CodeRuleService ruleService;
-    private final CodeGenerateService generateService;
-    private final CodeSequenceStateService stateService;
-    private final CodeLedgerEntryService ledgerService;
-    private final CodeRecycleEntryService recycleService;
-    private final CodeIssueLogService issueLogService;
-    private final TransactionTemplate transactionTemplate;
+    @Inject
+    CodeRuleService ruleService;
 
-    @Autowired
-    CodeRepositoryIT(CodeRuleService ruleService,
-                     CodeGenerateService generateService,
-                     CodeSequenceStateService stateService,
-                     CodeLedgerEntryService ledgerService,
-                     CodeRecycleEntryService recycleService,
-                     CodeIssueLogService issueLogService,
-                     PlatformTransactionManager transactionManager) {
-        this.ruleService = ruleService;
-        this.generateService = generateService;
-        this.stateService = stateService;
-        this.ledgerService = ledgerService;
-        this.recycleService = recycleService;
-        this.issueLogService = issueLogService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
+    @Inject
+    CodeGenerateService generateService;
+
+    @Inject
+    CodeSequenceStateService stateService;
+
+    @Inject
+    CodeLedgerEntryService ledgerService;
+
+    @Inject
+    CodeRecycleEntryService recycleService;
+
+    @Inject
+    CodeIssueLogService issueLogService;
+
+    @Inject
+    UserTransaction userTransaction;
 
     @Test
     void shouldPersistCodeRuleTreeAndLifecycleRecordsThroughRepository() {
+        requirePostgres();
         CodeRule rule = rule(uniqueModuleAlias(), "orderNo");
         rule.setAllowRecycle(Boolean.TRUE);
         CodeRule saved = ruleService.saveRuleTree(rule);
@@ -114,11 +117,13 @@ class CodeRepositoryIT {
     }
 
     @Test
-    void shouldRollbackSequenceAllocationWithOuterTransaction() {
+    void shouldRollbackSequenceAllocationWithOuterTransaction() throws Exception {
+        requirePostgres();
         CodeRule rule = rule(uniqueModuleAlias(), "orderNo");
         ruleService.saveRuleTree(rule);
 
-        transactionTemplate.executeWithoutResult(status -> {
+        userTransaction.begin();
+        try {
             GenerateCodeResult generated = generateService.generate(new GenerateCodeCommand(
                     rule.getModuleAlias(),
                     "main",
@@ -129,11 +134,12 @@ class CodeRepositoryIT {
                     Map.of(),
                     null
             ));
-        assertThat(generated.value()).isEqualTo("SO-0001");
+            assertThat(generated.value()).isEqualTo("SO-0001");
             assertThat(stateService.selectState(rule.getId(), generated.basisKey(), generated.periodKey()))
                     .isNotNull();
-            status.setRollbackOnly();
-        });
+        } finally {
+            userTransaction.rollback();
+        }
 
         assertThat(stateService.selectState(rule.getId(), CodeSequenceState.DEFAULT_BUCKET, CodeSequenceState.DEFAULT_BUCKET))
                 .isNull();
@@ -151,6 +157,7 @@ class CodeRepositoryIT {
 
     @Test
     void shouldAllocateSequenceAtomicallyUnderConcurrentRepositoryWrites() throws Exception {
+        requirePostgres();
         CodeRule rule = rule(uniqueModuleAlias(), "orderNo");
         ruleService.saveRuleTree(rule);
         int count = 24;
@@ -205,6 +212,7 @@ class CodeRepositoryIT {
 
     @Test
     void shouldTreatLedgerAsSingleOccupationFact() {
+        requirePostgres();
         CodeRule rule = rule(uniqueModuleAlias(), "orderNo");
         ruleService.saveRuleTree(rule);
 
@@ -228,6 +236,7 @@ class CodeRepositoryIT {
 
     @Test
     void shouldConsumeRecycleAtomicallyUnderConcurrentRepositoryWrites() throws Exception {
+        requirePostgres();
         CodeRule rule = rule(uniqueModuleAlias(), "orderNo");
         rule.setAllowRecycle(Boolean.TRUE);
         ruleService.saveRuleTree(rule);
@@ -314,98 +323,35 @@ class CodeRepositoryIT {
         return "crm.code_" + suffix;
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EnableMuYunRepositories(basePackageClasses = CodeRuleDao.class)
-    static class TestApplication {
-        @Bean
-        DataSource dataSource() {
-            return DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
-        }
+    private void requirePostgres() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+    }
 
-        @Bean
-        CodeRuleService codeRuleService(CodeRuleDao ruleDao,
-                                        CodeRuleSegmentService segmentService,
-                                        CodeSequencePolicyService sequencePolicyService,
-                                        CodeValueMappingService mappingService) {
-            return new CodeRuleService(ruleDao, segmentService, sequencePolicyService, mappingService);
-        }
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("muyun.platform-bootstrap.enabled", "false");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                return config;
+            }
 
-        @Bean
-        CodeRuleSegmentService codeRuleSegmentService(CodeRuleSegmentDao segmentDao) {
-            return new CodeRuleSegmentService(segmentDao);
-        }
-
-        @Bean
-        CodeSequencePolicyService codeSequencePolicyService(CodeSequencePolicyDao policyDao) {
-            return new CodeSequencePolicyService(policyDao);
-        }
-
-        @Bean
-        CodeValueMappingService codeValueMappingService(CodeValueMappingDao mappingDao) {
-            return new CodeValueMappingService(mappingDao);
-        }
-
-        @Bean
-        CodeSequenceAllocator codeSequenceAllocator(Jdbi jdbi) {
-            return new PostgresCodeSequenceAllocator(jdbi);
-        }
-
-        @Bean
-        CodeRecycleConsumer codeRecycleConsumer(Jdbi jdbi) {
-            return new PostgresCodeRecycleConsumer(jdbi);
-        }
-
-        @Bean
-        CodeSequenceStateService codeSequenceStateService(CodeSequenceStateDao stateDao,
-                                                          CodeSequenceAllocator sequenceAllocator) {
-            return new CodeSequenceStateService(stateDao, List.of(sequenceAllocator));
-        }
-
-        @Bean
-        CodeLedgerEntryService codeLedgerEntryService(CodeLedgerEntryDao ledgerEntryDao) {
-            return new CodeLedgerEntryService(ledgerEntryDao);
-        }
-
-        @Bean
-        CodeRecycleEntryService codeRecycleEntryService(CodeRecycleEntryDao recycleEntryDao,
-                                                        CodeRecycleConsumer recycleConsumer) {
-            return new CodeRecycleEntryService(recycleEntryDao, List.of(recycleConsumer));
-        }
-
-        @Bean
-        CodeIssueLogService codeIssueLogService(CodeIssueLogDao issueLogDao) {
-            return new CodeIssueLogService(issueLogDao);
-        }
-
-        @Bean
-        CodePreviewService codePreviewService() {
-            return new CodePreviewService();
-        }
-
-        @Bean
-        CodeGenerateService codeGenerateService(CodeRuleService ruleService,
-                                                CodePreviewService previewService,
-                                                CodeSequenceStateService stateService,
-                                                CodeRecycleEntryService recycleEntryService,
-                                                CodeIssueLogService issueLogService) {
-            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
-                    issueLogService, null);
-        }
-
-        @Bean
-        JdbiConfigurer bigIntegerJdbiConfigurer() {
-            return jdbi -> jdbi.registerArgument(new AbstractArgumentFactory<BigInteger>(Types.BIGINT) {
-                @Override
-                protected Argument build(BigInteger value, ConfigRegistry config) {
-                    return (position, statement, context) -> statement.setLong(position, value.longValueExact());
-                }
-            });
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 }
