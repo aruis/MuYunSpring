@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import jakarta.ws.rs.Path;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -44,6 +45,11 @@ class ScopedWebTest {
         assertThat(web.verifiedTenantId).isEqualTo("tenant-a");
     }
 
+    @Test
+    void shouldUseJaxRsPathAsDefaultScopeName() {
+        assertThat(new PathScopedWeb().webScopeName()).isEqualTo("iam.organization");
+    }
+
     private static class TestScopedWeb implements ScopedWeb<Object> {
         @Override
         public Object service() {
@@ -67,6 +73,14 @@ class ScopedWebTest {
         @Override
         public String webScopeName() {
             return "test.module";
+        }
+    }
+
+    @Path("/iam.organization")
+    private static class PathScopedWeb implements ScopedWeb<Object> {
+        @Override
+        public Object service() {
+            return new Object();
         }
     }
 }

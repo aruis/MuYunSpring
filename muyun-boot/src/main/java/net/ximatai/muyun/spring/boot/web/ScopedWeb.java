@@ -4,8 +4,7 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.ws.rs.Path;
 
 import java.util.function.Supplier;
 
@@ -29,12 +28,9 @@ public interface ScopedWeb<S> {
     }
 
     default String webScopeName() {
-        RequestMapping mapping = AnnotationUtils.findAnnotation(getClass(), RequestMapping.class);
+        Path mapping = getClass().getAnnotation(Path.class);
         if (mapping != null) {
-            String mappingPath = firstText(mapping.value());
-            if (mappingPath == null) {
-                mappingPath = firstText(mapping.path());
-            }
+            String mappingPath = mapping.value();
             if (mappingPath != null) {
                 return mappingPath.replaceFirst("^/", "");
             }
@@ -48,10 +44,4 @@ public interface ScopedWeb<S> {
         return service().getClass().getSimpleName();
     }
 
-    private static String firstText(String[] values) {
-        if (values == null || values.length == 0 || values[0].isBlank()) {
-            return null;
-        }
-        return values[0];
-    }
 }

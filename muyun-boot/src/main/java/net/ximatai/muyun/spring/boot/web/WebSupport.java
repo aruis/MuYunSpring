@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.inject.Inject;
 
 public abstract class WebSupport<S> implements ScopedWeb<S> {
-    @Autowired
+    @Inject
     protected S service;
 
     @Override
