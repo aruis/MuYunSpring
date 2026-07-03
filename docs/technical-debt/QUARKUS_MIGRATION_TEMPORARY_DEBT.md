@@ -90,11 +90,11 @@
 
 ## HTTP Payloads
 
-### Multipart and remaining download APIs are transitional
+### Servlet request scope APIs are transitional
 
-- 现状：动态导入 multipart、交换模板下载和动态导出已迁移到 RESTEasy Reactive/JAX-RS；导入错误文件下载等部分路径仍保留 servlet `HttpServletResponse` 和 `jakarta.servlet-api` 临时依赖。
-- 影响：HTTP 响应构造方式不统一，Quarkus native/build-time 优化和测试方式也会受影响。
-- 回收方向：统一迁移到 JAX-RS `Response`、`StreamingOutput` 或 RESTEasy Reactive 推荐类型，移除 servlet 过渡依赖。
+- 现状：动态导入 multipart、交换模板下载、动态导出和导入错误文件下载已迁移到 RESTEasy Reactive/JAX-RS；剩余 servlet 依赖主要来自嵌套 CRUD/作用域控制器通过 `HttpServletRequest` 读取路径变量。
+- 影响：静态 Web 基类仍带 servlet 请求模型，Quarkus Web 层与平台 scope API 的长期边界还不够清晰。
+- 回收方向：把嵌套路由所需的路径变量收敛为稳定的 JAX-RS scope 上下文或显式方法参数，移除 servlet 过渡依赖。
 
 ## Test Migration
 

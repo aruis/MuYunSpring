@@ -2,11 +2,10 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -87,18 +86,16 @@ public class DynamicImportWebController {
     @POST
     @Path("/error-file/{token}")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public void downloadErrorFile(@PathParam("moduleAlias") String moduleAlias,
-                                  @PathParam("token") String token,
-                                  @Context HttpServletResponse response) {
-        tenantScope(moduleAlias, () -> {
+    public Response downloadErrorFile(@PathParam("moduleAlias") String moduleAlias,
+                                      @PathParam("token") String token) {
+        return tenantScope(moduleAlias, () -> {
             exchangeDescriptor(moduleAlias);
             DynamicImportErrorFileService.ErrorFilePayload payload =
                     errorFileService.get(moduleAlias, currentTenantId(moduleAlias), token);
             if (payload == null) {
                 throw new PlatformException("dynamic import error file token not found: " + token);
             }
-            writeXlsx(response, payload.fileName(), payload.content());
-            return null;
+            return xlsxResponse(payload.fileName(), payload.content());
         });
     }
 
@@ -194,17 +191,13 @@ public class DynamicImportWebController {
         return "attachment; filename=\"" + fileName.replace("\"", "_") + "\"; filename*=UTF-8''" + encoded;
     }
 
-    private static void writeXlsx(@Context HttpServletResponse response, String fileName, byte[] bytes) {
-        try {
-            response.setContentType(XLSX_CONTENT_TYPE);
-            response.setHeader("Content-Disposition", contentDisposition(fileName));
-            response.setHeader("Access-Control-Expose-Headers", "Content-Disposition,X-Import-FileName");
-            response.setHeader("X-Import-FileName", fileName);
-            response.setContentLength(bytes.length);
-            response.getOutputStream().write(bytes);
-        } catch (IOException ex) {
-            throw new PlatformException("dynamic import error file write failed", ex);
-        }
+    private static Response xlsxResponse(String fileName, byte[] bytes) {
+        return Response.ok(bytes, XLSX_CONTENT_TYPE)
+                .header("Content-Disposition", contentDisposition(fileName))
+                .header("Access-Control-Expose-Headers", "Content-Disposition,X-Import-FileName")
+                .header("X-Import-FileName", fileName)
+                .header("Content-Length", bytes.length)
+                .build();
     }
 
     private <T> T tenantScope(String moduleAlias, Supplier<T> action) {

@@ -1,11 +1,9 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.WriteListener;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -32,7 +30,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,7 +40,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -175,14 +171,15 @@ class DynamicImportWebControllerTest {
         String token = errorFileService.save(MODULE, "tenant_a", "errors.xlsx", new byte[]{9, 8, 7});
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
-        CapturingResponse response = new CapturingResponse();
 
-        controller.downloadErrorFile(MODULE, token, response.response());
+        Response response = controller.downloadErrorFile(MODULE, token);
 
-        assertThat(response.header("X-Import-FileName")).isEqualTo("errors.xlsx");
-        assertThat(response.header("Access-Control-Expose-Headers"))
+        assertThat(response.getHeaderString("X-Import-FileName")).isEqualTo("errors.xlsx");
+        assertThat(response.getHeaderString("Access-Control-Expose-Headers"))
                 .isEqualTo("Content-Disposition,X-Import-FileName");
-        assertThat(response.bytes()).containsExactly(9, 8, 7);
+        assertThat(response.getHeaderString("Content-Length")).isEqualTo("3");
+        assertThat(response.getMediaType().toString()).isEqualTo(DynamicImportWebController.XLSX_CONTENT_TYPE);
+        assertThat((byte[]) response.getEntity()).containsExactly(9, 8, 7);
     }
 
     @Test
@@ -190,9 +187,7 @@ class DynamicImportWebControllerTest {
         String token = errorFileService.save("crm.customer", "tenant_a", "errors.xlsx", new byte[]{9, 8, 7});
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
-        CapturingResponse response = new CapturingResponse();
-
-        assertThatThrownBy(() -> controller.downloadErrorFile(MODULE, token, response.response()))
+        assertThatThrownBy(() -> controller.downloadErrorFile(MODULE, token))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("dynamic import error file token not found");
     }
@@ -303,44 +298,4 @@ class DynamicImportWebControllerTest {
         }
     }
 
-    private static class CapturingResponse {
-        private final HttpServletResponse response = mock(HttpServletResponse.class);
-        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
-        private final Map<String, String> headers = new LinkedHashMap<>();
-
-        CapturingResponse() throws IOException {
-            ServletOutputStream output = new ServletOutputStream() {
-                @Override
-                public boolean isReady() {
-                    return true;
-                }
-
-                @Override
-                public void setWriteListener(WriteListener writeListener) {
-                }
-
-                @Override
-                public void write(int b) {
-                    body.write(b);
-                }
-            };
-            when(response.getOutputStream()).thenReturn(output);
-            org.mockito.Mockito.doAnswer(invocation -> {
-                headers.put(invocation.getArgument(0), invocation.getArgument(1));
-                return null;
-            }).when(response).setHeader(anyString(), anyString());
-        }
-
-        HttpServletResponse response() {
-            return response;
-        }
-
-        String header(String name) {
-            return headers.get(name);
-        }
-
-        byte[] bytes() {
-            return body.toByteArray();
-        }
-    }
 }
