@@ -2,11 +2,10 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -23,7 +22,6 @@ import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTempla
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicRecordReferenceDropdownResolver;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
 
-import java.io.IOException;
 import java.util.function.Supplier;
 
 @ApplicationScoped
@@ -57,23 +55,24 @@ public class DynamicExchangeTemplateWebController {
     @POST
     @Path("/template")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public void template(@PathParam("moduleAlias") String moduleAlias,
-                         DynamicExchangeTemplateRequest request,
-                         @Context HttpServletResponse response) {
-        tenantScope(moduleAlias, () -> {
-            writeTemplate(moduleAlias, request, response);
-            return null;
-        });
+    public Response template(@PathParam("moduleAlias") String moduleAlias,
+                             DynamicExchangeTemplateRequest request) {
+        return tenantScope(moduleAlias, () -> templateResponse(moduleAlias, request));
     }
 
-    private void writeTemplate(String moduleAlias,
-                               DynamicExchangeTemplateRequest request,
-                               @Context HttpServletResponse response) {
+    private Response templateResponse(String moduleAlias,
+                                      DynamicExchangeTemplateRequest request) {
         DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
         requireExchangeCapability(descriptor);
         ExcelWorkbookPlan plan = templatePlanBuilder.build(descriptor, templateOptions(request));
         byte[] bytes = workbookWriter.writeToBytes(plan);
-        writeXlsx(response, moduleAlias.replace('.', '_') + "-exchange-template.xlsx", bytes);
+        String fileName = moduleAlias.replace('.', '_') + "-exchange-template.xlsx";
+        return Response.ok(bytes, DynamicImportWebController.XLSX_CONTENT_TYPE)
+                .header("Content-Disposition", DynamicImportWebController.contentDisposition(fileName))
+                .header("Access-Control-Expose-Headers", "Content-Disposition,X-Exchange-FileName")
+                .header("X-Exchange-FileName", fileName)
+                .header("Content-Length", bytes.length)
+                .build();
     }
 
     private DynamicExchangeTemplateOptions templateOptions(DynamicExchangeTemplateRequest request) {
@@ -94,19 +93,6 @@ public class DynamicExchangeTemplateWebController {
                         + descriptor.mainEntityAlias()));
         if (!mainEntity.capabilities().contains(EntityCapability.EXCHANGE.name())) {
             throw new PlatformException("dynamic entity does not support capability: EXCHANGE");
-        }
-    }
-
-    private void writeXlsx(@Context HttpServletResponse response, String fileName, byte[] bytes) {
-        try {
-            response.setContentType(DynamicImportWebController.XLSX_CONTENT_TYPE);
-            response.setHeader("Content-Disposition", DynamicImportWebController.contentDisposition(fileName));
-            response.setHeader("Access-Control-Expose-Headers", "Content-Disposition,X-Exchange-FileName");
-            response.setHeader("X-Exchange-FileName", fileName);
-            response.setContentLength(bytes.length);
-            response.getOutputStream().write(bytes);
-        } catch (IOException ex) {
-            throw new PlatformException("dynamic exchange template write failed", ex);
         }
     }
 

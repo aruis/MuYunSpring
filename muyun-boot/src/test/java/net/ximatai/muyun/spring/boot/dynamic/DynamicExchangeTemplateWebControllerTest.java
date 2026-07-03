@@ -1,12 +1,9 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.WriteListener;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -28,8 +25,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.List;
 
@@ -63,11 +58,10 @@ class DynamicExchangeTemplateWebControllerTest {
                 .isEqualTo("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/exchange");
 
         Method method = DynamicExchangeTemplateWebController.class.getMethod(
-                "template", String.class, DynamicExchangeTemplateRequest.class, HttpServletResponse.class);
+                "template", String.class, DynamicExchangeTemplateRequest.class);
         assertThat(method.getAnnotation(POST.class)).isNotNull();
         assertThat(method.getAnnotation(Path.class).value()).isEqualTo("/template");
         assertThat(method.getParameters()[0].getAnnotation(PathParam.class).value()).isEqualTo("moduleAlias");
-        assertThat(method.getParameters()[2].getAnnotation(Context.class)).isNotNull();
 
         ActionEndpoint endpoint = method.getAnnotation(ActionEndpoint.class);
         assertThat(endpoint).isNotNull();
@@ -81,17 +75,16 @@ class DynamicExchangeTemplateWebControllerTest {
         when(recordService.describe(MODULE)).thenReturn(descriptor);
         when(templatePlanBuilder.build(eq(descriptor), any(DynamicExchangeTemplateOptions.class))).thenReturn(plan);
         when(writer.writeToBytes(plan)).thenReturn(new byte[]{1, 2, 3});
-        CapturingResponse response = new CapturingResponse();
 
-        inTenant(() -> controller.template(MODULE, new DynamicExchangeTemplateRequest(
-                List.of("order.customerId"), 100), response.mock()));
+        Response response = inTenant(() -> controller.template(MODULE, new DynamicExchangeTemplateRequest(
+                List.of("order.customerId"), 100)));
 
-        assertThat(response.contentType).isEqualTo(DynamicImportWebController.XLSX_CONTENT_TYPE);
-        assertThat(response.headers).containsEntry("X-Exchange-FileName", "sales_order-exchange-template.xlsx");
-        assertThat(response.headers).containsEntry("Access-Control-Expose-Headers",
+        assertThat(response.getMediaType().toString()).isEqualTo(DynamicImportWebController.XLSX_CONTENT_TYPE);
+        assertThat(response.getHeaderString("X-Exchange-FileName")).isEqualTo("sales_order-exchange-template.xlsx");
+        assertThat(response.getHeaderString("Access-Control-Expose-Headers")).isEqualTo(
                 "Content-Disposition,X-Exchange-FileName");
-        assertThat(response.contentLength).isEqualTo(3);
-        assertThat(response.bytes()).containsExactly(1, 2, 3);
+        assertThat(response.getHeaderString("Content-Length")).isEqualTo("3");
+        assertThat((byte[]) response.getEntity()).containsExactly(1, 2, 3);
         verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
         ArgumentCaptor<DynamicExchangeTemplateOptions> options =
                 ArgumentCaptor.forClass(DynamicExchangeTemplateOptions.class);
@@ -103,16 +96,15 @@ class DynamicExchangeTemplateWebControllerTest {
     @Test
     void shouldRejectTemplateWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
-        CapturingResponse response = new CapturingResponse();
 
-        assertThatThrownBy(() -> inTenant(() -> controller.template(MODULE, null, response.mock())))
+        assertThatThrownBy(() -> inTenant(() -> controller.template(MODULE, null)))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("dynamic entity does not support capability: EXCHANGE");
     }
 
-    private void inTenant(Runnable action) {
+    private <T> T inTenant(java.util.function.Supplier<T> action) {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            action.run();
+            return action.get();
         }
     }
 
@@ -145,49 +137,4 @@ class DynamicExchangeTemplateWebControllerTest {
         )));
     }
 
-    private static final class CapturingResponse {
-        private final HttpServletResponse response = org.mockito.Mockito.mock(HttpServletResponse.class);
-        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
-        private final java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
-        private String contentType;
-        private int contentLength;
-
-        private CapturingResponse() throws IOException {
-            when(response.getOutputStream()).thenReturn(new ServletOutputStream() {
-                @Override
-                public boolean isReady() {
-                    return true;
-                }
-
-                @Override
-                public void setWriteListener(WriteListener writeListener) {
-                }
-
-                @Override
-                public void write(int b) {
-                    body.write(b);
-                }
-            });
-            org.mockito.Mockito.doAnswer(invocation -> {
-                contentType = invocation.getArgument(0);
-                return null;
-            }).when(response).setContentType(any());
-            org.mockito.Mockito.doAnswer(invocation -> {
-                headers.put(invocation.getArgument(0), invocation.getArgument(1));
-                return null;
-            }).when(response).setHeader(any(), any());
-            org.mockito.Mockito.doAnswer(invocation -> {
-                contentLength = invocation.getArgument(0);
-                return null;
-            }).when(response).setContentLength(org.mockito.ArgumentMatchers.anyInt());
-        }
-
-        private HttpServletResponse mock() {
-            return response;
-        }
-
-        private byte[] bytes() {
-            return body.toByteArray();
-        }
-    }
 }
