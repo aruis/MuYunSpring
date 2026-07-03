@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
@@ -140,6 +141,22 @@ class DynamicRecordWebControllerTest {
         assertRoute(DynamicRecordWebController.class.getMethod("previewFormula",
                         String.class, DynamicFormulaPreviewRequest.class),
                 POST.class, "/formula/preview", PlatformAction.CREATE);
+        assertRoute(DynamicRecordWebController.class.getMethod("dynamicActions", String.class),
+                GET.class, "/actions", null);
+        assertRoute(DynamicRecordWebController.class.getMethod("dynamicRecordActions", String.class, String.class),
+                GET.class, "/actions/{recordId}", null);
+        assertRoute(DynamicRecordWebController.class.getMethod("executeDynamicListAction",
+                        String.class, String.class, DynamicWebActionRequest.class),
+                POST.class, "/" + PlatformWebPathRules.ACTION_CODE_PATH,
+                null);
+        assertRoute(DynamicRecordWebController.class.getMethod("executeDynamicBatchAction",
+                        String.class, String.class, DynamicWebActionRequest.class),
+                POST.class, "/" + PlatformWebPathRules.ACTION_CODE_PATH + "/batch",
+                null);
+        assertRoute(DynamicRecordWebController.class.getMethod("executeDynamicRecordAction",
+                        String.class, String.class, String.class, DynamicWebActionRequest.class),
+                POST.class, "/" + PlatformWebPathRules.ACTION_CODE_PATH + "/{recordId}",
+                null);
         assertRoute(DynamicRecordWebController.class.getMethod("reference",
                         String.class, DynamicWebReferenceRequest.class),
                 ReferenceWeb.class.getMethod("reference", String.class, Object.class),

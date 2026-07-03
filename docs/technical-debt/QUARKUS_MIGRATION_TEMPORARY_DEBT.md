@@ -28,11 +28,11 @@
 - 影响：子类 override 中的个性化路径、参数或响应语义存在遗漏风险。
 - 回收方向：逐个核对继承式 Web controller，必要时拆成明确的 Quarkus resource 方法，确保每个路由只有一个声明来源。
 
-### Dynamic Web inherited default routes are not fully restored
+### Dynamic Web inherited default routes still need route-by-route review
 
-- 现状：`DynamicRecordWebControllerIT` 已迁移为 Quarkus HTTP 测试，静态 exact alias resource 已可绑定；部分接口 default method 声明的动态记录路由仍返回 404。
-- 影响：动态模块 Web 入口与旧 Spring MVC 的接口继承路由暴露语义不完全等价。
-- 回收方向：把动态 Web 入口从接口 default route 迁到显式 JAX-RS resource 方法或专门路由层，并补真实 HTTP contract 测试。
+- 现状：`DynamicRecordWebControllerIT` 已迁移为 Quarkus HTTP 测试，静态 exact alias resource 已可绑定；动态 action 路由已从 `ActionWeb` default method 迁到显式 JAX-RS resource 方法，并通过真实 HTTP contract 覆盖。
+- 影响：动态模块 Web 入口仍有其他继承式 CRUD/enable/tree/reference 路由，需要确认 Quarkus 暴露语义与旧 Spring MVC 是否等价。
+- 回收方向：继续按路由组把动态 Web 入口从接口 default route 迁到显式 JAX-RS resource 方法或专门路由层，并补真实 HTTP contract 测试；静态 exact alias 与动态 catch-all 的优先级作为正式语义保留。
 
 ### Spring multi-path mappings were collapsed
 
@@ -44,7 +44,7 @@
 
 ### Request data uses ThreadLocal adapters
 
-- 现状：`BearerTokenCurrentUserProvider` 和 `DynamicWebRequest` 通过 JAX-RS filter 写入 ThreadLocal 来读取授权头和请求路径；正式方向见 Web 迁移边界决策第 4 条。
+- 现状：`BearerTokenCurrentUserProvider` 和 `DynamicWebRequest` 通过 JAX-RS filter 写入 ThreadLocal 来读取授权头和请求路径；动态 action 路由已改为显式 `@PathParam("moduleAlias")`，不再依赖 `DynamicWebRequest` 解析模块别名；正式方向见 Web 迁移边界决策第 4 条。
 - 影响：虽然可用于迁移期解耦 Spring `RequestContextHolder`，但需要严格清理生命周期，异步执行或上下文传播场景存在风险。
 - 回收方向：改为 `@RequestScoped` 上下文对象、JAX-RS `ContainerRequestContext` 适配器或 Quarkus 安全上下文，并补并发/请求隔离测试。
 
