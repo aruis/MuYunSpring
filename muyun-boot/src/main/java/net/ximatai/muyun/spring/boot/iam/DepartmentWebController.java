@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
@@ -8,29 +10,15 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
-import net.ximatai.muyun.spring.boot.web.WebListResponse;
-import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
+import net.ximatai.muyun.spring.boot.web.ScopedTreeWeb;
+import net.ximatai.muyun.spring.boot.web.TreeScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
-import net.ximatai.muyun.spring.boot.web.WebTreeNode;
-import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理", route = "/iam/departments")
@@ -39,6 +27,7 @@ import java.util.List;
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,
         EnableWeb<Department, DepartmentService>,
+        ScopedTreeWeb<Department, DepartmentService>,
         StaticModuleUiContributor {
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
@@ -71,75 +60,26 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
                 .build();
     }
 
-    @PostMapping("/sort/{id}")
-    @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
-        return webScope(() -> {
-            TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
-            service().moveInDepartmentTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-            return new WebCountResponse(1);
-        });
+    @Override
+    public TreeScope treeScope(HttpServletRequest request) {
+        return departmentTreeScope(request.getParameter("organizationId"));
     }
 
-    @GetMapping("/tree")
-    @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@RequestParam String organizationId,
-                                   @RequestParam(defaultValue = "false") boolean flat) {
-        return webScope(() -> {
-            List<Department> roots = service().departmentChildrenForAction(
-                    PlatformAction.TREE, organizationId, TreeAbility.ROOT_ID);
-            if (flat) {
-                List<Department> rows = new ArrayList<>();
-                for (Department root : roots) {
-                    rows.add(root);
-                    appendDescendants(organizationId, root.getId(), rows);
-                }
-                return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
-            }
-            return new WebListResponse<>(roots.stream().map(root -> treeNode(organizationId, root)).toList());
-        });
+    @Override
+    public TreeScope treeScope(HttpServletRequest request, Department record) {
+        return departmentTreeScope(record.getOrganizationId());
     }
 
-    @GetMapping("/tree/{id}")
-    @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@PathVariable String id,
-                                   @RequestParam(defaultValue = "false") boolean flat,
-                                   @RequestParam(defaultValue = "true") boolean includeSelf) {
-        return webScope(() -> {
-            Department root = service().selectForAction(PlatformAction.TREE, id);
-            if (root == null) {
-                return new WebListResponse<>(List.of());
-            }
-            if (!flat) {
-                if (includeSelf) {
-                    return new WebListResponse<>(List.of(treeNode(root.getOrganizationId(), root)));
-                }
-                return new WebListResponse<>(service().departmentChildrenForAction(
-                                PlatformAction.TREE, root.getOrganizationId(), root.getId()).stream()
-                        .map(child -> treeNode(root.getOrganizationId(), child))
-                        .toList());
-            }
-            List<Department> rows = new ArrayList<>();
-            if (includeSelf) {
-                rows.add(root);
-            }
-            appendDescendants(root.getOrganizationId(), root.getId(), rows);
-            return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
-        });
+    @Override
+    public TreeScope treeScopeForRecordLookup(HttpServletRequest request, String id) {
+        String organizationId = request.getParameter("organizationId");
+        return organizationId == null || organizationId.isBlank()
+                ? TreeScope.none()
+                : departmentTreeScope(organizationId);
     }
 
-    private void appendDescendants(String organizationId, String parentId, List<Department> rows) {
-        for (Department child : service().departmentChildrenForAction(PlatformAction.TREE, organizationId, parentId)) {
-            rows.add(child);
-            appendDescendants(organizationId, child.getId(), rows);
-        }
-    }
-
-    private WebTreeNode<Department> treeNode(String organizationId, Department record) {
-        return new WebTreeNode<>(WebOutputSupport.record(service(), record, FieldOutputContext.VIEW),
-                service().departmentChildrenForAction(PlatformAction.TREE, organizationId, record.getId()).stream()
-                        .map(child -> treeNode(organizationId, child))
-                        .toList());
+    private TreeScope departmentTreeScope(String organizationId) {
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        return TreeScope.of(Criteria.of().eq("organizationId", validOrganizationId));
     }
 }
