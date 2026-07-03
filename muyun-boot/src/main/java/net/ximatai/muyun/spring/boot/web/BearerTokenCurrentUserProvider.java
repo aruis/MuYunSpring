@@ -1,37 +1,38 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Optional;
 
 public class BearerTokenCurrentUserProvider implements CurrentUserProvider {
+    private static final ThreadLocal<String> AUTHORIZATION_HEADER = new ThreadLocal<>();
+
     private final UserSessionService userSessionService;
 
     public BearerTokenCurrentUserProvider(UserSessionService userSessionService) {
         this.userSessionService = userSessionService;
     }
 
+    public static Scope useAuthorizationHeader(String authorizationHeader) {
+        String previous = AUTHORIZATION_HEADER.get();
+        AUTHORIZATION_HEADER.set(authorizationHeader);
+        return () -> {
+            if (previous == null) {
+                AUTHORIZATION_HEADER.remove();
+            } else {
+                AUTHORIZATION_HEADER.set(previous);
+            }
+        };
+    }
+
     @Override
     public Optional<CurrentUser> currentUser() {
-        return request().flatMap(request -> userSessionService.currentUser(bearerToken(request)));
+        return userSessionService.currentUser(bearerToken(AUTHORIZATION_HEADER.get()));
     }
 
-    private Optional<HttpServletRequest> request() {
-        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-        if (attributes instanceof ServletRequestAttributes servletAttributes) {
-            return Optional.of(servletAttributes.getRequest());
-        }
-        return Optional.empty();
-    }
-
-    private String bearerToken(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
+    private String bearerToken(String header) {
         if (header == null || header.isBlank()) {
             return null;
         }
@@ -40,5 +41,10 @@ public class BearerTokenCurrentUserProvider implements CurrentUserProvider {
             return null;
         }
         return header.substring(prefix.length()).trim();
+    }
+
+    public interface Scope extends AutoCloseable {
+        @Override
+        void close();
     }
 }

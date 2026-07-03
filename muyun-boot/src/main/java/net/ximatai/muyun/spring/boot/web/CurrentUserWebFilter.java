@@ -1,19 +1,25 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.annotation.Priority;
+import jakarta.ws.rs.Priorities;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
 import java.util.Optional;
 
-public class CurrentUserWebFilter extends OncePerRequestFilter {
+@Provider
+@Priority(Priorities.AUTHENTICATION)
+public class CurrentUserWebFilter implements ContainerRequestFilter, ContainerResponseFilter {
+    private static final String CURRENT_USER_SCOPE = CurrentUserWebFilter.class.getName() + ".CURRENT_USER_SCOPE";
+    private static final String TENANT_SCOPE = CurrentUserWebFilter.class.getName() + ".TENANT_SCOPE";
+
     private final CurrentUserProvider currentUserProvider;
 
     public CurrentUserWebFilter(CurrentUserProvider currentUserProvider) {
@@ -21,36 +27,44 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
-        Optional<CurrentUser> currentUser = currentUserProvider.currentUser();
-        if (currentUser.isEmpty()) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(currentUser.get())) {
-            doFilterWithTenantScope(currentUser.get(), request, response, filterChain);
+    public void filter(ContainerRequestContext requestContext) {
+        try (BearerTokenCurrentUserProvider.Scope ignored = BearerTokenCurrentUserProvider.useAuthorizationHeader(
+                requestContext.getHeaderString("Authorization"))) {
+            Optional<CurrentUser> currentUser = currentUserProvider.currentUser();
+            if (currentUser.isEmpty()) {
+                return;
+            }
+            requestContext.setProperty(CURRENT_USER_SCOPE, CurrentUserContext.use(currentUser.get()));
+            TenantContext.Scope tenantScope = tenantScope(currentUser.get());
+            if (tenantScope != null) {
+                requestContext.setProperty(TENANT_SCOPE, tenantScope);
+            }
         }
     }
 
-    private void doFilterWithTenantScope(CurrentUser currentUser,
-                                         HttpServletRequest request,
-                                         HttpServletResponse response,
-                                         FilterChain filterChain) throws ServletException, IOException {
+    @Override
+    public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
+        close(requestContext.getProperty(TENANT_SCOPE));
+        close(requestContext.getProperty(CURRENT_USER_SCOPE));
+    }
+
+    private TenantContext.Scope tenantScope(CurrentUser currentUser) {
         if (currentUser.system()) {
-            try (TenantContext.Scope ignored = TenantContext.system("system user web request")) {
-                filterChain.doFilter(request, response);
-            }
-            return;
+            return TenantContext.system("system user web request");
         }
         String tenantId = currentUser.tenantId();
         if (tenantId == null || tenantId.isBlank()) {
-            filterChain.doFilter(request, response);
-            return;
+            return null;
         }
-        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
-            filterChain.doFilter(request, response);
+        return TenantContext.use(tenantId);
+    }
+
+    private void close(Object scope) {
+        if (scope instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 }

@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.NotAllowedException;
+import jakarta.ws.rs.NotFoundException;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
@@ -72,6 +74,19 @@ class PlatformWebExceptionHandlerTest {
             assertThat(error.code()).isEqualTo("DYNAMIC_DESCRIPTOR_MISSING");
             assertThat(error.scope().moduleAlias()).isEqualTo("crm.customer");
         }
+    }
+
+    @Test
+    void shouldMapJaxRsRoutingExceptionsToUnifiedEnvelope() {
+        Response notFound = handler.handleNotFound(new NotFoundException("missing route"));
+        Response methodNotAllowed = handler.handleMethodNotAllowed(new NotAllowedException("method not allowed"));
+
+        PlatformWebError notFoundError = (PlatformWebError) notFound.getEntity();
+        PlatformWebError methodNotAllowedError = (PlatformWebError) methodNotAllowed.getEntity();
+        assertThat(notFound.getStatus()).isEqualTo(404);
+        assertThat(notFoundError.code()).isEqualTo(PlatformErrorCodes.RESOURCE_NOT_FOUND);
+        assertThat(methodNotAllowed.getStatus()).isEqualTo(405);
+        assertThat(methodNotAllowedError.code()).isEqualTo(PlatformErrorCodes.VALIDATION_FAILED);
     }
 
     @Test
