@@ -1,5 +1,4 @@
 [versions]
-spring-framework = "7.0.8"
 quarkus = "3.37.0"
 muyun-database = "3.26.14"
 junit = "6.1.1"
@@ -29,7 +28,6 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
-spring-tx = { module = "org.springframework:spring-tx", version.ref = "spring-framework" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }

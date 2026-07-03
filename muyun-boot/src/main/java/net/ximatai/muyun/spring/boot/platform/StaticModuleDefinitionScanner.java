@@ -165,7 +165,7 @@ public class StaticModuleDefinitionScanner {
         if (!ScopedWeb.class.isAssignableFrom(beanClass)) {
             return;
         }
-        // Web scope validation moves to the Quarkus REST migration because Spring RequestMapping is no longer present.
+        // Web scope validation is handled by JAX-RS route contracts rather than static module scanning.
     }
 
     private String normalizeScope(String value) {
