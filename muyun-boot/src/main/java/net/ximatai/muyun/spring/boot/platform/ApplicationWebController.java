@@ -7,14 +7,14 @@ import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = ApplicationService.MODULE_ALIAS, title = "平台应用")
 @PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "应用管理", order = 10)
-@RequestMapping("/platform.application")
+@Path("/platform.application")
 public class ApplicationWebController extends WebSupport<ApplicationService> implements
         CrudWeb<Application, ApplicationService>,
         EnableWeb<Application, ApplicationService>,
