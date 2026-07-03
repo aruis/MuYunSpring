@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -54,6 +55,7 @@ import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -65,11 +67,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -141,10 +147,10 @@ class IamWebControllerIT {
         organization.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(organizationService.organizationChildrenForAction(PlatformAction.TREE, "tenant_a", TreeAbility.ROOT_ID))
+        doCallRealMethod().when(organizationService).scopedTreeCriteria(any(Criteria.class), any(String.class));
+        when(organizationService.listForAction(eq(PlatformAction.TREE),
+                any(Criteria.class), any(PageRequest.class), any(Sort.class)))
                 .thenReturn(List.of(organization));
-        when(organizationService.organizationChildrenForAction(PlatformAction.TREE, "tenant_a", "org-1"))
-                .thenReturn(List.of());
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
@@ -156,6 +162,10 @@ class IamWebControllerIT {
     void shouldBindTreeSortEndpointInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(organizationService.requireRecordScopeResult(any(), any()))
+                .thenReturn(DataScopeCriteriaResult.unrestricted(Criteria.of()));
+        doAnswer(invocation -> invocation.<Supplier<?>>getArgument(1).get())
+                .when(organizationService).withDataScopeTenant(any(), any());
 
         mvc.perform(post("/iam.organization/sort/org-1")
                         .contentType("application/json")
@@ -165,7 +175,7 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        verify(organizationService).moveInOrganizationTree("tenant_a", "org-1", "org-0", null, TreeAbility.ROOT_ID);
+        verify(organizationService).moveInTree(any(Criteria.class), eq("org-1"), eq("org-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }
 
     @Test
@@ -178,24 +188,38 @@ class IamWebControllerIT {
         department.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", TreeAbility.ROOT_ID)).thenReturn(List.of(department));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", "dept-1")).thenReturn(List.of());
+        doCallRealMethod().when(departmentService).scopedTreeCriteria(any(Criteria.class), any(String.class));
+        when(departmentService.listForAction(eq(PlatformAction.TREE),
+                any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(department))
+                .thenReturn(List.of());
 
         mvc.perform(get("/iam.department/tree").param("organizationId", "org-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("dept-1"))
                 .andExpect(jsonPath("$.records[0].record.organizationId").value("org-1"))
                 .andExpect(jsonPath("$.records[0].children").isArray());
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(departmentService, atLeastOnce()).listForAction(eq(PlatformAction.TREE),
+                criteriaCaptor.capture(), any(PageRequest.class), any(Sort.class));
+        assertThat(criteriaCaptor.getAllValues()).anySatisfy(criteria -> {
+            assertThat(containsCondition(criteria, "organizationId", "org-1")).isTrue();
+            assertThat(containsCondition(criteria, "parentId", TreeAbility.ROOT_ID)).isTrue();
+        });
     }
 
     @Test
     void shouldBindDepartmentTreeSortEndpointInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(departmentService.requireRecordScopeResult(any(), any()))
+                .thenReturn(DataScopeCriteriaResult.unrestricted(Criteria.of()));
+        doAnswer(invocation -> invocation.<Supplier<?>>getArgument(1).get())
+                .when(departmentService).withDataScopeTenant(any(), any());
 
         mvc.perform(post("/iam.department/sort/dept-1")
+                        .param("organizationId", "org-1")
                         .contentType("application/json")
                         .content("""
                                 {"previousId":"dept-0","parentId":"root"}
@@ -203,7 +227,7 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        verify(departmentService).moveInDepartmentTree("dept-1", "dept-0", null, TreeAbility.ROOT_ID);
+        verify(departmentService).moveInTree(any(Criteria.class), eq("dept-1"), eq("dept-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }
 
     @Test
