@@ -6,37 +6,38 @@ import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = PlatformModuleActionService.MODULE_ALIAS, title = "平台模块动作")
-@RequestMapping("/platform.module/{moduleAlias}/actions")
+@Path("/platform.module/{moduleAlias}/actions")
 public class PlatformModuleActionWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformModuleAction, PlatformModuleActionService> {
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("moduleAlias", moduleAlias(request));
     }
 
     @Override
-    protected void bindScope(PlatformModuleAction record, HttpServletRequest request) {
+    protected void bindScope(PlatformModuleAction record, @Context HttpServletRequest request) {
         record.setModuleAlias(moduleAlias(request));
     }
 
     @Override
-    protected boolean inScope(PlatformModuleAction record, HttpServletRequest request) {
+    protected boolean inScope(PlatformModuleAction record, @Context HttpServletRequest request) {
         return moduleAlias(request).equals(record.getModuleAlias());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "module action does not belong to module: " + moduleAlias(request) + "." + id;
     }
 
-    private String moduleAlias(HttpServletRequest request) {
+    private String moduleAlias(@Context HttpServletRequest request) {
         return PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
     }
 }

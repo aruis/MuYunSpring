@@ -7,15 +7,16 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
         title = "平台字段保护配置")
-@RequestMapping("/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs")
+@Path("/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs")
 public class MetadataFieldProtectionConfigWebController
         extends NestedCrudWebSupport<MetadataFieldProtectionConfig, MetadataFieldProtectionConfigService> {
 
@@ -26,29 +27,29 @@ public class MetadataFieldProtectionConfigWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         requireField(request);
         criteria.eq("metadataFieldId", fieldId(request));
     }
 
     @Override
-    protected void bindScope(MetadataFieldProtectionConfig record, HttpServletRequest request) {
+    protected void bindScope(MetadataFieldProtectionConfig record, @Context HttpServletRequest request) {
         requireField(request);
         record.setMetadataFieldId(fieldId(request));
     }
 
     @Override
-    protected boolean inScope(MetadataFieldProtectionConfig record, HttpServletRequest request) {
+    protected boolean inScope(MetadataFieldProtectionConfig record, @Context HttpServletRequest request) {
         requireField(request);
         return Objects.equals(record.getMetadataFieldId(), fieldId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "metadata field protection config does not belong to field: " + fieldId(request) + "." + id;
     }
 
-    private MetadataField requireField(HttpServletRequest request) {
+    private MetadataField requireField(@Context HttpServletRequest request) {
         MetadataField field = fieldService.select(fieldId(request));
         if (field == null || !Objects.equals(field.getMetadataId(), metadataId(request))) {
             throw new IllegalArgumentException("metadata field does not belong to metadata: "
@@ -57,11 +58,11 @@ public class MetadataFieldProtectionConfigWebController
         return field;
     }
 
-    private String metadataId(HttpServletRequest request) {
+    private String metadataId(@Context HttpServletRequest request) {
         return pathVariable(request, "metadataId");
     }
 
-    private String fieldId(HttpServletRequest request) {
+    private String fieldId(@Context HttpServletRequest request) {
         return pathVariable(request, "fieldId");
     }
 }
