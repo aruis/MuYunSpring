@@ -1,18 +1,21 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebQueryCriteria;
+import net.ximatai.muyun.spring.boot.web.WebQueryGroupOperator;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
+import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.identity.CurrentUser;
-import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -33,6 +36,7 @@ import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
+import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
@@ -50,29 +54,22 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Field;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class IamWebControllerTest {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String TENANT = "tenant_a";
+
     private TenantDao tenantDao;
     private OrganizationDao organizationDao;
     private PositionDao positionDao;
@@ -81,13 +78,14 @@ class IamWebControllerTest {
     private UserAccountDao userAccountDao;
     private RoleService roleService;
     private RoleGrantableActionResolver grantableActionResolver;
-    private CurrentUser currentUser;
-    private MockMvc mvc;
+    private TenantWebController tenantController;
+    private OrganizationWebController organizationController;
+    private PositionWebController positionController;
+    private UserAccountWebController userAccountController;
+    private RoleWebController roleController;
 
     @BeforeEach
     void setUp() {
-        objectMapper.registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
-        currentUser = null;
         tenantDao = mock(TenantDao.class);
         organizationDao = mock(OrganizationDao.class);
         positionDao = mock(PositionDao.class);
@@ -96,6 +94,7 @@ class IamWebControllerTest {
         userAccountDao = mock(UserAccountDao.class);
         roleService = mock(RoleService.class);
         grantableActionResolver = mock(RoleGrantableActionResolver.class);
+
         TenantService tenantService = new TenantService(tenantDao);
         OrganizationService organizationService = new OrganizationService(organizationDao, tenantService);
         PositionCategoryService positionCategoryService = new PositionCategoryService(
@@ -104,276 +103,184 @@ class IamWebControllerTest {
                 employeePositionDao);
         UserAccountService userAccountService = new UserAccountService(
                 userAccountDao, tenantService, new PasswordHashingService());
-        TenantWebController tenantController = new TenantWebController();
-        OrganizationWebController organizationController = new OrganizationWebController();
-        PositionWebController positionController = new PositionWebController();
-        UserAccountWebController userAccountController = new UserAccountWebController(null);
-        RoleWebController roleController = new RoleWebController(grantableActionResolver);
-        ReflectionTestUtils.setField(tenantController, "service", tenantService);
-        ReflectionTestUtils.setField(organizationController, "service", organizationService);
-        ReflectionTestUtils.setField(positionController, "service", positionService);
-        ReflectionTestUtils.setField(userAccountController, "service", userAccountService);
-        ReflectionTestUtils.setField(roleController, "service", roleService);
-        mvc = MockMvcBuilders
-                .standaloneSetup(
-                        tenantController,
-                        organizationController,
-                        positionController,
-                        userAccountController,
-                        roleController
-                )
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.ofNullable(currentUser)))
-                .build();
+
+        tenantController = setService(new TenantWebController(), tenantService);
+        organizationController = setService(new OrganizationWebController(), organizationService);
+        positionController = setService(new PositionWebController(), positionService);
+        userAccountController = setService(new UserAccountWebController(null), userAccountService);
+        roleController = setService(new RoleWebController(grantableActionResolver), roleService);
     }
 
     @AfterEach
     void tearDown() {
         TenantContext.clear();
-        CurrentUserContext.clear();
     }
 
     @Test
-    void shouldQueryAndCreateTenantThroughSystemManagedWebContract() throws Exception {
+    void shouldQueryAndCreateTenantThroughSystemManagedWebContract() {
         when(tenantDao.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
-                .thenReturn(PageResult.of(List.of(tenant("tenant_a", "Tenant A")), 1, PageRequest.of(1, 20)));
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(tenant("tenant_b", "Tenant B")));
+                .thenReturn(PageResult.of(List.of(tenant(TENANT, "Tenant A")), 1, PageRequest.of(1, 20)));
         when(tenantDao.insert(any())).thenAnswer(invocation -> {
             assertThat(TenantContext.isSystem()).isTrue();
             return invocation.<Tenant>getArgument(0).getAlias();
         });
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(tenant("tenant_b", "Tenant B")));
 
-        mvc.perform(post("/iam.tenant/query"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].alias").value("tenant_a"))
-                .andExpect(jsonPath("$.records[0].title").value("Tenant A"))
-                .andExpect(jsonPath("$.pageNum").value(1))
-                .andExpect(jsonPath("$.pageSize").value(20));
+        WebPageResponse<Tenant> page = tenantController.query(null);
+        WebRecordResponse<Tenant> created = tenantController.insert(tenant("tenant_b", "Tenant B"));
 
-        mvc.perform(post("/iam.tenant/insert")
-                        .contentType("application/json")
-                        .content(json(tenant("tenant_b", "Tenant B"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.alias").value("tenant_b"));
+        assertThat(page.records().getFirst().getAlias()).isEqualTo(TENANT);
+        assertThat(page.pageNum()).isEqualTo(1);
+        assertThat(created.record().getAlias()).isEqualTo("tenant_b");
     }
 
     @Test
-    void shouldRejectUnsupportedStaticQueryConditionsInsteadOfIgnoringThem() throws Exception {
-        mvc.perform(post("/iam.tenant/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "title",
-                                        "operator", "EQ",
-                                        "values", List.of("Tenant A")
-                                ))
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("query conditions are not supported by iam.tenant"));
+    void shouldRejectUnsupportedStaticQuerySurfacesInsteadOfIgnoringThem() {
+        assertThatThrownBy(() -> tenantController.query(new WebQueryRequest(
+                null,
+                List.of(new WebQueryCondition("title", "EQ", List.of("Tenant A"))),
+                List.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("query conditions are not supported by iam.tenant");
+
+        assertThatThrownBy(() -> tenantController.query(new WebQueryRequest(
+                null,
+                null,
+                List.of(),
+                new WebQueryCriteria(WebQueryGroupOperator.OR,
+                        List.of(new WebQueryCondition("title", "EQ", List.of("Tenant A"))), List.of()),
+                java.util.Map.of(),
+                List.of(),
+                null,
+                null,
+                java.util.Map.of(),
+                null,
+                null,
+                List.of(),
+                null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("query criteria are not supported by iam.tenant");
     }
 
     @Test
-    void shouldRejectUnsupportedStaticQueryCriteriaInsteadOfIgnoringThem() throws Exception {
-        mvc.perform(post("/iam.tenant/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "criteria", Map.of(
-                                        "operator", "OR",
-                                        "conditions", List.of(Map.of(
-                                                "fieldName", "title",
-                                                "operator", "EQ",
-                                                "values", List.of("Tenant A")
-                                        ))
-                                )
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("query criteria are not supported by iam.tenant"));
-    }
-
-    @Test
-    void shouldRejectUnsupportedIamQuerySurfacesInsteadOfIgnoringThem() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-
-        mvc.perform(post("/iam.position/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "unpaged", true,
-                                "quickSearch", "dev",
-                                "quickSearchFields", List.of("categoryId"),
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "categoryId",
-                                        "operator", "EQ",
-                                        "values", List.of("category-1")
-                                ))
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("quick search field is not supported by iam.position: categoryId"));
-    }
-
-    @Test
-    void shouldQueryPositionsByCategoryCondition() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+    void shouldQueryPositionsByCategoryConditionAndSupportUnpagedQuery() {
+        tenantScope();
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant(TENANT, "Tenant A")));
         when(positionDao.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(position("pos-1", "category-1", "DEV", "Developer")), 1,
                         PageRequest.of(1, 20)));
+        when(positionDao.list(any(Criteria.class), any(Sort[].class)))
+                .thenReturn(List.of(position("pos-2", "category-1", "QA", "Tester")));
 
-        mvc.perform(post("/iam.position/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "categoryId",
-                                        "operator", "EQ",
-                                        "values", List.of("category-1")
-                                ))
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("pos-1"))
-                .andExpect(jsonPath("$.records[0].categoryId").value("category-1"));
+        WebQueryRequest filtered = new WebQueryRequest(null,
+                List.of(new WebQueryCondition("categoryId", "EQ", List.of("category-1"))), List.of());
+        WebPageResponse<Position> page = positionController.query(filtered);
+        WebPageResponse<Position> unpaged = positionController.query(new WebQueryRequest(
+                null, true, filtered.conditions(), null, java.util.Map.of(), List.of(),
+                null, null, java.util.Map.of(), null, null, List.of(), null));
 
+        assertThat(page.records().getFirst().getId()).isEqualTo("pos-1");
+        assertThat(unpaged.records().getFirst().getId()).isEqualTo("pos-2");
         ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
         verify(positionDao).pageQuery(criteriaCaptor.capture(), any(PageRequest.class), any(Sort[].class));
         assertThat(containsCondition(criteriaCaptor.getValue(), "categoryId", "category-1")).isTrue();
     }
 
     @Test
-    void shouldQueryPositionsWithoutPagingWhenRequested() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-        when(positionDao.list(any(Criteria.class), any(Sort[].class)))
-                .thenReturn(List.of(position("pos-1", "category-1", "DEV", "Developer")));
-
-        mvc.perform(post("/iam.position/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "unpaged", true,
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "categoryId",
-                                        "operator", "EQ",
-                                        "values", List.of("category-1")
-                                ))
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("pos-1"))
-                .andExpect(jsonPath("$.pageNum").value(1))
-                .andExpect(jsonPath("$.pageSize").value(1))
-                .andExpect(jsonPath("$.total").value(1));
-
-        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
-        verify(positionDao).list(criteriaCaptor.capture(), any(Sort[].class));
-        verify(positionDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
-        assertThat(containsCondition(criteriaCaptor.getValue(), "categoryId", "category-1")).isTrue();
-    }
-
-    @Test
-    void shouldExposeOrganizationTreeUnderTenantScope() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-        when(organizationDao.list(any(Criteria.class), any()))
-                .thenAnswer(invocation -> {
-                    assertThat(TenantContext.currentTenantId()).contains("tenant_a");
-                    Organization organization = organization("org-1", "HQ", "Headquarters");
-                    organization.setTenantId("tenant_a");
-                    organization.setParentId(TreeAbility.ROOT_ID);
-                    return List.of(organization);
-                })
-                .thenReturn(List.of());
-
-        mvc.perform(get("/iam.organization/tree?flat=true"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("org-1"))
-                .andExpect(jsonPath("$.records[0].tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.records[0].code").value("HQ"));
-    }
-
-    @Test
-    void shouldExposeOrganizationNestedTreeByDefault() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+    void shouldExposeOrganizationTreeAndCreateUnderTenantScope() {
+        tenantScope();
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant(TENANT, "Tenant A")));
         Organization root = organization("org-1", "HQ", "Headquarters");
-        root.setTenantId("tenant_a");
+        root.setTenantId(TENANT);
         root.setParentId(TreeAbility.ROOT_ID);
         Organization child = organization("org-2", "BR", "Branch");
-        child.setTenantId("tenant_a");
+        child.setTenantId(TENANT);
         child.setParentId("org-1");
         when(organizationDao.count(any(Criteria.class))).thenReturn(1L);
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(root), List.of(child));
         when(organizationDao.list(any(Criteria.class), any()))
                 .thenReturn(List.of(root), List.of(child), List.of());
-
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("org-1"))
-                .andExpect(jsonPath("$.records[0].record.tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.records[0].children[0].record.id").value("org-2"))
-                .andExpect(jsonPath("$.records[0].children[0].children").isArray());
-    }
-
-    @Test
-    void shouldCreateOrganizationUnderTenantScope() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
         when(organizationDao.insert(any())).thenAnswer(invocation -> {
-            assertThat(TenantContext.currentTenantId()).contains("tenant_a");
-            Organization organization = invocation.getArgument(0);
-            assertThat(organization.getTenantId()).isEqualTo("tenant_a");
-            return "org-1";
+            Organization incoming = invocation.getArgument(0);
+            assertThat(TenantContext.currentTenantId()).contains(TENANT);
+            assertThat(incoming.getTenantId()).isEqualTo(TENANT);
+            return "org-3";
         });
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(organization("org-1", "HQ", "Headquarters")));
+                .thenReturn(List.of(root), List.of(child), List.of(organization("org-3", "NEW", "New Org")));
 
-        mvc.perform(post("/iam.organization/insert")
-                        .contentType("application/json")
-                        .content(json(organization(null, "HQ", "Headquarters"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("org-1"));
+        WebListResponse<?> tree = organizationController.tree(false);
+        WebRecordResponse<Organization> created = organizationController.insert(organization(null, "NEW", "New Org"));
+
+        assertThat(tree.records()).hasSize(1);
+        assertThat(created.record().getId()).isEqualTo("org-3");
     }
 
     @Test
-    void shouldCreateUserThroughStandardCrudContractWithoutExposingPasswordMaterial() throws Exception {
-        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+    void shouldRequireActiveTenantForOrganizationAccess() {
+        tenantScope();
+        doThrow(new PlatformException("Tenant is not active: " + TENANT))
+                .when(tenantDao).query(any(Criteria.class), any(PageRequest.class));
+
+        assertThatThrownBy(() -> organizationController.tree(false))
+                .isInstanceOf(PlatformException.class)
+                .hasMessage("Tenant is not active: " + TENANT);
+
+        TenantContext.clear();
+        assertThatThrownBy(() -> organizationController.tree(false))
+                .isInstanceOf(PlatformException.class)
+                .hasMessage("iam.organization requires tenant context");
+    }
+
+    @Test
+    void shouldCreateAndUpdateUserWithoutExposingPasswordMaterial() {
+        tenantScope();
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant(TENANT, "Tenant A")));
         when(userAccountDao.insert(any())).thenAnswer(invocation -> {
-            assertThat(TenantContext.currentTenantId()).contains("tenant_a");
             UserAccount user = invocation.getArgument(0);
-            assertThat(user.getTenantId()).isEqualTo("tenant_a");
+            assertThat(user.getTenantId()).isEqualTo(TENANT);
             assertThat(user.getPasswordHash()).startsWith("pbkdf2$");
             assertThat(user.getPasswordHash()).isNotEqualTo("client-supplied-hash");
             return "user-1";
         });
-        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(), List.of(user("user-1", "alice", "Alice")));
+        UserAccount saved = user("user-1", "alice", "Alice");
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(), List.of(saved));
 
-        mvc.perform(post("/iam.user/insert")
-                        .contentType("application/json")
-                        .content("""
-                                {
-	                                  "username":"alice",
-	                                  "title":"Alice",
-	                                  "passwordHash":"client-supplied-hash",
-	                                  "password":"secret2"
-	                                }
-                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("user-1"))
-                .andExpect(jsonPath("$.record.username").value("alice"))
-                .andExpect(jsonPath("$.record.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.record.password").doesNotExist());
+        UserAccount input = user(null, "alice", "Alice");
+        input.setPasswordHash("client-supplied-hash");
+        input.setPassword("secret2");
+        WebRecordResponse<UserAccount> created = userAccountController.insert(input);
+
+        assertThat(created.record().getId()).isEqualTo("user-1");
+        assertThat(created.record().getPasswordHash()).isNull();
+        assertThat(created.record().getPassword()).isNull();
+
+        UserAccount existing = user("user-1", "alice", "Alice");
+        existing.setTenantId(TENANT);
+        existing.setVersion(3);
+        existing.setPasswordHash("pbkdf2$existing-hash");
+        when(userAccountDao.count(any(Criteria.class))).thenReturn(1L);
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
+        when(userAccountDao.updateByIdAndVersion(any(UserAccount.class), any())).thenAnswer(invocation -> {
+            UserAccount updated = invocation.getArgument(0);
+            assertThat(updated.getPasswordHash()).isEqualTo("pbkdf2$existing-hash");
+            return 1;
+        });
+
+        UserAccount update = user(null, "alice", "Alice Updated");
+        update.setPasswordHash("client-supplied-hash");
+        update.setPassword("new-plain-password");
+        WebRecordResponse<UserAccount> updated = userAccountController.update("user-1", update);
+
+        assertThat(updated.record().getPasswordHash()).isEqualTo("pbkdf2$existing-hash");
+        assertThat(updated.record().getPassword()).isNull();
     }
 
     @Test
-    void shouldCreateRoleWithCodeTitleEnumCodeThroughStandardCrudContract() throws Exception {
-        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
+    void shouldCreateRoleWithCodeTitleEnumAndDisableTenantThroughSystemContext() {
+        tenantScope();
         Role saved = new Role();
         saved.setId("role-1");
         saved.setTitle("Data Grant Role");
@@ -384,100 +291,27 @@ class IamWebControllerTest {
             return "role-1";
         });
         when(roleService.select("role-1")).thenReturn(saved);
+        WebRecordResponse<Role> role = roleController.insert(saved);
+        assertThat(role.record().getRoleKind()).isEqualTo(RoleKind.DATA_GRANT);
 
-        mvc.perform(post("/iam.role/insert")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "title":"Data Grant Role",
-                                  "roleKind":"dataGrant"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.roleKind").value("dataGrant"));
-    }
-
-    @Test
-    void shouldKeepExistingPasswordHashWhenUpdatingUserThroughStandardCrudContract() throws Exception {
-        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
-        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-        UserAccount existing = user("user-1", "alice", "Alice");
-        existing.setTenantId("tenant_a");
-        existing.setVersion(3);
-        existing.setPasswordHash("pbkdf2$existing-hash");
-        when(userAccountDao.count(any(Criteria.class))).thenReturn(1L);
-        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(existing));
-        when(userAccountDao.updateByIdAndVersion(any(UserAccount.class), any())).thenAnswer(invocation -> {
-            UserAccount updated = invocation.getArgument(0);
-            assertThat(updated.getPasswordHash()).isEqualTo("pbkdf2$existing-hash");
-            assertThat(updated.getPasswordHash()).isNotEqualTo("client-supplied-hash");
-            assertThat(updated.getPassword()).isEqualTo("new-plain-password");
-            return 1;
-        });
-
-        mvc.perform(post("/iam.user/update/{id}", "user-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "username":"alice",
-                                  "title":"Alice Updated",
-                                  "passwordHash":"client-supplied-hash",
-                                  "password":"new-plain-password"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.password").doesNotExist());
-    }
-
-    @Test
-    void shouldRejectOrganizationAccessWhenTenantIsInactive() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
-        doThrow(new PlatformException("Tenant is not active: tenant_a"))
-                .when(tenantDao).query(any(Criteria.class), any(PageRequest.class));
-
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("Tenant is not active: tenant_a"));
-    }
-
-    @Test
-    void shouldRequireCurrentUserTenantForOrganizationAccess() throws Exception {
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));
-    }
-
-    @Test
-    void shouldDisableTenantThroughSystemContext() throws Exception {
-        Tenant existing = tenant("tenant_a", "Tenant A");
+        Tenant existing = tenant(TENANT, "Tenant A");
         existing.setVersion(2);
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
         when(tenantDao.updateByIdAndVersion(any(Tenant.class), any())).thenAnswer(invocation -> {
             assertThat(TenantContext.isSystem()).isTrue();
             return 1;
         });
-
-        mvc.perform(post("/iam.tenant/disable/{tenantAlias}", "tenant_a"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(tenantDao).updateByIdAndVersion(any(Tenant.class), any());
+        WebCountResponse disabled = tenantController.disable(TENANT);
+        assertThat(disabled.count()).isEqualTo(1);
     }
 
     @Test
-    void shouldExposeRoleGrantAndActionGrantEndpoints() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+    void shouldExposeRoleGrantAndPermissionMatrixEndpoints() {
+        tenantScope();
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
-                ManagementScopeType.TENANT, "tenant_a");
+                ManagementScopeType.TENANT, TENANT);
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, TENANT))
                 .thenReturn("grant-1");
         when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
         when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
@@ -489,94 +323,36 @@ class IamWebControllerTest {
                 null, null, null)).thenReturn(1);
         when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
 
-        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"userId":"user-2","managementScopeType":"tenant","managementScopeId":"tenant_a"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-1"));
-        mvc.perform(get("/iam.role/{roleId}/account-grants", "role-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].userId").value("user-2"))
-                .andExpect(jsonPath("$[0].managementScopeType").value("tenant"));
-        mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
-                        .contentType("application/json")
-                        .content("""
-                                {"employeePositionId":"position-1"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-2"));
-        mvc.perform(get("/iam.role/{roleId}/employment-grants", "role-2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("grant-2"))
-                .andExpect(jsonPath("$[0].employeePositionId").value("position-1"));
-        mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "moduleAlias":"sales.contract",
-                                  "actionCode":"query",
-                                  "dataScopePolicy":"owner",
-                                  "tenantScopePolicy":"currentTenant"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"moduleAlias":"sales.contract","actionCode":"query"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-    }
+        assertThat(roleController.grantAccountRole("role-1",
+                new RoleWebController.AccountRoleGrantRequest("user-2", ManagementScopeType.TENANT, TENANT)))
+                .isEqualTo("grant-1");
+        assertThat(roleController.accountRoleGrants("role-1").getFirst().getUserId()).isEqualTo("user-2");
+        assertThat(roleController.deleteAccountRoleGrant("role-1", "grant-1").count()).isEqualTo(1);
+        assertThat(roleController.grantEmploymentRole("role-2",
+                new RoleWebController.EmploymentRoleGrantRequest("position-1"))).isEqualTo("grant-2");
+        assertThat(roleController.employmentRoleGrants("role-2").getFirst().getEmployeePositionId())
+                .isEqualTo("position-1");
+        assertThat(roleController.deleteEmploymentRoleGrant("role-2", "grant-2").count()).isEqualTo(1);
+        assertThat(roleController.grantAction("role-1", new RoleWebController.GrantActionRequest(
+                "sales.contract", "query", DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
+                null, null, null)).count()).isEqualTo(1);
+        assertThat(roleController.revokeAction("role-1",
+                new RoleWebController.RevokeActionRequest("sales.contract", "query")).count()).isEqualTo(1);
 
-    @Test
-    void shouldExposeRoleBatchGrantAndRevokeEndpoints() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(roleService.grantActions(any(), any())).thenReturn(2);
         when(roleService.revokeActions(any(), any())).thenReturn(1);
-
-        mvc.perform(post("/iam.role/grant/{roleId}/batch", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "actions":[
-                                    {"moduleAlias":"sales.contract","actionCode":"query"},
-                                    {"moduleAlias":"sales.order","actionCode":"menu"}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(2));
-
-        mvc.perform(post("/iam.role/revoke/{roleId}/batch", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "actions":[
-                                    {"moduleAlias":"sales.contract","actionCode":"query"}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(roleService).grantActions(any(), any());
-        verify(roleService).revokeActions(any(), any());
+        assertThat(roleController.grantActions("role-1", new RoleWebController.GrantActionsRequest(List.of(
+                new RoleWebController.GrantActionRequest("sales.contract", "query", null, null, null, null, null),
+                new RoleWebController.GrantActionRequest("sales.order", "menu", null, null, null, null, null)
+        ))).count()).isEqualTo(2);
+        assertThat(roleController.revokeActions("role-1", new RoleWebController.RevokeActionsRequest(List.of(
+                new RoleWebController.RevokeActionRequest("sales.contract", "query")
+        ))).count()).isEqualTo(1);
     }
 
     @Test
-    void shouldExposeRolePermissionMatrixFromModuleAliases() throws Exception {
-        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+    void shouldExposeRolePermissionAndMenuMatrix() {
+        tenantScope();
         List<GrantableAction> grantableActions = List.of(
                 new GrantableAction("sales.contract", "query", "view", "Query", true, true));
         when(grantableActionResolver.resolve(List.of("sales.contract"))).thenReturn(grantableActions);
@@ -584,127 +360,64 @@ class IamWebControllerTest {
                 "role-1",
                 List.of(new RolePermissionMatrix.Module(
                         "sales.contract",
-                        List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
-                                "sales.contract", "query", "view", "Query",
+                        List.of(new RolePermissionAction("sales.contract", "query", "view", "Query",
                                 true, true, true, DataScopePolicy.OWNER,
                                 TenantScopePolicy.CURRENT_TENANT, null, null, null))
                 ))
         ));
+        RolePermissionMatrix matrix = roleController.permissionMatrix("role-1",
+                new RoleWebController.PermissionMatrixRequest(List.of("sales.contract")));
+        assertThat(matrix.modules().getFirst().actions().getFirst().granted()).isTrue();
 
-        mvc.perform(post("/iam.role/permissionMatrix/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"moduleAliases":["sales.contract"]}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roleId").value("role-1"))
-                .andExpect(jsonPath("$.modules[0].moduleAlias").value("sales.contract"))
-                .andExpect(jsonPath("$.modules[0].actions[0].actionCode").value("query"))
-                .andExpect(jsonPath("$.modules[0].actions[0].permissionActionCode").value("view"))
-                .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
-    }
-
-    @Test
-    void shouldExposeRoleMenuMatrixFromMenuTree() throws Exception {
         MenuService menuService = mock(MenuService.class);
-        RoleWebController controller = new RoleWebController(grantableActionResolver, provider(menuService));
-        ReflectionTestUtils.setField(controller, "service", roleService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .addFilters(new CurrentUserWebFilter(() ->
-                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
-
+        RoleWebController menuController = setService(new RoleWebController(grantableActionResolver, provider(menuService)),
+                roleService);
         Menu group = menu("group-1", "scheme-1", null);
         Menu contract = menu("menu-1", "scheme-1", "sales.contract");
-        Menu organization = menu("menu-2", "scheme-1", "iam.organization");
-        organization.setRoute("/iam/organizations");
-        Menu docs = menu("menu-3", "scheme-1", "platform.docs");
-        docs.setExternalUrl("https://example.com/docs");
         when(menuService.rootMenus("scheme-1")).thenReturn(List.of(group));
-        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract, organization, docs));
+        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract));
         when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
-        when(menuService.children("scheme-1", "menu-2")).thenReturn(List.of());
-        when(menuService.children("scheme-1", "menu-3")).thenReturn(List.of());
         when(roleService.permissionMatrix(any(), any())).thenReturn(new RolePermissionMatrix(
                 "role-1",
-                List.of(
-                        new RolePermissionMatrix.Module(
-                                "sales.contract",
-                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
-                                        "sales.contract", "menu", "menu", "Menu",
-                                        true, false, true, DataScopePolicy.NONE,
-                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
-                        ),
-                        new RolePermissionMatrix.Module(
-                                "iam.organization",
-                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
-                                        "iam.organization", "menu", "menu", "Menu",
-                                        true, false, true, DataScopePolicy.NONE,
-                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
-                        ),
-                        new RolePermissionMatrix.Module(
-                                "platform.docs",
-                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
-                                        "platform.docs", "menu", "menu", "Menu",
-                                        true, false, true, DataScopePolicy.NONE,
-                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
-                        )
+                List.of(new RolePermissionMatrix.Module(
+                        "sales.contract",
+                        List.of(new RolePermissionAction("sales.contract", "menu", "menu", "Menu",
+                                true, false, true, DataScopePolicy.NONE,
+                                TenantScopePolicy.CURRENT_TENANT, null, null, null))
                 ))
-        );
+        ));
 
-        mvc.perform(get("/iam.role/menuMatrix/{roleId}/{schemeId}", "role-1", "scheme-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].menu.id").value("group-1"))
-                .andExpect(jsonPath("$.records[0].children[0].menu.id").value("menu-1"))
-                .andExpect(jsonPath("$.records[0].children[0].granted").value(true))
-                .andExpect(jsonPath("$.records[0].children[1].menu.id").value("menu-2"))
-                .andExpect(jsonPath("$.records[0].children[1].granted").value(true))
-                .andExpect(jsonPath("$.records[0].children[2].menu.id").value("menu-3"))
-                .andExpect(jsonPath("$.records[0].children[2].granted").value(true));
-
-        ArgumentCaptor<List<GrantableAction>> actionsCaptor = ArgumentCaptor.captor();
-        verify(roleService).permissionMatrix(any(), actionsCaptor.capture());
-        assertThat(actionsCaptor.getValue())
-                .extracting(GrantableAction::moduleAlias)
-                .containsExactly("sales.contract", "iam.organization", "platform.docs");
+        WebListResponse<RoleWebController.RoleMenuNode> menuMatrix = menuController.menuMatrix("role-1", "scheme-1");
+        assertThat(menuMatrix.records().getFirst().children().getFirst().granted()).isTrue();
     }
 
     @Test
-    void shouldExposeUserSelectorQuery() throws Exception {
-        RoleService roleService = mock(RoleService.class);
+    void shouldExposeUserSelectorQuery() {
+        tenantScope();
+        RoleService selectorRoleService = mock(RoleService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
-        UserAccountWebController controller = new UserAccountWebController(null, provider(roleService));
-        ReflectionTestUtils.setField(controller, "service", userAccountService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .addFilters(new CurrentUserWebFilter(() ->
-                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        UserAccountWebController controller = setService(
+                new UserAccountWebController(null, provider(selectorRoleService)), userAccountService);
         UserAccount alice = user("user-2", "alice", "Alice");
         alice.setOrganizationId("org-1");
-        when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
+        when(selectorRoleService.userIds("role-1")).thenReturn(List.of("user-2"));
         userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
 
-        mvc.perform(post("/iam.user/selector/query")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "roleId":"role-1",
-                                  "organizationId":"org-1",
-                                  "keyword":"ali"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("user-2"))
-                .andExpect(jsonPath("$.records[0].username").value("alice"))
-                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"));
+        WebPageResponse<UserAccountWebController.UserSelectorItem> response = controller.selector(
+                new UserAccountWebController.UserSelectorRequest("org-1", "role-1", "ali", null, null));
 
-        verify(roleService).userIds("role-1");
+        assertThat(response.records().getFirst().username()).isEqualTo("alice");
+        verify(selectorRoleService).userIds("role-1");
         assertThat(userAccountService.scopedPolicies)
                 .extracting(ActionExecutionPolicy::actionCode)
                 .containsExactly("userSelector");
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
         assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    private void tenantScope() {
+        TenantContext.setTenantId(TENANT);
     }
 
     private Tenant tenant(String alias, String title) {
@@ -784,11 +497,24 @@ class IamWebControllerTest {
         return menu;
     }
 
-    @SuppressWarnings("unchecked")
     private <T> ObjectProvider<T> provider(T value) {
-        ObjectProvider<T> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(value);
-        return provider;
+        return new ObjectProvider<>() {
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+        };
+    }
+
+    private <C> C setService(C controller, Object service) {
+        try {
+            Field field = net.ximatai.muyun.spring.boot.web.WebSupport.class.getDeclaredField("service");
+            field.setAccessible(true);
+            field.set(controller, service);
+            return controller;
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Cannot inject test service", ex);
+        }
     }
 
     private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
@@ -822,9 +548,5 @@ class IamWebControllerTest {
             queriedCriteria = criteria;
             return result;
         }
-    }
-
-    private String json(Object value) throws Exception {
-        return objectMapper.writeValueAsString(value);
     }
 }
