@@ -1,13 +1,17 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.PropertyAccessorFactory;
 
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class RecordReadProjectionProjector {
     private RecordReadProjectionProjector() {
@@ -20,11 +24,12 @@ public final class RecordReadProjectionProjector {
         if (projection == null) {
             throw new IllegalArgumentException("record read projection must not be null");
         }
-        BeanWrapper wrapper = PropertyAccessorFactory.forBeanPropertyAccess(record);
+        Map<String, PropertyDescriptor> properties = properties(record.getClass());
         LinkedHashMap<String, Object> output = new LinkedHashMap<>();
         for (String fieldName : responseFields(projection)) {
-            if (wrapper.isReadableProperty(fieldName)) {
-                output.put(fieldName, wrapper.getPropertyValue(fieldName));
+            PropertyDescriptor property = properties.get(fieldName);
+            if (property != null && property.getReadMethod() != null) {
+                output.put(fieldName, read(record, property));
             }
         }
         return Collections.unmodifiableMap(output);
@@ -45,5 +50,22 @@ public final class RecordReadProjectionProjector {
                         projection.outputFields().stream().map(ViewFieldRef::fieldName))
                 .distinct()
                 .toList();
+    }
+
+    private static Map<String, PropertyDescriptor> properties(Class<?> recordClass) {
+        try {
+            return java.util.Arrays.stream(Introspector.getBeanInfo(recordClass).getPropertyDescriptors())
+                    .collect(Collectors.toMap(PropertyDescriptor::getName, Function.identity(), (left, right) -> left));
+        } catch (IntrospectionException ex) {
+            throw new IllegalArgumentException("record properties cannot be read: " + recordClass.getName(), ex);
+        }
+    }
+
+    private static Object read(Object record, PropertyDescriptor property) {
+        try {
+            return property.getReadMethod().invoke(record);
+        } catch (IllegalAccessException | InvocationTargetException ex) {
+            throw new IllegalArgumentException("record property cannot be read: " + property.getName(), ex);
+        }
     }
 }

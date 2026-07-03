@@ -36,9 +36,9 @@ import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import jakarta.inject.Inject;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-@Service
+@ApplicationScoped
 public class PlatformModuleRuntimeContextService {
     static final String DECISION_AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED";
     static final String DECISION_ACCESS_DENIED = "ACCESS_DENIED";
@@ -60,7 +60,7 @@ public class PlatformModuleRuntimeContextService {
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformPageBootstrapService pageBootstrapService;
 
-    @Autowired
+    @Inject
     public PlatformModuleRuntimeContextService(PlatformModuleService moduleService,
                                                PlatformModuleActionService actionService,
                                                StaticModuleDefinitionCatalog staticModuleCatalog,

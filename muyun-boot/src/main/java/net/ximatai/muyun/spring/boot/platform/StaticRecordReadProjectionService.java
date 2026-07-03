@@ -2,13 +2,13 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
-import org.springframework.stereotype.Component;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@Component
+@ApplicationScoped
 public class StaticRecordReadProjectionService {
     private final StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
 
