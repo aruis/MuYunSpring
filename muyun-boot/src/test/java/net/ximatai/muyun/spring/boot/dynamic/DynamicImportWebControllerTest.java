@@ -1,17 +1,20 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
-import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.MultivaluedMap;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.exchange.importer.BuildDynamicImportPlanCommand;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportCommand;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportErrorFileService;
@@ -23,29 +26,27 @@ import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportResult;
 import net.ximatai.muyun.spring.platform.exchange.importer.GroupedWorkbook;
 import net.ximatai.muyun.spring.platform.exchange.importer.ImportDuplicateStrategy;
 import net.ximatai.muyun.spring.platform.exchange.importer.ImportErrorRow;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class DynamicImportWebControllerTest {
     private static final String MODULE = "sales.order";
@@ -54,22 +55,23 @@ class DynamicImportWebControllerTest {
     private DynamicRecordService recordService;
     private DynamicImportFacade importFacade;
     private DynamicImportErrorFileService errorFileService;
-    private ActiveTenantVerifier activeTenantVerifier;
-    private MockMvc mvc;
+    private TenantService activeTenantVerifier;
+    private DynamicImportWebController controller;
 
     @BeforeEach
     void setUp() {
+        TenantContext.setTenantId("tenant_a");
         recordService = mock(DynamicRecordService.class);
         importFacade = mock(DynamicImportFacade.class);
         errorFileService = new DynamicImportErrorFileService();
-        activeTenantVerifier = mock(ActiveTenantVerifier.class);
-        mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicImportWebController(
-                        recordService, importFacade, errorFileService, activeTenantVerifier))
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        activeTenantVerifier = mock(TenantService.class);
+        controller = new DynamicImportWebController(
+                recordService, importFacade, errorFileService, activeTenantVerifier, objectMapper);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
@@ -90,14 +92,12 @@ class DynamicImportWebControllerTest {
                 ))
         ));
 
-        mvc.perform(multipart("/{moduleAlias}/import/parse", MODULE)
-                        .file(new MockMultipartFile("file", "order.xlsx",
-                                DynamicImportWebController.XLSX_CONTENT_TYPE, new byte[]{1, 2, 3})))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleAlias").value(MODULE))
-                .andExpect(jsonPath("$.mainEntityAlias").value("order"))
-                .andExpect(jsonPath("$.mainSheetName").value("Order"))
-                .andExpect(jsonPath("$.sheets[0].fields[0].matchKeyCandidate").value(true));
+        DynamicImportParseResult response = controller.parse(MODULE, upload(new byte[]{1, 2, 3}));
+
+        assertThat(response.moduleAlias()).isEqualTo(MODULE);
+        assertThat(response.mainEntityAlias()).isEqualTo("order");
+        assertThat(response.mainSheetName()).isEqualTo("Order");
+        assertThat(response.sheets().getFirst().fields().getFirst().matchKeyCandidate()).isTrue();
 
         verify(recordService).describe(MODULE);
         verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
@@ -107,10 +107,9 @@ class DynamicImportWebControllerTest {
     void shouldRejectParseWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
-        mvc.perform(multipart("/{moduleAlias}/import/parse", MODULE)
-                        .file(new MockMultipartFile("file", "order.xlsx",
-                                DynamicImportWebController.XLSX_CONTENT_TYPE, new byte[]{1, 2, 3})))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.parse(MODULE, upload(new byte[]{1, 2, 3})))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic entity does not support capability");
     }
 
     @Test
@@ -119,9 +118,7 @@ class DynamicImportWebControllerTest {
         when(recordService.describe(MODULE)).thenReturn(descriptor);
         when(importFacade.importWorkbook(any(DynamicImportCommand.class))).thenReturn(importResultWithErrors());
 
-        MockMultipartFile command = new MockMultipartFile("command", "command.json",
-                MediaType.APPLICATION_JSON_VALUE,
-                objectMapper.writeValueAsBytes(Map.of(
+        String command = objectMapper.writeValueAsString(Map.of(
                         "mainSheet", Map.of(
                                 "matchFieldName", "orderNo",
                                 "duplicateStrategy", "OVERWRITE"
@@ -131,20 +128,17 @@ class DynamicImportWebControllerTest {
                                 "matchFieldName", "sku",
                                 "duplicateStrategy", "SKIP"
                         ))
-                )));
+                ));
 
-        mvc.perform(multipart("/{moduleAlias}/import/execute", MODULE)
-                        .file(command)
-                        .file(new MockMultipartFile("file", "order.xlsx",
-                                DynamicImportWebController.XLSX_CONTENT_TYPE, new byte[]{4, 5, 6})))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.created").value(1))
-                .andExpect(jsonPath("$.updated").value(2))
-                .andExpect(jsonPath("$.skipped").value(3))
-                .andExpect(jsonPath("$.errorCount").value(1))
-                .andExpect(jsonPath("$.partialSuccess").value(true))
-                .andExpect(jsonPath("$.errorFileName").value("sales_order-import-errors.xlsx"))
-                .andExpect(jsonPath("$.errorFileToken").isNotEmpty());
+        DynamicImportUploadResult response = controller.execute(MODULE, command, upload(new byte[]{4, 5, 6}));
+
+        assertThat(response.created()).isEqualTo(1);
+        assertThat(response.updated()).isEqualTo(2);
+        assertThat(response.skipped()).isEqualTo(3);
+        assertThat(response.errorCount()).isEqualTo(1);
+        assertThat(response.partialSuccess()).isTrue();
+        assertThat(response.errorFileName()).isEqualTo("sales_order-import-errors.xlsx");
+        assertThat(response.errorFileToken()).isNotBlank();
 
         ArgumentCaptor<DynamicImportCommand> captor = ArgumentCaptor.forClass(DynamicImportCommand.class);
         verify(importFacade).importWorkbook(captor.capture());
@@ -163,22 +157,17 @@ class DynamicImportWebControllerTest {
         when(recordService.describe(MODULE)).thenReturn(descriptor);
         when(importFacade.importWorkbook(any(DynamicImportCommand.class))).thenReturn(importResultWithOnlySkippedAndErrors());
 
-        MockMultipartFile command = new MockMultipartFile("command", "command.json",
-                MediaType.APPLICATION_JSON_VALUE,
-                objectMapper.writeValueAsBytes(Map.of(
+        String command = objectMapper.writeValueAsString(Map.of(
                         "mainSheet", Map.of("matchFieldName", "orderNo")
-                )));
+                ));
 
-        mvc.perform(multipart("/{moduleAlias}/import/execute", MODULE)
-                        .file(command)
-                        .file(new MockMultipartFile("file", "order.xlsx",
-                                DynamicImportWebController.XLSX_CONTENT_TYPE, new byte[]{4, 5, 6})))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.created").value(0))
-                .andExpect(jsonPath("$.updated").value(0))
-                .andExpect(jsonPath("$.skipped").value(2))
-                .andExpect(jsonPath("$.errorCount").value(1))
-                .andExpect(jsonPath("$.partialSuccess").value(false));
+        DynamicImportUploadResult response = controller.execute(MODULE, command, upload(new byte[]{4, 5, 6}));
+
+        assertThat(response.created()).isZero();
+        assertThat(response.updated()).isZero();
+        assertThat(response.skipped()).isEqualTo(2);
+        assertThat(response.errorCount()).isEqualTo(1);
+        assertThat(response.partialSuccess()).isFalse();
     }
 
     @Test
@@ -186,13 +175,14 @@ class DynamicImportWebControllerTest {
         String token = errorFileService.save(MODULE, "tenant_a", "errors.xlsx", new byte[]{9, 8, 7});
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .post("/{moduleAlias}/import/error-file/{token}", MODULE, token))
-                .andExpect(status().isOk())
-                .andExpect(header().string("X-Import-FileName", "errors.xlsx"))
-                .andExpect(header().string("Access-Control-Expose-Headers",
-                        "Content-Disposition,X-Import-FileName"))
-                .andExpect(content().bytes(new byte[]{9, 8, 7}));
+        CapturingResponse response = new CapturingResponse();
+
+        controller.downloadErrorFile(MODULE, token, response.response());
+
+        assertThat(response.header("X-Import-FileName")).isEqualTo("errors.xlsx");
+        assertThat(response.header("Access-Control-Expose-Headers"))
+                .isEqualTo("Content-Disposition,X-Import-FileName");
+        assertThat(response.bytes()).containsExactly(9, 8, 7);
     }
 
     @Test
@@ -200,9 +190,11 @@ class DynamicImportWebControllerTest {
         String token = errorFileService.save("crm.customer", "tenant_a", "errors.xlsx", new byte[]{9, 8, 7});
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .post("/{moduleAlias}/import/error-file/{token}", MODULE, token))
-                .andExpect(status().isBadRequest());
+        CapturingResponse response = new CapturingResponse();
+
+        assertThatThrownBy(() -> controller.downloadErrorFile(MODULE, token, response.response()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic import error file token not found");
     }
 
     private DynamicModuleDescriptor descriptor() {
@@ -271,5 +263,84 @@ class DynamicImportWebControllerTest {
         );
         return new DynamicImportResult(plan, new GroupedWorkbook(new LinkedHashMap<>(), List.of()),
                 execution, new byte[]{7, 8, 9});
+    }
+
+    private FileUpload upload(byte[] bytes) throws IOException {
+        Path path = Files.createTempFile("dynamic-import-", ".xlsx");
+        Files.write(path, bytes);
+        return new TestFileUpload(path, bytes.length);
+    }
+
+    private record TestFileUpload(Path uploadedFile, long size) implements FileUpload {
+        @Override
+        public String name() {
+            return "file";
+        }
+
+        @Override
+        public Path filePath() {
+            return uploadedFile;
+        }
+
+        @Override
+        public String fileName() {
+            return "order.xlsx";
+        }
+
+        @Override
+        public String contentType() {
+            return DynamicImportWebController.XLSX_CONTENT_TYPE;
+        }
+
+        @Override
+        public String charSet() {
+            return null;
+        }
+
+        @Override
+        public MultivaluedMap<String, String> getHeaders() {
+            return new MultivaluedHashMap<>();
+        }
+    }
+
+    private static class CapturingResponse {
+        private final HttpServletResponse response = mock(HttpServletResponse.class);
+        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
+        private final Map<String, String> headers = new LinkedHashMap<>();
+
+        CapturingResponse() throws IOException {
+            ServletOutputStream output = new ServletOutputStream() {
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setWriteListener(WriteListener writeListener) {
+                }
+
+                @Override
+                public void write(int b) {
+                    body.write(b);
+                }
+            };
+            when(response.getOutputStream()).thenReturn(output);
+            org.mockito.Mockito.doAnswer(invocation -> {
+                headers.put(invocation.getArgument(0), invocation.getArgument(1));
+                return null;
+            }).when(response).setHeader(anyString(), anyString());
+        }
+
+        HttpServletResponse response() {
+            return response;
+        }
+
+        String header(String name) {
+            return headers.get(name);
+        }
+
+        byte[] bytes() {
+            return body.toByteArray();
+        }
     }
 }

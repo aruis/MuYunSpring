@@ -1,15 +1,21 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.exchange.importer.BuildDynamicImportPlanCommand;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportCommand;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportErrorFileService;
@@ -18,73 +24,72 @@ import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportFacade;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportParseResult;
 import net.ximatai.muyun.spring.platform.exchange.importer.DynamicImportResult;
 import net.ximatai.muyun.spring.platform.exchange.importer.ImportDuplicateStrategy;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.function.Supplier;
 
-@RestController
-@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/import")
+@ApplicationScoped
+@Path("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/import")
 public class DynamicImportWebController {
     static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final DynamicRecordService recordService;
     private final DynamicImportFacade importFacade;
     private final DynamicImportErrorFileService errorFileService;
-    private final ActiveTenantVerifier activeTenantVerifier;
+    private final TenantService activeTenantVerifier;
+    private final ObjectMapper objectMapper;
 
     public DynamicImportWebController(DynamicRecordService recordService,
                                       DynamicImportFacade importFacade,
                                       DynamicImportErrorFileService errorFileService,
-                                      ActiveTenantVerifier activeTenantVerifier) {
+                                      TenantService activeTenantVerifier,
+                                      ObjectMapper objectMapper) {
         this.recordService = recordService;
         this.importFacade = importFacade;
         this.errorFileService = errorFileService;
         this.activeTenantVerifier = activeTenantVerifier;
+        this.objectMapper = objectMapper;
     }
 
-    @PostMapping("/parse")
+    @POST
+    @Path("/parse")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public DynamicImportParseResult parse(@PathVariable String moduleAlias,
-                                          @RequestParam("file") MultipartFile file) {
+    public DynamicImportParseResult parse(@PathParam("moduleAlias") String moduleAlias,
+                                          @RestForm("file") FileUpload file) {
         return tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = exchangeDescriptor(moduleAlias);
             return importFacade.parse(descriptor, bytes(file));
         });
     }
 
-    @PostMapping("/execute")
+    @POST
+    @Path("/execute")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public DynamicImportUploadResult execute(@PathVariable String moduleAlias,
-                                             @RequestPart("command") DynamicImportExecuteRequest request,
-                                             @RequestPart("file") MultipartFile file) {
+    public DynamicImportUploadResult execute(@PathParam("moduleAlias") String moduleAlias,
+                                             @RestForm("command") String request,
+                                             @RestForm("file") FileUpload file) {
         return tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = exchangeDescriptor(moduleAlias);
             DynamicImportResult result = importFacade.importWorkbook(new DynamicImportCommand(
                     descriptor,
                     bytes(file),
-                    buildCommand(moduleAlias, request)
+                    buildCommand(moduleAlias, importRequest(request))
             ));
             return uploadResult(moduleAlias, result);
         });
     }
 
-    @PostMapping("/error-file/{token}")
+    @POST
+    @Path("/error-file/{token}")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public void downloadErrorFile(@PathVariable String moduleAlias,
-                                  @PathVariable String token,
-                                  HttpServletResponse response) {
+    public void downloadErrorFile(@PathParam("moduleAlias") String moduleAlias,
+                                  @PathParam("token") String token,
+                                  @Context HttpServletResponse response) {
         tenantScope(moduleAlias, () -> {
             exchangeDescriptor(moduleAlias);
             DynamicImportErrorFileService.ErrorFilePayload payload =
@@ -129,6 +134,17 @@ public class DynamicImportWebController {
         );
     }
 
+    private DynamicImportExecuteRequest importRequest(String request) {
+        if (request == null || request.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(request, DynamicImportExecuteRequest.class);
+        } catch (IOException ex) {
+            throw new PlatformException("dynamic import command parse failed", ex);
+        }
+    }
+
     private ImportDuplicateStrategy duplicateStrategy(ImportDuplicateStrategy strategy) {
         return strategy == null ? ImportDuplicateStrategy.ERROR : strategy;
     }
@@ -162,12 +178,12 @@ public class DynamicImportWebController {
                 .orElseThrow(() -> new PlatformException(moduleAlias + " requires tenant context"));
     }
 
-    private byte[] bytes(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
+    private byte[] bytes(FileUpload file) {
+        if (file == null || file.uploadedFile() == null) {
             throw new PlatformException("dynamic import file must not be empty");
         }
         try {
-            return file.getBytes();
+            return Files.readAllBytes(file.uploadedFile());
         } catch (IOException ex) {
             throw new PlatformException("dynamic import file read failed", ex);
         }
@@ -178,7 +194,7 @@ public class DynamicImportWebController {
         return "attachment; filename=\"" + fileName.replace("\"", "_") + "\"; filename*=UTF-8''" + encoded;
     }
 
-    private static void writeXlsx(HttpServletResponse response, String fileName, byte[] bytes) {
+    private static void writeXlsx(@Context HttpServletResponse response, String fileName, byte[] bytes) {
         try {
             response.setContentType(XLSX_CONTENT_TYPE);
             response.setHeader("Content-Disposition", contentDisposition(fileName));
