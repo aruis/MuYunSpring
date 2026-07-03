@@ -20,29 +20,29 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理", route = "/iam/departments")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "部门管理", order = 30)
-@RequestMapping("/iam.department")
+@Path("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,
         EnableWeb<Department, DepartmentService>,
         StaticModuleUiContributor {
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
-    @Autowired(required = false)
+    @Inject
     void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
         this.staticRecordReadProjectionService = staticRecordReadProjectionService;
     }
@@ -71,10 +71,11 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
                 .build();
     }
 
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+    public WebCountResponse sort(@PathParam("id") String id,
+                                 TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             service().moveInDepartmentTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
@@ -82,10 +83,11 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
         });
     }
 
-    @GetMapping("/tree")
+    @GET
+    @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@RequestParam String organizationId,
-                                   @RequestParam(defaultValue = "false") boolean flat) {
+    public WebListResponse<?> tree(@QueryParam("organizationId") String organizationId,
+                                   @DefaultValue("false") @QueryParam("flat") boolean flat) {
         return webScope(() -> {
             List<Department> roots = service().departmentChildrenForAction(
                     PlatformAction.TREE, organizationId, TreeAbility.ROOT_ID);
@@ -101,11 +103,12 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
         });
     }
 
-    @GetMapping("/tree/{id}")
+    @GET
+    @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@PathVariable String id,
-                                   @RequestParam(defaultValue = "false") boolean flat,
-                                   @RequestParam(defaultValue = "true") boolean includeSelf) {
+    public WebListResponse<?> tree(@PathParam("id") String id,
+                                   @DefaultValue("false") @QueryParam("flat") boolean flat,
+                                   @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
         return webScope(() -> {
             Department root = service().selectForAction(PlatformAction.TREE, id);
             if (root == null) {
