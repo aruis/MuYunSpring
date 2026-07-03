@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.DefaultTenantMenuProvisioner;
+import net.ximatai.muyun.spring.boot.platform.DefaultOrganizationRoleProvisioner;
+import net.ximatai.muyun.spring.boot.platform.DefaultTenantRoleProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
@@ -142,9 +144,26 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean({RoleService.class, BuiltInRolePermissionTemplateService.class})
+    @ConditionalOnMissingBean(DefaultTenantRoleProvisioner.class)
+    public DefaultTenantRoleProvisioner defaultTenantRoleProvisioner(
+            RoleService roleService,
+            BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
+        return new DefaultTenantRoleProvisioner(roleService, rolePermissionTemplateService);
+    }
+
+    @Bean
+    @ConditionalOnBean({RoleService.class, BuiltInRolePermissionTemplateService.class})
+    @ConditionalOnMissingBean(DefaultOrganizationRoleProvisioner.class)
+    public DefaultOrganizationRoleProvisioner defaultOrganizationRoleProvisioner(
+            RoleService roleService,
+            BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
+        return new DefaultOrganizationRoleProvisioner(roleService, rolePermissionTemplateService);
+    }
+
+    @Bean
     @ConditionalOnBean({TenantService.class, OrganizationService.class, DepartmentService.class, EmployeeService.class,
-            UserAccountService.class, EmployeeAccountService.class, RoleService.class,
-            BuiltInRolePermissionTemplateService.class})
+            UserAccountService.class, EmployeeAccountService.class, DefaultTenantRoleProvisioner.class})
     @ConditionalOnMissingBean(DemoBootstrapTask.class)
     public DemoBootstrapTask demoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
                                                TenantService tenantService,
@@ -153,10 +172,9 @@ public class MuYunSpringIdentityConfiguration {
                                                EmployeeService employeeService,
                                                UserAccountService userAccountService,
                                                EmployeeAccountService employeeAccountService,
-                                               RoleService roleService,
-                                               BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
+                                               DefaultTenantRoleProvisioner tenantRoleProvisioner) {
         return new DemoBootstrapTask(properties, tenantService, organizationService, departmentService, employeeService,
-                userAccountService, employeeAccountService, roleService, rolePermissionTemplateService);
+                userAccountService, employeeAccountService, tenantRoleProvisioner);
     }
 
     @Bean

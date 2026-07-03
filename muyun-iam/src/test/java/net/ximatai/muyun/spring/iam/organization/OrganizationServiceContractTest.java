@@ -2,17 +2,22 @@ package net.ximatai.muyun.spring.iam.organization;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.OrganizationCreationProvisioner;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -97,6 +102,29 @@ class OrganizationServiceContractTest {
 
         assertThat(service.organizationIdsFromSelfToRoot("dept-1"))
                 .containsExactly("dept-1", "group-1");
+    }
+
+    @Test
+    void shouldRunOrganizationCreationProvisionersAndAllowReplay() {
+        OrganizationDao dao = mock(OrganizationDao.class);
+        when(dao.insert(any())).thenReturn("org-1");
+        Organization saved = organization("HQ", "Headquarters");
+        saved.setId("org-1");
+        saved.setTenantId("tenant_a");
+        when(dao.query(any(), any())).thenReturn(List.of(saved));
+        OrganizationCreationProvisioner provisioner = mock(OrganizationCreationProvisioner.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<OrganizationCreationProvisioner> provisioners = mock(ObjectProvider.class);
+        when(provisioners.orderedStream()).thenAnswer(invocation -> Stream.of(provisioner));
+        OrganizationService service = new OrganizationService(dao, activeTenantVerifier(), Optional.empty(),
+                provisioners);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.insert(organization("HQ", "Headquarters"));
+            service.provisionOrganization("org-1");
+        }
+
+        verify(provisioner, times(2)).afterOrganizationCreated("tenant_a", "org-1");
     }
 
     private Organization organization(String code, String title) {
