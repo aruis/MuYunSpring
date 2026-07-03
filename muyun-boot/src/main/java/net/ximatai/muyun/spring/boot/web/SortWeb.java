@@ -6,19 +6,20 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extends ScopedWeb<S> {
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    default WebCountResponse sort(@PathVariable String id,
-                                  @RequestBody(required = false) SortWebRequest request) {
+    default WebCountResponse sort(@PathParam("id") String id,
+                                  SortWebRequest request) {
         return webScope(() -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {

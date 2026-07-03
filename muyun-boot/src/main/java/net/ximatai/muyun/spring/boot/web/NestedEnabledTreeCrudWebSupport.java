@@ -10,17 +10,19 @@ import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
 
 public abstract class NestedEnabledTreeCrudWebSupport<
         T extends EntityContract & EnabledCapable & TreeCapable,
         S extends CrudAbility<T> & EnableAbility<T> & TreeAbility<T>>
         extends NestedCrudWebSupport<T, S> {
-    @PostMapping("/enable/{id}")
+    @POST
+    @Path("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public WebCountResponse enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse enable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             int count = service().enable(id);
@@ -28,9 +30,10 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         });
     }
 
-    @PostMapping("/disable/{id}")
+    @POST
+    @Path("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public WebCountResponse disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse disable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             int count = service().disable(id);
@@ -38,11 +41,12 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         });
     }
 
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(HttpServletRequest servletRequest,
-                                 @PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+    public WebCountResponse sort(@Context HttpServletRequest servletRequest,
+                                 @PathParam("id") String id,
+                                 TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             requireSortInput(normalized);
@@ -61,17 +65,17 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         });
     }
 
-    protected Criteria treeScopeCriteria(HttpServletRequest request) {
+    protected Criteria treeScopeCriteria(@Context HttpServletRequest request) {
         return Criteria.of();
     }
 
-    private void requireScopedNeighbor(HttpServletRequest request, String id) {
+    private void requireScopedNeighbor(@Context HttpServletRequest request, String id) {
         if (id != null && !id.isBlank()) {
             requireScopedRecord(request, id);
         }
     }
 
-    private void requireScopedParent(HttpServletRequest request, String parentId) {
+    private void requireScopedParent(@Context HttpServletRequest request, String parentId) {
         if (parentId != null && !parentId.isBlank() && !TreeAbility.ROOT_ID.equals(parentId)) {
             requireScopedRecord(request, parentId);
         }

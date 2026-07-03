@@ -9,14 +9,16 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
 
 public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends EnableAbility<T>>
         extends ScopedWeb<S>, RecordLabelWeb<T> {
-    @PostMapping("/enable/{id}")
+    @POST
+    @Path("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    default WebCountResponse enable(@PathVariable String id) {
+    default WebCountResponse enable(@PathParam("id") String id) {
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.ENABLE, id);
             int count = service().enable(id);
@@ -24,9 +26,10 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
         });
     }
 
-    @PostMapping("/disable/{id}")
+    @POST
+    @Path("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    default WebCountResponse disable(@PathVariable String id) {
+    default WebCountResponse disable(@PathParam("id") String id) {
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.DISABLE, id);
             int count = service().disable(id);

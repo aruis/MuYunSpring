@@ -8,11 +8,12 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.DefaultValue;
 
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -21,10 +22,11 @@ import java.util.List;
 import java.util.Set;
 
 public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeAbility<T>> extends ScopedWeb<S> {
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    default WebCountResponse sort(@PathVariable String id,
-                                  @RequestBody(required = false) TreeSortWebRequest request) {
+    default WebCountResponse sort(@PathParam("id") String id,
+                                  TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             requireSortInput(normalized);
@@ -34,9 +36,10 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
         });
     }
 
-    @GetMapping("/tree")
+    @GET
+    @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    default WebListResponse<?> tree(@RequestParam(defaultValue = "false") boolean flat) {
+    default WebListResponse<?> tree(@DefaultValue("false") @QueryParam("flat") boolean flat) {
         return webScope(() -> {
             List<T> roots = treeChildren(TreeAbility.ROOT_ID);
             if (flat) {
@@ -51,11 +54,12 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
         });
     }
 
-    @GetMapping("/tree/{id}")
+    @GET
+    @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    default WebListResponse<?> tree(@PathVariable String id,
-                                    @RequestParam(defaultValue = "false") boolean flat,
-                                    @RequestParam(defaultValue = "true") boolean includeSelf) {
+    default WebListResponse<?> tree(@PathParam("id") String id,
+                                    @DefaultValue("false") @QueryParam("flat") boolean flat,
+                                    @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
         return webScope(() -> {
             T root = treeSelect(id);
             if (root == null) {

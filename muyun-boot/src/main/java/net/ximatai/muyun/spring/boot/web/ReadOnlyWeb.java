@@ -11,10 +11,10 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
 
 public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
     default Criteria queryCriteria(WebQueryRequest request) {
@@ -42,9 +42,10 @@ public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>>
         return new Sort[0];
     }
 
-    @PostMapping("/query")
+    @POST
+    @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
+    default WebPageResponse<T> query(WebQueryRequest request) {
         return webScope(() -> {
             WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
             PageResult<T> result = service().pageQuery(
@@ -55,9 +56,10 @@ public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>>
         });
     }
 
-    @GetMapping("/view/{id}")
+    @GET
+    @Path("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
-    default T view(@PathVariable String id) {
+    default T view(@PathParam("id") String id) {
         return webScope(() -> WebOutputSupport.record(
                 service(), service().select(id), FieldOutputContext.VIEW));
     }

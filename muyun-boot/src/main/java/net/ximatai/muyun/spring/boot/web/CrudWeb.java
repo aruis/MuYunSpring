@@ -23,15 +23,14 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import org.springframework.http.HttpStatus;
-import org.springframework.core.ResolvableType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.List;
 
 public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
@@ -109,9 +108,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return new Sort[0];
     }
 
-    @GetMapping("/query/schema")
+    @GET
+    @Path("/query/schema")
     @ActionEndpoint(PlatformAction.QUERY)
-    default QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
+    default QuerySchema querySchema(@QueryParam("uiConfigId") String uiConfigId) {
         return webScope(() -> {
             if (service() instanceof QueryAbility<?> queryAbility) {
                 return queryAbility.querySchema();
@@ -120,9 +120,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         });
     }
 
-    @GetMapping("/form/schema")
+    @GET
+    @Path("/form/schema")
     @ActionEndpoint(PlatformAction.VIEW)
-    default FormSchema formSchema(@RequestParam(required = false) String uiConfigId) {
+    default FormSchema formSchema(@QueryParam("uiConfigId") String uiConfigId) {
         return webScope(() -> {
             if (this instanceof StaticModuleUiContributor contributor) {
                 if (isCurrentModuleUiDefinition(contributor)) {
@@ -150,12 +151,49 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         if (modelClass != null) {
             return modelClass;
         }
-        return ResolvableType.forClass(CrudWeb.class, getClass()).resolveGeneric(0);
+        return resolveCrudWebModelClass(getClass());
     }
 
-    @PostMapping("/query")
+    private Class<?> resolveCrudWebModelClass(Type type) {
+        if (type instanceof ParameterizedType parameterizedType) {
+            Type rawType = parameterizedType.getRawType();
+            if (rawType instanceof Class<?> rawClass && CrudWeb.class.equals(rawClass)) {
+                return classOf(parameterizedType.getActualTypeArguments()[0]);
+            }
+            if (rawType instanceof Class<?> rawClass) {
+                return resolveCrudWebModelClass(rawClass);
+            }
+        }
+        if (type instanceof Class<?> typeClass) {
+            for (Type candidate : typeClass.getGenericInterfaces()) {
+                Class<?> resolved = resolveCrudWebModelClass(candidate);
+                if (!Object.class.equals(resolved)) {
+                    return resolved;
+                }
+            }
+            Type superclass = typeClass.getGenericSuperclass();
+            if (superclass != null) {
+                return resolveCrudWebModelClass(superclass);
+            }
+        }
+        return Object.class;
+    }
+
+    private Class<?> classOf(Type type) {
+        if (type instanceof Class<?> typeClass) {
+            return typeClass;
+        }
+        if (type instanceof ParameterizedType parameterizedType
+                && parameterizedType.getRawType() instanceof Class<?> rawClass) {
+            return rawClass;
+        }
+        return Object.class;
+    }
+
+    @POST
+    @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
+    default WebPageResponse<T> query(WebQueryRequest request) {
         return webScope(() -> {
             WebPageResponse<T> response;
             if (request != null && request.unpagedEnabled()) {
@@ -176,17 +214,18 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return projectionService.projectDefaultList(contributor.moduleUiDefinition().moduleAlias(), response, service());
     }
 
-    @GetMapping("/view/{id}")
+    @GET
+    @Path("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
-    default T view(@PathVariable String id) {
+    default T view(@PathParam("id") String id) {
         return webScope(() -> WebOutputSupport.record(service(),
                 selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW));
     }
 
-    @PostMapping("/insert")
+    @POST
+    @Path("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
-    @ResponseStatus(HttpStatus.CREATED)
-    default WebRecordResponse<T> insert(@RequestBody T record) {
+    default WebRecordResponse<T> insert(T record) {
         return webScope(() -> {
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
@@ -194,9 +233,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         });
     }
 
-    @PostMapping("/update/{id}")
+    @POST
+    @Path("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    default WebRecordResponse<T> update(@PathVariable String id, @RequestBody T record) {
+    default WebRecordResponse<T> update(@PathParam("id") String id, T record) {
         record.setId(id);
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
@@ -206,9 +246,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         });
     }
 
-    @PostMapping("/delete/{id}")
+    @POST
+    @Path("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    default WebCountResponse delete(@PathVariable String id) {
+    default WebCountResponse delete(@PathParam("id") String id) {
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
             T record = service().select(id);
