@@ -16,11 +16,11 @@
 
 ## Web Endpoint Semantics
 
-### Nested scope path variables use a transitional request attribute
+### Nested scope path variables use a transitional scope facade
 
-- 现状：`NestedCrudWebSupport` 的路径变量读取已从 Spring `HandlerMapping` 改为平台自有 request attribute；真实 Quarkus HTTP 请求如何填充该 attribute 尚未收口，`ModuleScopedRuleTreeWebSupport` 等其他路径 scope 仍待迁移。
-- 影响：轻量 contract test 可以验证 scope 行为，但真实 HTTP 路由下的嵌套 CRUD、模块范围规则树等能力仍可能无法正确解析 scope。
-- 回收方向：改为显式 `@PathParam` 传递，或提供 Quarkus 请求上下文适配器，并为嵌套路径补真实 HTTP 测试。
+- 现状：`NestedCrudWebSupport`、`ModuleScopedRuleTreeWebSupport` 和派生作用域 controller 已从 Spring `HandlerMapping`/servlet request attribute 迁到 `UriInfo` 生成的 `WebRequestScope`。
+- 影响：真实 Quarkus HTTP 路由已能通过 JAX-RS path parameters 解析 scope，但 `WebRequestScope` 仍是迁移期门面，长期 API 形态还未最终定型。
+- 回收方向：评估是否改为显式 `@PathParam` 传递，或将 `WebRequestScope` 固化为平台 Web scope API，并为关键嵌套路由补真实 HTTP contract 测试。
 
 ### Duplicate route handling uses temporary override removal
 
