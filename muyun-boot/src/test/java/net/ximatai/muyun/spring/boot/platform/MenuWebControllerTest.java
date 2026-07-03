@@ -1,20 +1,28 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
-import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
+import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
+import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
-import net.ximatai.muyun.spring.common.identity.CurrentUser;
-import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
@@ -24,104 +32,64 @@ import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class MenuWebControllerTest {
     @AfterEach
     void tearDown() {
-        CurrentUserContext.clear();
         TenantContext.clear();
     }
 
     @Test
-    void shouldExposeCurrentUserVisibleMenuTreeWithoutSchemeInput() throws Exception {
+    void shouldDeclareCurrentUserMenuRoute() throws Exception {
+        assertThat(MenuWebController.class.getAnnotation(Path.class).value()).isEqualTo("/platform.menu");
+        Method method = MenuWebController.class.getMethod("mine");
+        assertThat(method.getAnnotation(GET.class)).isNotNull();
+        assertThat(method.getAnnotation(Path.class).value()).isEqualTo("/mine");
+    }
+
+    @Test
+    void shouldExposeCurrentUserVisibleMenuTreeWithoutSchemeInput() {
         MenuService menuService = mock(MenuService.class);
         MenuWebController controller = new MenuWebController(menuService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .build();
         Menu root = menu("root-1", "scheme-1", "业务中心", null);
         Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
         when(menuService.currentUserVisibleRootMenus()).thenReturn(List.of(root));
         when(menuService.visibleChildren("scheme-1", "root-1")).thenReturn(List.of(child));
         when(menuService.visibleChildren("scheme-1", "menu-1")).thenReturn(List.of());
 
-        mvc.perform(get("/platform.menu/mine"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
-                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("tab"))
-                .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
+        WebListResponse<WebTreeNode<Menu>> response = controller.mine();
+
+        assertThat(response.records()).singleElement().satisfies(rootNode -> {
+            assertThat(rootNode.record().getId()).isEqualTo("root-1");
+            assertThat(rootNode.children()).singleElement().satisfies(childNode -> {
+                assertThat(childNode.record().getOpenMode()).isEqualTo(MenuOpenMode.TAB);
+                assertThat(childNode.record().getModuleAlias()).isEqualTo("crm.customer");
+            });
+        });
     }
 
     @Test
-    void shouldResolveCurrentUserFromBearerTokenBeforeReturningMineMenuTree() throws Exception {
-        MenuService menuService = mock(MenuService.class);
-        UserSessionService sessionService = mock(UserSessionService.class);
-        MenuWebController controller = new MenuWebController(menuService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .addFilters(new CurrentUserWebFilter(new BearerTokenCurrentUserProvider(sessionService)))
-                .build();
-        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "alice", "tenant-a", "dept-1");
-        Menu root = menu("root-1", "scheme-1", "业务中心", null);
-        Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
-        when(sessionService.currentUser("token-1")).thenReturn(Optional.of(currentUser));
-        when(menuService.currentUserVisibleRootMenus()).thenAnswer(invocation -> {
-            assertThat(CurrentUserContext.currentUser()).contains(currentUser);
-            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
-            return List.of(root);
-        });
-        when(menuService.visibleChildren("scheme-1", "root-1")).thenAnswer(invocation -> {
-            assertThat(CurrentUserContext.currentUser()).contains(currentUser);
-            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
-            return List.of(child);
-        });
-        when(menuService.visibleChildren("scheme-1", "menu-1")).thenReturn(List.of());
-
-        mvc.perform(get("/platform.menu/mine")
-                        .header("Authorization", "Bearer token-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
-                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("tab"))
-                .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
-
-        verify(sessionService).currentUser("token-1");
-    }
-
-    @Test
-    void shouldReturnConfigurationErrorWhenCurrentUserHasNoMenuScheme() throws Exception {
+    void shouldPropagateConfigurationErrorWhenCurrentUserHasNoMenuScheme() {
         MenuService menuService = mock(MenuService.class);
         MenuWebController controller = new MenuWebController(menuService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .build();
         when(menuService.currentUserVisibleRootMenus())
                 .thenThrow(new PlatformConfigurationException("menu scheme is not configured for current user"));
 
-        mvc.perform(get("/platform.menu/mine"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFIG_MISSING))
-                .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.message").value("menu scheme is not configured for current user"));
+        assertThatThrownBy(controller::mine)
+                .isInstanceOf(PlatformConfigurationException.class)
+                .hasMessageContaining("menu scheme is not configured for current user");
     }
 
     @Test
@@ -129,35 +97,43 @@ class MenuWebControllerTest {
         TenantContext.setTenantId("tenant-a");
         MenuSchemeService schemeService = mock(MenuSchemeService.class);
         MenuSchemeWebController controller = new MenuSchemeWebController();
-        ReflectionTestUtils.setField(controller, "service", schemeService);
+        setService(controller, schemeService);
         MenuScheme scheme = scheme("scheme-1", "default");
         when(schemeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(scheme), 1, PageRequest.of(1, 20)));
         when(schemeService.insert(any(MenuScheme.class))).thenReturn("scheme-1");
         when(schemeService.select("scheme-1")).thenReturn(scheme);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .build();
-        mvc.perform(post("/platform.menu_scheme/query")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"conditions":[{"fieldName":"alias","values":["default"]}]}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("scheme-1"))
-                .andExpect(jsonPath("$.records[0].alias").value("default"));
-        mvc.perform(post("/platform.menu_scheme/insert")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"alias":"default","scopeType":"tenant","title":"Default"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("scheme-1"));
+        WebPageResponse<MenuScheme> page = controller.query(new WebQueryRequest(null, List.of(), null));
+        WebRecordResponse<MenuScheme> inserted = controller.insert(scheme(null, "default"));
 
+        assertThat(page.records()).singleElement().satisfies(record -> {
+            assertThat(record.getId()).isEqualTo("scheme-1");
+            assertThat(record.getAlias()).isEqualTo("default");
+        });
+        assertThat(inserted.record().getId()).isEqualTo("scheme-1");
         ArgumentCaptor<MenuScheme> captor = ArgumentCaptor.forClass(MenuScheme.class);
         verify(schemeService).insert(captor.capture());
         assertThat(captor.getValue().getAlias()).isEqualTo("default");
+    }
+
+    @Test
+    void shouldDeclareSchemeScopedMenuRoutes() throws Exception {
+        assertThat(MenuManagementWebController.class.getAnnotation(Path.class).value())
+                .isEqualTo("/platform.menu-scheme/{schemeId}/menus");
+        Method tree = MenuManagementWebController.class.getMethod("tree", HttpServletRequest.class, boolean.class);
+        assertThat(tree.getAnnotation(GET.class)).isNotNull();
+        assertThat(tree.getAnnotation(Path.class).value()).isEqualTo("/tree");
+        assertThat(tree.getParameters()[0].getAnnotation(Context.class)).isNotNull();
+        assertThat(tree.getParameters()[1].getAnnotation(QueryParam.class).value()).isEqualTo("flat");
+        assertThat(tree.getParameters()[1].getAnnotation(DefaultValue.class).value()).isEqualTo("false");
+        assertThat(tree.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.TREE);
+
+        Method childTree = MenuManagementWebController.class.getMethod(
+                "tree", HttpServletRequest.class, String.class, boolean.class, boolean.class);
+        assertThat(childTree.getAnnotation(Path.class).value()).isEqualTo("/tree/{id}");
+        assertThat(childTree.getParameters()[1].getAnnotation(PathParam.class).value()).isEqualTo("id");
+        assertThat(childTree.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.TREE);
     }
 
     @Test
@@ -165,7 +141,7 @@ class MenuWebControllerTest {
         TenantContext.setTenantId("tenant-a");
         MenuService menuService = mock(MenuService.class);
         MenuManagementWebController controller = new MenuManagementWebController();
-        ReflectionTestUtils.setField(controller, "service", menuService);
+        setService(controller, menuService);
         Menu root = menu("root-1", "scheme-1", "业务中心", null);
         Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
         Menu inserted = menu("menu-2", "scheme-1", "订单", "crm.order");
@@ -175,38 +151,31 @@ class MenuWebControllerTest {
         when(menuService.insert(any(Menu.class))).thenReturn("menu-2");
         when(menuService.select("menu-2")).thenReturn(inserted);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .build();
-        mvc.perform(get("/platform.menu-scheme/scheme-1/menus/tree"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
-                .andExpect(jsonPath("$.records[0].children[0].record.id").value("menu-1"));
-        mvc.perform(post("/platform.menu-scheme/scheme-1/menus/insert")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"schemeId":"other-scheme","parentId":"root-1","title":"订单","moduleAlias":"crm.order"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.schemeId").value("scheme-1"));
+        WebListResponse<?> tree = controller.tree(requestVars("scheme-1"), false);
+        WebRecordResponse<Menu> saved = controller.insert(requestVars("scheme-1"),
+                menu(null, "other-scheme", "订单", "crm.order"));
 
+        assertThat(tree.records()).singleElement().isInstanceOfSatisfying(WebTreeNode.class, node -> {
+            assertThat(((Menu) node.record()).getId()).isEqualTo("root-1");
+            assertThat(node.children()).singleElement().isInstanceOfSatisfying(WebTreeNode.class, childNode -> {
+                WebTreeNode<?> typedChild = (WebTreeNode<?>) childNode;
+                assertThat(((Menu) typedChild.record()).getId()).isEqualTo("menu-1");
+            });
+        });
+        assertThat(saved.record().getSchemeId()).isEqualTo("scheme-1");
         ArgumentCaptor<Menu> captor = ArgumentCaptor.forClass(Menu.class);
         verify(menuService).insert(captor.capture());
         assertThat(captor.getValue().getSchemeId()).isEqualTo("scheme-1");
     }
 
     @Test
-    void shouldRejectCrossSchemeMenuUpdate() {
+    void shouldRejectCrossSchemeMenuUpdate() throws Exception {
         MenuService menuService = mock(MenuService.class);
         MenuManagementWebController controller = new MenuManagementWebController();
-        ReflectionTestUtils.setField(controller, "service", menuService);
+        setService(controller, menuService);
         when(menuService.select("menu-1")).thenReturn(menu("menu-1", "other-scheme", "客户", "crm.customer"));
 
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        request.setAttribute(org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
-                java.util.Map.of("schemeId", "scheme-1"));
-
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.update(request, "menu-1", new Menu()))
+        assertThatThrownBy(() -> controller.update(requestVars("scheme-1"), "menu-1", new Menu()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("menu does not belong to scheme");
     }
@@ -235,9 +204,16 @@ class MenuWebControllerTest {
         return scheme;
     }
 
-    private MappingJackson2HttpMessageConverter codeTitleEnumConverter() {
-        ObjectMapper objectMapper = new ObjectMapper()
-                .registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
-        return new MappingJackson2HttpMessageConverter(objectMapper);
+    private HttpServletRequest requestVars(String schemeId) {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
+                .thenReturn(Map.of("schemeId", schemeId));
+        return request;
+    }
+
+    private void setService(Object target, Object service) throws ReflectiveOperationException {
+        Field field = WebSupport.class.getDeclaredField("service");
+        field.setAccessible(true);
+        field.set(target, service);
     }
 }

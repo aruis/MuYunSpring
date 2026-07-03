@@ -1,17 +1,17 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("/platform.menu")
+@ApplicationScoped
+@Path("/platform.menu")
 public class MenuWebController {
     private final MenuService menuService;
 
@@ -19,7 +19,8 @@ public class MenuWebController {
         this.menuService = menuService;
     }
 
-    @GetMapping("/mine")
+    @GET
+    @Path("/mine")
     public WebListResponse<WebTreeNode<Menu>> mine() {
         return new WebListResponse<>(menuService.currentUserVisibleRootMenus().stream()
                 .map(this::node)
