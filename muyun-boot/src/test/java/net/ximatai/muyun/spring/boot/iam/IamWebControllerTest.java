@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -61,6 +63,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -278,7 +281,7 @@ class IamWebControllerTest {
     void shouldExposeOrganizationTreeUnderTenantScope() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
-        when(organizationDao.list(any(Criteria.class), any()))
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenAnswer(invocation -> {
                     assertThat(TenantContext.currentTenantId()).contains("tenant_a");
                     Organization organization = organization("org-1", "HQ", "Headquarters");
@@ -296,6 +299,38 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldExposeOrganizationTreeForRequestedTenantUnderSystemScope() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        Organization root = organization("org-1", "HQ", "Headquarters");
+        root.setTenantId("demo");
+        root.setParentId(TreeAbility.ROOT_ID);
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(List.of(root))
+                .thenReturn(List.of());
+
+        mvc.perform(get("/iam.organization/tree?tenantId=demo&flat=true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("org-1"))
+                .andExpect(jsonPath("$.records[0].tenantId").value("demo"));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(organizationDao, atLeastOnce())
+                .query(criteriaCaptor.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(criteriaCaptor.getAllValues())
+                .anySatisfy(criteria -> assertThat(compiledCriteria(criteria)).contains("\"tenantId\" ="));
+    }
+
+    @Test
+    void shouldRejectOrganizationTreeForDifferentTenantUnderTenantScope() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+
+        mvc.perform(get("/iam.organization/tree?tenantId=tenant_b"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("organization tree tenantId must match current tenant"));
+    }
+
+    @Test
     void shouldExposeOrganizationNestedTreeByDefault() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
@@ -305,11 +340,10 @@ class IamWebControllerTest {
         Organization child = organization("org-2", "BR", "Branch");
         child.setTenantId("tenant_a");
         child.setParentId("org-1");
-        when(organizationDao.count(any(Criteria.class))).thenReturn(1L);
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(root), List.of(child));
-        when(organizationDao.list(any(Criteria.class), any()))
-                .thenReturn(List.of(root), List.of(child), List.of());
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(List.of(root), List.of(root), List.of(child), List.of(child), List.of());
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
@@ -795,6 +829,12 @@ class IamWebControllerTest {
         return criteria.getClauses().stream()
                 .anyMatch(clause -> fieldName.equals(clause.getField())
                         && clause.getValues().contains(value));
+    }
+
+    private String compiledCriteria(Criteria criteria) {
+        return new CriteriaSqlCompiler()
+                .compile(criteria, field -> field, DBInfo.Type.POSTGRESQL)
+                .getSql();
     }
 
     private static final class RecordingUserAccountService extends UserAccountService {

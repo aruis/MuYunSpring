@@ -22,6 +22,8 @@ import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -172,7 +174,7 @@ public class StaticModuleDefinitionScanner {
         addStandardActions(actions, beanClass);
         addWorkflowActions(actions, capabilities);
         ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
-        return List.copyOf(actions.values());
+        return orderedActions(actions);
     }
 
     private void addActionContributions(LinkedHashMap<String, StaticModuleDefinition> definitions) {
@@ -306,7 +308,34 @@ public class StaticModuleDefinitionScanner {
         addContributionStandardActions(actions, beanClass, contribution);
         ReflectionUtils.doWithMethods(beanClass, method -> addContributionAnnotatedAction(actions, method,
                 contribution));
-        return List.copyOf(actions.values());
+        return orderedActions(actions);
+    }
+
+    private List<StaticModuleActionDefinition> orderedActions(
+            LinkedHashMap<String, StaticModuleActionDefinition> actions) {
+        ArrayList<StaticModuleActionDefinition> ordered = new ArrayList<>(actions.values());
+        ordered.sort(Comparator.comparingInt(action -> standardActionOrder(action.actionCode())));
+        return List.copyOf(ordered);
+    }
+
+    private int standardActionOrder(String actionCode) {
+        return switch (actionCode) {
+            case "menu" -> 10;
+            case "create" -> 20;
+            case "view" -> 30;
+            case "update" -> 40;
+            case "delete" -> 50;
+            case "batchDelete" -> 55;
+            case "query" -> 60;
+            case "tree" -> 70;
+            case "sort" -> 80;
+            case "reference" -> 90;
+            case "enable" -> 100;
+            case "disable" -> 110;
+            case "import" -> 120;
+            case "export" -> 130;
+            default -> 1000;
+        };
     }
 
     private void addMenuAction(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {

@@ -33,6 +33,7 @@ import net.ximatai.muyun.spring.common.security.SignedField;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.List;
 import java.util.Collection;
@@ -169,8 +170,9 @@ class DataScopeWebTest {
         DataScopedTreeController controller = new DataScopedTreeController(service);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            WebListResponse<?> tree = controller.tree(true);
-            WebListResponse<?> subtree = controller.tree("root-1", true, true);
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            WebListResponse<?> tree = controller.tree(request, true);
+            WebListResponse<?> subtree = controller.tree(request, "root-1", true, true);
 
             assertThat(tree.records()).hasSize(2);
             assertThat(subtree.records()).hasSize(2);
@@ -198,7 +200,7 @@ class DataScopeWebTest {
         DataScopedTreeController controller = new DataScopedTreeController(service);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            controller.sort("moving", new TreeSortWebRequest("previous", null, "parent"));
+            controller.sort(new MockHttpServletRequest(), "moving", new TreeSortWebRequest("previous", null, "parent"));
         }
 
         assertThat(service.scopedIdCalls).anySatisfy(ids ->

@@ -141,8 +141,10 @@ class IamWebControllerIT {
         organization.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(organizationService.childrenForAction(PlatformAction.TREE, TreeAbility.ROOT_ID)).thenReturn(List.of(organization));
-        when(organizationService.childrenForAction(PlatformAction.TREE, "org-1")).thenReturn(List.of());
+        when(organizationService.organizationChildrenForAction(PlatformAction.TREE, "tenant_a", TreeAbility.ROOT_ID))
+                .thenReturn(List.of(organization));
+        when(organizationService.organizationChildrenForAction(PlatformAction.TREE, "tenant_a", "org-1"))
+                .thenReturn(List.of());
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
@@ -163,7 +165,7 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        verify(organizationService).moveInTree("org-1", "org-0", null, TreeAbility.ROOT_ID);
+        verify(organizationService).moveInOrganizationTree("tenant_a", "org-1", "org-0", null, TreeAbility.ROOT_ID);
     }
 
     @Test

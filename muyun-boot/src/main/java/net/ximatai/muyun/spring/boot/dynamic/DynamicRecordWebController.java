@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.dynamic;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -1137,7 +1138,8 @@ public class DynamicRecordWebController implements
     @Override
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
+    public WebCountResponse sort(HttpServletRequest httpRequest,
+                                 @PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
