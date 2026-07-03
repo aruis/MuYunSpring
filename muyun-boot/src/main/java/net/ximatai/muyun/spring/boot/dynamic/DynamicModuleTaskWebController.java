@@ -7,45 +7,46 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckResult;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckService;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskDefinition;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
+@ApplicationScoped
+@Path("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
 public class DynamicModuleTaskWebController {
     private final PlatformModuleTaskCheckService taskCheckService;
     private final DynamicRecordService recordService;
-    private final ActiveTenantVerifier activeTenantVerifier;
+    private final TenantService activeTenantVerifier;
 
     public DynamicModuleTaskWebController(PlatformModuleTaskCheckService taskCheckService,
                                           DynamicRecordService recordService,
-                                          ActiveTenantVerifier activeTenantVerifier) {
+                                          TenantService activeTenantVerifier) {
         this.taskCheckService = taskCheckService;
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
     }
 
-    @PostMapping("/view/{id}/tasks/check")
+    @POST
+    @Path("/view/{id}/tasks/check")
     @ActionEndpoint(PlatformAction.VIEW)
-    public List<PlatformModuleTaskStatus> checkTasks(@PathVariable String id,
-                                                     @RequestBody(required = false) DynamicModuleTaskCheckRequest request) {
+    public List<PlatformModuleTaskStatus> checkTasks(@PathParam("id") String id,
+                                                     DynamicModuleTaskCheckRequest request) {
         return evaluateTasks(id, request).tasks();
     }
 
-    @GetMapping("/tasks/definitions")
+    @GET
+    @Path("/tasks/definitions")
     @ActionEndpoint(PlatformAction.VIEW)
     public List<PlatformModuleTaskDefinition> taskDefinitions() {
         String moduleAlias = DynamicWebRequest.moduleAlias();
@@ -53,10 +54,11 @@ public class DynamicModuleTaskWebController {
         return taskCheckService.definitions(moduleAlias);
     }
 
-    @PostMapping("/view/{id}/tasks/evaluate")
+    @POST
+    @Path("/view/{id}/tasks/evaluate")
     @ActionEndpoint(PlatformAction.VIEW)
-    public PlatformModuleTaskCheckResult evaluateTasks(@PathVariable String id,
-                                                       @RequestBody(required = false) DynamicModuleTaskCheckRequest request) {
+    public PlatformModuleTaskCheckResult evaluateTasks(@PathParam("id") String id,
+                                                       DynamicModuleTaskCheckRequest request) {
         String moduleAlias = DynamicWebRequest.moduleAlias();
         requireTenantContext(moduleAlias);
         requireDataScopeRecord(moduleAlias, id);

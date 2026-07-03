@@ -33,6 +33,5 @@ tasks.named<JavaCompile>("compileTestJava").configure {
         "**/DynamicExchangeTemplateWebControllerTest.java",
         "**/DynamicImportWebControllerTest.java",
         "**/DynamicExportWebControllerTest.java",
-        "**/DynamicModuleTaskWebControllerTest.java"
     )
 }
