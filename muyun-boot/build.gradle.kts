@@ -27,6 +27,5 @@ dependencies {
 tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
         "**/IamWebControllerTest.java",
-        "**/DynamicExportWebControllerTest.java",
     )
 }

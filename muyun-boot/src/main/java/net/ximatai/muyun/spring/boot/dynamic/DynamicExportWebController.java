@@ -1,22 +1,29 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
@@ -29,16 +36,6 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.LinkedHashSet;
@@ -47,25 +44,25 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-@RestController
-@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/export")
+@ApplicationScoped
+@Path("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/export")
 public class DynamicExportWebController {
     private final DynamicRecordService recordService;
-    private final ActiveTenantVerifier activeTenantVerifier;
+    private final TenantService activeTenantVerifier;
     private final DynamicExportFacade exportFacade;
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
 
     public DynamicExportWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       DynamicExportFacade exportFacade) {
         this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null, null, null);
     }
 
-    @Autowired
+    @Inject
     public DynamicExportWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       DynamicExportFacade exportFacade,
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
@@ -77,7 +74,7 @@ public class DynamicExportWebController {
     }
 
     public DynamicExportWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       DynamicExportFacade exportFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService) {
@@ -85,7 +82,7 @@ public class DynamicExportWebController {
     }
 
     public DynamicExportWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
+                                      TenantService activeTenantVerifier,
                                       DynamicExportFacade exportFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService,
@@ -98,11 +95,12 @@ public class DynamicExportWebController {
         this.moduleMetadataFieldService = moduleMetadataFieldService;
     }
 
-    @PostMapping("/data")
+    @POST
+    @Path("/data")
     @ActionEndpoint(PlatformAction.EXPORT)
-    public void exportData(@PathVariable String moduleAlias,
-                           @RequestBody(required = false) WebQueryRequest request,
-                           HttpServletResponse response) {
+    public void exportData(@PathParam("moduleAlias") String moduleAlias,
+                           WebQueryRequest request,
+                           @Context HttpServletResponse response) {
         tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
             requireExchangeCapability(descriptor);
@@ -112,11 +110,12 @@ public class DynamicExportWebController {
         });
     }
 
-    @PostMapping("/selected")
+    @POST
+    @Path("/selected")
     @ActionEndpoint(PlatformAction.EXPORT)
-    public void exportSelected(@PathVariable String moduleAlias,
-                               @RequestBody(required = false) DynamicSelectedExportRequest request,
-                               HttpServletResponse response) {
+    public void exportSelected(@PathParam("moduleAlias") String moduleAlias,
+                               DynamicSelectedExportRequest request,
+                               @Context HttpServletResponse response) {
         tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
             requireExchangeCapability(descriptor);
@@ -309,7 +308,7 @@ public class DynamicExportWebController {
         }
     }
 
-    private void writeXlsx(HttpServletResponse response, String fileName, byte[] bytes) {
+    private void writeXlsx(@Context HttpServletResponse response, String fileName, byte[] bytes) {
         try {
             response.setContentType(DynamicImportWebController.XLSX_CONTENT_TYPE);
             response.setHeader("Content-Disposition", DynamicImportWebController.contentDisposition(fileName));

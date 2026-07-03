@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
+import jakarta.servlet.http.HttpServletResponse;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -8,18 +11,16 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
-import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
-import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
@@ -35,50 +36,49 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.eq;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.anyString;
 
 class DynamicExportWebControllerTest {
     private static final String MODULE = "sales.order";
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private DynamicRecordService recordService;
-    private ActiveTenantVerifier activeTenantVerifier;
+    private TenantService activeTenantVerifier;
     private DynamicExportFacade exportFacade;
-    private MockMvc mvc;
+    private DynamicExportWebController controller;
 
     @BeforeEach
     void setUp() {
+        TenantContext.setTenantId("tenant_a");
         recordService = mock(DynamicRecordService.class);
-        activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        activeTenantVerifier = mock(TenantService.class);
         exportFacade = mock(DynamicExportFacade.class);
-        mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicExportWebController(
-                        recordService, activeTenantVerifier, exportFacade))
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        controller = new DynamicExportWebController(recordService, activeTenantVerifier, exportFacade);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
@@ -98,12 +98,12 @@ class DynamicExportWebControllerTest {
                 List.of(new WebQueryCondition("status", "EQ", List.of("active"))),
                 List.of(new WebSort("orderNo", true))
         );
-        mvc.perform(post("/{moduleAlias}/export/data", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(request)))
-                .andExpect(status().isOk())
-                .andExpect(header().string("X-Export-FileName", "sales_order-export.xlsx"))
-                .andExpect(content().bytes(new byte[]{7, 8, 9}));
+        CapturingResponse response = new CapturingResponse();
+
+        controller.exportData(MODULE, request, response.response());
+
+        assertThat(response.header("X-Export-FileName")).isEqualTo("sales_order-export.xlsx");
+        assertThat(response.bytes()).containsExactly(7, 8, 9);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -118,13 +118,8 @@ class DynamicExportWebControllerTest {
     void shouldReuseLowCodeQueryTemplateWhenExportingData() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
-        MockMvc exportMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicExportWebController(
-                        recordService, activeTenantVerifier, exportFacade, snapshotService, queryItemService))
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        DynamicExportWebController exportController = new DynamicExportWebController(
+                recordService, activeTenantVerifier, exportFacade, snapshotService, queryItemService);
         DynamicModuleDescriptor descriptor = descriptor();
         DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
         PlatformQueryTemplate template = new PlatformQueryTemplate();
@@ -143,18 +138,16 @@ class DynamicExportWebControllerTest {
         when(exportFacade.exportWorkbook(org.mockito.ArgumentMatchers.any(DynamicExportCommand.class)))
                 .thenReturn(new byte[]{1, 2, 3});
 
-        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(Map.of(
-                                "queryTemplateId", "tpl-active",
-                                "externalQueryValues", Map.of("owner", "user-1"),
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "ownerId",
-                                        "operator", "EQ",
-                                        "values", List.of("user-1")
-                                ))
-                        ))))
-                .andExpect(status().isOk());
+        WebQueryRequest request = objectMapper.readValue(objectMapper.writeValueAsBytes(Map.of(
+                "queryTemplateId", "tpl-active",
+                "externalQueryValues", Map.of("owner", "user-1"),
+                "conditions", List.of(Map.of(
+                        "fieldName", "ownerId",
+                        "operator", "EQ",
+                        "values", List.of("user-1")
+                ))
+        )), WebQueryRequest.class);
+        exportController.exportData(MODULE, request, new CapturingResponse().response());
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -178,21 +171,22 @@ class DynamicExportWebControllerTest {
         when(exportFacade.exportWorkbook(org.mockito.ArgumentMatchers.any(DynamicExportCommand.class)))
                 .thenReturn(new byte[]{1, 3, 5});
 
-        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "ids": ["order-1", "order-2", "order-1"],
-                                  "query": {
-                                    "conditions": [
-                                      {"fieldName": "status", "operator": "EQ", "values": ["active"]}
-                                    ]
-                                  }
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(header().string("X-Export-FileName", "sales_order-selected-export.xlsx"))
-                .andExpect(content().bytes(new byte[]{1, 3, 5}));
+        DynamicSelectedExportRequest request = objectMapper.readValue("""
+                {
+                  "ids": ["order-1", "order-2", "order-1"],
+                  "query": {
+                    "conditions": [
+                      {"fieldName": "status", "operator": "EQ", "values": ["active"]}
+                    ]
+                  }
+                }
+                """, DynamicSelectedExportRequest.class);
+        CapturingResponse response = new CapturingResponse();
+
+        controller.exportSelected(MODULE, request, response.response());
+
+        assertThat(response.header("X-Export-FileName")).isEqualTo("sales_order-selected-export.xlsx");
+        assertThat(response.bytes()).containsExactly(1, 3, 5);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -213,14 +207,9 @@ class DynamicExportWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
-        MockMvc exportMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicExportWebController(
-                        recordService, activeTenantVerifier, exportFacade,
-                        snapshotService, queryItemService, moduleFieldService))
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        DynamicExportWebController exportController = new DynamicExportWebController(
+                recordService, activeTenantVerifier, exportFacade,
+                snapshotService, queryItemService, moduleFieldService);
         DynamicModuleDescriptor descriptor = descriptor();
         DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
         PlatformUiSet uiSet = uiSet("set-list");
@@ -240,26 +229,24 @@ class DynamicExportWebControllerTest {
         });
         when(exportFacade.exportWorkbook(any(DynamicExportCommand.class))).thenReturn(new byte[]{4, 5, 6});
 
-        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "uiConfigId": "ui-list",
-                                  "queryForm": {
-                                    "code": "C-001"
-                                  },
-                                  "quickSearch": "C-001",
-                                  "quickSearchFields": ["code"],
-                                  "criteria": {
-                                    "operator": "OR",
-                                    "conditions": [
-                                      {"fieldName": "status", "operator": "EQ", "values": ["ACTIVE"]},
-                                      {"fieldName": "status", "operator": "EQ", "values": ["PENDING"]}
-                                    ]
-                                  }
-                                }
-                                """))
-                .andExpect(status().isOk());
+        WebQueryRequest request = objectMapper.readValue("""
+                {
+                  "uiConfigId": "ui-list",
+                  "queryForm": {
+                    "code": "C-001"
+                  },
+                  "quickSearch": "C-001",
+                  "quickSearchFields": ["code"],
+                  "criteria": {
+                    "operator": "OR",
+                    "conditions": [
+                      {"fieldName": "status", "operator": "EQ", "values": ["ACTIVE"]},
+                      {"fieldName": "status", "operator": "EQ", "values": ["PENDING"]}
+                    ]
+                  }
+                }
+                """, WebQueryRequest.class);
+        exportController.exportData(MODULE, request, new CapturingResponse().response());
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -285,16 +272,11 @@ class DynamicExportWebControllerTest {
         when(recordService.mainEntity(MODULE)).thenReturn(operations);
         when(operations.newRecord()).thenReturn(new net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord(entity()));
 
-        mvc.perform(post("/{moduleAlias}/export/data", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "sorts": [
-                                    {"field": "displayCode", "desc": true}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest());
+        WebQueryRequest request = new WebQueryRequest(
+                null, List.of(), List.of(new WebSort("displayCode", true)));
+
+        assertThatThrownBy(() -> controller.exportData(MODULE, request, new CapturingResponse().response()))
+                .isInstanceOf(PlatformException.class);
 
         verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
     }
@@ -307,19 +289,12 @@ class DynamicExportWebControllerTest {
         when(recordService.mainEntity(MODULE)).thenReturn(operations);
         when(operations.newRecord()).thenReturn(new net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord(entity()));
 
-        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "ids": ["order-1"],
-                                  "query": {
-                                    "sorts": [
-                                      {"field": "displayCode", "desc": true}
-                                    ]
-                                  }
-                                }
-                                """))
-                .andExpect(status().isBadRequest());
+        DynamicSelectedExportRequest request = new DynamicSelectedExportRequest(
+                List.of("order-1"),
+                new WebQueryRequest(null, List.of(), List.of(new WebSort("displayCode", true))));
+
+        assertThatThrownBy(() -> controller.exportSelected(MODULE, request, new CapturingResponse().response()))
+                .isInstanceOf(PlatformException.class);
 
         verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
     }
@@ -328,14 +303,9 @@ class DynamicExportWebControllerTest {
     void shouldRejectVirtualFieldInExportQuickSearch() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
-        MockMvc exportMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicExportWebController(
-                        recordService, activeTenantVerifier, exportFacade,
-                        snapshotService, null, moduleFieldService))
-                .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
-                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
-                .build();
+        DynamicExportWebController exportController = new DynamicExportWebController(
+                recordService, activeTenantVerifier, exportFacade,
+                snapshotService, null, moduleFieldService);
         DynamicModuleDescriptor descriptor = descriptor();
         DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
         PlatformUiSet uiSet = uiSet("set-list");
@@ -348,16 +318,12 @@ class DynamicExportWebControllerTest {
         when(moduleFieldService.resolve("field-display-code")).thenReturn(resolvedField(
                 "field-display-code", "displayCode", "string", MetadataFieldForm.VIRTUAL));
 
-        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "uiConfigId": "ui-list",
-                                  "quickSearch": "C-001",
-                                  "quickSearchFields": ["displayCode"]
-                                }
-                                """))
-                .andExpect(status().isBadRequest());
+        WebQueryRequest request = new WebQueryRequest(null, null, List.of(), null, Map.of(), List.of(),
+                "ui-list", null, Map.of(), null, "C-001", List.of("displayCode"), null);
+
+        assertThatThrownBy(() -> exportController.exportData(MODULE, request, new CapturingResponse().response()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Quick search field is not searchable");
 
         verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
     }
@@ -366,18 +332,19 @@ class DynamicExportWebControllerTest {
     void shouldRejectDataExportWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
-        mvc.perform(post("/{moduleAlias}/export/data", MODULE))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.exportData(MODULE, null, new CapturingResponse().response()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic entity does not support capability");
     }
 
     @Test
     void shouldRejectSelectedExportWithoutIds() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
-        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ids\":[]}"))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.exportSelected(MODULE,
+                new DynamicSelectedExportRequest(List.of(), null), new CapturingResponse().response()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic selected export ids must not be empty");
     }
 
     private DynamicModuleDescriptor descriptor() {
@@ -478,6 +445,47 @@ class DynamicExportWebControllerTest {
             return method.invoke(entry);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Cannot read criteria node", e);
+        }
+    }
+
+    private static class CapturingResponse {
+        private final HttpServletResponse response = mock(HttpServletResponse.class);
+        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
+        private final Map<String, String> headers = new LinkedHashMap<>();
+
+        CapturingResponse() throws IOException {
+            ServletOutputStream output = new ServletOutputStream() {
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setWriteListener(WriteListener writeListener) {
+                }
+
+                @Override
+                public void write(int b) {
+                    body.write(b);
+                }
+            };
+            when(response.getOutputStream()).thenReturn(output);
+            org.mockito.Mockito.doAnswer(invocation -> {
+                headers.put(invocation.getArgument(0), invocation.getArgument(1));
+                return null;
+            }).when(response).setHeader(anyString(), anyString());
+        }
+
+        HttpServletResponse response() {
+            return response;
+        }
+
+        String header(String name) {
+            return headers.get(name);
+        }
+
+        byte[] bytes() {
+            return body.toByteArray();
         }
     }
 
