@@ -11,20 +11,22 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
 @PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "字典管理", order = 50)
-@RequestMapping({"/platform.dictionary_category", "/platform.application/{applicationAlias}/dictionary-categories"})
+@Path("/platform.dictionary_category")
 public class DictionaryCategoryWebController
         extends NestedEnabledTreeCrudWebSupport<DictionaryCategory, DictionaryCategoryService>
         implements StaticModuleUiContributor {
@@ -43,13 +45,13 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected Criteria treeScopeCriteria(HttpServletRequest request) {
+    protected Criteria treeScopeCriteria(@Context HttpServletRequest request) {
         String applicationAlias = applicationAlias(request);
         return applicationAlias == null ? Criteria.of() : Criteria.of().eq("applicationAlias", applicationAlias);
     }
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         String applicationAlias = applicationAlias(request);
         if (applicationAlias != null) {
             criteria.eq("applicationAlias", applicationAlias);
@@ -57,7 +59,7 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected void bindScope(DictionaryCategory record, HttpServletRequest request) {
+    protected void bindScope(DictionaryCategory record, @Context HttpServletRequest request) {
         String applicationAlias = applicationAlias(request);
         if (applicationAlias != null) {
             record.setApplicationAlias(applicationAlias);
@@ -65,20 +67,21 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected boolean inScope(DictionaryCategory record, HttpServletRequest request) {
+    protected boolean inScope(DictionaryCategory record, @Context HttpServletRequest request) {
         String applicationAlias = applicationAlias(request);
         return applicationAlias == null || Objects.equals(record.getApplicationAlias(), applicationAlias);
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "dictionary category does not belong to application: " + applicationAlias(request) + "." + id;
     }
 
-    @GetMapping("/tree")
+    @GET
+    @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(HttpServletRequest request,
-                                   @RequestParam(defaultValue = "false") boolean flat) {
+    public WebListResponse<?> tree(@Context HttpServletRequest request,
+                                   @DefaultValue("false") @QueryParam("flat") boolean flat) {
         return webScope(() -> {
             List<DictionaryCategory> roots = applicationAlias(request) == null
                     ? service().rootCategories()
@@ -95,12 +98,13 @@ public class DictionaryCategoryWebController
         });
     }
 
-    @GetMapping("/tree/{id}")
+    @GET
+    @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(HttpServletRequest request,
-                                   @PathVariable String id,
-                                   @RequestParam(defaultValue = "false") boolean flat,
-                                   @RequestParam(defaultValue = "true") boolean includeSelf) {
+    public WebListResponse<?> tree(@Context HttpServletRequest request,
+                                   @PathParam("id") String id,
+                                   @DefaultValue("false") @QueryParam("flat") boolean flat,
+                                   @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
         return webScope(() -> {
             DictionaryCategory root = requireScopedRecord(request, id);
             if (!flat) {
@@ -133,7 +137,7 @@ public class DictionaryCategoryWebController
         }
     }
 
-    private String applicationAlias(HttpServletRequest request) {
+    private String applicationAlias(@Context HttpServletRequest request) {
         String value = pathVariable(request, "applicationAlias");
         return value == null || value.isBlank() ? null : value;
     }
