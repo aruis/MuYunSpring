@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -30,7 +31,8 @@ class ActionEndpointAnnotationTest {
         assertThat(endpoint(EnableWeb.class, "enable", String.class).value()).isEqualTo(PlatformAction.ENABLE);
         assertThat(endpoint(EnableWeb.class, "disable", String.class).value()).isEqualTo(PlatformAction.DISABLE);
         assertThat(endpoint(SortWeb.class, "sort", String.class, SortWebRequest.class).value()).isEqualTo(PlatformAction.SORT);
-        assertThat(endpoint(TreeWeb.class, "tree", boolean.class).value()).isEqualTo(PlatformAction.TREE);
+        assertThat(endpoint(TreeWeb.class, "tree", HttpServletRequest.class, boolean.class).value())
+                .isEqualTo(PlatformAction.TREE);
         assertThat(endpoint(ReferenceWeb.class, "reference", String.class, Object.class).value())
                 .isEqualTo(PlatformAction.REFERENCE);
     }
@@ -43,8 +45,8 @@ class ActionEndpointAnnotationTest {
 
     @Test
     void shouldKeepActionEndpointWhenDynamicControllerOverridesStandardWebMethods() throws Exception {
-        assertThat(endpoint(DynamicRecordWebController.class, "sort", String.class, TreeSortWebRequest.class).value())
-                .isEqualTo(PlatformAction.SORT);
+        assertThat(endpoint(DynamicRecordWebController.class, "sort",
+                HttpServletRequest.class, String.class, TreeSortWebRequest.class).value()).isEqualTo(PlatformAction.SORT);
         assertThat(endpoint(DynamicRecordWebController.class, "querySchema", String.class).value())
                 .isEqualTo(PlatformAction.QUERY);
         Class<?> referenceRequestType = Class.forName("net.ximatai.muyun.spring.boot.dynamic.DynamicWebReferenceRequest");
