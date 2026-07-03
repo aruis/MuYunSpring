@@ -8,13 +8,13 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 import java.util.Objects;
 
-@Component
+@ApplicationScoped
 public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier {
     private final PlatformModuleService moduleService;
     private final PlatformModuleActionService moduleActionService;
@@ -25,7 +25,7 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
         this(moduleService, moduleActionService, new StaticModuleActionRegistry());
     }
 
-    @Autowired
+    @Inject
     public PlatformRoleActionGrantVerifier(PlatformModuleService moduleService,
                                            PlatformModuleActionService moduleActionService,
                                            StaticModuleActionRegistry staticModuleActionRegistry) {

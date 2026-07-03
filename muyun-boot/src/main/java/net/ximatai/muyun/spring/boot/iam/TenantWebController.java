@@ -10,13 +10,13 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "iam", alias = "iam.tenant", title = "租户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
-@RequestMapping("/iam.tenant")
+@Path("/iam.tenant")
 public class TenantWebController extends WebSupport<TenantService> implements
         CrudWeb<Tenant, TenantService>,
         EnableWeb<Tenant, TenantService>,

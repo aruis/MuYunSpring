@@ -7,13 +7,13 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import jakarta.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 
-@Component
+@ApplicationScoped
 public class RoleGrantableActionResolver {
     private final PlatformModuleService moduleService;
     private final PlatformModuleActionService moduleActionService;
@@ -24,7 +24,7 @@ public class RoleGrantableActionResolver {
         this(moduleService, moduleActionService, new StaticModuleActionRegistry());
     }
 
-    @Autowired
+    @Inject
     public RoleGrantableActionResolver(PlatformModuleService moduleService,
                                        PlatformModuleActionService moduleActionService,
                                        StaticModuleActionRegistry staticModuleActionRegistry) {

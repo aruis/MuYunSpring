@@ -9,13 +9,13 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "iam", alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20)
-@RequestMapping("/iam.organization")
+@Path("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements
         CrudWeb<Organization, OrganizationService>,
         EnableWeb<Organization, OrganizationService>,

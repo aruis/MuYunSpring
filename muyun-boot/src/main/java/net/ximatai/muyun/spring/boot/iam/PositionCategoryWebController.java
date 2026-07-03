@@ -9,14 +9,14 @@ import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.position.PositionCategory;
 import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "iam", alias = "iam.position_category", title = "岗位管理",
         route = "/iam/positions")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "岗位管理", order = 40)
-@RequestMapping("/iam.position_category")
+@Path("/iam.position_category")
 public class PositionCategoryWebController extends WebSupport<PositionCategoryService> implements
         CrudWeb<PositionCategory, PositionCategoryService>,
         EnableWeb<PositionCategory, PositionCategoryService>,

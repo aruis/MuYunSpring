@@ -11,17 +11,17 @@ import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.position.Position;
 import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticActionContribution(
         targetModule = PositionCategoryService.MODULE_ALIAS,
         resource = "position",
         resourceTitle = "岗位"
 )
-@RequestMapping("/iam.position")
+@Path("/iam.position")
 public class PositionWebController extends WebSupport<PositionService> implements
         CrudWeb<Position, PositionService>,
         EnableWeb<Position, PositionService>,
