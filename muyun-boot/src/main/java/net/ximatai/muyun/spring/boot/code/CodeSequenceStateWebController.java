@@ -9,17 +9,16 @@ import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceBaselineResult;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceStateService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = CodeSequenceStateService.MODULE_ALIAS, title = "编码序列状态")
-@RequestMapping({"/platform.code_sequence_state", "/platform/code/sequence-state"})
+@Path("/platform.code_sequence_state")
 public class CodeSequenceStateWebController extends WebSupport<CodeSequenceStateService> implements
         ReadOnlyWeb<CodeSequenceState, CodeSequenceStateService> {
 
@@ -28,16 +27,17 @@ public class CodeSequenceStateWebController extends WebSupport<CodeSequenceState
     public CodeSequenceStateWebController() {
     }
 
-    @Autowired
+    @Inject
     public CodeSequenceStateWebController(CodeOpsActionService opsActionService) {
         this.opsActionService = opsActionService;
     }
 
-    @PostMapping("/adjust/{id}")
+    @POST
+    @Path("/adjust/{id}")
     @CustomActionEndpoint(value = "adjustBaseline", title = "调整序列基线",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public CodeSequenceBaselineResult adjustBaseline(@PathVariable String id,
-                                                     @RequestBody AdjustBaselineRequest request) {
+    public CodeSequenceBaselineResult adjustBaseline(@PathParam("id") String id,
+                                                     AdjustBaselineRequest request) {
         return webScope(() -> requireOpsActionService().adjustSequenceState(
                 id,
                 request.currentValue(),
