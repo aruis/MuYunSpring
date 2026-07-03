@@ -55,6 +55,7 @@ import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -72,6 +73,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -186,16 +188,24 @@ class IamWebControllerIT {
         department.setParentId(TreeAbility.ROOT_ID);
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", TreeAbility.ROOT_ID)).thenReturn(List.of(department));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", "dept-1")).thenReturn(List.of());
+        when(departmentService.listForAction(eq(PlatformAction.TREE),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(List.of(department))
+                .thenReturn(List.of());
 
         mvc.perform(get("/iam.department/tree").param("organizationId", "org-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("dept-1"))
                 .andExpect(jsonPath("$.records[0].record.organizationId").value("org-1"))
                 .andExpect(jsonPath("$.records[0].children").isArray());
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(departmentService, atLeastOnce()).listForAction(eq(PlatformAction.TREE),
+                criteriaCaptor.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(criteriaCaptor.getAllValues()).anySatisfy(criteria -> {
+            assertThat(containsCondition(criteria, "organizationId", "org-1")).isTrue();
+            assertThat(containsCondition(criteria, "parentId", TreeAbility.ROOT_ID)).isTrue();
+        });
     }
 
     @Test
