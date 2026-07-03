@@ -2,8 +2,13 @@ package net.ximatai.muyun.spring.boot.web;
 
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ResourceInfo;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
@@ -19,6 +24,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +90,28 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
+    void shouldResolveActionContextFromJaxRsResourceInfo() throws NoSuchMethodException {
+        ResourceInfo resourceInfo = mock(ResourceInfo.class);
+        doReturn(AnnotatedActionResource.class).when(resourceInfo).getResourceClass();
+        when(resourceInfo.getResourceMethod()).thenReturn(AnnotatedActionResource.class.getMethod("query"));
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(uriInfo.getPathParameters(false)).thenReturn(new MultivaluedHashMap<>());
+        when(uriInfo.getQueryParameters(false)).thenReturn(new MultivaluedHashMap<>());
+        TestRequestContext request = new TestRequestContext();
+        request.uriInfo = uriInfo;
+        interceptor.resourceInfo = resourceInfo;
+
+        interceptor.filter(request);
+
+        ActionExecutionContext authorized = (ActionExecutionContext) request.getProperty(
+                ActionEndpointInterceptor.ACTION_CONTEXT_PROPERTY);
+        assertThat(policyService.context.moduleAlias()).isEqualTo("iam.organization");
+        assertThat(policyService.context.actionCode()).isEqualTo("query");
+        assertThat(authorized.authorizationResult()).isNotNull();
+        assertThat(ActionExecutionContextHolder.current()).contains(authorized);
+    }
+
+    @Test
     void shouldClearActionContextWhenAuthorizationFails() {
         ActionEndpointInterceptor interceptor = new ActionEndpointInterceptor(
                 new ThrowingPolicyService(),
@@ -127,8 +155,16 @@ class ActionEndpointInterceptorTest {
         }
     }
 
+    @PlatformStaticModule(application = "iam", alias = "iam.organization", title = "组织", route = "/iam/organizations")
+    public static final class AnnotatedActionResource {
+        @ActionEndpoint(PlatformAction.QUERY)
+        public void query() {
+        }
+    }
+
     private static final class TestRequestContext implements ContainerRequestContext {
         private final Map<String, Object> properties = new HashMap<>();
+        private UriInfo uriInfo;
 
         @Override
         public Object getProperty(String name) {
@@ -152,7 +188,7 @@ class ActionEndpointInterceptorTest {
 
         @Override
         public jakarta.ws.rs.core.UriInfo getUriInfo() {
-            throw unsupported();
+            return uriInfo;
         }
 
         @Override

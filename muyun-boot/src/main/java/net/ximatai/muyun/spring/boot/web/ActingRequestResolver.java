@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -20,7 +20,7 @@ public class ActingRequestResolver {
         this.employeeDelegationService = employeeDelegationService;
     }
 
-    public Optional<ActingContext> resolve(HttpServletRequest request, ActionExecutionContext actionContext) {
+    public Optional<ActingContext> resolve(ContainerRequestContext request, ActionExecutionContext actionContext) {
         String principalEmployeeId = header(request, PRINCIPAL_EMPLOYEE_ID_HEADER);
         String principalPositionId = header(request, PRINCIPAL_POSITION_ID_HEADER);
         if (principalEmployeeId == null && principalPositionId == null) {
@@ -41,17 +41,17 @@ public class ActingRequestResolver {
         ));
     }
 
-    public static boolean hasActingRequest(HttpServletRequest request) {
+    public static boolean hasActingRequest(ContainerRequestContext request) {
         return headerValue(request, PRINCIPAL_EMPLOYEE_ID_HEADER) != null
                 || headerValue(request, PRINCIPAL_POSITION_ID_HEADER) != null;
     }
 
-    private String header(HttpServletRequest request, String name) {
+    private String header(ContainerRequestContext request, String name) {
         return headerValue(request, name);
     }
 
-    private static String headerValue(HttpServletRequest request, String name) {
-        String value = request.getHeader(name);
+    private static String headerValue(ContainerRequestContext request, String name) {
+        String value = request.getHeaderString(name);
         return value == null || value.isBlank() ? null : value.trim();
     }
 }

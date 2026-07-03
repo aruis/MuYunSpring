@@ -1,6 +1,11 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ResourceInfo;
+import jakarta.ws.rs.core.MultivaluedMap;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContributionSupport;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -10,18 +15,13 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContributionSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerMapping;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -40,12 +40,32 @@ public class ActionEndpointContextResolver {
         this.moduleActionService = moduleActionService;
     }
 
-    public Optional<ActionExecutionContext> resolve(HttpServletRequest request,
-                                                    HandlerMethod handlerMethod,
+    public PlatformModuleActionService moduleActionService() {
+        return moduleActionService;
+    }
+
+    public Optional<ActionExecutionContext> resolve(ContainerRequestContext requestContext, ResourceInfo resourceInfo) {
+        if (resourceInfo == null || resourceInfo.getResourceMethod() == null) {
+            return Optional.empty();
+        }
+        Method method = resourceInfo.getResourceMethod();
+        ActionEndpoint endpoint = method.getAnnotation(ActionEndpoint.class);
+        if (endpoint != null) {
+            return resolve(requestContext, resourceInfo, endpoint);
+        }
+        CustomActionEndpoint customEndpoint = method.getAnnotation(CustomActionEndpoint.class);
+        if (customEndpoint != null) {
+            return resolve(requestContext, resourceInfo, customEndpoint);
+        }
+        return Optional.empty();
+    }
+
+    public Optional<ActionExecutionContext> resolve(ContainerRequestContext requestContext,
+                                                    ResourceInfo resourceInfo,
                                                     ActionEndpoint endpoint) {
-        PlatformStaticActionContribution contribution = contribution(handlerMethod);
+        PlatformStaticActionContribution contribution = contribution(resourceInfo);
         String moduleAlias = contribution == null
-                ? moduleAlias(request, handlerMethod)
+                ? moduleAlias(requestContext, resourceInfo)
                 : PlatformStaticActionContributionSupport.targetModule(contribution);
         if (moduleAlias == null || moduleAlias.isBlank()) {
             return Optional.empty();
@@ -60,17 +80,17 @@ public class ActionEndpointContextResolver {
         return Optional.of(ActionExecutionContext.ofPolicy(
                 moduleAlias,
                 policy,
-                recordIds(request),
+                recordIds(requestContext),
                 CurrentUserContext.currentUser()
         ));
     }
 
-    public Optional<ActionExecutionContext> resolve(HttpServletRequest request,
-                                                    HandlerMethod handlerMethod,
+    public Optional<ActionExecutionContext> resolve(ContainerRequestContext requestContext,
+                                                    ResourceInfo resourceInfo,
                                                     CustomActionEndpoint endpoint) {
-        PlatformStaticActionContribution contribution = contribution(handlerMethod);
+        PlatformStaticActionContribution contribution = contribution(resourceInfo);
         String moduleAlias = contribution == null
-                ? moduleAlias(request, handlerMethod)
+                ? moduleAlias(requestContext, resourceInfo)
                 : PlatformStaticActionContributionSupport.targetModule(contribution);
         if (moduleAlias == null || moduleAlias.isBlank()) {
             return Optional.empty();
@@ -91,20 +111,19 @@ public class ActionEndpointContextResolver {
         return Optional.of(ActionExecutionContext.ofPolicy(
                 moduleAlias,
                 policy,
-                customRecordIds(request, endpoint),
+                customRecordIds(requestContext, endpoint),
                 CurrentUserContext.currentUser()
         ));
     }
 
-    private PlatformStaticActionContribution contribution(HandlerMethod handlerMethod) {
+    private PlatformStaticActionContribution contribution(ResourceInfo resourceInfo) {
         PlatformStaticActionContribution methodContribution =
-                org.springframework.core.annotation.AnnotationUtils.findAnnotation(
-                        handlerMethod.getMethod(), PlatformStaticActionContribution.class);
+                resourceInfo.getResourceMethod().getAnnotation(PlatformStaticActionContribution.class);
         if (methodContribution != null) {
             return methodContribution;
         }
-        return org.springframework.core.annotation.AnnotationUtils.findAnnotation(
-                handlerMethod.getBeanType(), PlatformStaticActionContribution.class);
+        Class<?> resourceClass = resourceInfo.getResourceClass();
+        return resourceClass == null ? null : resourceClass.getAnnotation(PlatformStaticActionContribution.class);
     }
 
     private ActionExecutionPolicy contributionPolicy(PlatformStaticActionContribution contribution,
@@ -122,20 +141,15 @@ public class ActionEndpointContextResolver {
         );
     }
 
-    private String moduleAlias(HttpServletRequest request, HandlerMethod handlerMethod) {
-        PlatformStaticModule staticModule = handlerMethod.getBeanType().getAnnotation(PlatformStaticModule.class);
+    private String moduleAlias(ContainerRequestContext requestContext, ResourceInfo resourceInfo) {
+        Class<?> resourceClass = resourceInfo.getResourceClass();
+        PlatformStaticModule staticModule = resourceClass == null
+                ? null
+                : resourceClass.getAnnotation(PlatformStaticModule.class);
         if (staticModule != null && !staticModule.alias().isBlank()) {
             return staticModule.alias();
         }
-        String pathModuleAlias = pathVariable(request, MODULE_ALIAS_PATH_KEY);
-        if (pathModuleAlias != null && !pathModuleAlias.isBlank()) {
-            return pathModuleAlias;
-        }
-        Object bean = handlerMethod.getBean();
-        if (bean instanceof ScopedWeb<?> scopedWeb) {
-            return scopedWeb.webScopeName();
-        }
-        return null;
+        return pathVariable(requestContext, MODULE_ALIAS_PATH_KEY);
     }
 
     private Optional<ActionExecutionPolicy> registeredPolicy(String moduleAlias, String actionCode) {
@@ -181,43 +195,45 @@ public class ActionEndpointContextResolver {
         };
     }
 
-    private Set<String> recordIds(HttpServletRequest request) {
+    private Set<String> recordIds(ContainerRequestContext requestContext) {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (String key : RECORD_ID_KEYS) {
-            collect(ids, pathVariable(request, key));
-            collect(ids, request.getParameterValues(key));
+            collect(ids, pathVariable(requestContext, key));
+            collect(ids, queryValues(requestContext, key));
         }
-        collect(ids, pathVariable(request, IDS_KEY));
-        collect(ids, request.getParameterValues(IDS_KEY));
+        collect(ids, pathVariable(requestContext, IDS_KEY));
+        collect(ids, queryValues(requestContext, IDS_KEY));
         return Set.copyOf(ids);
     }
 
-    private Set<String> customRecordIds(HttpServletRequest request, CustomActionEndpoint endpoint) {
-        LinkedHashSet<String> ids = new LinkedHashSet<>(recordIds(request));
+    private Set<String> customRecordIds(ContainerRequestContext requestContext, CustomActionEndpoint endpoint) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>(recordIds(requestContext));
         String key = endpoint.recordIdPathVariable();
         if (key != null && !key.isBlank()) {
-            collect(ids, pathVariable(request, key));
+            collect(ids, pathVariable(requestContext, key));
         }
         return Set.copyOf(ids);
     }
 
-    private String pathVariable(HttpServletRequest request, String key) {
-        Object value = pathVariables(request).get(key);
-        return value == null ? null : value.toString();
+    private String pathVariable(ContainerRequestContext requestContext, String key) {
+        if (requestContext == null || requestContext.getUriInfo() == null) {
+            return null;
+        }
+        return first(requestContext.getUriInfo().getPathParameters(false), key);
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, String> pathVariables(HttpServletRequest request) {
-        Object attribute = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-        if (!(attribute instanceof Map<?, ?> variables)) {
-            return Map.of();
+    private java.util.List<String> queryValues(ContainerRequestContext requestContext, String key) {
+        if (requestContext == null || requestContext.getUriInfo() == null) {
+            return java.util.List.of();
         }
-        return variables.entrySet().stream()
-                .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                        entry -> entry.getKey().toString(),
-                        entry -> entry.getValue().toString()
-                ));
+        return requestContext.getUriInfo().getQueryParameters(false).getOrDefault(key, java.util.List.of());
+    }
+
+    private String first(MultivaluedMap<String, String> values, String key) {
+        if (values == null) {
+            return null;
+        }
+        return values.getFirst(key);
     }
 
     private void collect(Set<String> ids, String value) {
@@ -230,10 +246,12 @@ public class ActionEndpointContextResolver {
                 .forEach(ids::add);
     }
 
-    private void collect(Set<String> ids, String[] values) {
-        if (values == null || values.length == 0) {
+    private void collect(Set<String> ids, Iterable<String> values) {
+        if (values == null) {
             return;
         }
-        Arrays.stream(values).forEach(value -> collect(ids, value));
+        for (String value : values) {
+            collect(ids, value);
+        }
     }
 }

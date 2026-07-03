@@ -1,33 +1,34 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import io.quarkus.arc.DefaultBean;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import net.ximatai.muyun.spring.common.di.ObjectProvider;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@Configuration
+@ApplicationScoped
 public class ActionEndpointWebConfiguration {
-    @Bean
-    @ConditionalOnMissingBean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     public ActionExecutionPolicyService actionExecutionPolicyService() {
         return new AllowAllActionExecutionPolicyService();
     }
 
-    @Bean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     public ActionEndpointContextResolver actionEndpointContextResolver(
             ObjectProvider<PlatformModuleActionService> moduleActionService) {
         return new ActionEndpointContextResolver(moduleActionService.getIfAvailable());
     }
 
-    @Bean
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
     public ActionEndpointInterceptor actionEndpointInterceptor(ActionExecutionPolicyService policyService,
                                                               ActionEndpointContextResolver contextResolver,
                                                               ObjectProvider<EmployeeDelegationService>
@@ -35,22 +36,5 @@ public class ActionEndpointWebConfiguration {
         EmployeeDelegationService delegationService = employeeDelegationService.getIfAvailable();
         return new ActionEndpointInterceptor(policyService, contextResolver,
                 delegationService == null ? null : new ActingRequestResolver(delegationService));
-    }
-}
-
-@Configuration
-@ConditionalOnBean(ActionEndpointInterceptor.class)
-class ActionEndpointInterceptorRegistration implements WebMvcConfigurer {
-    private final ActionEndpointInterceptor interceptor;
-
-    ActionEndpointInterceptorRegistration(ActionEndpointInterceptor interceptor) {
-        this.interceptor = interceptor;
-    }
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(interceptor)
-                .addPathPatterns("/**")
-                .order(Ordered.HIGHEST_PRECEDENCE + 200);
     }
 }
