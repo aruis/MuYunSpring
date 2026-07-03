@@ -16,12 +16,6 @@
 
 ## Web Endpoint Semantics
 
-### Action endpoint context is incomplete
-
-- 现状：`ActionEndpointInterceptor` 已迁移为 JAX-RS 过滤器骨架，但原 Spring `HandlerMethod` 注解解析、动作上下文、授权上下文、acting/delegation scope 等语义尚未恢复；正式方向见 Web 迁移边界决策第 2 条。
-- 影响：依赖 action endpoint 上下文的授权、审计或动作解析行为可能与 Spring 版本不一致。
-- 回收方向：基于 Quarkus/Resteasy Reactive 的资源方法元数据、路径参数和过滤器上下文重建 `ActionEndpointContextResolver` 契约，并补动作端点 contract 测试。
-
 ### Nested scope path variables use a transitional request attribute
 
 - 现状：`NestedCrudWebSupport` 的路径变量读取已从 Spring `HandlerMapping` 改为平台自有 request attribute；真实 Quarkus HTTP 请求如何填充该 attribute 尚未收口，`ModuleScopedRuleTreeWebSupport` 等其他路径 scope 仍待迁移。
@@ -92,20 +86,8 @@
 
 ## Test Migration
 
-### Test suite still depends on Spring testing stack
-
-- 现状：生产代码已能通过 Quarkus 编译和 `quarkusBuild`，但测试代码仍大量依赖 Spring Test、MockMvc、`@SpringBootTest`、Mockito/AssertJ 组合，`./gradlew test` 尚未恢复。
-- 影响：迁移后的行为缺少自动回归保护。
-- 回收方向：按平台契约优先级迁移测试：核心能力 contract 测试、Web resource 测试、动态运行态真实路径测试，再清理 Spring test 依赖。
-
 ### Legacy integration tests are temporarily excluded from test compilation
 
-- 现状：历史 `*IT.java` 仍位于 `src/test/java`，且大量使用 Spring Boot test context、Spring property injection 和 Spring transaction test API。迁移期间 `compileTestJava` 临时排除了 `**/*IT.java`，避免阻塞普通单元测试恢复。
+- 现状：普通 `./gradlew test` 已恢复；历史 `*IT.java` 仍位于 `src/test/java`，且大量使用 Spring Boot test context、Spring property injection 和 Spring transaction test API。迁移期间全局 `compileTestJava` 临时排除了 `**/*IT.java`，避免阻塞普通单元测试。
 - 影响：`integrationTest` 任务在这些测试 Quarkus 化之前不能提供真实数据库/HTTP 集成回归保护。
 - 回收方向：建立 Quarkus 风格集成测试源集或逐个迁移 `*IT.java` 到 `@QuarkusTest`、Quarkus test resource、REST Assured/JAX-RS 客户端和 MuYunDatabase Quarkus repository 注入。
-
-### Legacy boot Spring tests are temporarily excluded from boot test compilation
-
-- 现状：`muyun-boot` 中部分 configuration、MockMvc Web controller、Spring HandlerMethod/filter/exception-handler 测试仍依赖 Spring Test。迁移期间在 `muyun-boot/build.gradle.kts` 临时排除了这些测试文件，保留不依赖 Spring 的 boot 单元测试继续编译。
-- 影响：Quarkus HTTP 路由、异常映射、过滤器、动作端点上下文和配置 producer 仍缺少等价测试保护。
-- 回收方向：按业务入口重建 Quarkus 测试：configuration producer 用 CDI/Quarkus component test 或 `@QuarkusTest`，Web controller 用 REST Assured 或 JAX-RS 资源测试，filter/exception mapper 用 Quarkus HTTP 集成测试。
