@@ -103,3 +103,9 @@
 - 现状：`muyun-platform` 为运行 `@QuarkusTest` 集成测试临时应用 Quarkus Gradle 插件，但该模块仍是库模块，不是独立 Quarkus 应用；因此禁用了 platform 模块自身的 Quarkus 应用打包任务。
 - 影响：platform 集成测试可以获得 Quarkus ApplicationModel 和 MuYunDatabase Quarkus 注入能力，但 `:muyun-platform:quarkusBuild` 不作为有效验证入口。
 - 回收方向：将平台 Quarkus IT 迁到正式测试宿主模块，或为库模块建立独立 Quarkus test fixture/source set；届时移除 platform 模块的临时插件/任务禁用配置。
+
+### Platform Quarkus IT profiles manually isolate service graphs
+
+- 现状：部分平台 `@QuarkusTest` 通过 `quarkus.arc.exclude-types` 精确排除未进入当前测试目标的平台 bean，并在测试内手动组装服务图。
+- 影响：可以避免迁移期一次性打开整个平台 CDI 图，但测试 profile 与正式应用注入图仍存在差异。
+- 回收方向：平台服务 CDI 边界稳定后，减少测试 profile 中的 bean 排除项，改用正式 producer/module fixture 组装集成测试依赖。

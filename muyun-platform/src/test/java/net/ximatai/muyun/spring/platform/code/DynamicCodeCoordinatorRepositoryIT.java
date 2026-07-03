@@ -1,10 +1,16 @@
 package net.ximatai.muyun.spring.platform.code;
 
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
+import jakarta.transaction.Status;
+import jakarta.transaction.UserTransaction;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.spring.boot.JdbiConfigurer;
-import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
+import net.ximatai.muyun.database.quarkus.MuYunRepositoryFactory;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -25,34 +31,24 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
+import net.ximatai.muyun.spring.platform.support.PostgresQuarkusTestResource;
+import org.eclipse.microprofile.config.Config;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.argument.AbstractArgumentFactory;
 import org.jdbi.v3.core.argument.Argument;
 import org.jdbi.v3.core.config.ConfigRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
 import java.math.BigInteger;
 import java.sql.Types;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -65,45 +61,98 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = DynamicCodeCoordinatorRepositoryIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(DynamicCodeCoordinatorRepositoryIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class DynamicCodeCoordinatorRepositoryIT {
     private static final String TENANT_ID = "tenant-code";
 
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    @Inject
+    Config config;
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.default-schema", () -> "public");
-        registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
+    @Inject
+    @SuppressWarnings("rawtypes")
+    IDatabaseOperations operations;
+
+    @Inject
+    MuYunRepositoryFactory repositoryFactory;
+
+    @Inject
+    Jdbi jdbi;
+
+    @Inject
+    UserTransaction userTransaction;
+
+    private DynamicModuleRuntimeRefresher refresher;
+    private DynamicRecordService recordService;
+    private CodeRuleService ruleService;
+    private CodeSequenceStateService stateService;
+    private CodeLedgerEntryService ledgerService;
+    private CodeRecycleEntryService recycleService;
+
+    @BeforeEach
+    void setUp() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+        jdbi.registerArgument(new AbstractArgumentFactory<BigInteger>(Types.BIGINT) {
+            @Override
+            protected Argument build(BigInteger value, ConfigRegistry config) {
+                return (position, statement, context) -> statement.setLong(position, value.longValueExact());
+            }
+        });
+
+        Clock codeClock = Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"), ZoneOffset.UTC);
+        CodeBusinessTimeService timeService = new CodeBusinessTimeService(codeClock, List.of(
+                organizationId -> "org-shanghai".equals(organizationId)
+                        ? Optional.of(ZoneId.of("Asia/Shanghai"))
+                        : Optional.empty()
+        ));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, new DynamicModuleRegistry());
+        refresher = new DynamicModuleRuntimeRefresher(new DynamicSchemaService(operations), runtime);
+
+        CodeRuleSegmentService segmentService = new CodeRuleSegmentService(dao(CodeRuleSegmentDao.class));
+        CodeSequencePolicyService sequencePolicyService = new CodeSequencePolicyService(dao(CodeSequencePolicyDao.class));
+        CodeValueMappingService mappingService = new CodeValueMappingService(dao(CodeValueMappingDao.class));
+        ruleService = new CodeRuleService(dao(CodeRuleDao.class), segmentService, sequencePolicyService, mappingService);
+        stateService = new CodeSequenceStateService(dao(CodeSequenceStateDao.class),
+                List.of(new PostgresCodeSequenceAllocator(jdbi)));
+        ledgerService = new CodeLedgerEntryService(dao(CodeLedgerEntryDao.class));
+        recycleService = new CodeRecycleEntryService(dao(CodeRecycleEntryDao.class),
+                List.of(new PostgresCodeRecycleConsumer(jdbi)));
+        CodeIssueLogService issueLogService = new CodeIssueLogService(dao(CodeIssueLogDao.class));
+        CodePreviewService previewService = new CodePreviewService(new FormulaEngine(codeClock), codeClock);
+        CodeGenerateService generateService = new CodeGenerateService(ruleService, previewService, stateService,
+                recycleService, issueLogService, timeService, codeClock);
+
+        DynamicRecordService[] holder = new DynamicRecordService[1];
+        DynamicCodeCoordinator coordinator = new DynamicCodeCoordinator(
+                ruleService,
+                generateService,
+                previewService,
+                stateService,
+                ledgerService,
+                recycleService,
+                new DynamicRecordServiceProxy(holder),
+                timeService,
+                codeClock
+        );
+        holder[0] = new DynamicRecordService(
+                runtime,
+                new AllowAllActionExecutionPolicyService(),
+                new AllowAllDataScopeCriteriaService(),
+                coordinator,
+                codeClock
+        );
+        recordService = holder[0];
     }
 
-    private final DynamicModuleRuntimeRefresher refresher;
-    private final DynamicRecordService recordService;
-    private final CodeRuleService ruleService;
-    private final CodeSequenceStateService stateService;
-    private final CodeLedgerEntryService ledgerService;
-    private final CodeRecycleEntryService recycleService;
-    private final TransactionTemplate transactionTemplate;
-
-    @Autowired
-    DynamicCodeCoordinatorRepositoryIT(DynamicModuleRuntimeRefresher refresher,
-                                       DynamicRecordService recordService,
-                                       CodeRuleService ruleService,
-                                       CodeSequenceStateService stateService,
-                                       CodeLedgerEntryService ledgerService,
-                                       CodeRecycleEntryService recycleService,
-                                       PlatformTransactionManager transactionManager) {
-        this.refresher = refresher;
-        this.recordService = recordService;
-        this.ruleService = ruleService;
-        this.stateService = stateService;
-        this.ledgerService = ledgerService;
-        this.recycleService = recycleService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    private <T> T dao(Class<T> daoType) {
+        return repositoryFactory.create(daoType);
     }
 
     @Test
@@ -185,12 +234,13 @@ class DynamicCodeCoordinatorRepositoryIT {
     }
 
     @Test
-    void shouldRollbackDynamicCreateSequenceStateAndLedgerWithOuterTransaction() {
+    void shouldRollbackDynamicCreateSequenceStateAndLedgerWithOuterTransaction() throws Exception {
         Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         AtomicReference<String> recordId = new AtomicReference<>();
 
-        transactionTemplate.executeWithoutResult(status -> {
+        userTransaction.begin();
+        try {
             try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
                 DynamicRecord record = recordService.newRecord(scenario.moduleAlias(), "main")
                         .setValue("title", "rollback");
@@ -201,9 +251,10 @@ class DynamicCodeCoordinatorRepositoryIT {
                 assertThat(stateService.selectState(rule.getId(), CodeSequenceState.DEFAULT_BUCKET,
                         CodeSequenceState.DEFAULT_BUCKET)).isNotNull();
                 assertThat(ledgerService.findByRuleAndValue(rule.getId(), "SO-0001")).isNotNull();
-                status.setRollbackOnly();
             }
-        });
+        } finally {
+            userTransaction.rollback();
+        }
 
         try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
             assertThat(recordService.select(scenario.moduleAlias(), "main", recordId.get())).isNull();
@@ -378,12 +429,13 @@ class DynamicCodeCoordinatorRepositoryIT {
     }
 
     @Test
-    void shouldContinueSequenceAfterAcceptedEditableAutoCodeThroughImportGateway() {
+    void shouldContinueSequenceAfterAcceptedEditableAutoCodeThroughImportGateway() throws Exception {
         Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
         AtomicReference<String> importedId = new AtomicReference<>();
 
-        transactionTemplate.executeWithoutResult(status -> {
+        userTransaction.begin();
+        try {
             try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
                 DynamicRecordActionGateway records = recordService.recordsForAction(
                         scenario.moduleAlias(), PlatformAction.IMPORT, "dynamic-import-test");
@@ -392,7 +444,11 @@ class DynamicCodeCoordinatorRepositoryIT {
                         .setValue("orderNo", "SO-0010");
                 importedId.set(records.create("main", imported));
             }
-        });
+            userTransaction.commit();
+        } catch (Throwable ex) {
+            rollbackIfActive();
+            throw ex;
+        }
         DynamicRecord next = create(scenario, "next");
 
         assertThat(next.getValue("orderNo")).isEqualTo("SO-0011");
@@ -405,7 +461,7 @@ class DynamicCodeCoordinatorRepositoryIT {
     }
 
     @Test
-    void shouldRollbackRecycleConsumptionWhenDynamicCreateFailsInOuterTransaction() {
+    void shouldRollbackRecycleConsumptionWhenDynamicCreateFailsInOuterTransaction() throws Exception {
         Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         DynamicRecord first = create(scenario, "first");
@@ -413,16 +469,18 @@ class DynamicCodeCoordinatorRepositoryIT {
             recordService.delete(scenario.moduleAlias(), "main", first.getId());
         }
 
-        transactionTemplate.executeWithoutResult(status -> {
+        userTransaction.begin();
+        try {
             try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
                 DynamicRecord record = recordService.newRecord(scenario.moduleAlias(), "main")
                         .setValue("title", "rollback-reuse");
                 recordService.create(scenario.moduleAlias(), "main", record);
                 assertThat(record.getValue("orderNo")).isEqualTo("SO-0001");
                 assertThat(recycleEntry(rule, "SO-0001").getStatus()).isEqualTo(CodeRecycleStatus.USED);
-                status.setRollbackOnly();
             }
-        });
+        } finally {
+            userTransaction.rollback();
+        }
 
         assertThat(recycleEntry(rule, "SO-0001").getStatus()).isEqualTo(CodeRecycleStatus.AVAILABLE);
         CodeLedgerEntry ledger = ledgerService.findByRuleAndValue(rule.getId(), "SO-0001");
@@ -865,166 +923,73 @@ class DynamicCodeCoordinatorRepositoryIT {
     private record Scenario(String moduleAlias) {
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EnableTransactionManagement
-    @EnableMuYunRepositories(basePackageClasses = CodeRuleDao.class)
-    static class TestApplication {
-        @Bean
-        DataSource dataSource() {
-            return DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
+    private void rollbackIfActive() throws Exception {
+        int status = userTransaction.getStatus();
+        if (status == Status.STATUS_ACTIVE || status == Status.STATUS_MARKED_ROLLBACK) {
+            userTransaction.rollback();
         }
+    }
 
-        @Bean
-        Clock codeClock() {
-            return Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"), ZoneOffset.UTC);
-        }
-
-        @Bean
-        CodeOrganizationTimeZoneResolver codeOrganizationTimeZoneResolver() {
-            return organizationId -> "org-shanghai".equals(organizationId)
-                    ? Optional.of(ZoneId.of("Asia/Shanghai"))
-                    : Optional.empty();
-        }
-
-        @Bean
-        CodeBusinessTimeService codeBusinessTimeService(Clock codeClock,
-                                                        CodeOrganizationTimeZoneResolver resolver) {
-            return new CodeBusinessTimeService(codeClock, List.of(resolver));
-        }
-
-        @Bean
-        DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
-            return new DynamicSchemaService(operations);
-        }
-
-        @Bean
-        DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations<?> operations) {
-            return new DynamicRecordRuntime(operations, new DynamicModuleRegistry());
-        }
-
-        @Bean
-        DynamicModuleRuntimeRefresher dynamicModuleRuntimeRefresher(DynamicSchemaService schemaService,
-                                                      DynamicRecordRuntime runtime) {
-            return new DynamicModuleRuntimeRefresher(schemaService, runtime);
-        }
-
-        @Bean
-        DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime,
-                                                  CodeRuleService ruleService,
-                                                  CodeGenerateService generateService,
-                                                  CodePreviewService previewService,
-                                                  CodeSequenceStateService stateService,
-                                                  CodeLedgerEntryService ledgerEntryService,
-                                                  CodeRecycleEntryService recycleEntryService,
-                                                  CodeBusinessTimeService timeService,
-                                                  Clock codeClock) {
-            DynamicRecordService[] holder = new DynamicRecordService[1];
-            DynamicCodeCoordinator coordinator = new DynamicCodeCoordinator(
-                    ruleService,
-                    generateService,
-                    previewService,
-                    stateService,
-                    ledgerEntryService,
-                    recycleEntryService,
-                    new DynamicRecordServiceProxy(holder),
-                    timeService,
-                    codeClock
-            );
-            holder[0] = new DynamicRecordService(
-                    runtime,
-                    new AllowAllActionExecutionPolicyService(),
-                    new AllowAllDataScopeCriteriaService(),
-                    coordinator,
-                    codeClock
-            );
-            return holder[0];
-        }
-
-        @Bean
-        CodeRuleService codeRuleService(CodeRuleDao ruleDao,
-                                        CodeRuleSegmentService segmentService,
-                                        CodeSequencePolicyService sequencePolicyService,
-                                        CodeValueMappingService mappingService) {
-            return new CodeRuleService(ruleDao, segmentService, sequencePolicyService, mappingService);
-        }
-
-        @Bean
-        CodeRuleSegmentService codeRuleSegmentService(CodeRuleSegmentDao segmentDao) {
-            return new CodeRuleSegmentService(segmentDao);
-        }
-
-        @Bean
-        CodeSequencePolicyService codeSequencePolicyService(CodeSequencePolicyDao policyDao) {
-            return new CodeSequencePolicyService(policyDao);
-        }
-
-        @Bean
-        CodeValueMappingService codeValueMappingService(CodeValueMappingDao mappingDao) {
-            return new CodeValueMappingService(mappingDao);
-        }
-
-        @Bean
-        CodeSequenceAllocator codeSequenceAllocator(Jdbi jdbi) {
-            return new PostgresCodeSequenceAllocator(jdbi);
-        }
-
-        @Bean
-        CodeRecycleConsumer codeRecycleConsumer(Jdbi jdbi) {
-            return new PostgresCodeRecycleConsumer(jdbi);
-        }
-
-        @Bean
-        CodeSequenceStateService codeSequenceStateService(CodeSequenceStateDao stateDao,
-                                                          CodeSequenceAllocator sequenceAllocator) {
-            return new CodeSequenceStateService(stateDao, List.of(sequenceAllocator));
-        }
-
-        @Bean
-        CodeLedgerEntryService codeLedgerEntryService(CodeLedgerEntryDao ledgerEntryDao) {
-            return new CodeLedgerEntryService(ledgerEntryDao);
-        }
-
-        @Bean
-        CodeRecycleEntryService codeRecycleEntryService(CodeRecycleEntryDao recycleEntryDao,
-                                                        CodeRecycleConsumer recycleConsumer) {
-            return new CodeRecycleEntryService(recycleEntryDao, List.of(recycleConsumer));
-        }
-
-        @Bean
-        CodeIssueLogService codeIssueLogService(CodeIssueLogDao issueLogDao) {
-            return new CodeIssueLogService(issueLogDao);
-        }
-
-        @Bean
-        CodePreviewService codePreviewService(Clock codeClock) {
-            return new CodePreviewService(new FormulaEngine(codeClock), codeClock);
-        }
-
-        @Bean
-        CodeGenerateService codeGenerateService(CodeRuleService ruleService,
-                                                CodePreviewService previewService,
-                                                CodeSequenceStateService stateService,
-                                                CodeRecycleEntryService recycleEntryService,
-                                                CodeIssueLogService issueLogService,
-                                                Clock codeClock) {
-            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
-                    issueLogService, codeClock);
-        }
-
-        @Bean
-        JdbiConfigurer bigIntegerJdbiConfigurer() {
-            return jdbi -> jdbi.registerArgument(new AbstractArgumentFactory<BigInteger>(Types.BIGINT) {
-                @Override
-                protected Argument build(BigInteger value, ConfigRegistry config) {
-                    return (position, statement, context) -> statement.setLong(position, value.longValueExact());
-                }
-            });
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_code_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("quarkus.arc.exclude-types", String.join(",",
+                    "net.ximatai.muyun.spring.platform.application.**",
+                    "net.ximatai.muyun.spring.platform.attachment.**",
+                    "net.ximatai.muyun.spring.platform.audit.**",
+                    "net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService",
+                    "net.ximatai.muyun.spring.platform.code.CodeBusinessTimeService",
+                    "net.ximatai.muyun.spring.platform.code.CodeGenerateService",
+                    "net.ximatai.muyun.spring.platform.code.CodeIssueLogService",
+                    "net.ximatai.muyun.spring.platform.code.CodeLedgerEntryService",
+                    "net.ximatai.muyun.spring.platform.code.CodeOpsActionService",
+                    "net.ximatai.muyun.spring.platform.code.CodeOpsQueryService",
+                    "net.ximatai.muyun.spring.platform.code.CodePreviewService",
+                    "net.ximatai.muyun.spring.platform.code.CodeRecycleEntryService",
+                    "net.ximatai.muyun.spring.platform.code.CodeRuleSegmentService",
+                    "net.ximatai.muyun.spring.platform.code.CodeRuleService",
+                    "net.ximatai.muyun.spring.platform.code.CodeRuntimeFacade",
+                    "net.ximatai.muyun.spring.platform.code.CodeSequencePolicyService",
+                    "net.ximatai.muyun.spring.platform.code.CodeSequenceStateService",
+                    "net.ximatai.muyun.spring.platform.code.CodeValueMappingService",
+                    "net.ximatai.muyun.spring.platform.code.DynamicCodeCoordinator",
+                    "net.ximatai.muyun.spring.platform.config.**",
+                    "net.ximatai.muyun.spring.platform.currency.**",
+                    "net.ximatai.muyun.spring.platform.dictionary.**",
+                    "net.ximatai.muyun.spring.platform.duplicate.**",
+                    "net.ximatai.muyun.spring.platform.exchange.**",
+                    "net.ximatai.muyun.spring.platform.generation.**",
+                    "net.ximatai.muyun.spring.platform.impact.**",
+                    "net.ximatai.muyun.spring.platform.initialdata.**",
+                    "net.ximatai.muyun.spring.platform.measure.**",
+                    "net.ximatai.muyun.spring.platform.menu.**",
+                    "net.ximatai.muyun.spring.platform.metadata.**",
+                    "net.ximatai.muyun.spring.platform.module.**",
+                    "net.ximatai.muyun.spring.platform.option.**",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefresher",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService",
+                    "net.ximatai.muyun.spring.platform.runtime.PlatformModuleDefinitionCompiler",
+                    "net.ximatai.muyun.spring.platform.ui.**",
+                    "net.ximatai.muyun.spring.platform.workflow.**",
+                    "net.ximatai.muyun.spring.platform.writeback.**"
+            ));
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                config.put("muyun.database.repository-schema-mode", "ENSURE");
+                return config;
+            }
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 

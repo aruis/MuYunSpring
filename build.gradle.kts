@@ -19,6 +19,7 @@ val migratedQuarkusIntegrationTests = mapOf(
         "net/ximatai/muyun/spring/boot/platform/RuntimeAuditRecordRepositoryIT.java"
     ),
     "muyun-platform" to setOf(
+        "net/ximatai/muyun/spring/platform/code/DynamicCodeCoordinatorRepositoryIT.java",
         "net/ximatai/muyun/spring/platform/runtime/PlatformDynamicRuntimeRefresherIT.java"
     )
 )
