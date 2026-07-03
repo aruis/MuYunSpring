@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.HttpHeaders;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -39,7 +39,7 @@ class LoginWebControllerTest {
         assertThat(LoginWebController.class.getAnnotation(Path.class).value()).isEqualTo("/iam.auth");
 
         assertRoute("login", new Class<?>[]{LoginWebController.LoginRequest.class}, POST.class, "/login");
-        assertRoute("logout", new Class<?>[]{HttpServletRequest.class}, POST.class, "/logout");
+        assertRoute("logout", new Class<?>[]{HttpHeaders.class}, POST.class, "/logout");
         assertRoute("context", new Class<?>[]{}, GET.class, "/context");
     }
 
@@ -58,19 +58,19 @@ class LoginWebControllerTest {
 
     @Test
     void shouldLogoutWithBearerToken() {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer token-1");
+        HttpHeaders headers = mock(HttpHeaders.class);
+        when(headers.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer token-1");
 
-        controller.logout(request);
+        controller.logout(headers);
 
         verify(userSessionService).logout("token-1");
     }
 
     @Test
     void shouldLogoutWithNullTokenWhenAuthorizationHeaderIsMissingOrUnsupported() {
-        HttpServletRequest missing = mock(HttpServletRequest.class);
-        HttpServletRequest unsupported = mock(HttpServletRequest.class);
-        when(unsupported.getHeader("Authorization")).thenReturn("Basic credential");
+        HttpHeaders missing = mock(HttpHeaders.class);
+        HttpHeaders unsupported = mock(HttpHeaders.class);
+        when(unsupported.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Basic credential");
 
         controller.logout(missing);
         controller.logout(unsupported);

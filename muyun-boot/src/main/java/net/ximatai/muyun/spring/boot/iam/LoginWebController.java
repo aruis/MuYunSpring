@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -11,6 +10,7 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 
 @ApplicationScoped
 @Path("/iam.auth")
@@ -29,8 +29,8 @@ public class LoginWebController {
 
     @POST
     @Path("/logout")
-    public void logout(@Context HttpServletRequest request) {
-        userSessionService.logout(bearerToken(request));
+    public void logout(@Context HttpHeaders headers) {
+        userSessionService.logout(bearerToken(headers));
     }
 
     @GET
@@ -40,8 +40,8 @@ public class LoginWebController {
                 .orElseThrow(() -> new AuthenticationRequiredException("current user context is not available"));
     }
 
-    private String bearerToken(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
+    private String bearerToken(HttpHeaders headers) {
+        String header = headers == null ? null : headers.getHeaderString(HttpHeaders.AUTHORIZATION);
         if (header == null || header.isBlank()) {
             return null;
         }
