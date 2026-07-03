@@ -95,8 +95,8 @@ class ActionEndpointInterceptorTest {
         doReturn(AnnotatedActionResource.class).when(resourceInfo).getResourceClass();
         when(resourceInfo.getResourceMethod()).thenReturn(AnnotatedActionResource.class.getMethod("query"));
         UriInfo uriInfo = mock(UriInfo.class);
-        when(uriInfo.getPathParameters(false)).thenReturn(new MultivaluedHashMap<>());
-        when(uriInfo.getQueryParameters(false)).thenReturn(new MultivaluedHashMap<>());
+        when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+        when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
         TestRequestContext request = new TestRequestContext();
         request.uriInfo = uriInfo;
         interceptor.resourceInfo = resourceInfo;

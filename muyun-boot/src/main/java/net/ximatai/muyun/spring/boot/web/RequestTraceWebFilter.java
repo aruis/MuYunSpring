@@ -21,7 +21,7 @@ public class RequestTraceWebFilter implements ContainerRequestFilter, ContainerR
     public void filter(ContainerRequestContext requestContext) {
         RequestTraceContext.Scope scope = RequestTraceContext.use(traceIdOf(requestContext));
         requestContext.setProperty(TRACE_SCOPE, scope);
-        DynamicWebRequest.useRequestPath("/" + requestContext.getUriInfo().getPath(false));
+        DynamicWebRequest.useRequestPath("/" + requestContext.getUriInfo().getPath());
         MDC.put(MDC_TRACE_ID, RequestTraceContext.ensureTraceId());
     }
 

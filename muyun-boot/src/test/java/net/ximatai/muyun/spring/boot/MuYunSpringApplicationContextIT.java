@@ -200,7 +200,12 @@ class MuYunSpringApplicationContextIT {
             config.put("muyun.database.install-postgres-plugins", "true");
             config.put("muyun.database.repository-schema-mode", "ENSURE");
             config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
-            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.exclude-types", String.join(",",
+                    "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*",
+                    "net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebControllerIT$NoopTenantService",
+                    "net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebControllerIT$TestBeans",
+                    "net.ximatai.muyun.spring.boot.iam.IamWebControllerIT$TestBeans"
+            ));
             config.put("quarkus.arc.remove-unused-beans", "false");
             if (Boolean.getBoolean("muyun.postgres.it.required")) {
                 config.put("muyun.platform-bootstrap.enabled", "true");

@@ -1,36 +1,24 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.CriteriaClause;
-import net.ximatai.muyun.database.core.orm.CriteriaGroup;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.PageResult;
-import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.ability.form.FormAbility;
-import net.ximatai.muyun.spring.ability.query.QueryCompiler;
-import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
-import net.ximatai.muyun.spring.ability.query.QueryField;
-import net.ximatai.muyun.spring.ability.query.QueryOperator;
-import net.ximatai.muyun.spring.ability.query.QueryRequest;
-import net.ximatai.muyun.spring.ability.query.QuerySchema;
-import net.ximatai.muyun.spring.ability.query.QueryValueType;
-import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.test.common.http.TestHTTPResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.Alternative;
+import jakarta.enterprise.inject.Produces;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
-import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
-import net.ximatai.muyun.spring.common.platform.EntityCapability;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
-import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
-import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegation;
@@ -40,950 +28,389 @@ import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
-import net.ximatai.muyun.spring.iam.position.Position;
+import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
-import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
-import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
-import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
-import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
-import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.Mockito;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isA;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {
-        TenantWebController.class,
-        OrganizationWebController.class,
-        DepartmentWebController.class,
-        EmployeeWebController.class,
-        PositionWebController.class,
-        RoleWebController.class
-})
-@Import({
-        CurrentUserWebFilter.class,
-        MuYunSpringJacksonConfiguration.class,
-        PlatformWebExceptionHandler.class,
-        StaticRecordReadProjectionService.class
-})
+@QuarkusTest
+@TestProfile(IamWebControllerIT.WebProfile.class)
 class IamWebControllerIT {
-    @Autowired
-    private MockMvc mvc;
+    private static final ObjectMapper JSON = new ObjectMapper();
 
-    @MockitoBean
-    private TenantService tenantService;
+    @TestHTTPResource
+    URI baseUri;
 
-    @MockitoBean
-    private OrganizationService organizationService;
+    private HttpClient httpClient;
 
-    @MockitoBean
-    private DepartmentService departmentService;
-
-    @MockitoBean
-    private EmployeeService employeeService;
-
-    @MockitoBean
-    private EmployeePositionService employeePositionService;
-
-    @MockitoBean
-    private EmployeeAccountService employeeAccountService;
-
-    @MockitoBean
-    private EmployeeDelegationService employeeDelegationService;
-
-    @MockitoBean
-    private StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
-
-    @MockitoBean
-    private PositionService positionService;
-
-    @MockitoBean
-    private RoleService roleService;
-
-    @MockitoBean
-    private RoleGrantableActionResolver roleGrantableActionResolver;
-
-    @MockitoBean
-    private CurrentUserProvider currentUserProvider;
+    @BeforeEach
+    void setUp() {
+        TestBeans.reset();
+        httpClient = HttpClient.newHttpClient();
+        when(TestBeans.currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+    }
 
     @Test
-    void shouldUseInjectedServiceAndCurrentUserTenantInRealMvcContext() throws Exception {
+    void shouldBindInheritedOrganizationTreeRouteInRealQuarkusHttpContext() throws Exception {
         Organization organization = new Organization();
         organization.setId("org-1");
         organization.setCode("HQ");
         organization.setTitle("Headquarters");
-        organization.setParentId(TreeAbility.ROOT_ID);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(organizationService.childrenForAction(PlatformAction.TREE, TreeAbility.ROOT_ID)).thenReturn(List.of(organization));
-        when(organizationService.childrenForAction(PlatformAction.TREE, "org-1")).thenReturn(List.of());
+        organization.setParentId("root");
+        when(TestBeans.organizationService.childrenForAction(PlatformAction.TREE, "root"))
+                .thenReturn(List.of(organization));
+        when(TestBeans.organizationService.childrenForAction(PlatformAction.TREE, "org-1"))
+                .thenReturn(List.of());
 
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("org-1"))
-                .andExpect(jsonPath("$.records[0].children").isArray());
+        HttpResponse<String> response = get("/iam.organization/tree");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(json(response).at("/records/0/record/id").asText()).isEqualTo("org-1");
     }
 
     @Test
-    void shouldBindTreeSortEndpointInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-
-        mvc.perform(post("/iam.organization/sort/org-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"previousId":"org-0","parentId":"root"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(organizationService).moveInTree("org-1", "org-0", null, TreeAbility.ROOT_ID);
-    }
-
-    @Test
-    void shouldBindDepartmentTreeEndpointWithOrganizationScopeInRealMvcContext() throws Exception {
+    void shouldBindDepartmentTreeEndpointInRealQuarkusHttpContext() throws Exception {
         Department department = new Department();
         department.setId("dept-1");
         department.setOrganizationId("org-1");
         department.setCode("FIN");
         department.setTitle("Finance");
-        department.setParentId(TreeAbility.ROOT_ID);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", TreeAbility.ROOT_ID)).thenReturn(List.of(department));
-        when(departmentService.departmentChildrenForAction(
-                PlatformAction.TREE, "org-1", "dept-1")).thenReturn(List.of());
+        department.setParentId("root");
+        when(TestBeans.departmentService.departmentChildrenForAction(PlatformAction.TREE, "org-1", "root"))
+                .thenReturn(List.of(department));
+        when(TestBeans.departmentService.departmentChildrenForAction(PlatformAction.TREE, "org-1", "dept-1"))
+                .thenReturn(List.of());
 
-        mvc.perform(get("/iam.department/tree").param("organizationId", "org-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].record.id").value("dept-1"))
-                .andExpect(jsonPath("$.records[0].record.organizationId").value("org-1"))
-                .andExpect(jsonPath("$.records[0].children").isArray());
+        HttpResponse<String> response = get("/iam.department/tree?organizationId=org-1");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode first = json(response).at("/records/0");
+        assertThat(first.at("/record/id").asText()).isEqualTo("dept-1");
+        assertThat(first.at("/record/organizationId").asText()).isEqualTo("org-1");
+        assertThat(first.get("children").isArray()).isTrue();
     }
 
     @Test
-    void shouldBindDepartmentTreeSortEndpointInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+    void shouldBindDepartmentTreeSortEndpointInRealQuarkusHttpContext() throws Exception {
+        HttpResponse<String> response = post("/iam.department/sort/dept-1", """
+                {"previousId":"dept-0","parentId":"root"}
+                """);
 
-        mvc.perform(post("/iam.department/sort/dept-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"previousId":"dept-0","parentId":"root"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(departmentService).moveInDepartmentTree("dept-1", "dept-0", null, TreeAbility.ROOT_ID);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(json(response).get("count").asInt()).isEqualTo(1);
+        verify(TestBeans.departmentService).moveInDepartmentTree("dept-1", "dept-0", null, "root");
     }
 
     @Test
-    void shouldBindPlainSortEndpointInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.systemUser("admin", "Admin")));
+    void shouldBindEmployeePositionEndpointsInRealQuarkusHttpContext() throws Exception {
+        EmployeePosition relation = employeePosition("relation-1");
+        when(TestBeans.employeePositionService.positions("employee-1")).thenReturn(List.of(relation));
+        when(TestBeans.employeePositionService.addPosition(eq("employee-1"), any(EmployeePosition.class)))
+                .thenReturn("relation-1");
+        when(TestBeans.employeePositionService.select("relation-1")).thenReturn(relation);
+        when(TestBeans.employeePositionService.deletePosition("employee-1", "relation-1")).thenReturn(1);
+        when(TestBeans.employeePositionService.makePrimaryPosition("employee-1", "relation-1")).thenReturn(1);
 
-        mvc.perform(post("/iam.tenant/sort/tenant-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"previousId":"tenant-0"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(tenantService).moveAfter("tenant-1", "tenant-0");
+        assertThat(json(get("/iam.employee/employee-1/positions")).at("/records/0/id").asText())
+                .isEqualTo("relation-1");
+        assertThat(json(post("/iam.employee/employee-1/positions", """
+                {"organizationId":"org-1","departmentId":"dept-1","positionId":"position-1"}
+                """)).get("id").asText()).isEqualTo("relation-1");
+        assertThat(json(post("/iam.employee/employee-1/positions/relation-1/delete", "{}"))
+                .get("count").asInt()).isEqualTo(1);
+        assertThat(json(post("/iam.employee/employee-1/positions/relation-1/primary", "{}"))
+                .get("count").asInt()).isEqualTo(1);
     }
 
     @Test
-    void shouldBindEmployeeSortEndpointInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+    void shouldBindEmployeeAccountEndpointsInRealQuarkusHttpContext() throws Exception {
+        EmployeeAccount binding = new EmployeeAccount();
+        binding.setId("binding-1");
+        binding.setEmployeeId("employee-1");
+        binding.setUserId("user-2");
+        binding.setPrimaryAccount(Boolean.TRUE);
+        when(TestBeans.employeeAccountService.accounts("employee-1")).thenReturn(List.of(binding));
+        when(TestBeans.employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class)))
+                .thenReturn("binding-1");
+        when(TestBeans.employeeAccountService.select("binding-1")).thenReturn(binding);
+        when(TestBeans.employeeAccountService.deleteAccount("employee-1", "binding-1")).thenReturn(1);
 
-        mvc.perform(post("/iam.employee/sort/employee-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"previousId":"employee-0"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(employeeService).moveAfter("employee-1", "employee-0");
+        assertThat(json(get("/iam.employee/employee-1/accounts")).at("/records/0/id").asText())
+                .isEqualTo("binding-1");
+        assertThat(json(post("/iam.employee/employee-1/accounts", """
+                {"userId":"user-2","primaryAccount":true}
+                """)).get("userId").asText()).isEqualTo("user-2");
+        assertThat(json(post("/iam.employee/employee-1/accounts/binding-1/delete", "{}"))
+                .get("count").asInt()).isEqualTo(1);
     }
 
     @Test
-    void shouldBindEmployeeViewEndpointInRealMvcContext() throws Exception {
-        Employee employee = new Employee();
-        employee.setId("employee-1");
-        employee.setOrganizationId("org-1");
-        employee.setDepartmentId("dept-1");
-        employee.setEmployeeNo("E001");
-        employee.setTitle("Alice");
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeService.selectForAction(PlatformAction.VIEW, "employee-1")).thenReturn(employee);
+    void shouldBindEmployeeDelegationEndpointsInRealQuarkusHttpContext() throws Exception {
+        EmployeeDelegation delegation = new EmployeeDelegation();
+        delegation.setId("delegation-1");
+        delegation.setPrincipalEmployeeId("employee-1");
+        delegation.setDelegateEmployeeId("employee-2");
+        when(TestBeans.employeeDelegationService.delegationsByPrincipal("employee-1"))
+                .thenReturn(List.of(delegation));
+        when(TestBeans.employeeDelegationService.delegationsByDelegate("employee-2"))
+                .thenReturn(List.of(delegation));
+        when(TestBeans.employeeDelegationService.addDelegation(eq("employee-1"), any(EmployeeDelegation.class)))
+                .thenReturn("delegation-1");
+        when(TestBeans.employeeDelegationService.select("delegation-1")).thenReturn(delegation);
+        when(TestBeans.employeeDelegationService.deleteDelegation("employee-1", "delegation-1")).thenReturn(1);
 
-        mvc.perform(get("/iam.employee/view/employee-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("employee-1"))
-                .andExpect(jsonPath("$.departmentId").value("dept-1"));
+        assertThat(json(get("/iam.employee/employee-1/delegations")).at("/records/0/id").asText())
+                .isEqualTo("delegation-1");
+        assertThat(json(get("/iam.employee/employee-2/delegated-to-me")).at("/records/0/principalEmployeeId").asText())
+                .isEqualTo("employee-1");
+        assertThat(json(post("/iam.employee/employee-1/delegations", """
+                {"delegateEmployeeId":"employee-2"}
+                """)).get("id").asText()).isEqualTo("delegation-1");
+        assertThat(json(post("/iam.employee/employee-1/delegations/delegation-1/delete", "{}"))
+                .get("count").asInt()).isEqualTo(1);
     }
 
     @Test
-    void shouldExposeEmployeeQuerySchemaInTenantScope() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeService.querySchema()).thenReturn(QuerySchema.from(employeeQueryDescriptor()));
+    void shouldBindRolePermissionEndpointsInRealQuarkusHttpContext() throws Exception {
+        when(TestBeans.roleService.grantAccountRole("role-1", "user-2",
+                ManagementScopeType.TENANT, null)).thenReturn("grant-1");
+        when(TestBeans.roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
+        when(TestBeans.roleService.grantAction("role-1", "iam.employee", "view",
+                DataScopePolicy.ALL, TenantScopePolicy.CURRENT_TENANT, null, null, null)).thenReturn(1);
+        when(TestBeans.roleGrantableActionResolver.resolve(List.of("iam.employee")))
+                .thenReturn(List.of());
+        when(TestBeans.roleService.permissionMatrix(eq("role-1"), any()))
+                .thenReturn(new RolePermissionMatrix("role-1", List.of()));
 
-        mvc.perform(get("/iam.employee/query/schema"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scopeName").value(EmployeeService.MODULE_ALIAS))
-                .andExpect(jsonPath("$.entityAlias").doesNotExist())
-                .andExpect(jsonPath("$.quickSearch.enabled").value(true))
-                .andExpect(jsonPath("$.quickSearch.fields[0]").value("employeeNo"))
-                .andExpect(jsonPath("$.quickSearch.fieldSchemas[?(@.name == 'employeeNo')].title")
-                        .value(org.hamcrest.Matchers.contains("职员编号")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'employeeNo')].title")
-                        .value(org.hamcrest.Matchers.contains("职员编号")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].valueType")
-                        .value(org.hamcrest.Matchers.contains("BOOLEAN")))
-                .andExpect(jsonPath("$.externalCriteria[0].key").value("departmentScope"));
-
-        verify(employeeService).verifyActiveTenant("tenant_a");
+        assertThat(post("/iam.role/role-1/account-grants", """
+                {"userId":"user-2","managementScopeType":"TENANT"}
+                """).body()).isEqualTo("grant-1");
+        assertThat(json(post("/iam.role/role-1/account-grants/grant-1/delete", "{}"))
+                .get("count").asInt()).isEqualTo(1);
+        assertThat(json(post("/iam.role/grant/role-1", """
+                {
+                  "moduleAlias":"iam.employee",
+                  "actionCode":"view",
+                  "dataScopePolicy":"ALL",
+                  "tenantScopePolicy":"CURRENT_TENANT"
+                }
+                """)).get("count").asInt()).isEqualTo(1);
+        assertThat(json(post("/iam.role/permissionMatrix/role-1", """
+                {"moduleAliases":["iam.employee"]}
+                """)).get("roleId").asText()).isEqualTo("role-1");
     }
 
-    @Test
-    void shouldExposeEmployeeFormSchemaFromStaticUiDefinition() throws Exception {
-        assertThat(FormAbility.class.isAssignableFrom(EmployeeService.class)).isFalse();
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-
-        mvc.perform(get("/iam.employee/form/schema"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scopeName").value(EmployeeService.MODULE_ALIAS))
-                .andExpect(jsonPath("$.title").value("职员档案"))
-                .andExpect(jsonPath("$.fields[0].name").value("organizationId"))
-                .andExpect(jsonPath("$.fields[0].title").value("所属机构"))
-                .andExpect(jsonPath("$.fields[0].required").value(true))
-                .andExpect(jsonPath("$.fields[0].readOnly").value(true))
-                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].controlType")
-                        .value(org.hamcrest.Matchers.contains("SWITCH")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].controlType")
-                        .value(org.hamcrest.Matchers.contains("SELECT")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.sourceType")
-                        .value(org.hamcrest.Matchers.contains("dictionary")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.source")
-                        .value(org.hamcrest.Matchers.contains("iam.gender")))
-                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionTitleField")
-                        .value(org.hamcrest.Matchers.contains("genderTitle")));
-
+    private HttpResponse<String> get(String path) throws Exception {
+        return httpClient.send(HttpRequest.newBuilder(uri(path)).GET().build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    @Test
-    void shouldExposeDepartmentFormSchemaFromStaticUiDefinition() throws Exception {
-        assertThat(FormAbility.class.isAssignableFrom(DepartmentService.class)).isFalse();
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-
-        mvc.perform(get("/iam.department/form/schema"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scopeName").value(DepartmentService.MODULE_ALIAS))
-                .andExpect(jsonPath("$.title").value("部门档案"))
-                .andExpect(jsonPath("$.fields[0].name").value("organizationId"))
-                .andExpect(jsonPath("$.fields[0].title").value("所属机构"))
-                .andExpect(jsonPath("$.fields[0].required").value(true))
-                .andExpect(jsonPath("$.fields[0].readOnly").value(true))
-                .andExpect(jsonPath("$.fields[1].name").value("parentId"))
-                .andExpect(jsonPath("$.fields[1].title").value("上级部门"))
-                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].controlType")
-                        .value(org.hamcrest.Matchers.contains("SWITCH")));
+    private HttpResponse<String> post(String path, String body) throws Exception {
+        return httpClient.send(HttpRequest.newBuilder(uri(path))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body == null ? "{}" : body))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 
-    @Test
-    void shouldQueryEmployeesWithDeclaredConditionsQuickSearchAndDepartmentScope() throws Exception {
-        Employee employee = new Employee();
-        employee.setId("employee-1");
-        employee.setOrganizationId("org-1");
-        employee.setDepartmentId("dept-child");
-        employee.setEmployeeNo("E001");
-        employee.setTitle("Alice");
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        wireEmployeeQueryAbility();
-        when(departmentService.selfAndDescendantIds("org-1", "dept-root"))
-                .thenReturn(List.of("dept-root", "dept-child"));
-        when(employeeService.pageQueryForAction(eq(PlatformAction.QUERY),
-                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
-                .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
-
-        mvc.perform(post("/iam.employee/query")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "quickSearch": "Alice",
-                                  "conditions": [
-                                    {"fieldName":"enabled","operator":"EQ","values":[true]}
-                                  ],
-                                  "externalQueryValues": {
-                                    "departmentScope": {
-                                      "organizationId": "org-1",
-                                      "departmentId": "dept-root",
-                                      "includeChildren": true
-                                    }
-                                  },
-                                  "sorts": [{"field":"employeeNo","desc":false}]
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("employee-1"));
-
-        org.mockito.ArgumentCaptor<Criteria> criteria = org.mockito.ArgumentCaptor.forClass(Criteria.class);
-        org.mockito.ArgumentCaptor<Sort[]> sorts = org.mockito.ArgumentCaptor.forClass(Sort[].class);
-        verify(employeeService).pageQueryForAction(eq(PlatformAction.QUERY),
-                criteria.capture(), any(PageRequest.class), sorts.capture());
-        assertThat(containsCondition(criteria.getValue(), "enabled", true)).isTrue();
-        assertThat(containsCondition(criteria.getValue(), "organizationId", "org-1")).isTrue();
-        assertThat(containsCondition(criteria.getValue(), "departmentId", "dept-child")).isTrue();
-        assertThat(containsCondition(criteria.getValue(), "title", "Alice")).isTrue();
-        assertThat(sorts.getValue()).hasSize(1);
+    private URI uri(String path) {
+        return baseUri.resolve(path.substring(1));
     }
 
-    @Test
-    void shouldProjectEmployeeQueryResponseByResolvedListView() throws Exception {
-        Employee employee = new Employee();
-        employee.setId("employee-1");
-        employee.setTenantId("tenant_a");
-        employee.setVersion(7);
-        employee.setOrganizationId("org-1");
-        employee.setDepartmentId("dept-child");
-        employee.setEmployeeNo("E001");
-        employee.setTitle("Alice");
-        employee.setMobile("13800000000");
-        employee.setEmail("alice@example.test");
-        employee.setEnabled(Boolean.TRUE);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        wireEmployeeQueryAbility();
-        when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
-                .thenReturn(Optional.of(employeeStaticModuleDefinition()));
-        when(employeeService.pageQueryForAction(eq(PlatformAction.QUERY),
-                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
-                .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
-
-        mvc.perform(post("/iam.employee/query")
-                        .contentType("application/json")
-                        .content("{}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("employee-1"))
-                .andExpect(jsonPath("$.records[0].employeeNo").value("E001"))
-                .andExpect(jsonPath("$.records[0].title").value("Alice"))
-                .andExpect(jsonPath("$.records[0].mobile").value("13800000000"))
-                .andExpect(jsonPath("$.records[0].email").value("alice@example.test"))
-                .andExpect(jsonPath("$.records[0].enabled").value(true))
-                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].departmentId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].version").doesNotExist());
+    private JsonNode json(HttpResponse<String> response) throws Exception {
+        assertThat(response.statusCode()).isEqualTo(200);
+        return JSON.readTree(response.body());
     }
 
-    @Test
-    void shouldProjectDepartmentQueryResponseByResolvedListView() throws Exception {
-        Department department = new Department();
-        department.setId("dept-1");
-        department.setTenantId("tenant_a");
-        department.setVersion(3);
-        department.setOrganizationId("org-1");
-        department.setParentId(TreeAbility.ROOT_ID);
-        department.setCode("FIN");
-        department.setTitle("财务部");
-        department.setEnabled(Boolean.TRUE);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(staticModuleDefinitionCatalog.find(DepartmentService.MODULE_ALIAS))
-                .thenReturn(Optional.of(departmentStaticModuleDefinition()));
-        when(departmentService.pageQueryForAction(eq(PlatformAction.QUERY),
-                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
-                .thenReturn(PageResult.of(List.of(department), 1, PageRequest.of(1, 20)));
-
-        mvc.perform(post("/iam.department/query")
-                        .contentType("application/json")
-                        .content("{}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("dept-1"))
-                .andExpect(jsonPath("$.records[0].code").value("FIN"))
-                .andExpect(jsonPath("$.records[0].title").value("财务部"))
-                .andExpect(jsonPath("$.records[0].enabled").value(true))
-                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].parentId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].version").doesNotExist());
-    }
-
-    @Test
-    void shouldRejectUndeclaredEmployeeQueryFieldsInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        wireEmployeeQueryAbility();
-
-        mvc.perform(post("/iam.employee/query")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "conditions": [
-                                    {"fieldName":"passwordHash","operator":"EQ","values":["secret"]}
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message")
-                        .value("query field is not supported by iam.employee: passwordHash"));
-
-        verify(employeeService, never()).pageQuery(isA(Criteria.class), isA(PageRequest.class), any(Sort[].class));
-    }
-
-    @Test
-    void shouldRejectEmployeeQueryTemplateUntilStaticTemplateSourceExists() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        wireEmployeeQueryAbility();
-
-        mvc.perform(post("/iam.employee/query")
-                        .contentType("application/json")
-                        .content("""
-                                {"queryTemplateId":"employee-default"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("query template is not supported by iam.employee"));
-
-        verify(employeeService, never()).pageQuery(isA(Criteria.class), isA(PageRequest.class), any(Sort[].class));
-    }
-
-    @Test
-    void shouldBindEmployeePositionEndpointsInRealMvcContext() throws Exception {
+    private EmployeePosition employeePosition(String id) {
         EmployeePosition relation = new EmployeePosition();
-        relation.setId("relation-1");
+        relation.setId(id);
         relation.setEmployeeId("employee-1");
         relation.setOrganizationId("org-1");
         relation.setDepartmentId("dept-1");
         relation.setPositionId("position-1");
         relation.setPrimaryPosition(Boolean.TRUE);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeePositionService.positions("employee-1")).thenReturn(List.of(relation));
-        when(employeePositionService.addPosition(eq("employee-1"), any())).thenReturn("relation-1");
-        when(employeePositionService.select("relation-1")).thenReturn(relation);
-        when(employeePositionService.deletePosition("employee-1", "relation-1")).thenReturn(1);
-        when(employeePositionService.makePrimaryPosition("employee-1", "relation-1")).thenReturn(1);
-
-        mvc.perform(get("/iam.employee/employee-1/positions"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("relation-1"))
-                .andExpect(jsonPath("$.records[0].primaryPosition").value(true));
-
-        mvc.perform(post("/iam.employee/employee-1/positions")
-                        .contentType("application/json")
-                        .content("""
-                                {"organizationId":"org-1","departmentId":"dept-1","positionId":"position-1"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("relation-1"));
-
-        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/delete"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/primary"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+        return relation;
     }
 
-    @Test
-    void shouldBindEmployeePositionSortEndpointInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+    @Alternative
+    @Priority(1)
+    @ApplicationScoped
+    public static class TestBeans {
+        static TenantService tenantService = Mockito.mock(TenantService.class);
+        static OrganizationService organizationService = Mockito.mock(OrganizationService.class);
+        static DepartmentService departmentService = Mockito.mock(DepartmentService.class);
+        static EmployeeService employeeService = Mockito.mock(EmployeeService.class);
+        static EmployeePositionService employeePositionService = Mockito.mock(EmployeePositionService.class);
+        static EmployeeAccountService employeeAccountService = Mockito.mock(EmployeeAccountService.class);
+        static EmployeeDelegationService employeeDelegationService = Mockito.mock(EmployeeDelegationService.class);
+        static PositionService positionService = Mockito.mock(PositionService.class);
+        static PositionCategoryService positionCategoryService = Mockito.mock(PositionCategoryService.class);
+        static RoleService roleService = Mockito.mock(RoleService.class);
+        static RoleGrantableActionResolver roleGrantableActionResolver = Mockito.mock(RoleGrantableActionResolver.class);
+        static PlatformModuleActionService moduleActionService = Mockito.mock(PlatformModuleActionService.class);
+        static StaticModuleDefinitionCatalog staticModuleDefinitionCatalog =
+                Mockito.mock(StaticModuleDefinitionCatalog.class);
+        static CurrentUserProvider currentUserProvider = Mockito.mock(CurrentUserProvider.class);
+        static MenuService menuService = Mockito.mock(MenuService.class);
 
-        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/sort")
-                        .contentType("application/json")
-                        .content("""
-                                {"previousId":"relation-0"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(employeePositionService).moveEmployeePosition("employee-1", "relation-1", "relation-0", null);
-    }
-
-    @Test
-    void shouldBindEmployeeAccountEndpointsInRealMvcContext() throws Exception {
-        EmployeeAccount binding = employeeAccount("binding-1", "employee-1", "user-2", true);
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeAccountService.accounts("employee-1")).thenReturn(List.of(binding));
-        when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
-        when(employeeAccountService.select("binding-1")).thenReturn(binding);
-        when(employeeAccountService.deleteAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.enableAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.disableAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.makePrimaryAccount("employee-1", "binding-1")).thenReturn(1);
-
-        mvc.perform(get("/iam.employee/employee-1/accounts"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("binding-1"))
-                .andExpect(jsonPath("$.records[0].primaryAccount").value(true));
-
-        mvc.perform(post("/iam.employee/employee-1/accounts")
-                        .contentType("application/json")
-                        .content("""
-                                {"userId":"user-2","primaryAccount":true}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("binding-1"))
-                .andExpect(jsonPath("$.userId").value("user-2"));
-
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/delete"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/enable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/disable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/primary"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(employeeAccountService).accounts("employee-1");
-        verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
-    }
-
-    @Test
-    void shouldBindEmployeeDelegationEndpointsInRealMvcContext() throws Exception {
-        EmployeeDelegation delegation = employeeDelegation("delegation-1", "employee-1", "employee-2");
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeDelegationService.delegationsByPrincipal("employee-1")).thenReturn(List.of(delegation));
-        when(employeeDelegationService.delegationsByDelegate("employee-2")).thenReturn(List.of(delegation));
-        when(employeeDelegationService.addDelegation(eq("employee-1"), any(EmployeeDelegation.class)))
-                .thenReturn("delegation-1");
-        when(employeeDelegationService.select("delegation-1")).thenReturn(delegation);
-        when(employeeDelegationService.updateDelegation(eq("employee-1"), eq("delegation-1"),
-                any(EmployeeDelegation.class))).thenReturn(1);
-        when(employeeDelegationService.deleteDelegation("employee-1", "delegation-1")).thenReturn(1);
-        when(employeeDelegationService.enableDelegation("employee-1", "delegation-1")).thenReturn(1);
-        when(employeeDelegationService.disableDelegation("employee-1", "delegation-1")).thenReturn(1);
-
-        mvc.perform(get("/iam.employee/employee-1/delegations"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("delegation-1"))
-                .andExpect(jsonPath("$.records[0].delegateEmployeeId").value("employee-2"));
-
-        mvc.perform(get("/iam.employee/employee-2/delegated-to-me"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].principalEmployeeId").value("employee-1"));
-
-        mvc.perform(post("/iam.employee/employee-1/delegations")
-                        .contentType("application/json")
-                        .content("""
-                                {"delegateEmployeeId":"employee-2"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("delegation-1"));
-
-        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/update")
-                        .contentType("application/json")
-                        .content("""
-                                {"delegateEmployeeId":"employee-2","memo":"changed"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("delegation-1"));
-
-        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/delete"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/enable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/disable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        verify(employeeDelegationService).delegationsByPrincipal("employee-1");
-        verify(employeeDelegationService).delegationsByDelegate("employee-2");
-        verify(employeeDelegationService).addDelegation(eq("employee-1"), any(EmployeeDelegation.class));
-    }
-
-    @Test
-    void shouldBindPositionEndpointInRealMvcContext() throws Exception {
-        Position position = new Position();
-        position.setId("position-1");
-        position.setCode("SALES_MANAGER");
-        position.setTitle("Sales Manager");
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(positionService.select("position-1")).thenReturn(position);
-
-        mvc.perform(get("/iam.position/view/position-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("position-1"))
-                .andExpect(jsonPath("$.code").value("SALES_MANAGER"));
-    }
-
-    @Test
-    void shouldRejectPostForReadOnlyTreeEndpointInRealMvcContext() throws Exception {
-        mvc.perform(post("/iam.organization/tree"))
-                .andExpect(status().isMethodNotAllowed());
-    }
-
-    @Test
-    void shouldApplyAdviceWhenCurrentUserTenantIsMissingInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser()).thenReturn(Optional.empty());
-
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));
-    }
-
-    @Test
-    void shouldBindRoleManagementEndpointsInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
-                ManagementScopeType.TENANT, "tenant_a");
-        EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
-                .thenReturn("grant-1");
-        when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
-        when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
-        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
-        when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
-        when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
-        when(roleService.grantAction("role-1", "sales.contract", "query",
-                DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
-                null, null, null)).thenReturn(1);
-        when(roleService.grantAction("role-1", "sales.contract", "query",
-                DataScopePolicy.DEPARTMENT_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT,
-                null, null, null)).thenReturn(1);
-        when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
-
-        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"userId":"user-2","managementScopeType":"tenant","managementScopeId":"tenant_a"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-1"));
-
-        mvc.perform(get("/iam.role/{roleId}/account-grants", "role-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].userId").value("user-2"))
-                .andExpect(jsonPath("$[0].managementScopeType").value("tenant"));
-
-        mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
-                        .contentType("application/json")
-                        .content("""
-                                {"employeePositionId":"position-1"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-2"));
-
-        mvc.perform(get("/iam.role/{roleId}/employment-grants", "role-2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("grant-2"))
-                .andExpect(jsonPath("$[0].employeePositionId").value("position-1"));
-
-        mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "moduleAlias":"sales.contract",
-                                  "actionCode":"query",
-                                  "dataScopePolicy":"owner",
-                                  "tenantScopePolicy":"currentTenant"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "moduleAlias":"sales.contract",
-                                  "actionCode":"query",
-                                  "dataScopePolicy":"departmentAndChildren",
-                                  "tenantScopePolicy":"currentTenant"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-
-        mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"moduleAlias":"sales.contract","actionCode":"query"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-    }
-
-    @Test
-    void shouldResolveRolePermissionMatrixInRealMvcContext() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        List<GrantableAction> grantableActions = List.of(
-                new GrantableAction("sales.contract", "query", "view", "Query", true, true)
-        );
-        when(roleGrantableActionResolver.resolve(List.of("sales.contract"))).thenReturn(grantableActions);
-        when(roleService.permissionMatrix("role-1", grantableActions)).thenReturn(new RolePermissionMatrix(
-                "role-1",
-                List.of(new RolePermissionMatrix.Module(
-                        "sales.contract",
-                        List.of(new RolePermissionAction(
-                                "sales.contract", "query", "view", "Query",
-                                true, true, true, DataScopePolicy.OWNER,
-                                TenantScopePolicy.CURRENT_TENANT, null, null, null))
-                ))
-        ));
-
-        mvc.perform(post("/iam.role/permissionMatrix/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {"moduleAliases":["sales.contract"]}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roleId").value("role-1"))
-                .andExpect(jsonPath("$.modules[0].moduleAlias").value("sales.contract"))
-                .andExpect(jsonPath("$.modules[0].actions[0].permissionActionCode").value("view"))
-                .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
-    }
-
-    @Test
-    void shouldApplyIamAdviceWhenRoleGrantRejectsUnsupportedCustomDataScope() throws Exception {
-        when(currentUserProvider.currentUser())
-                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(roleService.grantAction("role-1", "sales.contract", "query",
-                DataScopePolicy.CUSTOM, TenantScopePolicy.CURRENT_TENANT,
-                "authUserId = ${userId}", null, null))
-                .thenThrow(new PlatformException("custom data scope policy is not supported yet"));
-
-        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "moduleAlias":"sales.contract",
-                                  "actionCode":"query",
-                                  "dataScopePolicy":"custom",
-                                  "tenantScopePolicy":"currentTenant",
-                                  "scopeCondition":"authUserId = ${userId}"
-                                }
-                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("custom data scope policy is not supported yet"));
-    }
-
-    private AccountRoleGrant accountRoleGrant(String id,
-                                              String roleId,
-                                              String userId,
-                                              ManagementScopeType scopeType,
-                                              String scopeId) {
-        AccountRoleGrant grant = new AccountRoleGrant();
-        grant.setId(id);
-        grant.setRoleId(roleId);
-        grant.setUserId(userId);
-        grant.setManagementScopeType(scopeType);
-        grant.setManagementScopeId(scopeId);
-        grant.setEnabled(Boolean.TRUE);
-        return grant;
-    }
-
-    private EmploymentRoleGrant employmentRoleGrant(String id, String roleId, String employeePositionId) {
-        EmploymentRoleGrant grant = new EmploymentRoleGrant();
-        grant.setId(id);
-        grant.setRoleId(roleId);
-        grant.setEmployeePositionId(employeePositionId);
-        grant.setEnabled(Boolean.TRUE);
-        return grant;
-    }
-
-    private EmployeeAccount employeeAccount(String id, String employeeId, String userId, boolean primaryAccount) {
-        EmployeeAccount binding = new EmployeeAccount();
-        binding.setId(id);
-        binding.setEmployeeId(employeeId);
-        binding.setUserId(userId);
-        binding.setPrimaryAccount(primaryAccount);
-        binding.setEnabled(Boolean.TRUE);
-        return binding;
-    }
-
-    private EmployeeDelegation employeeDelegation(String id, String principalEmployeeId, String delegateEmployeeId) {
-        EmployeeDelegation delegation = new EmployeeDelegation();
-        delegation.setId(id);
-        delegation.setPrincipalEmployeeId(principalEmployeeId);
-        delegation.setDelegateEmployeeId(delegateEmployeeId);
-        delegation.setEnabled(Boolean.TRUE);
-        return delegation;
-    }
-
-    private void wireEmployeeQueryAbility() {
-        when(employeeService.queryCriteria(any(QueryRequest.class)))
-                .thenAnswer(invocation -> employeeQueryCompiler().criteria(invocation.getArgument(0)));
-        when(employeeService.querySorts(any(QueryRequest.class)))
-                .thenAnswer(invocation -> employeeQueryCompiler().sorts(invocation.getArgument(0)));
-    }
-
-    private StaticModuleDefinition employeeStaticModuleDefinition() {
-        EmployeeWebController controller = new EmployeeWebController(
-                employeePositionService,
-                employeeAccountService,
-                employeeDelegationService
-        );
-        return new StaticModuleDefinition(
-                "iam",
-                EmployeeService.MODULE_ALIAS,
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
-                controller.moduleUiDefinition()
-        );
-    }
-
-    private StaticModuleDefinition departmentStaticModuleDefinition() {
-        DepartmentWebController controller = new DepartmentWebController();
-        return new StaticModuleDefinition(
-                "iam",
-                DepartmentService.MODULE_ALIAS,
-                "部门管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/departments",
-                null,
-                Set.of(EntityCapability.CRUD, EntityCapability.TREE),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile("department", "部门管理", Department.class)),
-                controller.moduleUiDefinition()
-        );
-    }
-
-    private QueryCompiler employeeQueryCompiler() {
-        return new QueryCompiler(employeeQueryDescriptor());
-    }
-
-    private QueryDescriptor employeeQueryDescriptor() {
-        return QueryDescriptor.builder(EmployeeService.MODULE_ALIAS)
-                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
-                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属机构"))
-                .field(QueryField.of("departmentId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属部门"))
-                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
-                .field(QueryField.of("employeeNo", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("职员编号").withQuickSearch().withSortable())
-                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("职员姓名").withQuickSearch().withSortable())
-                .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("手机号").withQuickSearch())
-                .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("邮箱").withQuickSearch())
-                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
-                        .withTitle("排序号").withSortable())
-                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
-                                QueryOperator.BETWEEN)
-                        .withTitle("创建时间")
-                        .withSortable())
-                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
-                                QueryOperator.BETWEEN)
-                        .withTitle("更新时间")
-                        .withSortable())
-                .externalCriteria("departmentScope", this::employeeDepartmentScopeCriteria)
-                .defaultSort(Sort.asc("sortOrder"))
-                .defaultSort(Sort.asc("employeeNo"))
-                .build();
-    }
-
-    private Criteria employeeDepartmentScopeCriteria(Object value) {
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, Object> scope = (java.util.Map<String, Object>) value;
-        String organizationId = String.valueOf(scope.get("organizationId"));
-        String departmentId = String.valueOf(scope.get("departmentId"));
-        boolean includeChildren = Boolean.TRUE.equals(scope.get("includeChildren"));
-        Criteria criteria = Criteria.of().eq("organizationId", organizationId);
-        if (!includeChildren) {
-            return criteria.eq("departmentId", departmentId);
+        static void reset() {
+            Mockito.reset(tenantService, organizationService, departmentService, employeeService,
+                    employeePositionService, employeeAccountService, employeeDelegationService, positionService,
+                    positionCategoryService, roleService, roleGrantableActionResolver, moduleActionService,
+                    staticModuleDefinitionCatalog, currentUserProvider, menuService);
         }
-        return criteria.in("departmentId", departmentService.selfAndDescendantIds(organizationId, departmentId));
-    }
 
-    private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
-        return clauses(criteria).stream()
-                .anyMatch(clause -> fieldName.equals(clause.getField())
-                        && clause.getValues().contains(value));
-    }
+        @Produces
+        @Dependent
+        TenantService tenantService() {
+            return tenantService;
+        }
 
-    private List<CriteriaClause> clauses(Criteria criteria) {
-        List<CriteriaClause> result = new ArrayList<>();
-        collect(criteria.getRoot(), result);
-        return result;
-    }
+        @Produces
+        @Dependent
+        OrganizationService organizationService() {
+            return organizationService;
+        }
 
-    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
-        for (CriteriaGroup.Entry entry : group.getEntries()) {
-            Object node = criteriaNode(entry);
-            if (node instanceof CriteriaClause clause) {
-                result.add(clause);
-            } else if (node instanceof CriteriaGroup childGroup) {
-                collect(childGroup, result);
-            }
+        @Produces
+        @Dependent
+        DepartmentService departmentService() {
+            return departmentService;
+        }
+
+        @Produces
+        @Dependent
+        EmployeeService employeeService() {
+            return employeeService;
+        }
+
+        @Produces
+        @Dependent
+        EmployeePositionService employeePositionService() {
+            return employeePositionService;
+        }
+
+        @Produces
+        @Dependent
+        EmployeeAccountService employeeAccountService() {
+            return employeeAccountService;
+        }
+
+        @Produces
+        @Dependent
+        EmployeeDelegationService employeeDelegationService() {
+            return employeeDelegationService;
+        }
+
+        @Produces
+        @Dependent
+        PositionService positionService() {
+            return positionService;
+        }
+
+        @Produces
+        @Dependent
+        PositionCategoryService positionCategoryService() {
+            return positionCategoryService;
+        }
+
+        @Produces
+        @Dependent
+        RoleService roleService() {
+            return roleService;
+        }
+
+        @Produces
+        @Dependent
+        RoleGrantableActionResolver roleGrantableActionResolver() {
+            return roleGrantableActionResolver;
+        }
+
+        @Produces
+        @Dependent
+        PlatformModuleActionService moduleActionService() {
+            return moduleActionService;
+        }
+
+        @Produces
+        @Dependent
+        StaticModuleDefinitionCatalog staticModuleDefinitionCatalog() {
+            return staticModuleDefinitionCatalog;
+        }
+
+        @Produces
+        @Dependent
+        CurrentUserProvider currentUserProvider() {
+            return currentUserProvider;
+        }
+
+        @Produces
+        @Dependent
+        ActionExecutionPolicyService actionExecutionPolicyService() {
+            return new AllowAllActionExecutionPolicyService();
+        }
+
+        @Produces
+        @Dependent
+        MenuService menuService() {
+            return menuService;
         }
     }
 
-    private Object criteriaNode(CriteriaGroup.Entry entry) {
-        try {
-            Method method = entry.getClass().getMethod("getNode");
-            return method.invoke(entry);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Cannot read criteria node", e);
+    public static class WebProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_iam_web_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            config.put("quarkus.arc.exclude-types", String.join(",",
+                    "net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebControllerIT$NoopTenantService",
+                    "net.ximatai.muyun.spring.iam.tenant.TenantService",
+                    "net.ximatai.muyun.spring.iam.organization.OrganizationService",
+                    "net.ximatai.muyun.spring.iam.department.DepartmentService",
+                    "net.ximatai.muyun.spring.iam.employee.EmployeeService",
+                    "net.ximatai.muyun.spring.iam.employee.EmployeePositionService",
+                    "net.ximatai.muyun.spring.iam.employee.EmployeeAccountService",
+                    "net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService",
+                    "net.ximatai.muyun.spring.iam.position.PositionService",
+                    "net.ximatai.muyun.spring.iam.position.PositionCategoryService",
+                    "net.ximatai.muyun.spring.iam.role.RoleService",
+                    "net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver",
+                    "net.ximatai.muyun.spring.platform.module.PlatformModuleActionService",
+                    "net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebControllerIT$TestBeans"
+            ));
+            return config;
         }
     }
 }

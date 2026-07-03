@@ -18,10 +18,13 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
+import org.jboss.resteasy.reactive.server.core.ResteasyReactiveRequestContext;
+import org.jboss.resteasy.reactive.server.spi.ResteasyReactiveContainerRequestContext;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -219,14 +222,32 @@ public class ActionEndpointContextResolver {
         if (requestContext == null || requestContext.getUriInfo() == null) {
             return null;
         }
-        return first(requestContext.getUriInfo().getPathParameters(false), key);
+        if (requestContext instanceof ResteasyReactiveContainerRequestContext reactiveContext
+                && reactiveContext.getServerRequestContext() instanceof ResteasyReactiveRequestContext serverContext) {
+            return serverContext.getPathParameter(key, false);
+        }
+        return first(requestContext.getUriInfo().getPathParameters(), key);
     }
 
     private java.util.List<String> queryValues(ContainerRequestContext requestContext, String key) {
         if (requestContext == null || requestContext.getUriInfo() == null) {
             return java.util.List.of();
         }
-        return requestContext.getUriInfo().getQueryParameters(false).getOrDefault(key, java.util.List.of());
+        if (requestContext instanceof ResteasyReactiveContainerRequestContext reactiveContext
+                && reactiveContext.getServerRequestContext() instanceof ResteasyReactiveRequestContext serverContext) {
+            Object values = serverContext.getQueryParameter(key, false, false);
+            if (values instanceof List<?> list) {
+                return list.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .toList();
+            }
+            if (values instanceof String value) {
+                return List.of(value);
+            }
+            return List.of();
+        }
+        return requestContext.getUriInfo().getQueryParameters().getOrDefault(key, java.util.List.of());
     }
 
     private String first(MultivaluedMap<String, String> values, String key) {

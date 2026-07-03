@@ -28,11 +28,11 @@
 - 影响：子类 override 中的个性化路径、参数或响应语义存在遗漏风险。
 - 回收方向：逐个核对继承式 Web controller，必要时拆成明确的 Quarkus resource 方法，确保每个路由只有一个声明来源。
 
-### Dynamic Web route precedence and inherited default routes are not fully restored
+### Dynamic Web inherited default routes are not fully restored
 
-- 现状：`DynamicRecordWebControllerIT` 已迁移为 Quarkus HTTP 测试，但当前 RESTEasy Reactive 路由下，静态 exact alias resource 仍会被动态模块 regex resource 抢占；部分接口 default method 声明的动态记录路由仍返回 404。
-- 影响：动态模块 Web 入口与旧 Spring MVC 路由优先级、接口继承路由暴露语义不完全等价。
-- 回收方向：把动态 Web 入口从接口 default route 迁到显式 JAX-RS resource 方法或专门路由层，明确静态模块 exact path 优先于动态 fallback，并补真实 HTTP contract 测试。
+- 现状：`DynamicRecordWebControllerIT` 已迁移为 Quarkus HTTP 测试，静态 exact alias resource 已可绑定；部分接口 default method 声明的动态记录路由仍返回 404。
+- 影响：动态模块 Web 入口与旧 Spring MVC 的接口继承路由暴露语义不完全等价。
+- 回收方向：把动态 Web 入口从接口 default route 迁到显式 JAX-RS resource 方法或专门路由层，并补真实 HTTP contract 测试。
 
 ### Spring multi-path mappings were collapsed
 
@@ -47,6 +47,12 @@
 - 现状：`BearerTokenCurrentUserProvider` 和 `DynamicWebRequest` 通过 JAX-RS filter 写入 ThreadLocal 来读取授权头和请求路径；正式方向见 Web 迁移边界决策第 4 条。
 - 影响：虽然可用于迁移期解耦 Spring `RequestContextHolder`，但需要严格清理生命周期，异步执行或上下文传播场景存在风险。
 - 回收方向：改为 `@RequestScoped` 上下文对象、JAX-RS `ContainerRequestContext` 适配器或 Quarkus 安全上下文，并补并发/请求隔离测试。
+
+### RESTEasy Reactive request parameter access is framework-specific
+
+- 现状：`ActionEndpointContextResolver` 优先通过 RESTEasy Reactive request context 读取命名 path/query 参数，避免 `UriInfo` 的 non-decoded 参数分支；标准 JAX-RS `UriInfo` 仅作为单元测试和非 Quarkus fallback。
+- 影响：ActionEndpoint 解析逻辑暂时依赖 RESTEasy Reactive 类型，Web 层平台代码存在 Quarkus 专属分支。
+- 回收方向：抽出稳定的请求参数读取门面，由 Quarkus adapter 实现，ActionEndpoint resolver 只依赖平台接口。
 
 ## Dependency Injection
 
@@ -115,3 +121,9 @@
 - 现状：部分平台 `@QuarkusTest` 通过 `quarkus.arc.exclude-types` 精确排除未进入当前测试目标的平台 bean，并在测试内手动组装服务图。
 - 影响：可以避免迁移期一次性打开整个平台 CDI 图，但测试 profile 与正式应用注入图仍存在差异。
 - 回收方向：平台服务 CDI 边界稳定后，减少测试 profile 中的 bean 排除项，改用正式 producer/module fixture 组装集成测试依赖。
+
+### Web Quarkus IT profiles manually isolate service graphs
+
+- 现状：动态记录和 IAM Web `@QuarkusTest` 使用 `quarkus.arc.exclude-types` 与测试 producer/mock 隔离业务 service、平台 action 元数据 service 和相邻测试 fixture。
+- 影响：Web 路由和 controller contract 可以先恢复，但测试 profile 与正式应用注入图不完全一致，且跨测试 producer 需要显式排除以避免 CDI 歧义。
+- 回收方向：建立统一 Web test fixture 或 Quarkus test resource，按场景提供稳定 mock/real service 图，减少各 IT 手写 exclude/producers。

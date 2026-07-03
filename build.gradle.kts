@@ -14,6 +14,7 @@ val migratedQuarkusIntegrationTests = mapOf(
         "net/ximatai/muyun/spring/boot/MuYunSpringApplicationContextIT.java",
         "net/ximatai/muyun/spring/boot/dynamic/DynamicRecordWebControllerIT.java",
         "net/ximatai/muyun/spring/boot/dynamic/DynamicSchemaServiceIT.java",
+        "net/ximatai/muyun/spring/boot/iam/IamWebControllerIT.java",
         "net/ximatai/muyun/spring/boot/iam/OrganizationRepositoryIT.java",
         "net/ximatai/muyun/spring/boot/platform/CodeRepositoryIT.java",
         "net/ximatai/muyun/spring/boot/platform/PlatformFieldTypeRepositoryIT.java",

@@ -7,13 +7,16 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Alternative;
+import jakarta.enterprise.inject.Produces;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.iam.tenant.TenantDao;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,11 +65,10 @@ class DynamicRecordWebControllerIT {
     }
 
     @Test
-    void shouldKeepStaticExactAliasPrecedenceAsKnownQuarkusMigrationGap() throws Exception {
+    void shouldBindStaticExactAliasRouteInRealQuarkusHttpContext() throws Exception {
         HttpResponse<String> staticResponse = post("/sales.contract/query");
 
-        assertThat(staticResponse.statusCode()).isEqualTo(400);
-        verifyNoInteractions(recordService);
+        assertThat(staticResponse.statusCode()).isEqualTo(200);
     }
 
     @Test
@@ -111,6 +113,17 @@ class DynamicRecordWebControllerIT {
         }
     }
 
+    @Alternative
+    @Priority(1)
+    @ApplicationScoped
+    public static class TestBeans {
+        @Produces
+        @Dependent
+        PlatformModuleActionService moduleActionService() {
+            return mock(PlatformModuleActionService.class);
+        }
+    }
+
     public static class WebProfile implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
@@ -122,6 +135,10 @@ class DynamicRecordWebControllerIT {
             config.put("quarkus.datasource.password", "testpass");
             config.put("muyun.database.repository-schema-mode", "NONE");
             config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", String.join(",",
+                    "net.ximatai.muyun.spring.boot.iam.IamWebControllerIT$TestBeans",
+                    "net.ximatai.muyun.spring.platform.module.PlatformModuleActionService"
+            ));
             config.put("quarkus.arc.remove-unused-beans", "false");
             return config;
         }
