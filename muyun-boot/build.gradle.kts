@@ -29,7 +29,6 @@ tasks.named<JavaCompile>("compileTestJava").configure {
         "**/IamWebControllerTest.java",
         "**/MenuWebControllerTest.java",
         "**/RecordLinkageRuleWebControllerTest.java",
-        "**/PlatformModuleRuntimeContextWebControllerTest.java",
         "**/LowCodeGovernanceWebControllerTest.java",
         "**/DynamicExchangeTemplateWebControllerTest.java",
         "**/DynamicImportWebControllerTest.java",

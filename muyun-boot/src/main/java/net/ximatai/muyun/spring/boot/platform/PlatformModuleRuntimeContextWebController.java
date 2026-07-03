@@ -2,13 +2,13 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 
-@RestController
-@RequestMapping("/platform.module/{moduleAlias}/context")
+@ApplicationScoped
+@Path("/platform.module/{moduleAlias}/context")
 public class PlatformModuleRuntimeContextWebController {
     private final PlatformModuleRuntimeContextService contextService;
 
@@ -16,9 +16,9 @@ public class PlatformModuleRuntimeContextWebController {
         this.contextService = contextService;
     }
 
-    @GetMapping
+    @GET
     @ActionEndpoint(PlatformAction.MENU)
-    public PlatformModuleRuntimeContext context(@PathVariable String moduleAlias) {
+    public PlatformModuleRuntimeContext context(@PathParam("moduleAlias") String moduleAlias) {
         return contextService.context(moduleAlias);
     }
 }
