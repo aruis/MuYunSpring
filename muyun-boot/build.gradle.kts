@@ -28,7 +28,6 @@ tasks.named<JavaCompile>("compileTestJava").configure {
     exclude(
         "**/IamWebControllerTest.java",
         "**/MenuWebControllerTest.java",
-        "**/RecordLinkageRuleWebControllerTest.java",
         "**/LowCodeGovernanceWebControllerTest.java",
         "**/DynamicImportWebControllerTest.java",
         "**/DynamicExportWebControllerTest.java",

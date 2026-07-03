@@ -1,22 +1,22 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRule;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRuleService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = RecordGenerationRuleService.MODULE_ALIAS,
         title = "平台生单规则")
-@RequestMapping("/platform.module/{moduleAlias}/generation-rules")
+@Path("/platform.module/{moduleAlias}/generation-rules")
 public class RecordGenerationRuleWebController
         extends ModuleScopedRuleTreeWebSupport<RecordGenerationRule, RecordGenerationRuleService> {
 
@@ -24,20 +24,22 @@ public class RecordGenerationRuleWebController
         super("sourceModuleAlias");
     }
 
-    @GetMapping("/viewTree/{id}")
+    @GET
+    @Path("/viewTree/{id}")
     @CustomActionEndpoint(value = "viewTree", title = "查看生单规则树",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public RecordGenerationRule viewTree(HttpServletRequest request, @PathVariable String id) {
+    public RecordGenerationRule viewTree(@Context HttpServletRequest request, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(request, id);
             return service().viewRuleTree(id);
         });
     }
 
-    @PostMapping("/saveTree")
+    @POST
+    @Path("/saveTree")
     @CustomActionEndpoint(value = "saveTree", title = "保存生单规则树",
             level = PlatformActionLevel.ANY, dataAuth = false)
-    public RecordGenerationRule saveTree(HttpServletRequest request, @RequestBody RecordGenerationRule rule) {
+    public RecordGenerationRule saveTree(@Context HttpServletRequest request, RecordGenerationRule rule) {
         return webScope(() -> {
             if (rule == null) {
                 throw new IllegalArgumentException("generation rule tree must not be null");

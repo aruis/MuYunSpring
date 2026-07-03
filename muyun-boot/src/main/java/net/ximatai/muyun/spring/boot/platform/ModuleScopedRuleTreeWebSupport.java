@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -25,10 +26,10 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.servlet.HandlerMapping;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
 
 import java.util.Map;
 import java.util.Objects;
@@ -43,10 +44,11 @@ abstract class ModuleScopedRuleTreeWebSupport<
         this.scopeField = Objects.requireNonNull(scopeField, "scopeField must not be null");
     }
 
-    @PostMapping("/query")
+    @POST
+    @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<T> query(HttpServletRequest servletRequest,
-                                    @RequestBody(required = false) WebQueryRequest request) {
+    public WebPageResponse<T> query(@Context HttpServletRequest servletRequest,
+                                    WebQueryRequest request) {
         return webScope(() -> {
             Criteria criteria = queryCriteria(request);
             criteria.eq(scopeField, moduleAlias(servletRequest));
@@ -84,38 +86,42 @@ abstract class ModuleScopedRuleTreeWebSupport<
         return new Sort[]{Sort.asc("sortOrder")};
     }
 
-    @PostMapping("/delete/{id}")
+    @POST
+    @Path("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse delete(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             return new WebCountResponse(service().delete(id));
         });
     }
 
-    @PostMapping("/enable/{id}")
+    @POST
+    @Path("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public WebCountResponse enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse enable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             return new WebCountResponse(service().enable(id));
         });
     }
 
-    @PostMapping("/disable/{id}")
+    @POST
+    @Path("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public WebCountResponse disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public WebCountResponse disable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             return new WebCountResponse(service().disable(id));
         });
     }
 
-    @PostMapping("/sort/{id}")
+    @POST
+    @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(HttpServletRequest servletRequest,
-                                 @PathVariable String id,
-                                 @RequestBody(required = false) SortWebRequest request) {
+    public WebCountResponse sort(@Context HttpServletRequest servletRequest,
+                                 @PathParam("id") String id,
+                                 SortWebRequest request) {
         return webScope(() -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             requireScopedRecord(servletRequest, id);
@@ -133,14 +139,14 @@ abstract class ModuleScopedRuleTreeWebSupport<
         });
     }
 
-    protected void requireExistingRuleInScope(HttpServletRequest request, T rule) {
+    protected void requireExistingRuleInScope(@Context HttpServletRequest request, T rule) {
         if (rule == null || !hasText(rule.getId())) {
             return;
         }
         requireScopedRecord(request, rule.getId());
     }
 
-    protected T requireScopedRecord(HttpServletRequest request, String id) {
+    protected T requireScopedRecord(@Context HttpServletRequest request, String id) {
         T record = service().select(id);
         String moduleAlias = moduleAlias(request);
         if (record == null || !moduleAlias.equals(scopeValue(record))) {
@@ -149,29 +155,27 @@ abstract class ModuleScopedRuleTreeWebSupport<
         return record;
     }
 
-    protected String moduleAlias(HttpServletRequest request) {
+    protected String moduleAlias(@Context HttpServletRequest request) {
         return PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
     }
 
     protected abstract String scopeValue(T record);
 
-    private String pathVariable(HttpServletRequest request, String key) {
+    private String pathVariable(@Context HttpServletRequest request, String key) {
         Object value = pathVariables(request).get(key);
         return value == null ? null : value.toString();
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, String> pathVariables(HttpServletRequest request) {
-        Object attribute = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-        if (!(attribute instanceof Map<?, ?> variables)) {
+    private Map<String, String> pathVariables(@Context HttpServletRequest request) {
+        if (request == null) {
             return Map.of();
         }
-        return variables.entrySet().stream()
-                .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                        entry -> entry.getKey().toString(),
-                        entry -> entry.getValue().toString()
-                ));
+        Object value = request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE);
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, String>) map;
+        }
+        return Map.of();
     }
 
     private boolean hasText(String value) {
