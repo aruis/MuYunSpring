@@ -82,7 +82,10 @@ class MuYunSpringIdentityConfigurationTest {
         PlatformBootstrapTask task = mock(PlatformBootstrapTask.class);
         InitialDataExecutor executor = mock(InitialDataExecutor.class);
 
-        PlatformBootstrapRunner runner = configuration.platformBootstrapRunner(ObjectProviders.of(List.of(task)));
+        PlatformBootstrapRunner runner = configuration.platformBootstrapRunner(
+                ObjectProviders.of(List.of(task)),
+                new MuYunSpringPlatformBootstrapProperties()
+        );
         InitialDataBootstrapTask initialDataTask = configuration.initialDataBootstrapTask(executor);
 
         assertThat(runner).isNotNull();

@@ -26,7 +26,7 @@ public class QuarkusCollectionProducer {
         if (bean == null) {
             return Optional.empty();
         }
-        return Optional.of((T) itemType.cast(reference(beanManager, bean)));
+        return Optional.of((T) itemType.cast(reference(beanManager, bean, itemType)));
     }
 
     @Produces
@@ -34,7 +34,7 @@ public class QuarkusCollectionProducer {
     <T> List<T> list(InjectionPoint injectionPoint, BeanManager beanManager) {
         Class<?> itemType = itemType(injectionPoint.getType());
         return beanManager.getBeans(itemType, Any.Literal.INSTANCE).stream()
-                .map(bean -> itemType.cast(reference(beanManager, bean)))
+                .map(bean -> itemType.cast(reference(beanManager, bean, itemType)))
                 .sorted(Comparator.comparing(item -> item.getClass().getName()))
                 .map(item -> (T) item)
                 .toList();
@@ -49,8 +49,8 @@ public class QuarkusCollectionProducer {
         return itemType;
     }
 
-    private Object reference(BeanManager beanManager, Bean<?> bean) {
+    private Object reference(BeanManager beanManager, Bean<?> bean, Type targetType) {
         CreationalContext<?> context = beanManager.createCreationalContext(bean);
-        return beanManager.getReference(bean, bean.getBeanClass(), context);
+        return beanManager.getReference(bean, targetType, context);
     }
 }

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import jakarta.enterprise.inject.Vetoed;
 import jakarta.ws.rs.Path;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
@@ -128,6 +129,7 @@ public class CrudWebFormSchemaTest {
     }
 
     @Path("/demo.record")
+    @Vetoed
     private static final class DemoRecordController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService> {
         private DemoRecordController(DemoRecordService service) {
@@ -136,6 +138,7 @@ public class CrudWebFormSchemaTest {
     }
 
     @Path("/demo.record.ui")
+    @Vetoed
     private static final class DemoRecordUiController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService>, StaticModuleUiContributor {
         private StaticRecordReadProjectionService staticRecordReadProjectionService;
@@ -168,6 +171,7 @@ public class CrudWebFormSchemaTest {
     }
 
     @Path("/demo.record.child")
+    @Vetoed
     private static final class DemoRecordChildUiController extends WebSupport<DemoRecordService>
             implements CrudWeb<DemoRecord, DemoRecordService>, StaticModuleUiContributor {
         private DemoRecordChildUiController(DemoRecordService service) {

@@ -9,6 +9,9 @@ allprojects {
 }
 
 val testcontainersVersion = libs.versions.testcontainers.get()
+val migratedQuarkusIntegrationTests = mapOf(
+    "muyun-boot" to setOf("net/ximatai/muyun/spring/boot/platform/PlatformFieldTypeRepositoryIT.java")
+)
 
 subprojects {
     apply(plugin = "java-library")
@@ -27,7 +30,12 @@ subprojects {
     }
 
     tasks.named<JavaCompile>("compileTestJava").configure {
-        exclude("**/*IT.java")
+        val migratedTests = migratedQuarkusIntegrationTests[project.name].orEmpty()
+        exclude { element ->
+            element.name.endsWith("IT.java") && migratedTests.none { migrated ->
+                element.path.endsWith(migrated)
+            }
+        }
     }
 
     tasks.withType<Test>().configureEach {
@@ -35,6 +43,9 @@ subprojects {
         maxParallelForks = 1
         forkEvery = 0
         systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+        if (project.hasProperty("muyun.postgres.it.required")) {
+            systemProperty("muyun.postgres.it.required", project.property("muyun.postgres.it.required").toString())
+        }
 
         if (name == "test") {
             exclude("**/*IT.class")

@@ -1,49 +1,48 @@
-package net.ximatai.muyun.spring.platform.metadata;
+package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeDao;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import org.eclipse.microprofile.config.Config;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.sql.DataSource;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-@Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = PlatformFieldTypeRepositoryIT.TestApplication.class)
+@QuarkusTest
+@TestProfile(PlatformFieldTypeRepositoryIT.PostgresProfile.class)
+@QuarkusTestResource(value = PostgresQuarkusTestResource.class, restrictToAnnotatedClass = true)
 class PlatformFieldTypeRepositoryIT {
-    @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
-    }
+    @Inject
+    Config config;
 
-    private final PlatformFieldTypeService fieldTypeService;
+    @Inject
+    PlatformFieldTypeDao fieldTypeDao;
 
-    @Autowired
-    PlatformFieldTypeRepositoryIT(PlatformFieldTypeService fieldTypeService) {
-        this.fieldTypeService = fieldTypeService;
+    private PlatformFieldTypeService fieldTypeService() {
+        fieldTypeDao.ensureTable();
+        return new PlatformFieldTypeService(fieldTypeDao);
     }
 
     @Test
     void shouldPersistQueryOperatorsAsJsonSetThroughRepository() {
+        requirePostgres();
+        PlatformFieldTypeService fieldTypeService = fieldTypeService();
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         PlatformFieldType fieldType = new PlatformFieldType();
         fieldType.setAlias("string_" + suffix);
@@ -62,6 +61,8 @@ class PlatformFieldTypeRepositoryIT {
 
     @Test
     void shouldQueryJsonSetFieldWithCollectionCriteria() {
+        requirePostgres();
+        PlatformFieldTypeService fieldTypeService = fieldTypeService();
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         PlatformFieldType stringType = fieldType("string_" + suffix, FieldType.STRING,
                 Set.of("LIKE", "EQ"), Set.of("input", "select"));
@@ -116,23 +117,35 @@ class PlatformFieldTypeRepositoryIT {
         return type;
     }
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EnableMuYunRepositories(basePackageClasses = PlatformFieldTypeDao.class)
-    static class TestApplication {
-        @Bean
-        DataSource dataSource() {
-            return DataSourceBuilder.create()
-                    .url(postgres.getJdbcUrl())
-                    .username(postgres.getUsername())
-                    .password(postgres.getPassword())
-                    .driverClassName(postgres.getDriverClassName())
-                    .build();
-        }
+    private void requirePostgres() {
+        assumeTrue(
+                config.getOptionalValue("muyun.test.postgres.enabled", Boolean.class).orElse(false),
+                "PostgreSQL integration test is disabled; run with -Pmuyun.postgres.it.required=true to enable it"
+        );
+    }
 
-        @Bean
-        PlatformFieldTypeService fieldTypeService(PlatformFieldTypeDao fieldTypeDao) {
-            return new PlatformFieldTypeService(fieldTypeDao);
+    public static class PostgresProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            Map<String, String> config = new HashMap<>();
+            config.put("quarkus.datasource.db-kind", "postgresql");
+            config.put("quarkus.datasource.devservices.enabled", "false");
+            config.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://localhost:1/muyun_platform_it");
+            config.put("quarkus.datasource.username", "testuser");
+            config.put("quarkus.datasource.password", "testpass");
+            config.put("muyun.database.default-schema", "public");
+            config.put("muyun.database.install-postgres-plugins", "true");
+            config.put("muyun.platform-bootstrap.enabled", "false");
+            config.put("muyun.platform.time.default-zone-id", "Asia/Shanghai");
+            config.put("quarkus.arc.exclude-types", "net.ximatai.muyun.spring.boot.web.CrudWebFormSchemaTest$*");
+            config.put("quarkus.arc.remove-unused-beans", "false");
+            if (Boolean.getBoolean("muyun.postgres.it.required")) {
+                return config;
+            }
+
+            config.put("muyun.test.postgres.enabled", "false");
+            config.put("muyun.database.repository-schema-mode", "NONE");
+            return config;
         }
     }
 }

@@ -126,8 +126,9 @@ public class MuYunSpringIdentityConfiguration {
     @Produces
     @ApplicationScoped
     @DefaultBean
-    public PlatformBootstrapRunner platformBootstrapRunner(ObjectProvider<PlatformBootstrapTask> tasks) {
-        return new PlatformBootstrapRunner(tasks.orderedStream().toList());
+    public PlatformBootstrapRunner platformBootstrapRunner(ObjectProvider<PlatformBootstrapTask> tasks,
+                                                           MuYunSpringPlatformBootstrapProperties properties) {
+        return new PlatformBootstrapRunner(tasks.orderedStream().toList(), properties.isEnabled());
     }
 
     @Produces

@@ -88,6 +88,12 @@
 
 ### Legacy integration tests are temporarily excluded from test compilation
 
-- 现状：普通 `./gradlew test` 已恢复；历史 `*IT.java` 仍位于 `src/test/java`，且大量使用 Spring Boot test context、Spring property injection 和 Spring transaction test API。迁移期间全局 `compileTestJava` 临时排除了 `**/*IT.java`，避免阻塞普通单元测试。
-- 影响：`integrationTest` 任务在这些测试 Quarkus 化之前不能提供真实数据库/HTTP 集成回归保护。
-- 回收方向：建立 Quarkus 风格集成测试源集或逐个迁移 `*IT.java` 到 `@QuarkusTest`、Quarkus test resource、REST Assured/JAX-RS 客户端和 MuYunDatabase Quarkus repository 注入。
+- 现状：普通 `./gradlew test` 已恢复；历史 `*IT.java` 仍位于 `src/test/java`，且大量使用 Spring Boot test context、Spring property injection 和 Spring transaction test API。迁移期间 `compileTestJava` 只放行已迁移的 Quarkus IT，未迁移的旧 Spring IT 继续被排除。
+- 影响：`integrationTest` 已可承接已迁移的 Quarkus IT，但真实数据库/HTTP 集成回归保护仍不完整。
+- 回收方向：逐个迁移 `*IT.java` 到 `@QuarkusTest`、Quarkus test resource、REST Assured/JAX-RS 客户端和 MuYunDatabase Quarkus repository 注入；每迁移一批后同步收缩构建排除白名单。
+
+### Quarkus IT profile disables unused-bean removal
+
+- 现状：首个 Quarkus IT profile 临时设置 `quarkus.arc.remove-unused-beans=false`，避免迁移期通过运行时类型查找的 Web filter 在测试启动时被 Arc 裁剪。
+- 影响：该 profile 与生产构建优化策略不完全一致，只适合作为恢复集成测试迁移通道的临时措施。
+- 回收方向：把运行时查找的 Web/filter/provider 收敛为明确 CDI 引用或标注 `@Unremovable`，确认生产和测试启动行为一致后移除该 profile 配置。
