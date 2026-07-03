@@ -1,12 +1,13 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRule;
@@ -28,7 +29,8 @@ public class RecordGenerationRuleWebController
     @Path("/viewTree/{id}")
     @CustomActionEndpoint(value = "viewTree", title = "查看生单规则树",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "id")
-    public RecordGenerationRule viewTree(@Context HttpServletRequest request, @PathParam("id") String id) {
+    public RecordGenerationRule viewTree(@Context UriInfo uriInfo, @PathParam("id") String id) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             requireScopedRecord(request, id);
             return service().viewRuleTree(id);
@@ -39,7 +41,8 @@ public class RecordGenerationRuleWebController
     @Path("/saveTree")
     @CustomActionEndpoint(value = "saveTree", title = "保存生单规则树",
             level = PlatformActionLevel.ANY, dataAuth = false)
-    public RecordGenerationRule saveTree(@Context HttpServletRequest request, RecordGenerationRule rule) {
+    public RecordGenerationRule saveTree(@Context UriInfo uriInfo, RecordGenerationRule rule) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             if (rule == null) {
                 throw new IllegalArgumentException("generation rule tree must not be null");

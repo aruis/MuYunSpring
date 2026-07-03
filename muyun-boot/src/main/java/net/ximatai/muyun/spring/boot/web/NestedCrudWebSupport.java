@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -14,17 +14,13 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
-
-import java.util.Map;
+import jakarta.ws.rs.core.Context;
 
 public abstract class NestedCrudWebSupport<T extends EntityContract, S extends CrudAbility<T>>
         extends WebSupport<S> implements SystemScope<S>, RecordLabelWeb<T> {
-    public static final String PATH_VARIABLES_ATTRIBUTE = NestedCrudWebSupport.class.getName() + ".PATH_VARIABLES";
-
     protected Criteria queryCriteria(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
             Criteria criteria = queryAbility.queryCriteria(WebQueryRequests.from(request));
@@ -39,11 +35,11 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
         return Criteria.of();
     }
 
-    protected abstract void appendScope(Criteria criteria, @Context HttpServletRequest request);
+    protected abstract void appendScope(Criteria criteria, WebRequestScope scope);
 
-    protected abstract void bindScope(T record, @Context HttpServletRequest request);
+    protected abstract void bindScope(T record, WebRequestScope scope);
 
-    protected abstract boolean inScope(T record, @Context HttpServletRequest request);
+    protected abstract boolean inScope(T record, WebRequestScope scope);
 
     protected Sort[] querySorts(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
@@ -59,11 +55,12 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @POST
     @Path("/query")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebPageResponse<T> query(@Context HttpServletRequest servletRequest,
+    public WebPageResponse<T> query(@Context UriInfo uriInfo,
                                     WebQueryRequest request) {
         return webScope(() -> {
+            WebRequestScope scope = requestScope(uriInfo);
             Criteria criteria = queryCriteria(request);
-            appendScope(criteria, servletRequest);
+            appendScope(criteria, scope);
             WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
             PageResult<T> result = service().pageQuery(criteria,
                     PageRequest.of(page.pageNum(), page.pageSize()), querySorts(request));
@@ -74,17 +71,18 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @GET
     @Path("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
-    public T view(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
-        return webScope(() -> WebOutputSupport.record(service(), requireScopedRecord(servletRequest, id),
+    public T view(@Context UriInfo uriInfo, @PathParam("id") String id) {
+        return webScope(() -> WebOutputSupport.record(service(), requireScopedRecord(requestScope(uriInfo), id),
                 FieldOutputContext.VIEW));
     }
 
     @POST
     @Path("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
-    public WebRecordResponse<T> insert(@Context HttpServletRequest servletRequest, T record) {
+    public WebRecordResponse<T> insert(@Context UriInfo uriInfo, T record) {
         return webScope(() -> {
-            bindScope(record, servletRequest);
+            WebRequestScope scope = requestScope(uriInfo);
+            bindScope(record, scope);
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
             return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
@@ -94,12 +92,13 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @POST
     @Path("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<T> update(@Context HttpServletRequest servletRequest, @PathParam("id") String id,
+    public WebRecordResponse<T> update(@Context UriInfo uriInfo, @PathParam("id") String id,
                                        T record) {
         return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
+            WebRequestScope scope = requestScope(uriInfo);
+            requireScopedRecord(scope, id);
             record.setId(id);
-            bindScope(record, servletRequest);
+            bindScope(record, scope);
             service().update(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
             return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
@@ -109,39 +108,30 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @POST
     @Path("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
+    public WebCountResponse delete(@Context UriInfo uriInfo, @PathParam("id") String id) {
         return webScope(() -> {
-            T record = requireScopedRecord(servletRequest, id);
+            T record = requireScopedRecord(requestScope(uriInfo), id);
             return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
         });
     }
 
-    protected T requireScopedRecord(@Context HttpServletRequest request, String id) {
+    protected T requireScopedRecord(WebRequestScope scope, String id) {
         T record = service().select(id);
-        if (record == null || !inScope(record, request)) {
-            throw new IllegalArgumentException(scopedRecordNotFoundMessage(request, id));
+        if (record == null || !inScope(record, scope)) {
+            throw new IllegalArgumentException(scopedRecordNotFoundMessage(scope, id));
         }
         return record;
     }
 
-    protected String pathVariable(@Context HttpServletRequest request, String key) {
-        Object value = pathVariables(request).get(key);
-        return value == null ? null : value.toString();
+    protected String pathVariable(WebRequestScope scope, String key) {
+        return scope == null ? null : scope.pathVariable(key);
     }
 
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope scope, String id) {
         return "nested record does not belong to request scope: " + id;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, String> pathVariables(@Context HttpServletRequest request) {
-        if (request == null) {
-            return Map.of();
-        }
-        Object value = request.getAttribute(PATH_VARIABLES_ATTRIBUTE);
-        if (value instanceof Map<?, ?> map) {
-            return (Map<String, String>) map;
-        }
-        return Map.of();
+    protected WebRequestScope requestScope(UriInfo uriInfo) {
+        return WebRequestScope.from(uriInfo);
     }
 }

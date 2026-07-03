@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
@@ -17,26 +17,26 @@ public class MetadataFieldWebController
         extends NestedEnabledSortableCrudWebSupport<MetadataField, MetadataFieldService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("metadataId", metadataId(request));
     }
 
     @Override
-    protected void bindScope(MetadataField record, @Context HttpServletRequest request) {
+    protected void bindScope(MetadataField record, WebRequestScope request) {
         record.setMetadataId(metadataId(request));
     }
 
     @Override
-    protected boolean inScope(MetadataField record, @Context HttpServletRequest request) {
+    protected boolean inScope(MetadataField record, WebRequestScope request) {
         return metadataId(request).equals(record.getMetadataId());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "metadata field does not belong to metadata: " + metadataId(request) + "." + id;
     }
 
-    private String metadataId(@Context HttpServletRequest request) {
+    private String metadataId(WebRequestScope request) {
         return pathVariable(request, "metadataId");
     }
 }

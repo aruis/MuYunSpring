@@ -1,9 +1,10 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
@@ -33,7 +34,7 @@ class MeasureUnitWebControllerTest {
     void shouldDeclareApplicationScopedCategoryRoutesWithJaxRsAnnotations() throws Exception {
         assertThat(MeasureUnitCategoryWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.application/{applicationAlias}/measure-unit-categories");
-        assertRoute(MeasureUnitCategoryWebController.class.getMethod("options", HttpServletRequest.class, boolean.class),
+        assertRoute(MeasureUnitCategoryWebController.class.getMethod("options", UriInfo.class, boolean.class),
                 GET.class, "/options");
         assertRoute(method(NestedCrudWebSupport.class, "insert"), POST.class, "/insert");
     }
@@ -42,10 +43,10 @@ class MeasureUnitWebControllerTest {
     void shouldDeclareApplicationScopedUnitRoutesWithJaxRsAnnotations() throws Exception {
         assertThat(MeasureUnitWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units");
-        assertRoute(MeasureUnitWebController.class.getMethod("options", HttpServletRequest.class, boolean.class),
+        assertRoute(MeasureUnitWebController.class.getMethod("options", UriInfo.class, boolean.class),
                 GET.class, "/options");
         assertRoute(MeasureUnitWebController.class.getMethod("convert",
-                HttpServletRequest.class, MeasureUnitWebController.MeasureUnitConversionRequest.class),
+                UriInfo.class, MeasureUnitWebController.MeasureUnitConversionRequest.class),
                 POST.class, "/convert");
         assertRoute(method(NestedCrudWebSupport.class, "insert"), POST.class, "/insert");
     }
@@ -157,9 +158,11 @@ class MeasureUnitWebControllerTest {
                 .orElseThrow();
     }
 
-    private HttpServletRequest request(Map<String, String> pathVariables) {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE)).thenReturn(pathVariables);
+    private UriInfo request(Map<String, String> pathVariables) {
+        UriInfo request = mock(UriInfo.class);
+        MultivaluedHashMap<String, String> parameters = new MultivaluedHashMap<>();
+        pathVariables.forEach(parameters::putSingle);
+        when(request.getPathParameters()).thenReturn(parameters);
         return request;
     }
 

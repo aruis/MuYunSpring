@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
@@ -28,29 +28,29 @@ public class PlatformModuleMetadataFormulaRuleWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         requireRelation(request);
         criteria.eq("relationId", relationId(request));
     }
 
     @Override
-    protected void bindScope(ModuleMetadataFormulaRule record, @Context HttpServletRequest request) {
+    protected void bindScope(ModuleMetadataFormulaRule record, WebRequestScope request) {
         requireRelation(request);
         record.setRelationId(relationId(request));
     }
 
     @Override
-    protected boolean inScope(ModuleMetadataFormulaRule record, @Context HttpServletRequest request) {
+    protected boolean inScope(ModuleMetadataFormulaRule record, WebRequestScope request) {
         requireRelation(request);
         return Objects.equals(record.getRelationId(), relationId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "module metadata formula rule does not belong to relation: " + relationId(request) + "." + id;
     }
 
-    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(WebRequestScope request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -60,7 +60,7 @@ public class PlatformModuleMetadataFormulaRuleWebController
         return relation;
     }
 
-    private String relationId(@Context HttpServletRequest request) {
+    private String relationId(WebRequestScope request) {
         return pathVariable(request, "relationId");
     }
 }

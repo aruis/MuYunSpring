@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledTreeCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.DefaultValue;
@@ -52,37 +53,38 @@ public class DictionaryItemWebController
     }
 
     @Override
-    protected Criteria treeScopeCriteria(@Context HttpServletRequest request) {
+    protected Criteria treeScopeCriteria(WebRequestScope request) {
         return Criteria.of().eq("categoryId", category(request).getId());
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("categoryId", category(request).getId());
     }
 
     @Override
-    protected void bindScope(DictionaryItem record, @Context HttpServletRequest request) {
+    protected void bindScope(DictionaryItem record, WebRequestScope request) {
         DictionaryCategory category = category(request);
         record.setCategoryId(category.getId());
         record.setCategoryAlias(category.getAlias());
     }
 
     @Override
-    protected boolean inScope(DictionaryItem record, @Context HttpServletRequest request) {
+    protected boolean inScope(DictionaryItem record, WebRequestScope request) {
         return Objects.equals(record.getCategoryId(), category(request).getId());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "dictionary item does not belong to category: " + category(request).getId() + "." + id;
     }
 
     @GET
     @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             DictionaryCategory category = category(request);
             List<DictionaryItem> roots = service().rootItems(category.getId());
@@ -101,10 +103,11 @@ public class DictionaryItemWebController
     @GET
     @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @PathParam("id") String id,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat,
                                    @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             DictionaryItem root = requireScopedRecord(request, id);
             if (!flat) {
@@ -140,7 +143,7 @@ public class DictionaryItemWebController
         }
     }
 
-    private DictionaryCategory category(@Context HttpServletRequest request) {
+    private DictionaryCategory category(WebRequestScope request) {
         String categoryId = pathVariable(request, "categoryId");
         if (categoryId != null && !categoryId.isBlank()) {
             return service().category(categoryId);

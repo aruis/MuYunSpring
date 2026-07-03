@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
@@ -19,25 +19,25 @@ public abstract class NestedSortableCrudWebSupport<
     @POST
     @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@Context HttpServletRequest servletRequest,
+    public WebCountResponse sort(@Context UriInfo uriInfo,
                                  @PathParam("id") String id,
                                  SortWebRequest request) {
-        return webScope(() -> moveWithinScope(servletRequest, id, request, "sort requires previousId or nextId"));
+        return webScope(() -> moveWithinScope(requestScope(uriInfo), id, request, "sort requires previousId or nextId"));
     }
 
-    protected WebCountResponse moveWithinScope(@Context HttpServletRequest servletRequest,
+    protected WebCountResponse moveWithinScope(WebRequestScope scope,
                                                String id,
                                                SortWebRequest request,
                                                String errorMessage) {
         SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
-        requireScopedRecord(servletRequest, id);
+        requireScopedRecord(scope, id);
         if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
-            requireScopedRecord(servletRequest, normalized.previousId());
+            requireScopedRecord(scope, normalized.previousId());
             service().moveAfter(id, normalized.previousId());
             return new WebCountResponse(1);
         }
         if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
-            requireScopedRecord(servletRequest, normalized.nextId());
+            requireScopedRecord(scope, normalized.nextId());
             service().moveBefore(id, normalized.nextId());
             return new WebCountResponse(1);
         }

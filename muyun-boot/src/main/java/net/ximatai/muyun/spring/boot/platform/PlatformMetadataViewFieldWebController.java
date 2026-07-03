@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
@@ -33,29 +33,29 @@ public class PlatformMetadataViewFieldWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         requireView(request);
         criteria.eq("viewId", viewId(request));
     }
 
     @Override
-    protected void bindScope(MetadataViewField record, @Context HttpServletRequest request) {
+    protected void bindScope(MetadataViewField record, WebRequestScope request) {
         requireView(request);
         record.setViewId(viewId(request));
     }
 
     @Override
-    protected boolean inScope(MetadataViewField record, @Context HttpServletRequest request) {
+    protected boolean inScope(MetadataViewField record, WebRequestScope request) {
         requireView(request);
         return Objects.equals(record.getViewId(), viewId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "metadata view field does not belong to view: " + viewId(request) + "." + id;
     }
 
-    private MetadataView requireView(@Context HttpServletRequest request) {
+    private MetadataView requireView(WebRequestScope request) {
         requireRelation(request);
         MetadataView view = viewService.select(viewId(request));
         if (view == null || !Objects.equals(view.getRelationId(), relationId(request))) {
@@ -65,7 +65,7 @@ public class PlatformMetadataViewFieldWebController
         return view;
     }
 
-    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(WebRequestScope request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -75,11 +75,11 @@ public class PlatformMetadataViewFieldWebController
         return relation;
     }
 
-    private String relationId(@Context HttpServletRequest request) {
+    private String relationId(WebRequestScope request) {
         return pathVariable(request, "relationId");
     }
 
-    private String viewId(@Context HttpServletRequest request) {
+    private String viewId(WebRequestScope request) {
         return pathVariable(request, "viewId");
     }
 }

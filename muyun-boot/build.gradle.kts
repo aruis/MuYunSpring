@@ -11,7 +11,6 @@ dependencies {
     implementation(libs.quarkus.jdbc.postgresql)
     implementation(libs.quarkus.narayana.jta)
     implementation(libs.quarkus.scheduler)
-    implementation(libs.jakarta.servlet.api)
     implementation(libs.muyun.database.quarkus)
     runtimeOnly(libs.postgresql)
 

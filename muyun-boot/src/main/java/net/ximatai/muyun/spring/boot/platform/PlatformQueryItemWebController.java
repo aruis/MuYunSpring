@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
@@ -19,22 +19,22 @@ public class PlatformQueryItemWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformQueryItem, PlatformQueryItemService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("queryTemplateId", pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected void bindScope(PlatformQueryItem record, @Context HttpServletRequest request) {
+    protected void bindScope(PlatformQueryItem record, WebRequestScope request) {
         record.setQueryTemplateId(pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected boolean inScope(PlatformQueryItem record, @Context HttpServletRequest request) {
+    protected boolean inScope(PlatformQueryItem record, WebRequestScope request) {
         return Objects.equals(record.getQueryTemplateId(), pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "Query item does not belong to query template: "
                 + pathVariable(request, "queryTemplateId") + "." + id;
     }

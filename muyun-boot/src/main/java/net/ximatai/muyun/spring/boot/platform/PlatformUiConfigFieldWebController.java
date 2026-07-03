@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
@@ -20,22 +20,22 @@ public class PlatformUiConfigFieldWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformUiConfigField, PlatformUiConfigFieldService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("uiConfigId", pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected void bindScope(PlatformUiConfigField record, @Context HttpServletRequest request) {
+    protected void bindScope(PlatformUiConfigField record, WebRequestScope request) {
         record.setUiConfigId(pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected boolean inScope(PlatformUiConfigField record, @Context HttpServletRequest request) {
+    protected boolean inScope(PlatformUiConfigField record, WebRequestScope request) {
         return Objects.equals(record.getUiConfigId(), pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "UI config field does not belong to UI config: "
                 + pathVariable(request, "uiConfigId") + "." + id;
     }

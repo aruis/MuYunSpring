@@ -1,13 +1,14 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
@@ -29,30 +30,31 @@ import java.util.Objects;
 public class MenuManagementWebController extends NestedEnabledSortableCrudWebSupport<Menu, MenuService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("schemeId", schemeId(request));
     }
 
     @Override
-    protected void bindScope(Menu record, @Context HttpServletRequest request) {
+    protected void bindScope(Menu record, WebRequestScope request) {
         record.setSchemeId(schemeId(request));
     }
 
     @Override
-    protected boolean inScope(Menu record, @Context HttpServletRequest request) {
+    protected boolean inScope(Menu record, WebRequestScope request) {
         return Objects.equals(record.getSchemeId(), schemeId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "menu does not belong to scheme: " + schemeId(request) + "." + id;
     }
 
     @GET
     @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             List<Menu> roots = service().rootMenus(schemeId(request));
             if (flat) {
@@ -70,10 +72,11 @@ public class MenuManagementWebController extends NestedEnabledSortableCrudWebSup
     @GET
     @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @PathParam("id") String id,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat,
                                    @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             Menu root = requireScopedRecord(request, id);
             if (!flat) {
@@ -106,7 +109,7 @@ public class MenuManagementWebController extends NestedEnabledSortableCrudWebSup
         }
     }
 
-    private String schemeId(@Context HttpServletRequest request) {
+    private String schemeId(WebRequestScope request) {
         String value = pathVariable(request, "schemeId");
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("schemeId is required");

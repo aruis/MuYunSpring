@@ -1,8 +1,9 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
@@ -50,26 +51,26 @@ class WorkflowConfigurationWebControllerTest {
                 .isEqualTo("/platform.module/{moduleAlias}/workflow-definitions");
         assertThat(WorkflowVersionWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions");
-        assertRoute(NestedCrudWebSupport.class.getMethod("insert", HttpServletRequest.class,
+        assertRoute(NestedCrudWebSupport.class.getMethod("insert", UriInfo.class,
                         net.ximatai.muyun.spring.common.model.contract.EntityContract.class),
                 POST.class, "/insert");
-        assertRoute(NestedCrudWebSupport.class.getMethod("update", HttpServletRequest.class, String.class,
+        assertRoute(NestedCrudWebSupport.class.getMethod("update", UriInfo.class, String.class,
                         net.ximatai.muyun.spring.common.model.contract.EntityContract.class),
                 POST.class, "/update/{id}");
-        assertRoute(NestedCrudWebSupport.class.getMethod("delete", HttpServletRequest.class, String.class),
+        assertRoute(NestedCrudWebSupport.class.getMethod("delete", UriInfo.class, String.class),
                 POST.class, "/delete/{id}");
-        assertRoute(NestedSortableCrudWebSupport.class.getMethod("sort", HttpServletRequest.class, String.class,
+        assertRoute(NestedSortableCrudWebSupport.class.getMethod("sort", UriInfo.class, String.class,
                         net.ximatai.muyun.spring.boot.web.SortWebRequest.class),
                 POST.class, "/sort/{id}");
 
         assertActionEndpoint(WorkflowDefinitionWebController.class.getMethod("insert",
-                        HttpServletRequest.class, WorkflowDefinition.class),
+                        UriInfo.class, WorkflowDefinition.class),
                 PlatformAction.CREATE);
         assertActionEndpoint(WorkflowVersionWebController.class.getMethod("insert",
-                        HttpServletRequest.class, WorkflowVersion.class),
+                        UriInfo.class, WorkflowVersion.class),
                 PlatformAction.CREATE);
         Method publish = WorkflowDefinitionWebController.class.getMethod("publish",
-                HttpServletRequest.class, String.class, String.class);
+                UriInfo.class, String.class, String.class);
         CustomActionEndpoint endpoint = publish.getAnnotation(CustomActionEndpoint.class);
         assertThat(endpoint.value()).isEqualTo("publishWorkflowDefinition");
         assertThat(endpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
@@ -213,10 +214,12 @@ class WorkflowConfigurationWebControllerTest {
         return version;
     }
 
-    private HttpServletRequest requestVars(String moduleAlias, String definitionId) {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
-                .thenReturn(Map.of("moduleAlias", moduleAlias, "definitionId", definitionId));
+    private UriInfo requestVars(String moduleAlias, String definitionId) {
+        UriInfo request = mock(UriInfo.class);
+        MultivaluedHashMap<String, String> parameters = new MultivaluedHashMap<>();
+        parameters.putSingle("moduleAlias", moduleAlias);
+        parameters.putSingle("definitionId", definitionId);
+        when(request.getPathParameters()).thenReturn(parameters);
         return request;
     }
 

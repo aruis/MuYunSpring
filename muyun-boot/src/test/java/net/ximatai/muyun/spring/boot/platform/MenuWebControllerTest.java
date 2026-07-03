@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -8,6 +7,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -121,7 +122,7 @@ class MenuWebControllerTest {
     void shouldDeclareSchemeScopedMenuRoutes() throws Exception {
         assertThat(MenuManagementWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.menu-scheme/{schemeId}/menus");
-        Method tree = MenuManagementWebController.class.getMethod("tree", HttpServletRequest.class, boolean.class);
+        Method tree = MenuManagementWebController.class.getMethod("tree", UriInfo.class, boolean.class);
         assertThat(tree.getAnnotation(GET.class)).isNotNull();
         assertThat(tree.getAnnotation(Path.class).value()).isEqualTo("/tree");
         assertThat(tree.getParameters()[0].getAnnotation(Context.class)).isNotNull();
@@ -130,7 +131,7 @@ class MenuWebControllerTest {
         assertThat(tree.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.TREE);
 
         Method childTree = MenuManagementWebController.class.getMethod(
-                "tree", HttpServletRequest.class, String.class, boolean.class, boolean.class);
+                "tree", UriInfo.class, String.class, boolean.class, boolean.class);
         assertThat(childTree.getAnnotation(Path.class).value()).isEqualTo("/tree/{id}");
         assertThat(childTree.getParameters()[1].getAnnotation(PathParam.class).value()).isEqualTo("id");
         assertThat(childTree.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.TREE);
@@ -204,10 +205,11 @@ class MenuWebControllerTest {
         return scheme;
     }
 
-    private HttpServletRequest requestVars(String schemeId) {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
-                .thenReturn(Map.of("schemeId", schemeId));
+    private UriInfo requestVars(String schemeId) {
+        UriInfo request = mock(UriInfo.class);
+        MultivaluedHashMap<String, String> parameters = new MultivaluedHashMap<>();
+        parameters.putSingle("schemeId", schemeId);
+        when(request.getPathParameters()).thenReturn(parameters);
         return request;
     }
 

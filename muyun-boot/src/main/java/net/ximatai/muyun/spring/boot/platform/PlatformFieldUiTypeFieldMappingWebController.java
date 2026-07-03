@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
@@ -20,27 +20,27 @@ public class PlatformFieldUiTypeFieldMappingWebController
         extends NestedSortableCrudWebSupport<PlatformFieldUiTypeFieldMapping, PlatformFieldUiTypeFieldMappingService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("fieldUiTypeAlias", fieldUiTypeAlias(request));
     }
 
     @Override
-    protected void bindScope(PlatformFieldUiTypeFieldMapping record, @Context HttpServletRequest request) {
+    protected void bindScope(PlatformFieldUiTypeFieldMapping record, WebRequestScope request) {
         record.setFieldUiTypeAlias(fieldUiTypeAlias(request));
     }
 
     @Override
-    protected boolean inScope(PlatformFieldUiTypeFieldMapping record, @Context HttpServletRequest request) {
+    protected boolean inScope(PlatformFieldUiTypeFieldMapping record, WebRequestScope request) {
         return Objects.equals(record.getFieldUiTypeAlias(), fieldUiTypeAlias(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "field UI type field mapping does not belong to field UI type: "
                 + fieldUiTypeAlias(request) + "." + id;
     }
 
-    private String fieldUiTypeAlias(@Context HttpServletRequest request) {
+    private String fieldUiTypeAlias(WebRequestScope request) {
         return PlatformNameRules.requireIdentifier(pathVariable(request, "fieldUiTypeAlias"), "fieldUiTypeAlias");
     }
 }

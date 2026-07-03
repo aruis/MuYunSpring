@@ -1,11 +1,12 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -14,7 +15,6 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
-import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
@@ -50,10 +50,10 @@ class RecordLinkageRuleWebControllerTest {
         assertThat(RecordGenerationRuleWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.module/{moduleAlias}/generation-rules");
         assertCustomRoute(RecordGenerationRuleWebController.class, "viewTree",
-                new Class<?>[]{HttpServletRequest.class, String.class}, GET.class, "/viewTree/{id}",
+                new Class<?>[]{UriInfo.class, String.class}, GET.class, "/viewTree/{id}",
                 "viewTree", PlatformActionLevel.RECORD);
         assertCustomRoute(RecordGenerationRuleWebController.class, "saveTree",
-                new Class<?>[]{HttpServletRequest.class, RecordGenerationRule.class}, POST.class, "/saveTree",
+                new Class<?>[]{UriInfo.class, RecordGenerationRule.class}, POST.class, "/saveTree",
                 "saveTree", PlatformActionLevel.ANY);
         assertInheritedQueryRoute(RecordGenerationRuleWebController.class);
     }
@@ -63,10 +63,10 @@ class RecordLinkageRuleWebControllerTest {
         assertThat(RecordWriteBackRuleWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.module/{moduleAlias}/write-back-rules");
         assertCustomRoute(RecordWriteBackRuleWebController.class, "viewTree",
-                new Class<?>[]{HttpServletRequest.class, String.class}, GET.class, "/viewTree/{id}",
+                new Class<?>[]{UriInfo.class, String.class}, GET.class, "/viewTree/{id}",
                 "viewTree", PlatformActionLevel.RECORD);
         assertCustomRoute(RecordWriteBackRuleWebController.class, "saveTree",
-                new Class<?>[]{HttpServletRequest.class, RecordWriteBackRule.class}, POST.class, "/saveTree",
+                new Class<?>[]{UriInfo.class, RecordWriteBackRule.class}, POST.class, "/saveTree",
                 "saveTree", PlatformActionLevel.ANY);
         assertInheritedQueryRoute(RecordWriteBackRuleWebController.class);
     }
@@ -223,10 +223,11 @@ class RecordLinkageRuleWebControllerTest {
         return service;
     }
 
-    private HttpServletRequest requestVars(String moduleAlias) {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
-                .thenReturn(Map.of("moduleAlias", moduleAlias));
+    private UriInfo requestVars(String moduleAlias) {
+        UriInfo request = mock(UriInfo.class);
+        MultivaluedHashMap<String, String> parameters = new MultivaluedHashMap<>();
+        parameters.putSingle("moduleAlias", moduleAlias);
+        when(request.getPathParameters()).thenReturn(parameters);
         return request;
     }
 
@@ -257,7 +258,7 @@ class RecordLinkageRuleWebControllerTest {
     }
 
     private void assertInheritedQueryRoute(Class<?> controllerClass) throws Exception {
-        Method method = controllerClass.getMethod("query", HttpServletRequest.class, WebQueryRequest.class);
+        Method method = controllerClass.getMethod("query", UriInfo.class, WebQueryRequest.class);
         assertThat(method.getAnnotation(POST.class)).isNotNull();
         assertThat(method.getAnnotation(Path.class).value()).isEqualTo("/query");
         assertThat(method.getParameters()[0].getAnnotation(Context.class)).isNotNull();

@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledTreeCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.DefaultValue;
@@ -45,13 +46,13 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected Criteria treeScopeCriteria(@Context HttpServletRequest request) {
+    protected Criteria treeScopeCriteria(WebRequestScope request) {
         String applicationAlias = applicationAlias(request);
         return applicationAlias == null ? Criteria.of() : Criteria.of().eq("applicationAlias", applicationAlias);
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         String applicationAlias = applicationAlias(request);
         if (applicationAlias != null) {
             criteria.eq("applicationAlias", applicationAlias);
@@ -59,7 +60,7 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected void bindScope(DictionaryCategory record, @Context HttpServletRequest request) {
+    protected void bindScope(DictionaryCategory record, WebRequestScope request) {
         String applicationAlias = applicationAlias(request);
         if (applicationAlias != null) {
             record.setApplicationAlias(applicationAlias);
@@ -67,21 +68,22 @@ public class DictionaryCategoryWebController
     }
 
     @Override
-    protected boolean inScope(DictionaryCategory record, @Context HttpServletRequest request) {
+    protected boolean inScope(DictionaryCategory record, WebRequestScope request) {
         String applicationAlias = applicationAlias(request);
         return applicationAlias == null || Objects.equals(record.getApplicationAlias(), applicationAlias);
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "dictionary category does not belong to application: " + applicationAlias(request) + "." + id;
     }
 
     @GET
     @Path("/tree")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             List<DictionaryCategory> roots = applicationAlias(request) == null
                     ? service().rootCategories()
@@ -101,10 +103,11 @@ public class DictionaryCategoryWebController
     @GET
     @Path("/tree/{id}")
     @ActionEndpoint(PlatformAction.TREE)
-    public WebListResponse<?> tree(@Context HttpServletRequest request,
+    public WebListResponse<?> tree(@Context UriInfo uriInfo,
                                    @PathParam("id") String id,
                                    @DefaultValue("false") @QueryParam("flat") boolean flat,
                                    @DefaultValue("true") @QueryParam("includeSelf") boolean includeSelf) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> {
             DictionaryCategory root = requireScopedRecord(request, id);
             if (!flat) {
@@ -137,7 +140,7 @@ public class DictionaryCategoryWebController
         }
     }
 
-    private String applicationAlias(@Context HttpServletRequest request) {
+    private String applicationAlias(WebRequestScope request) {
         String value = pathVariable(request, "applicationAlias");
         return value == null || value.isBlank() ? null : value;
     }

@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
@@ -33,29 +33,29 @@ public class PlatformModuleMetadataFieldFilterWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         requireField(request);
         criteria.eq("moduleMetadataFieldId", fieldId(request));
     }
 
     @Override
-    protected void bindScope(ModuleMetadataFieldFilter record, @Context HttpServletRequest request) {
+    protected void bindScope(ModuleMetadataFieldFilter record, WebRequestScope request) {
         requireField(request);
         record.setModuleMetadataFieldId(fieldId(request));
     }
 
     @Override
-    protected boolean inScope(ModuleMetadataFieldFilter record, @Context HttpServletRequest request) {
+    protected boolean inScope(ModuleMetadataFieldFilter record, WebRequestScope request) {
         requireField(request);
         return Objects.equals(record.getModuleMetadataFieldId(), fieldId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "module metadata field filter does not belong to field: " + fieldId(request) + "." + id;
     }
 
-    private ModuleMetadataField requireField(@Context HttpServletRequest request) {
+    private ModuleMetadataField requireField(WebRequestScope request) {
         requireRelation(request);
         ModuleMetadataField field = fieldService.select(fieldId(request));
         if (field == null || !Objects.equals(field.getRelationId(), relationId(request))) {
@@ -65,7 +65,7 @@ public class PlatformModuleMetadataFieldFilterWebController
         return field;
     }
 
-    private ModuleMetadataRelation requireRelation(@Context HttpServletRequest request) {
+    private ModuleMetadataRelation requireRelation(WebRequestScope request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         ModuleMetadataRelation relation = relationService.select(relationId(request));
         if (relation == null || !validModuleAlias.equals(relation.getModuleAlias())) {
@@ -75,11 +75,11 @@ public class PlatformModuleMetadataFieldFilterWebController
         return relation;
     }
 
-    private String relationId(@Context HttpServletRequest request) {
+    private String relationId(WebRequestScope request) {
         return pathVariable(request, "relationId");
     }
 
-    private String fieldId(@Context HttpServletRequest request) {
+    private String fieldId(WebRequestScope request) {
         return pathVariable(request, "fieldId");
     }
 }

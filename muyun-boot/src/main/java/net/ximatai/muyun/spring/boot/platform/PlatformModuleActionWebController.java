@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -18,26 +18,26 @@ public class PlatformModuleActionWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformModuleAction, PlatformModuleActionService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("moduleAlias", moduleAlias(request));
     }
 
     @Override
-    protected void bindScope(PlatformModuleAction record, @Context HttpServletRequest request) {
+    protected void bindScope(PlatformModuleAction record, WebRequestScope request) {
         record.setModuleAlias(moduleAlias(request));
     }
 
     @Override
-    protected boolean inScope(PlatformModuleAction record, @Context HttpServletRequest request) {
+    protected boolean inScope(PlatformModuleAction record, WebRequestScope request) {
         return moduleAlias(request).equals(record.getModuleAlias());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "module action does not belong to module: " + moduleAlias(request) + "." + id;
     }
 
-    private String moduleAlias(@Context HttpServletRequest request) {
+    private String moduleAlias(WebRequestScope request) {
         return PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
     }
 }

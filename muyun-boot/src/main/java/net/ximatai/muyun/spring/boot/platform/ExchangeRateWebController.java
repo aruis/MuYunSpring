@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -35,20 +35,20 @@ public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSuppo
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
     }
 
     @Override
-    protected void bindScope(ExchangeRate record, @Context HttpServletRequest request) {
+    protected void bindScope(ExchangeRate record, WebRequestScope request) {
     }
 
     @Override
-    protected boolean inScope(ExchangeRate record, @Context HttpServletRequest request) {
+    protected boolean inScope(ExchangeRate record, WebRequestScope request) {
         return true;
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "exchange rate not found: " + id;
     }
 

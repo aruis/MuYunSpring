@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
@@ -18,6 +18,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
@@ -35,54 +36,56 @@ public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowV
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         requireDefinition(request);
         criteria.eq("definitionId", definitionId(request));
     }
 
     @Override
-    protected void bindScope(WorkflowVersion record, @Context HttpServletRequest request) {
+    protected void bindScope(WorkflowVersion record, WebRequestScope request) {
         requireDefinition(request);
         record.setDefinitionId(definitionId(request));
     }
 
     @Override
-    protected boolean inScope(WorkflowVersion record, @Context HttpServletRequest request) {
+    protected boolean inScope(WorkflowVersion record, WebRequestScope request) {
         requireDefinition(request);
         return definitionId(request).equals(record.getDefinitionId());
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "workflow version does not belong to definition: " + definitionId(request) + "." + id;
     }
 
     @Override
     @ActionEndpoint(PlatformAction.CREATE)
-    public WebRecordResponse<WorkflowVersion> insert(@Context HttpServletRequest servletRequest,
+    public WebRecordResponse<WorkflowVersion> insert(@Context UriInfo uriInfo,
                                                      WorkflowVersion record) {
         normalizeDraft(record);
-        return super.insert(servletRequest, record);
+        return super.insert(uriInfo, record);
     }
 
     @Override
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<WorkflowVersion> update(@Context HttpServletRequest servletRequest,
+    public WebRecordResponse<WorkflowVersion> update(@Context UriInfo uriInfo,
                                                      @PathParam("id") String id,
                                                      WorkflowVersion record) {
-        requireDraft(requireScopedRecord(servletRequest, id), "workflow version can only edit draft versions");
+        requireDraft(requireScopedRecord(requestScope(uriInfo), id),
+                "workflow version can only edit draft versions");
         normalizeDraft(record);
-        return super.update(servletRequest, id, record);
+        return super.update(uriInfo, id, record);
     }
 
     @Override
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
-        requireDraft(requireScopedRecord(servletRequest, id), "workflow version can only delete draft versions");
-        return super.delete(servletRequest, id);
+    public WebCountResponse delete(@Context UriInfo uriInfo, @PathParam("id") String id) {
+        requireDraft(requireScopedRecord(requestScope(uriInfo), id),
+                "workflow version can only delete draft versions");
+        return super.delete(uriInfo, id);
     }
 
-    private WorkflowDefinition requireDefinition(@Context HttpServletRequest request) {
+    private WorkflowDefinition requireDefinition(WebRequestScope request) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(pathVariable(request, "moduleAlias"));
         WorkflowDefinition definition = definitionService.select(definitionId(request));
         if (definition == null || !validModuleAlias.equals(definition.getModuleAlias())) {
@@ -92,7 +95,7 @@ public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowV
         return definition;
     }
 
-    private String definitionId(@Context HttpServletRequest request) {
+    private String definitionId(WebRequestScope request) {
         return pathVariable(request, "definitionId");
     }
 

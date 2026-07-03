@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
@@ -27,29 +27,29 @@ public class MetadataFieldProtectionConfigWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         requireField(request);
         criteria.eq("metadataFieldId", fieldId(request));
     }
 
     @Override
-    protected void bindScope(MetadataFieldProtectionConfig record, @Context HttpServletRequest request) {
+    protected void bindScope(MetadataFieldProtectionConfig record, WebRequestScope request) {
         requireField(request);
         record.setMetadataFieldId(fieldId(request));
     }
 
     @Override
-    protected boolean inScope(MetadataFieldProtectionConfig record, @Context HttpServletRequest request) {
+    protected boolean inScope(MetadataFieldProtectionConfig record, WebRequestScope request) {
         requireField(request);
         return Objects.equals(record.getMetadataFieldId(), fieldId(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "metadata field protection config does not belong to field: " + fieldId(request) + "." + id;
     }
 
-    private MetadataField requireField(@Context HttpServletRequest request) {
+    private MetadataField requireField(WebRequestScope request) {
         MetadataField field = fieldService.select(fieldId(request));
         if (field == null || !Objects.equals(field.getMetadataId(), metadataId(request))) {
             throw new IllegalArgumentException("metadata field does not belong to metadata: "
@@ -58,11 +58,11 @@ public class MetadataFieldProtectionConfigWebController
         return field;
     }
 
-    private String metadataId(@Context HttpServletRequest request) {
+    private String metadataId(WebRequestScope request) {
         return pathVariable(request, "metadataId");
     }
 
-    private String fieldId(@Context HttpServletRequest request) {
+    private String fieldId(WebRequestScope request) {
         return pathVariable(request, "fieldId");
     }
 }

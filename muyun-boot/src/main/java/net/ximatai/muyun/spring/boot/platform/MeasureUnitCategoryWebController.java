@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.DefaultValue;
@@ -27,36 +28,37 @@ public class MeasureUnitCategoryWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitCategory, MeasureUnitCategoryService> {
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("applicationAlias", applicationAlias(request));
     }
 
     @Override
-    protected void bindScope(MeasureUnitCategory record, @Context HttpServletRequest request) {
+    protected void bindScope(MeasureUnitCategory record, WebRequestScope request) {
         record.setApplicationAlias(applicationAlias(request));
     }
 
     @Override
-    protected boolean inScope(MeasureUnitCategory record, @Context HttpServletRequest request) {
+    protected boolean inScope(MeasureUnitCategory record, WebRequestScope request) {
         return Objects.equals(record.getApplicationAlias(), applicationAlias(request));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "measure unit category does not belong to application: " + applicationAlias(request) + "." + id;
     }
 
     @GET
     @Path("/options")
     @ActionEndpoint(PlatformAction.QUERY)
-    public WebListResponse<MeasureUnitCategory> options(@Context HttpServletRequest request,
+    public WebListResponse<MeasureUnitCategory> options(@Context UriInfo uriInfo,
                                                         @DefaultValue("true") @QueryParam("enabledOnly") boolean enabledOnly) {
+        WebRequestScope request = requestScope(uriInfo);
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
                 service().listVisibleCategories(applicationAlias(request), enabledOnly),
                 FieldOutputContext.LIST)));
     }
 
-    private String applicationAlias(@Context HttpServletRequest request) {
+    private String applicationAlias(WebRequestScope request) {
         String value = pathVariable(request, "applicationAlias");
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("applicationAlias is required");

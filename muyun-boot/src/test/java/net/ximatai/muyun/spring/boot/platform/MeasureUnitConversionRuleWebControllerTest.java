@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
-import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -37,14 +37,13 @@ class MeasureUnitConversionRuleWebControllerTest {
         assertThat(MeasureUnitConversionRuleWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.application/{applicationAlias}/measure-unit-conversion-rules");
         assertEndpoint(MeasureUnitConversionRuleWebController.class.getMethod("convert",
-                        HttpServletRequest.class,
+                        UriInfo.class,
                         MeasureUnitConversionRuleWebController.MeasureBusinessConversionRequest.class),
                 "/convert");
 
         assertThat(SharedMeasureUnitConversionRuleWebController.class.getAnnotation(Path.class).value())
                 .isEqualTo("/platform.measure_unit/conversion-rules");
         assertEndpoint(SharedMeasureUnitConversionRuleWebController.class.getMethod("convert",
-                        HttpServletRequest.class,
                         SharedMeasureUnitConversionRuleWebController.MeasureBusinessConversionRequest.class),
                 "/convert");
     }
@@ -140,7 +139,7 @@ class MeasureUnitConversionRuleWebControllerTest {
                         new BigDecimal("2"), "quantity", "box", "quantity", "bottle",
                         new BigDecimal("24"), List.of("rule-1")));
 
-        MeasureUnitBusinessConversion response = controller.convert(null,
+        MeasureUnitBusinessConversion response = controller.convert(
                 new SharedMeasureUnitConversionRuleWebController.MeasureBusinessConversionRequest(
                         "crm", "crm.order", "sku", "sku-1", null,
                         new BigDecimal("2"), "quantity", "box", "quantity", "bottle"));
@@ -168,10 +167,11 @@ class MeasureUnitConversionRuleWebControllerTest {
         return rule;
     }
 
-    private HttpServletRequest applicationRequest(String applicationAlias) {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(NestedCrudWebSupport.PATH_VARIABLES_ATTRIBUTE))
-                .thenReturn(Map.of("applicationAlias", applicationAlias));
+    private UriInfo applicationRequest(String applicationAlias) {
+        UriInfo request = mock(UriInfo.class);
+        MultivaluedHashMap<String, String> parameters = new MultivaluedHashMap<>();
+        parameters.putSingle("applicationAlias", applicationAlias);
+        when(request.getPathParameters()).thenReturn(parameters);
         return request;
     }
 

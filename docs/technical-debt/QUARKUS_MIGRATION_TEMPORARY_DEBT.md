@@ -90,11 +90,11 @@
 
 ## HTTP Payloads
 
-### Servlet request scope APIs are transitional
+### Request scope APIs are transitional
 
-- 现状：动态导入 multipart、交换模板下载、动态导出和导入错误文件下载已迁移到 RESTEasy Reactive/JAX-RS；剩余 servlet 依赖主要来自嵌套 CRUD/作用域控制器通过 `HttpServletRequest` 读取路径变量。
-- 影响：静态 Web 基类仍带 servlet 请求模型，Quarkus Web 层与平台 scope API 的长期边界还不够清晰。
-- 回收方向：把嵌套路由所需的路径变量收敛为稳定的 JAX-RS scope 上下文或显式方法参数，移除 servlet 过渡依赖。
+- 现状：动态导入 multipart、交换模板下载、动态导出、导入错误文件下载和嵌套 CRUD/作用域控制器路径变量读取已迁移到 RESTEasy Reactive/JAX-RS；平台内部通过 `WebRequestScope` 传递路径变量。
+- 影响：静态 Web 基类已不再依赖 servlet，但 `WebRequestScope` 仍是迁移期最小门面，尚未沉淀成完整请求作用域上下文。
+- 回收方向：评估是否将 `WebRequestScope` 扩展为稳定的 Web scope API，或继续把关键路径变量显式化为方法参数。
 
 ## Test Migration
 

@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.boot.web.WebRequestScope;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.currency.TenantCurrencySetting;
@@ -26,22 +26,22 @@ public class TenantCurrencySettingWebController
     }
 
     @Override
-    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, WebRequestScope request) {
         criteria.eq("tenantId", TenantContext.currentTenantId()
                 .orElseThrow(() -> new IllegalArgumentException("tenant currency setting requires tenant context")));
     }
 
     @Override
-    protected void bindScope(TenantCurrencySetting record, @Context HttpServletRequest request) {
+    protected void bindScope(TenantCurrencySetting record, WebRequestScope request) {
     }
 
     @Override
-    protected boolean inScope(TenantCurrencySetting record, @Context HttpServletRequest request) {
+    protected boolean inScope(TenantCurrencySetting record, WebRequestScope request) {
         return Objects.equals(record.getTenantId(), TenantContext.currentTenantId().orElse(null));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(WebRequestScope request, String id) {
         return "tenant currency setting not found: " + id;
     }
 }

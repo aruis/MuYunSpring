@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.core.UriInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
@@ -22,9 +22,9 @@ public abstract class NestedEnabledTreeCrudWebSupport<
     @POST
     @Path("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public WebCountResponse enable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
+    public WebCountResponse enable(@Context UriInfo uriInfo, @PathParam("id") String id) {
         return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
+            requireScopedRecord(requestScope(uriInfo), id);
             int count = service().enable(id);
             return new WebCountResponse(count, successMessage(service().select(id), "已启用"));
         });
@@ -33,9 +33,9 @@ public abstract class NestedEnabledTreeCrudWebSupport<
     @POST
     @Path("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public WebCountResponse disable(@Context HttpServletRequest servletRequest, @PathParam("id") String id) {
+    public WebCountResponse disable(@Context UriInfo uriInfo, @PathParam("id") String id) {
         return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
+            requireScopedRecord(requestScope(uriInfo), id);
             int count = service().disable(id);
             return new WebCountResponse(count, successMessage(service().select(id), "已停用"));
         });
@@ -44,17 +44,18 @@ public abstract class NestedEnabledTreeCrudWebSupport<
     @POST
     @Path("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@Context HttpServletRequest servletRequest,
+    public WebCountResponse sort(@Context UriInfo uriInfo,
                                  @PathParam("id") String id,
                                  TreeSortWebRequest request) {
         return webScope(() -> {
+            WebRequestScope scope = requestScope(uriInfo);
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             requireSortInput(normalized);
-            requireScopedRecord(servletRequest, id);
-            requireScopedNeighbor(servletRequest, normalized.previousId());
-            requireScopedNeighbor(servletRequest, normalized.nextId());
-            requireScopedParent(servletRequest, normalized.parentId());
-            Criteria scopeCriteria = treeScopeCriteria(servletRequest);
+            requireScopedRecord(scope, id);
+            requireScopedNeighbor(scope, normalized.previousId());
+            requireScopedNeighbor(scope, normalized.nextId());
+            requireScopedParent(scope, normalized.parentId());
+            Criteria scopeCriteria = treeScopeCriteria(scope);
             if (scopeCriteria == null || scopeCriteria.isEmpty()) {
                 service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
             } else {
@@ -65,19 +66,19 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         });
     }
 
-    protected Criteria treeScopeCriteria(@Context HttpServletRequest request) {
+    protected Criteria treeScopeCriteria(WebRequestScope scope) {
         return Criteria.of();
     }
 
-    private void requireScopedNeighbor(@Context HttpServletRequest request, String id) {
+    private void requireScopedNeighbor(WebRequestScope scope, String id) {
         if (id != null && !id.isBlank()) {
-            requireScopedRecord(request, id);
+            requireScopedRecord(scope, id);
         }
     }
 
-    private void requireScopedParent(@Context HttpServletRequest request, String parentId) {
+    private void requireScopedParent(WebRequestScope scope, String parentId) {
         if (parentId != null && !parentId.isBlank() && !TreeAbility.ROOT_ID.equals(parentId)) {
-            requireScopedRecord(request, parentId);
+            requireScopedRecord(scope, parentId);
         }
     }
 
