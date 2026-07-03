@@ -2,11 +2,10 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -37,7 +36,6 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 
-import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -98,30 +96,26 @@ public class DynamicExportWebController {
     @POST
     @Path("/data")
     @ActionEndpoint(PlatformAction.EXPORT)
-    public void exportData(@PathParam("moduleAlias") String moduleAlias,
-                           WebQueryRequest request,
-                           @Context HttpServletResponse response) {
-        tenantScope(moduleAlias, () -> {
+    public Response exportData(@PathParam("moduleAlias") String moduleAlias,
+                               WebQueryRequest request) {
+        return tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
             requireExchangeCapability(descriptor);
             byte[] bytes = exportFacade.exportWorkbook(exportCommand(moduleAlias, descriptor, request));
-            writeXlsx(response, moduleAlias.replace('.', '_') + "-export.xlsx", bytes);
-            return null;
+            return exportResponse(moduleAlias.replace('.', '_') + "-export.xlsx", bytes);
         });
     }
 
     @POST
     @Path("/selected")
     @ActionEndpoint(PlatformAction.EXPORT)
-    public void exportSelected(@PathParam("moduleAlias") String moduleAlias,
-                               DynamicSelectedExportRequest request,
-                               @Context HttpServletResponse response) {
-        tenantScope(moduleAlias, () -> {
+    public Response exportSelected(@PathParam("moduleAlias") String moduleAlias,
+                                   DynamicSelectedExportRequest request) {
+        return tenantScope(moduleAlias, () -> {
             DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
             requireExchangeCapability(descriptor);
             byte[] bytes = exportFacade.exportWorkbook(selectedExportCommand(moduleAlias, descriptor, request));
-            writeXlsx(response, moduleAlias.replace('.', '_') + "-selected-export.xlsx", bytes);
-            return null;
+            return exportResponse(moduleAlias.replace('.', '_') + "-selected-export.xlsx", bytes);
         });
     }
 
@@ -308,17 +302,13 @@ public class DynamicExportWebController {
         }
     }
 
-    private void writeXlsx(@Context HttpServletResponse response, String fileName, byte[] bytes) {
-        try {
-            response.setContentType(DynamicImportWebController.XLSX_CONTENT_TYPE);
-            response.setHeader("Content-Disposition", DynamicImportWebController.contentDisposition(fileName));
-            response.setHeader("Access-Control-Expose-Headers", "Content-Disposition,X-Export-FileName");
-            response.setHeader("X-Export-FileName", fileName);
-            response.setContentLength(bytes.length);
-            response.getOutputStream().write(bytes);
-        } catch (IOException ex) {
-            throw new PlatformException("dynamic export workbook write failed", ex);
-        }
+    private Response exportResponse(String fileName, byte[] bytes) {
+        return Response.ok(bytes, DynamicImportWebController.XLSX_CONTENT_TYPE)
+                .header("Content-Disposition", DynamicImportWebController.contentDisposition(fileName))
+                .header("Access-Control-Expose-Headers", "Content-Disposition,X-Export-FileName")
+                .header("X-Export-FileName", fileName)
+                .header("Content-Length", bytes.length)
+                .build();
     }
 
     private boolean hasText(String value) {

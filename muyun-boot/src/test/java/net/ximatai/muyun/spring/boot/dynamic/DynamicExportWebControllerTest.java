@@ -1,9 +1,7 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.WriteListener;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.core.Response;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -41,11 +39,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -56,7 +51,6 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.eq;
-import static org.mockito.ArgumentMatchers.anyString;
 
 class DynamicExportWebControllerTest {
     private static final String MODULE = "sales.order";
@@ -98,12 +92,13 @@ class DynamicExportWebControllerTest {
                 List.of(new WebQueryCondition("status", "EQ", List.of("active"))),
                 List.of(new WebSort("orderNo", true))
         );
-        CapturingResponse response = new CapturingResponse();
 
-        controller.exportData(MODULE, request, response.response());
+        Response response = controller.exportData(MODULE, request);
 
-        assertThat(response.header("X-Export-FileName")).isEqualTo("sales_order-export.xlsx");
-        assertThat(response.bytes()).containsExactly(7, 8, 9);
+        assertThat(response.getHeaderString("X-Export-FileName")).isEqualTo("sales_order-export.xlsx");
+        assertThat(response.getHeaderString("Content-Length")).isEqualTo("3");
+        assertThat(response.getMediaType().toString()).isEqualTo(DynamicImportWebController.XLSX_CONTENT_TYPE);
+        assertThat((byte[]) response.getEntity()).containsExactly(7, 8, 9);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -147,7 +142,7 @@ class DynamicExportWebControllerTest {
                         "values", List.of("user-1")
                 ))
         )), WebQueryRequest.class);
-        exportController.exportData(MODULE, request, new CapturingResponse().response());
+        exportController.exportData(MODULE, request);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -181,12 +176,12 @@ class DynamicExportWebControllerTest {
                   }
                 }
                 """, DynamicSelectedExportRequest.class);
-        CapturingResponse response = new CapturingResponse();
 
-        controller.exportSelected(MODULE, request, response.response());
+        Response response = controller.exportSelected(MODULE, request);
 
-        assertThat(response.header("X-Export-FileName")).isEqualTo("sales_order-selected-export.xlsx");
-        assertThat(response.bytes()).containsExactly(1, 3, 5);
+        assertThat(response.getHeaderString("X-Export-FileName")).isEqualTo("sales_order-selected-export.xlsx");
+        assertThat(response.getHeaderString("Content-Length")).isEqualTo("3");
+        assertThat((byte[]) response.getEntity()).containsExactly(1, 3, 5);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -246,7 +241,7 @@ class DynamicExportWebControllerTest {
                   }
                 }
                 """, WebQueryRequest.class);
-        exportController.exportData(MODULE, request, new CapturingResponse().response());
+        exportController.exportData(MODULE, request);
 
         ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
         verify(exportFacade).exportWorkbook(captor.capture());
@@ -275,7 +270,7 @@ class DynamicExportWebControllerTest {
         WebQueryRequest request = new WebQueryRequest(
                 null, List.of(), List.of(new WebSort("displayCode", true)));
 
-        assertThatThrownBy(() -> controller.exportData(MODULE, request, new CapturingResponse().response()))
+        assertThatThrownBy(() -> controller.exportData(MODULE, request))
                 .isInstanceOf(PlatformException.class);
 
         verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
@@ -293,7 +288,7 @@ class DynamicExportWebControllerTest {
                 List.of("order-1"),
                 new WebQueryRequest(null, List.of(), List.of(new WebSort("displayCode", true))));
 
-        assertThatThrownBy(() -> controller.exportSelected(MODULE, request, new CapturingResponse().response()))
+        assertThatThrownBy(() -> controller.exportSelected(MODULE, request))
                 .isInstanceOf(PlatformException.class);
 
         verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
@@ -321,7 +316,7 @@ class DynamicExportWebControllerTest {
         WebQueryRequest request = new WebQueryRequest(null, null, List.of(), null, Map.of(), List.of(),
                 "ui-list", null, Map.of(), null, "C-001", List.of("displayCode"), null);
 
-        assertThatThrownBy(() -> exportController.exportData(MODULE, request, new CapturingResponse().response()))
+        assertThatThrownBy(() -> exportController.exportData(MODULE, request))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Quick search field is not searchable");
 
@@ -332,7 +327,7 @@ class DynamicExportWebControllerTest {
     void shouldRejectDataExportWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
-        assertThatThrownBy(() -> controller.exportData(MODULE, null, new CapturingResponse().response()))
+        assertThatThrownBy(() -> controller.exportData(MODULE, null))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("dynamic entity does not support capability");
     }
@@ -342,7 +337,7 @@ class DynamicExportWebControllerTest {
         when(recordService.describe(MODULE)).thenReturn(descriptor());
 
         assertThatThrownBy(() -> controller.exportSelected(MODULE,
-                new DynamicSelectedExportRequest(List.of(), null), new CapturingResponse().response()))
+                new DynamicSelectedExportRequest(List.of(), null)))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("dynamic selected export ids must not be empty");
     }
@@ -445,47 +440,6 @@ class DynamicExportWebControllerTest {
             return method.invoke(entry);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Cannot read criteria node", e);
-        }
-    }
-
-    private static class CapturingResponse {
-        private final HttpServletResponse response = mock(HttpServletResponse.class);
-        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
-        private final Map<String, String> headers = new LinkedHashMap<>();
-
-        CapturingResponse() throws IOException {
-            ServletOutputStream output = new ServletOutputStream() {
-                @Override
-                public boolean isReady() {
-                    return true;
-                }
-
-                @Override
-                public void setWriteListener(WriteListener writeListener) {
-                }
-
-                @Override
-                public void write(int b) {
-                    body.write(b);
-                }
-            };
-            when(response.getOutputStream()).thenReturn(output);
-            org.mockito.Mockito.doAnswer(invocation -> {
-                headers.put(invocation.getArgument(0), invocation.getArgument(1));
-                return null;
-            }).when(response).setHeader(anyString(), anyString());
-        }
-
-        HttpServletResponse response() {
-            return response;
-        }
-
-        String header(String name) {
-            return headers.get(name);
-        }
-
-        byte[] bytes() {
-            return body.toByteArray();
         }
     }
 

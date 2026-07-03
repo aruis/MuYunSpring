@@ -92,7 +92,7 @@
 
 ### Multipart and remaining download APIs are transitional
 
-- 现状：动态导入 multipart 与交换模板下载已迁移到 RESTEasy Reactive/JAX-RS；动态导出、导入错误文件下载等部分路径仍保留 servlet `HttpServletResponse` 和 `jakarta.servlet-api` 临时依赖。
+- 现状：动态导入 multipart、交换模板下载和动态导出已迁移到 RESTEasy Reactive/JAX-RS；导入错误文件下载等部分路径仍保留 servlet `HttpServletResponse` 和 `jakarta.servlet-api` 临时依赖。
 - 影响：HTTP 响应构造方式不统一，Quarkus native/build-time 优化和测试方式也会受影响。
 - 回收方向：统一迁移到 JAX-RS `Response`、`StreamingOutput` 或 RESTEasy Reactive 推荐类型，移除 servlet 过渡依赖。
 
