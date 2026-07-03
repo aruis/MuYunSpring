@@ -6,34 +6,35 @@ import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = PlatformQueryItemService.MODULE_ALIAS, title = "平台查询项")
-@RequestMapping("/platform.query-template/{queryTemplateId}/items")
+@Path("/platform.query-template/{queryTemplateId}/items")
 public class PlatformQueryItemWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformQueryItem, PlatformQueryItemService> {
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("queryTemplateId", pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected void bindScope(PlatformQueryItem record, HttpServletRequest request) {
+    protected void bindScope(PlatformQueryItem record, @Context HttpServletRequest request) {
         record.setQueryTemplateId(pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected boolean inScope(PlatformQueryItem record, HttpServletRequest request) {
+    protected boolean inScope(PlatformQueryItem record, @Context HttpServletRequest request) {
         return Objects.equals(record.getQueryTemplateId(), pathVariable(request, "queryTemplateId"));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "Query item does not belong to query template: "
                 + pathVariable(request, "queryTemplateId") + "." + id;
     }

@@ -6,35 +6,36 @@ import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigFieldService;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Objects;
 
-@RestController
+@ApplicationScoped
 @PlatformStaticModule(application = "platform", alias = PlatformUiConfigFieldService.MODULE_ALIAS,
         title = "平台 UI 字段配置")
-@RequestMapping("/platform.ui-config/{uiConfigId}/fields")
+@Path("/platform.ui-config/{uiConfigId}/fields")
 public class PlatformUiConfigFieldWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformUiConfigField, PlatformUiConfigFieldService> {
 
     @Override
-    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    protected void appendScope(Criteria criteria, @Context HttpServletRequest request) {
         criteria.eq("uiConfigId", pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected void bindScope(PlatformUiConfigField record, HttpServletRequest request) {
+    protected void bindScope(PlatformUiConfigField record, @Context HttpServletRequest request) {
         record.setUiConfigId(pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected boolean inScope(PlatformUiConfigField record, HttpServletRequest request) {
+    protected boolean inScope(PlatformUiConfigField record, @Context HttpServletRequest request) {
         return Objects.equals(record.getUiConfigId(), pathVariable(request, "uiConfigId"));
     }
 
     @Override
-    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+    protected String scopedRecordNotFoundMessage(@Context HttpServletRequest request, String id) {
         return "UI config field does not belong to UI config: "
                 + pathVariable(request, "uiConfigId") + "." + id;
     }
