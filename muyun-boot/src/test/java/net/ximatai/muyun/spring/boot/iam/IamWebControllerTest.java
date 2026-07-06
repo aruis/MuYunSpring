@@ -65,6 +65,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -497,6 +498,51 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldSortTenantScopedRoleUnderResolvedExistingRecordTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        Role existing = tenantScopedRole("role-1", "demo");
+        when(roleService.select("role-1")).thenReturn(existing);
+        doAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            return null;
+        }).when(roleService).moveAfter("role-1", "role-0");
+
+        mvc.perform(post("/iam.role/sort/{id}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"previousId":"role-0"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void shouldGrantPermissionUnderResolvedRoleTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        Role existing = tenantScopedRole("role-1", "demo");
+        when(roleService.select("role-1")).thenReturn(existing);
+        when(roleService.grantAction("role-1", "sales.contract", "query",
+                DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
+                null, null, null)).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            return 1;
+        });
+
+        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "moduleAlias":"sales.contract",
+                                  "actionCode":"query",
+                                  "dataScopePolicy":"owner",
+                                  "tenantScopePolicy":"currentTenant"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
     void shouldKeepExistingPasswordHashWhenUpdatingUserThroughStandardCrudContract() throws Exception {
         currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
@@ -843,6 +889,18 @@ class IamWebControllerTest {
         position.setEnabled(Boolean.TRUE);
         position.setSortOrder(1);
         return position;
+    }
+
+    private Role tenantScopedRole(String id, String tenantId) {
+        Role role = new Role();
+        role.setId(id);
+        role.setTenantId(tenantId);
+        role.setTitle("Tenant Role");
+        role.setOwnerScopeType(RoleOwnerScopeType.TENANT);
+        role.setOwnerScopeId(tenantId);
+        role.setEnabled(Boolean.TRUE);
+        role.setSortOrder(1);
+        return role;
     }
 
     private AccountRoleGrant accountRoleGrant(String id,

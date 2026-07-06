@@ -99,6 +99,19 @@ const roleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const selectedTenantId = computed(() => selectedTenant.value?.id);
 const canSelectPlatformScope = computed(() => currentUser?.value?.system === true);
+const canBrowseTenants = computed(() => currentUser?.value?.system === true);
+const currentUserTenant = computed<Tenant | undefined>(() => {
+  const tenantId = currentUser?.value?.tenantId;
+  if (currentUser?.value?.system === true || !tenantId) {
+    return undefined;
+  }
+  return {
+    id: tenantId,
+    title: tenantId,
+    alias: tenantId,
+    enabled: true,
+  } as Tenant;
+});
 const organizationTreeContext = computed(() =>
   createScopedTreeModuleContext(organizationContext, {
     scopeFieldName: 'tenantId',
@@ -240,6 +253,8 @@ const roleFormFieldNames = computed<RoleFormFieldName[]>(() => [
 
 onMounted(loadRoleFormDefinition);
 
+watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
+
 watch(selectedScope, () => {
   selectedRoleKey.value = undefined;
   selectedRole.value = undefined;
@@ -316,6 +331,9 @@ function updateRoleDraftField(fieldName: string, value: string | number | boolea
 }
 
 function handleTenantsLoaded(records: CrudRecordListBase[]) {
+  if (!canBrowseTenants.value) {
+    return;
+  }
   if (!selectedScope.value && canSelectPlatformScope.value) {
     selectPlatformScope();
     return;
@@ -323,6 +341,15 @@ function handleTenantsLoaded(records: CrudRecordListBase[]) {
   if (!selectedTenant.value && records.length > 0) {
     selectTenant(records[0] as Tenant);
   }
+}
+
+function initializeTenantUserScope(record = currentUserTenant.value) {
+  if (!record || canBrowseTenants.value || selectedTenant.value || selectedScope.value) {
+    return;
+  }
+  selectedTenant.value = record;
+  selectTenantRootScope(record);
+  organizationReloadKey.value += 1;
 }
 
 function selectPlatformScope() {
@@ -639,7 +666,7 @@ function normalizedRoleDraft(draft: Partial<Role>, scope: RoleScope): Role {
 }
 
 function scopeTenantId(scope: RoleScope | undefined) {
-  return scope?.kind === 'platform' ? undefined : scope?.tenant?.id ?? scope?.id;
+  return scope?.kind === 'platform' ? undefined : (scope?.tenant?.id ?? scope?.id);
 }
 
 function validateRoleDraft(draft: Role) {
@@ -782,7 +809,8 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       refresh-title="刷新租户列表"
       :search-keyword="tenantSearchKeyword"
       search-placeholder="搜索租户名称、alias 或 ID"
-      @refresh="tenantReloadKey += 1"
+      :searchable="canBrowseTenants"
+      @refresh="canBrowseTenants ? (tenantReloadKey += 1) : initializeTenantUserScope()"
       @update:search-keyword="tenantSearchKeyword = $event"
     >
       <template #actions>
@@ -794,7 +822,21 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
           @click="selectPlatformScope"
         />
       </template>
+      <button
+        v-if="!canBrowseTenants && currentUserTenant"
+        class="role-tenant-root-scope"
+        type="button"
+        @click="selectTenant(currentUserTenant)"
+      >
+        <UiRecordExplorerItem
+          :title="tenantTitle(currentUserTenant)"
+          secondary="当前租户"
+          clickable
+          :selected="selectedTenant?.id === currentUserTenant.id"
+        />
+      </button>
       <CrudRecordListExplorer
+        v-else
         :context="tenantListContext"
         :selected-id="selectedTenant?.id"
         :reload-key="tenantReloadKey"
@@ -821,11 +863,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       <UiEmpty v-if="selectedScope?.kind === 'platform'" description="平台角色不需要选择租户内范围" />
       <UiEmpty v-else-if="!selectedTenant" description="请选择左侧租户" />
       <template v-else>
-        <button
-          class="role-tenant-root-scope"
-          type="button"
-          @click="selectTenantRootScope()"
-        >
+        <button class="role-tenant-root-scope" type="button" @click="selectTenantRootScope()">
           <UiRecordExplorerItem
             :title="tenantTitle(selectedTenant)"
             secondary="租户本级角色"
@@ -944,8 +982,8 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
   min-height: 0;
 }
 
-  .role-tenant-root-scope {
-    display: block;
+.role-tenant-root-scope {
+  display: block;
   width: 100%;
   margin: 0 0 8px;
   padding: 0 0 8px;

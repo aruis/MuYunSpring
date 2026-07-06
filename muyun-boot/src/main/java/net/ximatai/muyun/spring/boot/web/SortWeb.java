@@ -6,20 +6,23 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
     default WebCountResponse sort(@PathVariable String id,
                                   @RequestBody(required = false) SortWebRequest request) {
-        return webScope(() -> {
+        return mutationTenantScope(mutationTenantIdForSort(id), () -> webScope(() -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 requireSortScope(id, normalized.previousId());
@@ -32,7 +35,25 @@ public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extend
                 return new WebCountResponse(1);
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");
-        });
+        }));
+    }
+
+    private Optional<String> mutationTenantIdForSort(String id) {
+        if (!TenantContext.isSystem() || !(this instanceof MutationTenantScopeResolver<?> resolver)) {
+            return Optional.empty();
+        }
+        @SuppressWarnings("unchecked")
+        MutationTenantScopeResolver<T> typedResolver = (MutationTenantScopeResolver<T>) resolver;
+        return typedResolver.tenantIdForExistingRecord(id);
+    }
+
+    private WebCountResponse mutationTenantScope(Optional<String> tenantId, Supplier<WebCountResponse> action) {
+        if (tenantId.isEmpty()) {
+            return action.get();
+        }
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId.get())) {
+            return action.get();
+        }
     }
 
     private void requireSortScope(String id, String targetId) {

@@ -659,6 +659,11 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /<TreeRecordExplorer/);
   assert.match(roleViewSource, /<RecordQueryListPanel/);
   assert.match(roleViewSource, /selectedScope/);
+  assert.match(roleViewSource, /canBrowseTenants/);
+  assert.match(roleViewSource, /currentUserTenant/);
+  assert.match(roleViewSource, /initializeTenantUserScope/);
+  assert.match(roleViewSource, /secondary="当前租户"/);
+  assert.match(roleViewSource, /v-if="!canBrowseTenants && currentUserTenant"/);
   assert.match(roleViewSource, /selectPlatformScope/);
   assert.match(roleViewSource, /title: '平台角色'/);
   assert.match(roleViewSource, /selectTenantRootScope/);
@@ -676,7 +681,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /:fields="roleFormFieldDefinitions"/);
   assert.match(roleViewSource, /:fallback="roleFormFieldFallback"/);
   assert.match(roleViewSource, /tenantId: scopeTenantId\(scope\)/);
-  assert.match(roleViewSource, /scope\?\.kind === 'platform' \? undefined : scope\?\.tenant\?\.id \?\? scope\?\.id/);
+  assert.match(roleViewSource, /function scopeTenantId\(scope: RoleScope \| undefined\)/);
+  assert.match(roleViewSource, /scope\?\.kind === 'platform'/);
+  assert.match(roleViewSource, /scope\?\.tenant\?\.id \?\? scope\?\.id/);
   assert.match(roleViewSource, /assignmentType: \{[\s\S]*controlType: 'select'/);
   assert.match(roleViewSource, /roleKind: \{[\s\S]*controlType: 'select'/);
   assert.match(roleViewSource, /sharePolicy: \{[\s\S]*options: sharePolicyOptions/);
@@ -694,7 +701,10 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
-  assert.match(contractsSource, /export type RoleSharePolicy = 'private' \| 'ownerAndChildren' \| 'tenant' \| 'platform'/);
+  assert.match(
+    contractsSource,
+    /export type RoleSharePolicy = 'private' \| 'ownerAndChildren' \| 'tenant' \| 'platform'/,
+  );
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
