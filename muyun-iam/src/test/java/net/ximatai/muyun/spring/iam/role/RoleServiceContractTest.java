@@ -245,6 +245,42 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldScopeRoleSortingInsideOwnerScope() {
+        RoleService service = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role tenantRole = employmentRole("tenant-role", RoleKind.STANDARD);
+
+        Criteria scope = service.sortScope(tenantRole);
+        String sql = new CriteriaSqlCompiler()
+                .compile(scope, field -> field, DBInfo.Type.POSTGRESQL)
+                .getSql();
+
+        assertThat(sql).contains("\"ownerScopeType\" =");
+        assertThat(sql).contains("\"ownerScopeKey\" =");
+    }
+
+    @Test
+    void shouldRejectRoleSortingAcrossOwnerScopes() {
+        RoleService service = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role tenantRole = employmentRole("tenant-role", RoleKind.STANDARD);
+        Role sameTenantRole = employmentRole("tenant-role-2", RoleKind.STANDARD);
+        Role organizationRole = organizationRole("org-role", "org-1");
+        Role sameOrganizationRole = organizationRole("org-role-2", "org-1");
+        Role otherOrganizationRole = organizationRole("org-role-3", "org-2");
+
+        service.validateSortScope(tenantRole, sameTenantRole);
+        service.validateSortScope(organizationRole, sameOrganizationRole);
+
+        assertThatThrownBy(() -> service.validateSortScope(tenantRole, organizationRole))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("role sort scope must stay inside the same owner scope");
+        assertThatThrownBy(() -> service.validateSortScope(organizationRole, otherOrganizationRole))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("role sort scope must stay inside the same owner scope");
+    }
+
+    @Test
     void shouldRejectAccountOrNestedGroupRoleInGroup() {
         RoleDao roleDao = mock(RoleDao.class);
         when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
@@ -882,6 +918,15 @@ class RoleServiceContractTest {
 
     private Role employmentRole(String id, RoleKind kind) {
         return role(id, "Role " + id, RoleAssignmentType.EMPLOYMENT, kind);
+    }
+
+    private Role organizationRole(String id, String organizationId) {
+        Role role = employmentRole(id, RoleKind.STANDARD);
+        role.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        role.setOwnerScopeId(organizationId);
+        role.setOwnerScopeKey("organization:" + organizationId);
+        role.setSharePolicy(RoleSharePolicy.PRIVATE);
+        return role;
     }
 
     private Role systemManagedRole(String id) {

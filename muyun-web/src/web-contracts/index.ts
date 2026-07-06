@@ -470,6 +470,31 @@ export interface Employee extends StandardEnabledSortableEntity {
   email?: string;
 }
 
+export type RoleAssignmentType = 'account' | 'employment';
+
+export type RoleKind = 'standard' | 'group' | 'dataGrant' | 'system';
+
+export type RoleOwnerScopeType = 'platform' | 'tenant' | 'organization';
+
+export type RoleSharePolicy = 'private' | 'ownerAndChildren' | 'tenant' | 'platform';
+
+export interface Role extends StandardEnabledSortableEntity {
+  assignmentType?: RoleAssignmentType;
+  assignmentTypeTitle?: string;
+  roleKind?: RoleKind;
+  roleKindTitle?: string;
+  memberRoleIds?: string;
+  ownerScopeType?: RoleOwnerScopeType;
+  ownerScopeTypeTitle?: string;
+  ownerScopeId?: string;
+  ownerScopeKey?: string;
+  sharePolicy?: RoleSharePolicy;
+  sharePolicyTitle?: string;
+  builtIn?: boolean;
+  systemManaged?: boolean;
+  description?: string;
+}
+
 export interface Application extends StandardEnabledSortableEntity {
   alias?: string;
 }

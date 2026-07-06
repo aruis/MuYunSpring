@@ -56,7 +56,10 @@ export function createScopedTreeClient<TRecord>(
     subtree: (id, subtreeOptions) =>
       context.http.request<WebListResponse<WebTreeNode<TRecord>>>({
         path: treePathOf(options.treePath, id),
-        query: subtreeOptions,
+        query: {
+          ...scopeQueryParams(options),
+          ...subtreeOptions,
+        },
       }),
     sort: (id, request) =>
       context.http.request<WebCountResponse>({
@@ -65,6 +68,7 @@ export function createScopedTreeClient<TRecord>(
           /\/$/,
           '',
         )}/${encodeURIComponent(id)}`,
+        query: scopeQueryParams(options),
         body: request,
       }),
   };

@@ -211,6 +211,35 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("rolePermissions"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "rolePermissions", "角色授权"));
+                assertThat(definition.uiDefinition()).isNotNull();
+                assertThat(definition.uiDefinition().views()).hasSize(2);
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("title", "assignmentType", "roleKind", "sharePolicy",
+                                            "systemManaged", "enabled");
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("enabled"))
+                                    .singleElement()
+                                    .satisfies(field -> assertThat(field.uiType()).isEqualTo("enabledStatus"));
+                        });
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_form"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("title", "assignmentType", "roleKind", "memberRoleIds",
+                                            "ownerScopeType", "ownerScopeId", "sharePolicy", "description",
+                                            "enabled", "sortOrder");
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("ownerScopeType"))
+                                    .singleElement()
+                                    .satisfies(field -> {
+                                        assertThat(field.required().constant()).isTrue();
+                                        assertThat(field.readOnly().constant()).isTrue();
+                                        assertThat(field.uiType()).isEqualTo("select");
+                                    });
+                        });
             });
             assertThat(byAlias.get("iam.user")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");

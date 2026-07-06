@@ -125,6 +125,7 @@ test('static management explorers use unified item descriptors', () => {
     'DictionaryManagementView.vue',
     'MenuManagementView.vue',
     'EmployeeManagementView.vue',
+    'RoleManagementView.vue',
   ];
 
   for (const fileName of explorerViews) {
@@ -443,6 +444,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
+  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(panelSource, /return value \? '是' : '否'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
   assert.match(panelSource, /if \(!queryReady\.value\)/);
@@ -637,6 +640,71 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(panelSource, /uiDefinition/);
   assert.doesNotMatch(employeeViewSource, /uiDefinition/);
   assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
+});
+
+test('role management keeps basic scope management separate from binding and authorization', () => {
+  const roleViewSource = readSource('src/views/RoleManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+  const contractsSource = readSource('src/web-contracts/index.ts');
+  const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+
+  assert.match(routesSource, /moduleAlias: 'iam\.role'/);
+  assert.match(routesSource, /route: '\/iam\/roles'/);
+  assert.match(roleViewSource, /defineOptions\(\{ name: 'RoleManagementView' \}\)/);
+  assert.match(roleViewSource, /moduleAlias: 'iam\.tenant'/);
+  assert.match(roleViewSource, /moduleAlias: 'iam\.organization'/);
+  assert.match(roleViewSource, /moduleAlias: 'iam\.role'/);
+  assert.match(roleViewSource, /role-management-page/);
+  assert.match(roleViewSource, /<CrudRecordListExplorer/);
+  assert.match(roleViewSource, /<TreeRecordExplorer/);
+  assert.match(roleViewSource, /<RecordQueryListPanel/);
+  assert.match(roleViewSource, /selectedScope/);
+  assert.match(roleViewSource, /canBrowseTenants/);
+  assert.match(roleViewSource, /currentUserTenant/);
+  assert.match(roleViewSource, /initializeTenantUserScope/);
+  assert.match(roleViewSource, /secondary="当前租户"/);
+  assert.match(roleViewSource, /v-if="!canBrowseTenants && currentUserTenant"/);
+  assert.match(roleViewSource, /selectPlatformScope/);
+  assert.match(roleViewSource, /title: '平台角色'/);
+  assert.match(roleViewSource, /selectTenantRootScope/);
+  assert.match(roleViewSource, /selectOrganizationScope/);
+  assert.match(roleViewSource, /fieldName: 'ownerScopeType'/);
+  assert.match(roleViewSource, /fieldName: 'ownerScopeId'/);
+  assert.match(roleViewSource, /values: \[scope\.kind\]/);
+  assert.match(roleViewSource, /values: \[scope\.id\]/);
+  assert.match(roleViewSource, /createScopedTreeModuleContext/);
+  assert.match(roleViewSource, /treePath: '\/iam\.organization\/tree'/);
+  assert.match(roleViewSource, /scopeFieldName: 'tenantId'/);
+  assert.match(roleViewSource, /onMounted\(loadRoleFormDefinition\)/);
+  assert.match(roleViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
+  assert.match(roleViewSource, /roleFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
+  assert.match(roleViewSource, /:fields="roleFormFieldDefinitions"/);
+  assert.match(roleViewSource, /:fallback="roleFormFieldFallback"/);
+  assert.match(roleViewSource, /tenantId: scopeTenantId\(scope\)/);
+  assert.match(roleViewSource, /function scopeTenantId\(scope: RoleScope \| undefined\)/);
+  assert.match(roleViewSource, /scope\?\.kind === 'platform'/);
+  assert.match(roleViewSource, /scope\?\.tenant\?\.id \?\? scope\?\.id/);
+  assert.match(roleViewSource, /assignmentType: \{[\s\S]*controlType: 'select'/);
+  assert.match(roleViewSource, /roleKind: \{[\s\S]*controlType: 'select'/);
+  assert.match(roleViewSource, /sharePolicy: \{[\s\S]*options: sharePolicyOptions/);
+  assert.match(roleViewSource, /roleDraft\.value\.roleKind === 'group'/);
+  assert.match(roleViewSource, /fieldName === 'ownerScopeType' \|\| fieldName === 'ownerScopeId'/);
+  assert.match(roleViewSource, /roleDetailMode\.value === 'edit' && \['assignmentType', 'roleKind'\]/);
+  assert.match(roleViewSource, /selectedRole\.value\?\.systemManaged/);
+  assert.match(roleViewSource, /target as Role\)\.systemManaged !== true/);
+  assert.match(roleViewSource, /standard-crud-actions/);
+  assert.match(roleViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(roleViewSource, /account-grants/);
+  assert.doesNotMatch(roleViewSource, /employment-grants/);
+  assert.doesNotMatch(roleViewSource, /permissionMatrix/);
+  assert.doesNotMatch(roleViewSource, /rolePermissions/);
+  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
+  assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
+  assert.match(
+    contractsSource,
+    /export type RoleSharePolicy = 'private' \| 'ownerAndChildren' \| 'tenant' \| 'platform'/,
+  );
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {

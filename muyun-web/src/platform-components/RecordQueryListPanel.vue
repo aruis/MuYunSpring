@@ -592,7 +592,19 @@ function recordKey(record: QueryListRecord) {
 }
 
 function cellValue(record: QueryListRecord, column: RecordQueryListColumn) {
-  return column.render?.(record) ?? String(record[column.key] ?? '');
+  return column.render?.(record) ?? displayRecordFieldValue(record, column.key);
+}
+
+function displayRecordFieldValue(record: QueryListRecord, fieldName: string) {
+  const titleValue = record[`${fieldName}Title`];
+  if (typeof titleValue === 'string' && titleValue.trim()) {
+    return titleValue;
+  }
+  const value = record[fieldName];
+  if (typeof value === 'boolean') {
+    return value ? '是' : '否';
+  }
+  return String(value ?? '');
 }
 
 function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined): RecordQueryListColumn[] {

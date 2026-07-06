@@ -22,9 +22,9 @@ import java.util.Objects;
 public class DefaultTenantMenuProvisioner implements TenantCreationProvisioner {
     public static final String TENANT_ADMIN_SCHEME_ALIAS = "tenant_admin";
     public static final String TENANT_ADMIN_SCHEME_TITLE = "租户管理";
-    private static final String SCHEME_ID_PREFIX = "tenant_menu_scheme_";
-    private static final String MENU_ID_PREFIX = "tenant.menu.";
-    private static final int MENU_ID_MAX_LENGTH = 128;
+    private static final String SCHEME_ID_PREFIX = "tenant_menu_";
+    private static final String MENU_ID_PREFIX = "tenant_menu_";
+    private static final int STANDARD_ID_MAX_LENGTH = 32;
     private static final int HASH_LENGTH = 16;
 
     private final MenuSchemeService schemeService;
@@ -140,11 +140,13 @@ public class DefaultTenantMenuProvisioner implements TenantCreationProvisioner {
     }
 
     private static String tenantMenuId(String tenantId, String sourceMenuId) {
-        String candidate = MENU_ID_PREFIX + tenantId + "." + sourceMenuId;
-        if (candidate.length() <= MENU_ID_MAX_LENGTH) {
+        String validTenantId = requireText(tenantId, "tenantId");
+        String validSourceMenuId = requireText(sourceMenuId, "sourceMenuId");
+        String candidate = MENU_ID_PREFIX + validTenantId + "_" + shortHash(validSourceMenuId);
+        if (candidate.length() <= STANDARD_ID_MAX_LENGTH) {
             return candidate;
         }
-        return MENU_ID_PREFIX + tenantId + "." + shortHash(sourceMenuId);
+        return MENU_ID_PREFIX + shortHash(validTenantId + ":" + validSourceMenuId);
     }
 
     private static String requireText(String value, String name) {
