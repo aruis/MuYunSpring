@@ -2,22 +2,27 @@ package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
+import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -36,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -45,7 +51,9 @@ import java.util.stream.Collectors;
 public class RoleWebController extends WebSupport<RoleService> implements
         CrudWeb<Role, RoleService>,
         EnableWeb<Role, RoleService>,
-        SortWeb<Role, RoleService> {
+        SortWeb<Role, RoleService>,
+        MutationTenantScopeResolver<Role>,
+        StaticModuleUiContributor {
     private final RoleGrantableActionResolver grantableActionResolver;
     private final MenuService menuService;
 
@@ -64,6 +72,52 @@ public class RoleWebController extends WebSupport<RoleService> implements
                               MenuService menuService) {
         this.grantableActionResolver = grantableActionResolver;
         this.menuService = menuService;
+    }
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(RoleService.MODULE_ALIAS)
+                .listView(list -> list
+                        .title("角色列表")
+                        .field("title", field -> field.label("角色名称").width("180px"))
+                        .field("assignmentType", field -> field.label("授权层级").uiType("select").width("110px"))
+                        .field("roleKind", field -> field.label("角色类型").uiType("select").width("130px"))
+                        .field("sharePolicy", field -> field.label("公开策略").uiType("select").width("120px"))
+                        .field("systemManaged", field -> field.label("系统托管").width("100px").align("center"))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus")
+                                .width("90px").align("center")))
+                .formView(form -> form
+                        .title("角色档案")
+                        .field("title", field -> field.label("角色名称").required())
+                        .field("assignmentType", field -> field.label("授权层级").required().uiType("select"))
+                        .field("roleKind", field -> field.label("角色类型").required().uiType("select"))
+                        .field("memberRoleIds", field -> field.label("成员角色"))
+                        .field("ownerScopeType", field -> field.label("归属范围").required().readOnly().uiType("select"))
+                        .field("ownerScopeId", field -> field.label("归属对象").readOnly())
+                        .field("sharePolicy", field -> field.label("公开策略").required().uiType("select"))
+                        .field("description", field -> field.label("说明"))
+                        .field("enabled", field -> field.label("启用状态").uiType("enabledStatus"))
+                        .field("sortOrder", field -> field.label("排序号")))
+                .build();
+    }
+
+    @Override
+    public Optional<String> tenantIdForCreate(Role record) {
+        return tenantIdForRole(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForUpdate(String id, Role record) {
+        Role existing = service().select(id);
+        if (existing != null) {
+            return tenantIdForRole(existing);
+        }
+        return tenantIdForCreate(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForExistingRecord(String id) {
+        return tenantIdForRole(service().select(id));
     }
 
     @GetMapping("/{roleId}/account-grants")
@@ -302,6 +356,14 @@ public class RoleWebController extends WebSupport<RoleService> implements
     private boolean isModuleEntryMenu(Menu menu) {
         return menu.getModuleAlias() != null
                 && !menu.getModuleAlias().isBlank();
+    }
+
+    private Optional<String> tenantIdForRole(Role role) {
+        if (role == null || role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            return Optional.empty();
+        }
+        return Optional.of(Preconditions.requireText(role.getTenantId(),
+                "tenantId is required for tenant or organization role mutation"));
     }
 
     private List<Menu> flattenMenus(List<Menu> menus) {

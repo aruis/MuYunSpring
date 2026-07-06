@@ -62,6 +62,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DemoBootstrapTaskTest {
+    private static final int STANDARD_ID_MAX_LENGTH = 32;
+
     private final TenantMemoryDao tenantDao = new TenantMemoryDao();
     private final OrganizationMemoryDao organizationDao = new OrganizationMemoryDao();
     private final DepartmentMemoryDao departmentDao = new DepartmentMemoryDao();
@@ -113,6 +115,15 @@ class DemoBootstrapTaskTest {
         assertThat(employeeDao.list(Criteria.of())).isEmpty();
         assertThat(userAccountDao.list(Criteria.of())).isEmpty();
         assertThat(roleDao.list(Criteria.of())).isEmpty();
+    }
+
+    @Test
+    void shouldGenerateDefaultRoleIdsWithinStandardIdLength() {
+        assertThat(DefaultTenantRoleProvisioner.tenantAdminRoleId("acme"))
+                .hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH);
+        assertThat(DefaultOrganizationRoleProvisioner.organizationAdminRoleId("acme", "org-1"))
+                .startsWith("org_admin_")
+                .hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH);
     }
 
     @Test

@@ -55,6 +55,7 @@ test('scoped tree context sends scoped tree flat and sort requests through platf
   });
 
   await scopedContext.abilities.tree().treeFlat({ rootId: 'dept/1', includeSelf: true });
+  await scopedContext.abilities.tree().subtree('dept/2', { includeSelf: false });
   await scopedContext.abilities.tree().sort('dept/1', { beforeId: 'dept-0' });
 
   assert.deepEqual(context.requests, [
@@ -63,8 +64,13 @@ test('scoped tree context sends scoped tree flat and sort requests through platf
       query: { organizationId: 'org-1', flat: true, includeSelf: true },
     },
     {
+      path: '/iam.department/tree/dept%2F2',
+      query: { organizationId: 'org-1', includeSelf: false },
+    },
+    {
       method: 'POST',
       path: '/iam.department/sort/dept%2F1',
+      query: { organizationId: 'org-1' },
       body: { beforeId: 'dept-0' },
     },
   ]);

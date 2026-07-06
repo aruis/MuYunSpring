@@ -24,6 +24,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class DefaultTenantMenuProvisionerTest {
+    private static final int STANDARD_ID_MAX_LENGTH = 32;
+
     private final MenuSchemeMemoryDao schemeDao = new MenuSchemeMemoryDao();
     private final MenuMemoryDao menuDao = new MenuMemoryDao();
     private final PlatformModuleService moduleService = mock(PlatformModuleService.class);
@@ -56,8 +58,18 @@ class DefaultTenantMenuProvisionerTest {
             assertThat(menuService.rootMenus(schemeId))
                     .singleElement()
                     .satisfies(menu -> assertThat(menu.getTitle()).isEqualTo("组织与权限"));
-            assertThat(menuDao.list(Criteria.of().eq("schemeId", schemeId))).hasSize(2);
+            assertThat(menuDao.list(Criteria.of().eq("schemeId", schemeId)))
+                    .hasSize(2)
+                    .allSatisfy(menu -> assertThat(menu.getId()).hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH));
         }
+    }
+
+    @Test
+    void shouldGenerateTenantAdminSchemeIdWithinStandardIdLength() {
+        String schemeId = DefaultTenantMenuProvisioner.tenantAdminSchemeId("demo");
+
+        assertThat(schemeId).startsWith("tenant_menu_");
+        assertThat(schemeId).hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH);
     }
 
     private void createSystemAdminMenuTree() {

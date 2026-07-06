@@ -21,7 +21,7 @@ public class DefaultOrganizationRoleProvisioner implements OrganizationCreationP
     public static final String ORGANIZATION_ADMIN_ROLE_DESCRIPTION =
             "机构内置管理员角色，拥有当前机构及授权范围内的平台可授权动作和数据范围。";
     private static final String SYSTEM_OPERATOR_ID = "organization-provisioner";
-    private static final String ROLE_ID_PREFIX = "organization_admin_";
+    private static final String ROLE_ID_PREFIX = "org_admin_";
     private static final int HASH_LENGTH = 16;
 
     private final RoleService roleService;

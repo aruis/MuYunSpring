@@ -35,6 +35,7 @@ import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
+import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
@@ -439,6 +440,60 @@ class IamWebControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.record.id").value("role-1"))
                 .andExpect(jsonPath("$.record.roleKind").value("dataGrant"));
+    }
+
+    @Test
+    void shouldCreateTenantScopedRoleUnderResolvedMutationTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        Role saved = new Role();
+        saved.setId("role-1");
+        saved.setTenantId("demo");
+        saved.setTitle("Organization Role");
+        saved.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        saved.setOwnerScopeId("demo_org");
+        when(roleService.insert(any())).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            Role incoming = invocation.getArgument(0);
+            assertThat(incoming.getTenantId()).isEqualTo("demo");
+            assertThat(incoming.getOwnerScopeType()).isEqualTo(RoleOwnerScopeType.ORGANIZATION);
+            return "role-1";
+        });
+        when(roleService.select("role-1")).thenReturn(saved);
+
+        mvc.perform(post("/iam.role/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "tenantId":"demo",
+                                  "title":"Organization Role",
+                                  "ownerScopeType":"organization",
+                                  "ownerScopeId":"demo_org"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record.id").value("role-1"))
+                .andExpect(jsonPath("$.record.tenantId").value("demo"));
+    }
+
+    @Test
+    void shouldDeleteTenantScopedRoleUnderResolvedExistingRecordTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        Role existing = new Role();
+        existing.setId("role-1");
+        existing.setTenantId("demo");
+        existing.setTitle("Organization Role");
+        existing.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
+        existing.setOwnerScopeId("demo_org");
+        when(roleService.select("role-1")).thenReturn(existing);
+        when(roleService.delete("role-1")).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            return 1;
+        });
+
+        mvc.perform(post("/iam.role/delete/{id}", "role-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.message").value("「Organization Role」已删除"));
     }
 
     @Test
