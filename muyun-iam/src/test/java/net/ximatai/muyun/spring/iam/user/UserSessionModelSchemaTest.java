@@ -20,7 +20,7 @@ class UserSessionModelSchemaTest {
         assertThat(columnNames(table))
                 .contains("id", "tenant_id", "user_id", "username", "organization_id",
                         "token_hash", "issued_at", "expires_at", "max_expires_at",
-                        "last_seen_at", "revoked_at", "revoked_reason",
+                        "last_seen_at", "password_change_required", "revoked_at", "revoked_reason",
                         "deleted", "version", "created_at", "updated_at");
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {

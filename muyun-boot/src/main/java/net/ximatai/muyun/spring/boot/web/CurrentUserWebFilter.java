@@ -29,6 +29,10 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        if (currentUser.get().passwordChangeRequired() && !isPasswordChangeAllowed(request)) {
+            rejectPasswordChangeRequired(response);
+            return;
+        }
         try (CurrentUserContext.Scope ignored = CurrentUserContext.use(currentUser.get())) {
             doFilterWithTenantScope(currentUser.get(), request, response, filterChain);
         }
@@ -52,5 +56,19 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
         try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
             filterChain.doFilter(request, response);
         }
+    }
+
+    private boolean isPasswordChangeAllowed(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return "/iam.auth/changeOwnPassword".equals(path) || "/iam.auth/logout".equals(path);
+    }
+
+    private void rejectPasswordChangeRequired(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("""
+                {"code":"AUTH_REQUIRED","status":401,"message":"password change required"}
+                """);
     }
 }

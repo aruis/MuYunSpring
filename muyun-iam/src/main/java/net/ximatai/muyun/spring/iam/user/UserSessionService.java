@@ -76,9 +76,14 @@ public class UserSessionService {
                 userAccountService.recordLoginFailure(user, now());
                 throw new AuthenticationFailedException("invalid username or password");
             }
-            CurrentUser currentUser = currentUserOf(user);
             String token = newToken();
             Instant issuedAt = now();
+            if (userAccountService.resetPasswordExpired(user, issuedAt)) {
+                userAccountService.recordLoginFailure(user, issuedAt);
+                throw new AuthenticationFailedException("temporary password expired");
+            }
+            boolean passwordChangeRequired = userAccountService.passwordChangeRequired(user, issuedAt);
+            CurrentUser currentUser = currentUserOf(user, passwordChangeRequired);
             Instant maxExpiresAt = issuedAt.plus(SESSION_ABSOLUTE_TTL);
             UserSession session = new UserSession();
             session.setTenantId(currentUser.tenantId());
@@ -90,10 +95,11 @@ public class UserSessionService {
             session.setExpiresAt(nextIdleExpiresAt(issuedAt, maxExpiresAt));
             session.setMaxExpiresAt(maxExpiresAt);
             session.setLastSeenAt(issuedAt);
+            session.setPasswordChangeRequired(passwordChangeRequired);
             userSessionRecordService.issue(session);
             userAccountService.recordLoginSuccess(user.getId(), issuedAt, ip, userAgent);
             return LoginResult.bearer(token, issuedAt, currentUser,
-                    userAccountService.passwordChangeRequired(user, issuedAt),
+                    passwordChangeRequired,
                     userAccountService.effectivePasswordStatus(user),
                     user.getPasswordExpiresAt());
         }
@@ -123,7 +129,7 @@ public class UserSessionService {
             if (!updateLastSeenIfDue(session, now)) {
                 return Optional.empty();
             }
-            return Optional.of(currentUserOf(user));
+            return Optional.of(currentUserOf(user, Boolean.TRUE.equals(session.getPasswordChangeRequired())));
         }
     }
 
@@ -272,11 +278,12 @@ public class UserSessionService {
                 : TenantContext.use(tenantId);
     }
 
-    private CurrentUser currentUserOf(UserAccount user) {
+    private CurrentUser currentUserOf(UserAccount user, boolean passwordChangeRequired) {
         if (user.getTenantId() == null || user.getTenantId().isBlank()) {
-            return CurrentUser.systemUser(user.getId(), user.getUsername());
+            return CurrentUser.systemUser(user.getId(), user.getUsername(), passwordChangeRequired);
         }
-        return CurrentUser.tenantUser(user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
+        return CurrentUser.tenantUser(user.getId(), user.getUsername(), user.getTenantId(),
+                user.getOrganizationId(), passwordChangeRequired);
     }
 
     private String normalizeBlank(String value) {

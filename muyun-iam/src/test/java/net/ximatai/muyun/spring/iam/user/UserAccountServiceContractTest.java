@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -277,8 +278,9 @@ class UserAccountServiceContractTest {
         when(dao.count(any(Criteria.class))).thenReturn(1L);
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(dao.updateById(any(UserAccount.class))).thenReturn(1);
+        PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
-        }, passwordHashingService);
+        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             UserAccountService.PasswordResetResult result = service.resetPassword("user-1");
@@ -290,6 +292,8 @@ class UserAccountServiceContractTest {
             assertThat(user.getPasswordStatus()).isEqualTo(PasswordStatus.RESET_REQUIRED);
             assertThat(user.getPasswordExpiresAt()).isEqualTo(result.expiresAt());
         }
+
+        verify(passwordPolicyRuleService, atLeastOnce()).validatePassword(any());
     }
 
     @Test

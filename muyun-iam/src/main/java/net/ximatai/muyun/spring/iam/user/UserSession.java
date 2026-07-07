@@ -41,6 +41,10 @@ public class UserSession extends StandardEntity {
     @Column(name = "last_seen_at", type = ColumnType.TIMESTAMP, comment = "Last seen at")
     private Instant lastSeenAt;
 
+    @Column(name = "password_change_required", type = ColumnType.BOOLEAN,
+            comment = "Whether this session is restricted to password change")
+    private Boolean passwordChangeRequired;
+
     @Column(name = "revoked_at", type = ColumnType.TIMESTAMP, comment = "Revoked at")
     private Instant revokedAt;
 

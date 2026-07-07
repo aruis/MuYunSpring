@@ -47,6 +47,7 @@ export interface CurrentUser {
   tenantId?: string;
   organizationId?: string;
   system: boolean;
+  passwordChangeRequired?: boolean;
 }
 
 export interface SessionContext {

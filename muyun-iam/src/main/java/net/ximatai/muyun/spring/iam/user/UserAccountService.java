@@ -50,6 +50,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public static final String PLATFORM_SUPER_ADMIN_USER_ID = "platform.user.super_admin";
     public static final String PLATFORM_SUPER_ADMIN_USERNAME = "admin";
     public static final String PLATFORM_SUPER_ADMIN_USER_TITLE = "平台超级管理员";
+    private static final int TEMPORARY_PASSWORD_MAX_ATTEMPTS = 32;
 
     private final PasswordHashingService passwordHashingService;
     private final PasswordPolicyRuleService passwordPolicyRuleService;
@@ -271,13 +272,18 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         if (user == null) {
             return false;
         }
-        if (user.getPasswordExpiresAt() != null && !now.isBefore(user.getPasswordExpiresAt())) {
+        if (passwordExpired(user, now)) {
             return true;
         }
         PasswordStatus status = effectivePasswordStatus(user);
         return status == PasswordStatus.INITIAL
                 || status == PasswordStatus.RESET_REQUIRED
                 || status == PasswordStatus.EXPIRED;
+    }
+
+    public boolean resetPasswordExpired(UserAccount user, Instant now) {
+        return effectivePasswordStatus(user) == PasswordStatus.RESET_REQUIRED
+                && passwordExpired(user, now);
     }
 
     public PasswordStatus effectivePasswordStatus(UserAccount user) {
@@ -293,16 +299,20 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setLastLoginIp(normalizeLength(ip, 64));
         user.setLastLoginUserAgent(normalizeLength(userAgent, 512));
         user.setFailedLoginCount(0);
-        getDao().updateById(user);
+        updateLoginAudit(user);
     }
 
     public void recordLoginFailure(UserAccount user, Instant failedAt) {
         if (user == null || user.getId() == null || user.getId().isBlank()) {
             return;
         }
-        user.setLastFailedLoginAt(failedAt);
-        user.setFailedLoginCount((user.getFailedLoginCount() == null ? 0 : user.getFailedLoginCount()) + 1);
-        getDao().updateById(user);
+        UserAccount latest = select(user.getId());
+        if (latest == null) {
+            return;
+        }
+        latest.setLastFailedLoginAt(failedAt);
+        latest.setFailedLoginCount((latest.getFailedLoginCount() == null ? 0 : latest.getFailedLoginCount()) + 1);
+        updateLoginAudit(latest);
     }
 
     public UserAccount requireActiveUser(String username) {
@@ -391,9 +401,33 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     private String generateTemporaryPassword() {
-        byte[] bytes = new byte[12];
-        secureRandom.nextBytes(bytes);
-        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        for (int attempt = 0; attempt < TEMPORARY_PASSWORD_MAX_ATTEMPTS; attempt++) {
+            byte[] bytes = new byte[12];
+            secureRandom.nextBytes(bytes);
+            String temporaryPassword = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            try {
+                validatePasswordPolicy(temporaryPassword);
+                return temporaryPassword;
+            } catch (PlatformException ignored) {
+                // Configured regex rules can reject random candidates; try another bounded candidate.
+            }
+        }
+        throw new PlatformException("unable to generate temporary password that satisfies current policy");
+    }
+
+    private boolean passwordExpired(UserAccount user, Instant now) {
+        return user != null
+                && user.getPasswordExpiresAt() != null
+                && now != null
+                && !now.isBefore(user.getPasswordExpiresAt());
+    }
+
+    private void updateLoginAudit(UserAccount user) {
+        if (user.getVersion() == null) {
+            getDao().updateById(user);
+            return;
+        }
+        getDao().updateByIdAndVersion(user, user.getVersion());
     }
 
     private String normalizeLength(String value, int maxLength) {
