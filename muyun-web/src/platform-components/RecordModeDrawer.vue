@@ -11,6 +11,7 @@ const props = withDefaults(
     title: string;
     mode: string;
     viewMode?: string;
+    formModes?: string[];
     loading?: boolean;
     loadFailed?: boolean;
     closeOnOutside?: boolean;
@@ -21,6 +22,7 @@ const props = withDefaults(
   }>(),
   {
     viewMode: 'view',
+    formModes: () => ['edit', 'create'],
     loading: false,
     loadFailed: false,
     closeOnOutside: undefined,
@@ -46,8 +48,9 @@ const emit = defineEmits<{
   retry: [];
 }>();
 
-const readonly = computed(() => props.mode === props.viewMode);
-const actualCloseOnOutside = computed(() => props.closeOnOutside ?? readonly.value);
+const viewModeActive = computed(() => props.mode === props.viewMode);
+const formModeActive = computed(() => props.formModes.includes(props.mode));
+const actualCloseOnOutside = computed(() => props.closeOnOutside ?? viewModeActive.value);
 </script>
 
 <template>
@@ -79,10 +82,10 @@ const actualCloseOnOutside = computed(() => props.closeOnOutside ?? readonly.val
         </div>
       </slot>
     </template>
-    <template v-else-if="readonly">
+    <template v-else-if="viewModeActive">
       <slot name="view" />
     </template>
-    <template v-else>
+    <template v-else-if="formModeActive">
       <slot name="form" />
     </template>
   </RecordDetailDrawer>

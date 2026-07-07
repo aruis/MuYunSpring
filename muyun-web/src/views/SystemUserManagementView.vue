@@ -491,6 +491,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       :open="detailOpen"
       :title="detailTitle"
       :mode="detailMode"
+      :form-modes="['edit', 'resetPassword']"
       :loading="loadingDetail"
       :load-failed="detailLoadFailed"
       error-title="详情加载失败"
@@ -516,8 +517,10 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
         <UiSpin class="system-user-detail-state" tip="加载系统账号详情" />
       </template>
       <template #error>
-        <UiError title="详情加载失败" message="无法加载系统账号详情，请重试" />
-        <UiButton type="primary" icon-name="reload" @click="retryDetail">重试</UiButton>
+        <div class="system-user-detail-state">
+          <UiError title="详情加载失败" message="无法加载系统账号详情，请重试" />
+          <UiButton type="primary" icon-name="reload" @click="retryDetail">重试</UiButton>
+        </div>
       </template>
 
       <template #view>
