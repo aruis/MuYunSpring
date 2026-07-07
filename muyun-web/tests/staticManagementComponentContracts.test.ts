@@ -692,6 +692,13 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /roleDetailMode\.value === 'edit' && \['assignmentType', 'roleKind'\]/);
   assert.match(roleViewSource, /selectedRole\.value\?\.systemManaged/);
   assert.match(roleViewSource, /target as Role\)\.systemManaged !== true/);
+  assert.match(roleViewSource, /const roleListColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(roleViewSource, /:columns="roleListColumns"/);
+  assert.match(roleViewSource, /function assignmentTypeTitle/);
+  assert.match(roleViewSource, /function roleKindTitle/);
+  assert.match(roleViewSource, /function sharePolicyTitle/);
+  assert.match(roleViewSource, /commitRoleDetailRecord\(fullRecord, mode\)/);
+  assert.match(roleViewSource, /nextMode === 'edit' && record\.systemManaged !== true \? 'edit' : 'view'/);
   assert.match(roleViewSource, /standard-crud-actions/);
   assert.match(roleViewSource, /standard-crud-row-actions/);
   assert.doesNotMatch(roleViewSource, /account-grants/);
