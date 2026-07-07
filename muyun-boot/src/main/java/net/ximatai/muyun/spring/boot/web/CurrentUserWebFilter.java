@@ -60,7 +60,9 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
 
     private boolean isPasswordChangeAllowed(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return "/iam.auth/changeOwnPassword".equals(path) || "/iam.auth/logout".equals(path);
+        return "/iam.auth/context".equals(path)
+                || "/iam.auth/changeOwnPassword".equals(path)
+                || "/iam.auth/logout".equals(path);
     }
 
     private void rejectPasswordChangeRequired(HttpServletResponse response) throws IOException {

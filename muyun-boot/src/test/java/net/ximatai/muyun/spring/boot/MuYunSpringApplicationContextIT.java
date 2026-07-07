@@ -112,7 +112,7 @@ class MuYunSpringApplicationContextIT {
     }
 
     @Test
-    void shouldLoadCurrentUserAndMenusThroughRealHttpLogin() {
+    void shouldLoadCurrentUserAndRestrictMenusUntilPasswordChangeThroughRealHttpLogin() {
         ResponseEntity<JsonNode> login = restTemplate.postForEntity("/iam.auth/login",
                 Map.of(
                         "username", UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
@@ -139,10 +139,9 @@ class MuYunSpringApplicationContextIT {
 
         ResponseEntity<JsonNode> menus = restTemplate.exchange(
                 "/platform.menu/mine", HttpMethod.GET, bearerRequest, JsonNode.class);
-        assertThat(menus.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(menus.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(menus.getBody()).isNotNull();
-        assertThat(menus.getBody().path("records").isArray()).isTrue();
-        assertThat(menus.getBody().path("records")).isNotEmpty();
+        assertThat(menus.getBody().path("message").asText()).isEqualTo("password change required");
 
         ResponseEntity<Void> logout = restTemplate.exchange(
                 "/iam.auth/logout", HttpMethod.POST, bearerRequest, Void.class);

@@ -34,6 +34,15 @@ class CurrentUserWebFilterTest {
                 .andExpect(content().string("changed"));
     }
 
+    @Test
+    void shouldAllowContextRequestWhenPasswordChangeIsRequired() throws Exception {
+        MockMvc mvc = restrictedMvc();
+
+        mvc.perform(get("/iam.auth/context"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("context"));
+    }
+
     private MockMvc restrictedMvc() {
         return MockMvcBuilders.standaloneSetup(new TestController())
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(
@@ -51,6 +60,11 @@ class CurrentUserWebFilterTest {
         @PostMapping("/iam.auth/changeOwnPassword")
         String changeOwnPassword() {
             return "changed";
+        }
+
+        @GetMapping("/iam.auth/context")
+        String context() {
+            return "context";
         }
     }
 }
