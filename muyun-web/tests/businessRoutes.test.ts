@@ -19,6 +19,7 @@ test('static business route registry exposes route prefixes for navigation resol
     '/iam/departments',
     '/iam/employees',
     '/iam/users',
+    '/iam/system-users',
     '/iam/roles',
     '/iam/positions',
   ]);
@@ -31,6 +32,7 @@ test('static business route registry exposes route prefixes for navigation resol
     'iam.department': '/iam/departments',
     'iam.employee': '/iam/employees',
     'iam.user': '/iam/users',
+    'iam.system_user': '/iam/system-users',
     'iam.role': '/iam/roles',
     'iam.position_category': '/iam/positions',
   });
@@ -159,6 +161,22 @@ test('static business route registry resolves user management module route', () 
 
   assert.equal(route?.route, '/iam/users');
   assert.equal(route?.moduleAlias, 'iam.user');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves system user management module route', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/iam/system-users', moduleAlias: 'iam.system_user' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/iam/system-users');
+  assert.equal(route?.moduleAlias, 'iam.system_user');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 

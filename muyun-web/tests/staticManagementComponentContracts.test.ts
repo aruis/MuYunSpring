@@ -767,6 +767,47 @@ test('user management keeps account basics separate from employment binding and 
   assert.doesNotMatch(userViewSource, /sessionList|sessionAudit|revokeSession/);
 });
 
+test('system user management is a separate root account entry', () => {
+  const systemUserViewSource = readSource('src/views/SystemUserManagementView.vue');
+  const userViewSource = readSource('src/views/UserManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+
+  assert.match(routesSource, /moduleAlias: 'iam\.system_user'/);
+  assert.match(routesSource, /route: '\/iam\/system-users'/);
+  assert.match(systemUserViewSource, /defineOptions\(\{ name: 'SystemUserManagementView' \}\)/);
+  assert.match(systemUserViewSource, /moduleAlias: 'iam\.user'/);
+  assert.match(systemUserViewSource, /system-user-management-page/);
+  assert.match(systemUserViewSource, /height: calc\(100vh - 116px\)/);
+  assert.match(systemUserViewSource, /overflow: hidden/);
+  assert.match(systemUserViewSource, /<RecordQueryListPanel/);
+  assert.match(systemUserViewSource, /<RecordDetailDrawer/);
+  assert.match(systemUserViewSource, /<RecordDetailFields/);
+  assert.match(systemUserViewSource, /<RecordFormFields/);
+  assert.match(systemUserViewSource, /<RecordStatusSwitch/);
+  assert.match(systemUserViewSource, /<RecordActionBar/);
+  assert.match(systemUserViewSource, /fieldName: 'tenantId'/);
+  assert.match(systemUserViewSource, /operator: 'NULL'/);
+  assert.match(systemUserViewSource, /title="系统账号"/);
+  assert.match(systemUserViewSource, /function rowActionsOf/);
+  assert.match(systemUserViewSource, /actionCode: 'view'/);
+  assert.match(systemUserViewSource, /actionCode: 'update'/);
+  assert.match(systemUserViewSource, /actionCode: 'changePassword'/);
+  assert.match(
+    systemUserViewSource,
+    /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
+  );
+  assert.match(systemUserViewSource, /tenantId: undefined/);
+  assert.match(systemUserViewSource, /organizationId: undefined/);
+  assert.match(systemUserViewSource, /systemUserFormFieldDisabled/);
+  assert.doesNotMatch(systemUserViewSource, /<CrudRecordListExplorer/);
+  assert.doesNotMatch(systemUserViewSource, /<TreeRecordExplorer/);
+  assert.doesNotMatch(systemUserViewSource, /standard-crud-actions/);
+  assert.doesNotMatch(systemUserViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(systemUserViewSource, /actionCode: 'create'/);
+  assert.doesNotMatch(systemUserViewSource, /actionCode: 'delete'/);
+  assert.doesNotMatch(userViewSource, /iam\.system_user/);
+});
+
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
   const hostSource = readSource('src/platform-workbench/hosts/DynamicModuleHost.vue');
 

@@ -8,6 +8,7 @@ import MenuManagementView from '../views/MenuManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
 import RoleManagementView from '../views/RoleManagementView.vue';
+import SystemUserManagementView from '../views/SystemUserManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
 import UserManagementView from '../views/UserManagementView.vue';
 
@@ -57,6 +58,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/iam/users',
     moduleAlias: 'iam.user',
     component: UserManagementView,
+  },
+  {
+    route: '/iam/system-users',
+    moduleAlias: 'iam.system_user',
+    component: SystemUserManagementView,
   },
   {
     route: '/iam/roles',
