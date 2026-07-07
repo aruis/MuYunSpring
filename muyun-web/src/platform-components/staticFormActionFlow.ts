@@ -18,7 +18,7 @@ export interface StaticFormSaveOptions<TRecord> {
   successMessage?: string;
 }
 
-export interface StaticRecordActionOptions<TRecord, TResult extends { message?: string }> {
+export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
   loading: Ref<boolean>;
   source?: string;
   record: () => TRecord | undefined;
@@ -69,7 +69,7 @@ export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOpti
   }
 }
 
-export async function executeStaticRecordAction<TRecord, TResult extends { message?: string }>(
+export async function executeStaticRecordAction<TRecord, TResult = unknown>(
   options: StaticRecordActionOptions<TRecord, TResult>,
 ) {
   if (options.loading.value) {
@@ -93,7 +93,7 @@ export async function executeStaticRecordAction<TRecord, TResult extends { messa
   try {
     const result = await options.execute(record);
     await options.onExecuted(result, record);
-    presentPlatformMessage(result.message ?? options.successMessage ?? '操作成功', {
+    presentPlatformMessage(actionResultMessage(result) ?? options.successMessage ?? '操作成功', {
       source,
       phase: 'action',
       tone: 'success',
@@ -105,4 +105,12 @@ export async function executeStaticRecordAction<TRecord, TResult extends { messa
   } finally {
     options.loading.value = false;
   }
+}
+
+function actionResultMessage(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object' || !('message' in result)) {
+    return undefined;
+  }
+  const message = (result as { message?: unknown }).message;
+  return typeof message === 'string' && message.trim() ? message : undefined;
 }

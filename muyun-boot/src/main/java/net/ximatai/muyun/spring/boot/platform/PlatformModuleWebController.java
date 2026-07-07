@@ -34,7 +34,7 @@ import java.util.List;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
-@PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "模块管理", order = 20)
+@PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "模块管理", order = 20)
 @RequestMapping("/platform.module")
 public class PlatformModuleWebController extends WebSupport<PlatformModuleService> implements
         CrudWeb<PlatformModule, PlatformModuleService>,

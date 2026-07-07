@@ -31,6 +31,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -50,7 +52,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public static final String PLATFORM_SUPER_ADMIN_USER_TITLE = "平台超级管理员";
 
     private final PasswordHashingService passwordHashingService;
+    private final PasswordPolicyRuleService passwordPolicyRuleService;
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
+    private final SecureRandom secureRandom = new SecureRandom();
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
             "changePassword",
@@ -65,16 +69,20 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty());
+        this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty(), null);
     }
 
     @Autowired
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
-                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
+                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
+                              ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
+        this.passwordPolicyRuleService = passwordPolicyRuleService == null
+                ? null
+                : passwordPolicyRuleService.getIfAvailable();
         this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
     }
 
@@ -82,8 +90,17 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
                               Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService, dataScopeCriteriaService, null);
+    }
+
+    public UserAccountService(UserAccountDao userAccountDao,
+                              ActiveTenantVerifier activeTenantVerifier,
+                              PasswordHashingService passwordHashingService,
+                              Optional<DataScopeCriteriaService> dataScopeCriteriaService,
+                              PasswordPolicyRuleService passwordPolicyRuleService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
+        this.passwordPolicyRuleService = passwordPolicyRuleService;
         Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
                 ? Optional.empty()
                 : dataScopeCriteriaService;
@@ -136,6 +153,12 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                         .withTitle("手机号").withQuickSearch())
                 .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("邮箱").withQuickSearch())
+                .field(QueryField.of("passwordStatus", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("密码状态"))
+                .field(QueryField.of("lastLoginAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("最后登录时间")
+                        .withSortable())
                 .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
                         .withTitle("排序号").withSortable())
                 .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
@@ -174,7 +197,11 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     @Override
     public void beforeInsert(UserAccount user) {
         syncSelfAuthUser(user);
+        validatePasswordPolicy(user.getPassword());
         user.setPasswordHash(passwordHashingService.hash(user.getPassword()));
+        user.setPasswordStatus(user.getPasswordStatus() == null ? PasswordStatus.INITIAL : user.getPasswordStatus());
+        user.setPasswordChangedAt(user.getPasswordChangedAt() == null ? Instant.now() : user.getPasswordChangedAt());
+        user.setFailedLoginCount(user.getFailedLoginCount() == null ? 0 : user.getFailedLoginCount());
         rejectDuplicateUsername(user);
     }
 
@@ -182,7 +209,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public void beforeUpdate(UserAccount user) {
         UserAccount existing = select(user.getId());
         if (existing != null) {
-            user.setPasswordHash(existing.getPasswordHash());
+            preserveSecurityFields(user, existing);
         }
         syncSelfAuthUser(user);
         rejectDuplicateUsername(user);
@@ -198,8 +225,84 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         requireRecordScope(currentRecordMutationPolicy(), List.of(validUserId));
         UserAccount user = requireEnabled(validUserId,
                 "user is not active: " + userId);
+        validatePasswordPolicy(newPassword);
         user.setPasswordHash(passwordHashingService.hash(newPassword));
+        user.setPasswordStatus(PasswordStatus.NORMAL);
+        user.setPasswordChangedAt(Instant.now());
+        user.setPasswordExpiresAt(null);
         return getDao().updateById(user);
+    }
+
+    public PasswordResetResult resetPassword(String userId) {
+        String validUserId = Preconditions.requireText(userId, "userId");
+        requireRecordScope(resetPasswordPolicy(), List.of(validUserId));
+        UserAccount user = requireEnabled(validUserId,
+                "user is not active: " + userId);
+        String temporaryPassword = generateTemporaryPassword();
+        Instant now = Instant.now();
+        user.setPasswordHash(passwordHashingService.hash(temporaryPassword));
+        user.setPasswordStatus(PasswordStatus.RESET_REQUIRED);
+        user.setPasswordChangedAt(now);
+        user.setPasswordExpiresAt(now.plusSeconds(86_400));
+        user.setFailedLoginCount(0);
+        user.setLockedUntil(null);
+        int count = getDao().updateById(user);
+        return new PasswordResetResult(count, count > 0 ? temporaryPassword : null, user.getPasswordExpiresAt());
+    }
+
+    public int changeOwnPassword(String userId, String currentPassword, String newPassword) {
+        String validUserId = Preconditions.requireText(userId, "userId");
+        UserAccount user = requireEnabled(validUserId,
+                "user is not active: " + userId);
+        if (!passwordMatches(user, currentPassword)) {
+            throw new AuthenticationFailedException("invalid username or password");
+        }
+        validatePasswordPolicy(newPassword);
+        user.setPasswordHash(passwordHashingService.hash(newPassword));
+        user.setPasswordStatus(PasswordStatus.NORMAL);
+        user.setPasswordChangedAt(Instant.now());
+        user.setPasswordExpiresAt(null);
+        user.setFailedLoginCount(0);
+        user.setLockedUntil(null);
+        return getDao().updateById(user);
+    }
+
+    public boolean passwordChangeRequired(UserAccount user, Instant now) {
+        if (user == null) {
+            return false;
+        }
+        if (user.getPasswordExpiresAt() != null && !now.isBefore(user.getPasswordExpiresAt())) {
+            return true;
+        }
+        PasswordStatus status = effectivePasswordStatus(user);
+        return status == PasswordStatus.INITIAL
+                || status == PasswordStatus.RESET_REQUIRED
+                || status == PasswordStatus.EXPIRED;
+    }
+
+    public PasswordStatus effectivePasswordStatus(UserAccount user) {
+        return user == null || user.getPasswordStatus() == null ? PasswordStatus.NORMAL : user.getPasswordStatus();
+    }
+
+    public void recordLoginSuccess(String userId, Instant loginAt, String ip, String userAgent) {
+        UserAccount user = select(userId);
+        if (user == null) {
+            return;
+        }
+        user.setLastLoginAt(loginAt);
+        user.setLastLoginIp(normalizeLength(ip, 64));
+        user.setLastLoginUserAgent(normalizeLength(userAgent, 512));
+        user.setFailedLoginCount(0);
+        getDao().updateById(user);
+    }
+
+    public void recordLoginFailure(UserAccount user, Instant failedAt) {
+        if (user == null || user.getId() == null || user.getId().isBlank()) {
+            return;
+        }
+        user.setLastFailedLoginAt(failedAt);
+        user.setFailedLoginCount((user.getFailedLoginCount() == null ? 0 : user.getFailedLoginCount()) + 1);
+        getDao().updateById(user);
     }
 
     public UserAccount requireActiveUser(String username) {
@@ -242,10 +345,65 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         }
     }
 
+    private void preserveSecurityFields(UserAccount user, UserAccount existing) {
+        user.setPasswordHash(existing.getPasswordHash());
+        user.setPasswordStatus(existing.getPasswordStatus());
+        user.setPasswordChangedAt(existing.getPasswordChangedAt());
+        user.setPasswordExpiresAt(existing.getPasswordExpiresAt());
+        user.setLastLoginAt(existing.getLastLoginAt());
+        user.setLastLoginIp(existing.getLastLoginIp());
+        user.setLastLoginUserAgent(existing.getLastLoginUserAgent());
+        user.setLastFailedLoginAt(existing.getLastFailedLoginAt());
+        user.setFailedLoginCount(existing.getFailedLoginCount());
+        user.setLockedUntil(existing.getLockedUntil());
+    }
+
+    private void validatePasswordPolicy(String password) {
+        if (passwordPolicyRuleService != null) {
+            passwordPolicyRuleService.validatePassword(password);
+            return;
+        }
+        if (password == null || password.length() < 6) {
+            throw new PlatformException("密码长度不能少于 6 位");
+        }
+    }
+
     private ActionExecutionPolicy currentRecordMutationPolicy() {
         return ActionExecutionContextHolder.current()
                 .filter(context -> MODULE_ALIAS.equals(context.moduleAlias()))
                 .map(context -> context.actionPolicy())
                 .orElse(CHANGE_PASSWORD_POLICY);
+    }
+
+    private ActionExecutionPolicy resetPasswordPolicy() {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> MODULE_ALIAS.equals(context.moduleAlias()))
+                .map(context -> context.actionPolicy())
+                .orElse(new ActionExecutionPolicy(
+                        "resetPassword",
+                        PlatformActionLevel.RECORD,
+                        ActionAccessMode.AUTH_REQUIRED,
+                        true,
+                        true,
+                        ActionDefaultGrantPolicy.NONE,
+                        null
+                ));
+    }
+
+    private String generateTemporaryPassword() {
+        byte[] bytes = new byte[12];
+        secureRandom.nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String normalizeLength(String value, int maxLength) {
+        String normalized = normalizeBlank(value);
+        if (normalized == null || normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength);
+    }
+
+    public record PasswordResetResult(int count, String temporaryPassword, Instant expiresAt) {
     }
 }

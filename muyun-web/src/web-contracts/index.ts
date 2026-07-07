@@ -64,6 +64,14 @@ export interface LoginResult {
   tokenType: 'Bearer' | string;
   issuedAt: string;
   currentUser: CurrentUser;
+  passwordChangeRequired?: boolean;
+  passwordStatus?: UserPasswordStatus;
+  passwordExpiresAt?: string;
+}
+
+export interface ChangeOwnPasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 // Matches current Spring/Jackson code output from menu page mode fields.
@@ -476,6 +484,24 @@ export interface UserAccount extends StandardEnabledSortableEntity {
   email?: string;
   organizationId?: string;
   password?: string;
+  passwordStatus?: UserPasswordStatus;
+  passwordStatusTitle?: string;
+  passwordChangedAt?: string;
+  passwordExpiresAt?: string;
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginUserAgent?: string;
+  lastFailedLoginAt?: string;
+  failedLoginCount?: number;
+  lockedUntil?: string;
+}
+
+export type UserPasswordStatus = 'normal' | 'initial' | 'resetRequired' | 'expired';
+
+export interface ResetPasswordResponse {
+  count: number;
+  temporaryPassword?: string;
+  expiresAt?: string;
 }
 
 export type RoleAssignmentType = 'account' | 'employment';
@@ -500,6 +526,19 @@ export interface Role extends StandardEnabledSortableEntity {
   sharePolicyTitle?: string;
   builtIn?: boolean;
   systemManaged?: boolean;
+  description?: string;
+}
+
+export type PasswordPolicyScopeType = 'global' | 'tenant';
+
+export interface PasswordPolicyRule extends StandardEnabledSortableEntity {
+  scopeType?: PasswordPolicyScopeType;
+  scopeTypeTitle?: string;
+  scopeId?: string;
+  scopeKey?: string;
+  ruleCode?: string;
+  pattern?: string;
+  message?: string;
   description?: string;
 }
 

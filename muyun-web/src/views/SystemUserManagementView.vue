@@ -22,7 +22,12 @@ import {
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
 import { UiButton, UiError, UiInput, UiSpin } from '@muyun/vue-ui-antdv';
-import type { UserAccount, WebCountResponse, WebQueryRequest } from '@muyun/web-contracts';
+import type {
+  ResetPasswordResponse,
+  UserAccount,
+  WebCountResponse,
+  WebQueryRequest,
+} from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'SystemUserManagementView' });
@@ -42,6 +47,7 @@ const detailRequestSeq = ref(0);
 const reloadKey = ref(0);
 const userDraft = ref<Partial<UserAccount>>(createSystemUserDraft());
 const passwordDraft = ref('');
+const resetPasswordResult = ref<ResetPasswordResponse>();
 const formFieldDefinitions = ref(resolveRecordFormFields(undefined));
 
 const systemUserContext = computed(
@@ -92,6 +98,13 @@ const detailActions = computed<RecordActionItem[]>(() => {
         actionCode: 'changePassword',
         title: '修改密码',
         iconName: 'lock',
+        disabled: savingUser.value,
+      },
+      {
+        key: 'resetGeneratedPassword',
+        actionCode: 'resetPassword',
+        title: '重置密码',
+        iconName: 'reload',
         disabled: savingUser.value,
       },
     ];
@@ -195,6 +208,7 @@ async function openDetail(record: QueryListRecord, mode: SystemUserDetailMode) {
   selectedUser.value = undefined;
   userDraft.value = copySystemUser(record as UserAccount);
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   loadingDetail.value = true;
   detailLoadFailed.value = false;
   const requestSeq = detailRequestSeq.value + 1;
@@ -227,6 +241,7 @@ function closeDetail() {
   detailOpen.value = false;
   detailMode.value = 'view';
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   userDraft.value = selectedUser.value ? copySystemUser(selectedUser.value) : createSystemUserDraft();
 }
 
@@ -240,6 +255,7 @@ function cancelDetail() {
   }
   userDraft.value = copySystemUser(selectedUser.value);
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   detailMode.value = 'view';
   loadingDetail.value = false;
   detailLoadFailed.value = false;
@@ -264,7 +280,12 @@ function handleDetailAction(action: RecordActionItem) {
   }
   if (action.key === 'resetPassword' && selectedUser.value) {
     passwordDraft.value = '';
+    resetPasswordResult.value = undefined;
     detailMode.value = 'resetPassword';
+    return;
+  }
+  if (action.key === 'resetGeneratedPassword' && selectedUser.value) {
+    void resetUserLoginPassword();
   }
 }
 
@@ -317,6 +338,27 @@ async function resetUserPassword() {
     onExecuted: async (_, user) => {
       const refreshed = await userContext.crud.view(user.id!);
       commitDetailRecord(refreshed);
+      reloadKey.value += 1;
+    },
+  });
+}
+
+async function resetUserLoginPassword() {
+  await executeStaticRecordAction<UserAccount, ResetPasswordResponse>({
+    loading: savingUser,
+    source: 'system-user-management',
+    record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
+    canExecute: () => userContext.can('resetPassword') === true,
+    deniedMessage: '当前用户无权重置系统账号密码',
+    execute: (user) =>
+      userContext.http.request<ResetPasswordResponse>({
+        method: 'POST',
+        path: `/iam.user/resetPassword/${encodeURIComponent(user.id!)}`,
+      }),
+    onExecuted: async (result, user) => {
+      const refreshed = await userContext.crud.view(user.id!);
+      commitDetailRecord(refreshed);
+      resetPasswordResult.value = result;
       reloadKey.value += 1;
     },
   });
@@ -478,6 +520,14 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
           :fields="formFieldDefinitions"
           :fallback="formFieldFallback"
         />
+        <div
+          v-if="detailMode === 'view' && resetPasswordResult?.temporaryPassword"
+          class="system-user-password-reset-result"
+        >
+          <span>临时密码</span>
+          <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
+          <small v-if="resetPasswordResult.expiresAt">有效期至 {{ resetPasswordResult.expiresAt }}</small>
+        </div>
 
         <form v-else class="system-user-form" @submit.prevent="saveUser">
           <RecordFormFields
@@ -539,6 +589,22 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.system-user-password-reset-result {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--muyun-border);
+  border-radius: 8px;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 13px;
+}
+
+.system-user-password-reset-result small {
+  color: var(--muyun-text-muted);
 }
 
 .system-user-detail-state {

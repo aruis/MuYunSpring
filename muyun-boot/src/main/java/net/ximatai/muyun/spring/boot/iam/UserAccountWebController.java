@@ -86,6 +86,19 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         }));
     }
 
+    @PostMapping("/resetPassword/{id}")
+    @CustomActionEndpoint(value = "resetPassword", title = "重置密码",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    public ResetPasswordResponse resetPassword(@PathVariable String id) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            UserAccountService.PasswordResetResult result = service().resetPassword(id);
+            if (result.count() > 0 && userSessionService != null) {
+                userSessionService.revokeUserSessions(id);
+            }
+            return new ResetPasswordResponse(result.count(), result.temporaryPassword(), result.expiresAt());
+        }));
+    }
+
     @Override
     public Optional<String> tenantIdForCreate(UserAccount record) {
         return tenantIdForUser(record);
@@ -124,6 +137,9 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     public record ChangePasswordRequest(String password) {
+    }
+
+    public record ResetPasswordResponse(int count, String temporaryPassword, java.time.Instant expiresAt) {
     }
 
     public record UserSelectorRequest(

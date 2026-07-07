@@ -51,8 +51,8 @@ public class PasswordHashingService {
     }
 
     private String requirePassword(String password) {
-        if (password == null || password.length() < 6) {
-            throw new PlatformException("password length must be at least 6");
+        if (password == null || password.isEmpty()) {
+            throw new PlatformException("password must not be empty");
         }
         return password;
     }

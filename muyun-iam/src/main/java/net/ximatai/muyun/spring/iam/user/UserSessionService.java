@@ -62,6 +62,10 @@ public class UserSessionService {
     }
 
     public LoginResult login(String tenantId, String username, String password) {
+        return login(tenantId, username, password, null, null);
+    }
+
+    public LoginResult login(String tenantId, String username, String password, String ip, String userAgent) {
         String normalizedTenantId = normalizeBlank(tenantId);
         try (TenantContext.Scope ignored = loginTenantScope(normalizedTenantId)) {
             if (normalizedTenantId != null) {
@@ -69,6 +73,7 @@ public class UserSessionService {
             }
             UserAccount user = userAccountService.requireActiveUser(normalizedTenantId, username);
             if (!userAccountService.passwordMatches(user, password)) {
+                userAccountService.recordLoginFailure(user, now());
                 throw new AuthenticationFailedException("invalid username or password");
             }
             CurrentUser currentUser = currentUserOf(user);
@@ -86,7 +91,11 @@ public class UserSessionService {
             session.setMaxExpiresAt(maxExpiresAt);
             session.setLastSeenAt(issuedAt);
             userSessionRecordService.issue(session);
-            return LoginResult.bearer(token, issuedAt, currentUser);
+            userAccountService.recordLoginSuccess(user.getId(), issuedAt, ip, userAgent);
+            return LoginResult.bearer(token, issuedAt, currentUser,
+                    userAccountService.passwordChangeRequired(user, issuedAt),
+                    userAccountService.effectivePasswordStatus(user),
+                    user.getPasswordExpiresAt());
         }
     }
 
@@ -123,6 +132,14 @@ public class UserSessionService {
         if (session != null) {
             revoke(session, now(), "logout");
         }
+    }
+
+    public int changeOwnPassword(String userId, String currentPassword, String newPassword) {
+        int changed = userAccountService.changeOwnPassword(userId, currentPassword, newPassword);
+        if (changed > 0) {
+            revokeUserSessions(userId);
+        }
+        return changed;
     }
 
     private void verifyActiveTenantForLogin(String tenantId) {

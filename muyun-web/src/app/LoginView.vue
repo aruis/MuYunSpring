@@ -22,6 +22,10 @@ const username = ref(normalizeInitialValue(import.meta.env.VITE_MUYUN_LOGIN_USER
 const password = ref(normalizeInitialValue(import.meta.env.VITE_MUYUN_LOGIN_PASSWORD));
 const submitting = ref(false);
 const formError = ref<string>();
+const passwordChangeRequired = ref(false);
+const pendingToken = ref<string>();
+const newPassword = ref('');
+const confirmPassword = ref('');
 
 async function submit() {
   formError.value = undefined;
@@ -32,9 +36,49 @@ async function submit() {
       username: username.value,
       password: password.value,
     });
+    if (result.passwordChangeRequired) {
+      pendingToken.value = result.token;
+      passwordChangeRequired.value = true;
+      formError.value = undefined;
+      return;
+    }
     emit('authenticated', result.token);
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'Login failed';
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function submitPasswordChange() {
+  formError.value = undefined;
+  if (!pendingToken.value) {
+    formError.value = '登录状态已失效，请重新登录';
+    passwordChangeRequired.value = false;
+    return;
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    formError.value = '两次输入的新密码不一致';
+    return;
+  }
+  submitting.value = true;
+  try {
+    await props.authClient.changeOwnPassword(
+      {
+        currentPassword: password.value,
+        newPassword: newPassword.value,
+      },
+      pendingToken.value,
+    );
+    password.value = newPassword.value;
+    const result = await props.authClient.login({
+      tenantId: tenantId.value,
+      username: username.value,
+      password: newPassword.value,
+    });
+    emit('authenticated', result.token);
+  } catch (cause) {
+    formError.value = cause instanceof Error ? cause.message : 'Password change failed';
   } finally {
     submitting.value = false;
   }
@@ -53,7 +97,7 @@ async function submit() {
         {{ formError || error }}
       </p>
 
-      <form class="login-form" @submit.prevent="submit">
+      <form v-if="!passwordChangeRequired" class="login-form" @submit.prevent="submit">
         <p v-if="tenantLocked" class="login-context">租户：{{ tenantId }}</p>
         <label v-else>
           <span>租户 ID</span>
@@ -69,6 +113,20 @@ async function submit() {
         </label>
         <button type="submit" :disabled="submitting || loading">
           {{ submitting || loading ? '登录中' : '登录' }}
+        </button>
+      </form>
+      <form v-else class="login-form" @submit.prevent="submitPasswordChange">
+        <p class="login-context">当前密码需要修改后才能进入系统</p>
+        <label>
+          <span>新密码</span>
+          <input v-model="newPassword" type="password" autocomplete="new-password" required />
+        </label>
+        <label>
+          <span>确认新密码</span>
+          <input v-model="confirmPassword" type="password" autocomplete="new-password" required />
+        </label>
+        <button type="submit" :disabled="submitting || loading">
+          {{ submitting || loading ? '保存中' : '修改密码' }}
         </button>
       </form>
     </section>

@@ -37,7 +37,7 @@ import java.util.Map;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = CodeRuleService.MODULE_ALIAS, title = "编码规则")
-@PlatformMenu(parent = PlatformMenuGroups.OPS, order = 10)
+@PlatformMenu(parent = PlatformMenuGroups.BUSINESS_SUPPORT, order = 20)
 @RequestMapping({"/platform.code_rule", "/platform/code/rule"})
 public class CodeRuleWebController extends WebSupport<CodeRuleService> implements
         ReadOnlyWeb<CodeRule, CodeRuleService>,
