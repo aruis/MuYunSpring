@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from 'vue';
 import {
   RecordActionBar,
-  RecordDetailDrawer,
   RecordDetailFields,
   RecordFormFields,
   RecordMetaSection,
+  RecordModeDrawer,
   RecordQueryListPanel,
   RecordStatusSwitch,
   executeStaticFormSave,
@@ -487,11 +487,17 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       @select="selectedUserKey = String($event.id ?? '')"
     />
 
-    <RecordDetailDrawer
+    <RecordModeDrawer
       :open="detailOpen"
       :title="detailTitle"
-      :close-on-outside="detailMode === 'view'"
+      :mode="detailMode"
+      :form-modes="['edit', 'resetPassword']"
+      :loading="loadingDetail"
+      :load-failed="detailLoadFailed"
+      error-title="详情加载失败"
+      error-message="无法加载系统账号详情，请重试"
       @close="closeDetail"
+      @retry="retryDetail"
     >
       <template #status>
         <RecordStatusSwitch
@@ -507,15 +513,18 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
         <RecordActionBar :context="systemUserContext" :actions="detailActions" @action="handleDetailAction" />
       </template>
 
-      <UiSpin v-if="loadingDetail" class="system-user-detail-state" tip="加载系统账号详情" />
-      <div v-else-if="detailLoadFailed" class="system-user-detail-state">
-        <UiError title="详情加载失败" message="无法加载系统账号详情，请重试" />
-        <UiButton type="primary" icon-name="reload" @click="retryDetail">重试</UiButton>
-      </div>
+      <template #loading>
+        <UiSpin class="system-user-detail-state" tip="加载系统账号详情" />
+      </template>
+      <template #error>
+        <div class="system-user-detail-state">
+          <UiError title="详情加载失败" message="无法加载系统账号详情，请重试" />
+          <UiButton type="primary" icon-name="reload" @click="retryDetail">重试</UiButton>
+        </div>
+      </template>
 
-      <template v-else-if="detailMode === 'view' || selectedUser">
+      <template #view>
         <RecordDetailFields
-          v-if="detailMode === 'view'"
           :record="userDraft as RecordFormRecord"
           :fields="formFieldDefinitions"
           :fallback="formFieldFallback"
@@ -528,8 +537,11 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
           <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
           <small v-if="resetPasswordResult.expiresAt">有效期至 {{ resetPasswordResult.expiresAt }}</small>
         </div>
+        <RecordMetaSection :record="userDraft" show-sort-order />
+      </template>
 
-        <form v-else class="system-user-form" @submit.prevent="saveUser">
+      <template #form>
+        <form class="system-user-form" @submit.prevent="saveUser">
           <RecordFormFields
             v-if="detailMode !== 'resetPassword'"
             :record="userDraft as RecordFormRecord"
@@ -554,7 +566,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
         </form>
         <RecordMetaSection v-if="detailMode !== 'resetPassword'" :record="userDraft" show-sort-order />
       </template>
-    </RecordDetailDrawer>
+    </RecordModeDrawer>
   </section>
 </template>
 

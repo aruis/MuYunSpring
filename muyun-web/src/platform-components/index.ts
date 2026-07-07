@@ -12,6 +12,7 @@ export type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 export { default as RecordFormFields } from './RecordFormFields.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
+export { default as RecordModeDrawer } from './RecordModeDrawer.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
 export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
