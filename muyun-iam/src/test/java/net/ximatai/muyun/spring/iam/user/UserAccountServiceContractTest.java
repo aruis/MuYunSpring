@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -52,6 +55,29 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldExposeQuerySchemaForUserManagementScopes() {
+        UserAccountService service = new UserAccountService(
+                mock(UserAccountDao.class),
+                tenantId -> {
+                },
+                passwordHashingService,
+                Optional.of(mock(DataScopeCriteriaService.class))
+        );
+
+        assertThat(service).isInstanceOf(QueryAbility.class);
+        QuerySchema schema = service.querySchema();
+
+        assertThat(schema.fields()).extracting(QuerySchema.Field::name)
+                .contains("tenantId", "organizationId", "username", "title", "mobile", "email", "enabled");
+        assertThat(field(schema, "tenantId").operators())
+                .containsExactly(QueryOperator.EQ, QueryOperator.IN, QueryOperator.NULL);
+        assertThat(field(schema, "organizationId").operators()).containsExactly(QueryOperator.EQ, QueryOperator.IN);
+        assertThat(schema.quickSearch().fields()).containsExactly("username", "title", "mobile", "email");
+        assertThat(schema.defaultSorts()).extracting(QuerySchema.DefaultSort::field)
+                .containsExactly("sortOrder", "username");
+    }
+
+    @Test
     void shouldSyncUserAccountDataScopeFieldsOnInsert() {
         UserAccountDao dao = mock(UserAccountDao.class);
         when(dao.insert(any())).thenAnswer(invocation -> invocation.<UserAccount>getArgument(0).getId());
@@ -69,6 +95,22 @@ class UserAccountServiceContractTest {
         assertThat(user.getAuthUserId()).isEqualTo(user.getId());
         assertThat(user.getAuthOrganizationId()).isEqualTo("org-1");
         assertThat(user.getAuthModuleAlias()).isEqualTo(UserAccountService.MODULE_ALIAS);
+    }
+
+    @Test
+    void shouldDefaultUserTitleFromUsernameWhenMissing() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.insert(any())).thenAnswer(invocation -> invocation.<UserAccount>getArgument(0).getId());
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserAccount user = new UserAccount();
+        user.setUsername("alice");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            service.createUser(user, "secret1");
+        }
+
+        assertThat(user.getTitle()).isEqualTo("alice");
     }
 
     @Test
@@ -177,5 +219,12 @@ class UserAccountServiceContractTest {
         user.setEnabled(Boolean.TRUE);
         user.setPasswordHash(passwordHashingService.hash("secret1"));
         return user;
+    }
+
+    private QuerySchema.Field field(QuerySchema schema, String fieldName) {
+        return schema.fields().stream()
+                .filter(field -> fieldName.equals(field.name()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing query field: " + fieldName));
     }
 }

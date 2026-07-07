@@ -18,6 +18,7 @@ test('static business route registry exposes route prefixes for navigation resol
     '/iam/organizations',
     '/iam/departments',
     '/iam/employees',
+    '/iam/users',
     '/iam/roles',
     '/iam/positions',
   ]);
@@ -29,6 +30,7 @@ test('static business route registry exposes route prefixes for navigation resol
     'iam.organization': '/iam/organizations',
     'iam.department': '/iam/departments',
     'iam.employee': '/iam/employees',
+    'iam.user': '/iam/users',
     'iam.role': '/iam/roles',
     'iam.position_category': '/iam/positions',
   });
@@ -144,6 +146,22 @@ test('static business route registry resolves role management module route', () 
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 
+test('static business route registry resolves user management module route', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/iam/users', moduleAlias: 'iam.user' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/iam/users');
+  assert.equal(route?.moduleAlias, 'iam.user');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
 test('static business route registry resolves dictionary category as dictionary management entry', () => {
   const descriptor: BusinessRoutePageDescriptor = {
     pageType: 'business-route',
@@ -194,7 +212,7 @@ test('static business route registry rejects unregistered business routes', () =
     pageType: 'business-route',
     openMode: 'workbench-route',
     hostType: 'business-route-host',
-    target: { route: '/iam/users' },
+    target: { route: '/iam/accounts' },
     tabPolicy: { identity: 'by-target' },
   };
 
@@ -203,7 +221,7 @@ test('static business route registry rejects unregistered business routes', () =
 });
 
 test('static business route registry does not classify unregistered sibling routes as business pages', () => {
-  const descriptor = pageDescriptorFromUrl('/iam/users', { businessRoutePrefixes });
+  const descriptor = pageDescriptorFromUrl('/iam/users-extra', { businessRoutePrefixes });
 
   assert.equal(descriptor.pageType, 'platform-route');
 });

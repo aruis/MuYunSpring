@@ -7,6 +7,8 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
@@ -35,6 +37,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Optional;
+
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 60)
@@ -42,7 +46,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
         EnableWeb<UserAccount, UserAccountService>,
-        SortWeb<UserAccount, UserAccountService> {
+        SortWeb<UserAccount, UserAccountService>,
+        MutationTenantScopeResolver<UserAccount> {
     private static final ActionExecutionPolicy USER_SELECTOR_POLICY = new ActionExecutionPolicy(
             "userSelector",
             PlatformActionLevel.LIST,
@@ -72,13 +77,32 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             level = PlatformActionLevel.RECORD, dataAuth = true)
     public WebCountResponse changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
-        return webScope(() -> {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             int changed = service().changePassword(id, request.password());
             if (changed > 0 && userSessionService != null) {
                 userSessionService.revokeUserSessions(id);
             }
             return new WebCountResponse(changed);
-        });
+        }));
+    }
+
+    @Override
+    public Optional<String> tenantIdForCreate(UserAccount record) {
+        return tenantIdForUser(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForUpdate(String id, UserAccount record) {
+        UserAccount existing = service().select(id);
+        if (existing != null) {
+            return tenantIdForUser(existing);
+        }
+        return tenantIdForCreate(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForExistingRecord(String id) {
+        return tenantIdForUser(service().select(id));
     }
 
     @PostMapping("/selector/query")
@@ -181,5 +205,12 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                 .filter(context -> context.moduleAlias().equals(webScopeName()))
                 .map(ActionExecutionContext::actionPolicy)
                 .orElse(USER_SELECTOR_POLICY);
+    }
+
+    private Optional<String> tenantIdForUser(UserAccount user) {
+        if (user == null || user.getTenantId() == null || user.getTenantId().isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(user.getTenantId().trim());
     }
 }

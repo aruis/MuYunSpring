@@ -470,6 +470,14 @@ export interface Employee extends StandardEnabledSortableEntity {
   email?: string;
 }
 
+export interface UserAccount extends StandardEnabledSortableEntity {
+  username?: string;
+  mobile?: string;
+  email?: string;
+  organizationId?: string;
+  password?: string;
+}
+
 export type RoleAssignmentType = 'account' | 'employment';
 
 export type RoleKind = 'standard' | 'group' | 'dataGrant' | 'system';

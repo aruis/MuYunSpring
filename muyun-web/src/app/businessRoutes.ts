@@ -9,6 +9,7 @@ import OrganizationManagementView from '../views/OrganizationManagementView.vue'
 import PositionManagementView from '../views/PositionManagementView.vue';
 import RoleManagementView from '../views/RoleManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
+import UserManagementView from '../views/UserManagementView.vue';
 
 export interface StaticBusinessRoute {
   route: string;
@@ -51,6 +52,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/iam/employees',
     moduleAlias: 'iam.employee',
     component: EmployeeManagementView,
+  },
+  {
+    route: '/iam/users',
+    moduleAlias: 'iam.user',
+    component: UserManagementView,
   },
   {
     route: '/iam/roles',
