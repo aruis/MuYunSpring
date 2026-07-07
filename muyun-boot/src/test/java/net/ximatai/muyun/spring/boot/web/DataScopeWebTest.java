@@ -37,6 +37,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.List;
 import java.util.Collection;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -162,6 +163,18 @@ class DataScopeWebTest {
 
         assertThat(service.scopedActions).containsExactly(PlatformAction.ENABLE, PlatformAction.DISABLE);
         assertThat(service.scopedIdCalls).containsExactly(List.of("record-1"), List.of("record-2"));
+    }
+
+    @Test
+    void enableWebShouldUseResolvedExistingRecordTenantForSystemMutation() {
+        DataScopedEnabledService service = new DataScopedEnabledService();
+        DataScopedEnabledController controller = new DataScopedEnabledController(service);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            controller.enable("record-1");
+        }
+
+        assertThat(service.mutationTenantIds).containsExactly(Optional.of("tenant-b"));
     }
 
     @Test
@@ -318,6 +331,7 @@ class DataScopeWebTest {
             implements EnableAbility<DataScopedEnabledRecord>, DataScopeAbility<DataScopedEnabledRecord> {
         private final java.util.ArrayList<PlatformAction> scopedActions = new java.util.ArrayList<>();
         private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
+        private final java.util.ArrayList<Optional<String>> mutationTenantIds = new java.util.ArrayList<>();
 
         private DataScopedEnabledService() {
             super("demo.dataScopedEnabled", DataScopedEnabledRecord.class, dao());
@@ -337,12 +351,23 @@ class DataScopeWebTest {
 
         @Override
         public int enable(String id) {
+            mutationTenantIds.add(TenantContext.currentTenantId());
             return 1;
         }
 
         @Override
         public int disable(String id) {
+            mutationTenantIds.add(TenantContext.currentTenantId());
             return 1;
+        }
+
+        @Override
+        public DataScopedEnabledRecord select(String id) {
+            DataScopedEnabledRecord record = new DataScopedEnabledRecord();
+            record.setId(id);
+            record.setTitle("Enabled " + id);
+            record.setTenantId("tenant-b");
+            return record;
         }
     }
 
@@ -483,9 +508,15 @@ class DataScopeWebTest {
     }
 
     private static final class DataScopedEnabledController extends WebSupport<DataScopedEnabledService>
-            implements EnableWeb<DataScopedEnabledRecord, DataScopedEnabledService> {
+            implements EnableWeb<DataScopedEnabledRecord, DataScopedEnabledService>,
+            MutationTenantScopeResolver<DataScopedEnabledRecord> {
         private DataScopedEnabledController(DataScopedEnabledService service) {
             this.service = service;
+        }
+
+        @Override
+        public Optional<String> tenantIdForExistingRecord(String id) {
+            return Optional.of("tenant-b");
         }
     }
 

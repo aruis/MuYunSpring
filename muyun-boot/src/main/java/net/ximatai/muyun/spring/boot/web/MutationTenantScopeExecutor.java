@@ -27,12 +27,12 @@ public final class MutationTenantScopeExecutor {
         return run(existingRecordTenantId(owner, id), action);
     }
 
-    public static Optional<String> existingRecordTenantId(Object owner, String id) {
+    private static Optional<String> existingRecordTenantId(Object owner, String id) {
         return resolver(owner)
                 .flatMap(resolver -> resolver.tenantIdForExistingRecord(id));
     }
 
-    public static <R> R run(Optional<String> tenantId, Supplier<R> action) {
+    private static <R> R run(Optional<String> tenantId, Supplier<R> action) {
         if (!TenantContext.isSystem() || tenantId.isEmpty()) {
             return action.get();
         }
