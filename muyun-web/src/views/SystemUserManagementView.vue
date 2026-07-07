@@ -57,7 +57,7 @@ const columns = computed<RecordQueryListColumn[]>(() => [
 ]);
 const detailTitle = computed(() => {
   if (detailMode.value === 'resetPassword') {
-    return `重置密码 - ${systemUserTitle(selectedUser.value ?? userDraft.value)}`;
+    return `修改密码 - ${systemUserTitle(selectedUser.value ?? userDraft.value)}`;
   }
   return systemUserTitle(selectedUser.value ?? userDraft.value);
 });
@@ -90,7 +90,7 @@ const detailActions = computed<RecordActionItem[]>(() => {
       {
         key: 'resetPassword',
         actionCode: 'changePassword',
-        title: '重置密码',
+        title: '修改密码',
         iconName: 'lock',
         disabled: savingUser.value,
       },

@@ -138,7 +138,7 @@ const userDetailTitle = computed(() => {
     return '新建用户';
   }
   if (userDetailMode.value === 'resetPassword') {
-    return `重置密码 - ${userTitle(selectedUser.value ?? userDraft.value)}`;
+    return `修改密码 - ${userTitle(selectedUser.value ?? userDraft.value)}`;
   }
   return userTitle(selectedUser.value ?? userDraft.value);
 });
@@ -174,7 +174,7 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
       {
         key: 'resetPassword',
         actionCode: 'changePassword',
-        title: '重置密码',
+        title: '修改密码',
         iconName: 'lock',
         disabled: savingUser.value,
       },
