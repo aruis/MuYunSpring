@@ -89,6 +89,20 @@ docs              架构原则、平台专题、前端路线和技术债记录
 
 > 安全说明：快速开始配置仅用于本地开发。不要在公网或共享环境使用默认数据库密码和 `admin/admin123`。生产或共享环境应显式设置 `muyun.initial-admin.initial-password`，并按 `production` 运行模式治理 schema migration。
 
+一键启动本地开发栈：
+
+```bash
+./scripts/dev-local.sh
+```
+
+该脚本会启动 PostgreSQL，并并行启动后端和前端；默认启用演示初始化，便于本地验证租户、机构和角色基础数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。需要关闭演示初始化时：
+
+```bash
+MUYUN_DEMO_BOOTSTRAP_ENABLED=false ./scripts/dev-local.sh
+```
+
+也可以按下面步骤分开启动。
+
 1. 启动 PostgreSQL：
 
 ```bash

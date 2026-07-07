@@ -24,6 +24,7 @@ import {
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
+  type RecordQueryListColumn,
   type ResolvedRecordActionItem,
   type TreeRecordBase,
 } from '@muyun/platform-components';
@@ -119,9 +120,45 @@ const organizationTreeContext = computed(() =>
     treePath: '/iam.organization/tree',
   }),
 );
+const organizationPanelVisible = computed(() => selectedScope.value?.kind !== 'platform');
 const roleListContext = computed(
   () => createScopedRoleModuleContext(roleContext, selectedScope.value) as ModuleContext<QueryListRecord>,
 );
+const roleListColumns = computed<RecordQueryListColumn[]>(() => [
+  { key: 'title', title: '角色名称', width: '22%' },
+  {
+    key: 'assignmentType',
+    title: '授权层级',
+    width: '13%',
+    render: (record) =>
+      optionTitle(
+        record,
+        'assignmentType',
+        assignmentTypeTitle(record.assignmentType as RoleAssignmentType | undefined),
+      ),
+  },
+  {
+    key: 'roleKind',
+    title: '角色类型',
+    width: '13%',
+    render: (record) =>
+      optionTitle(record, 'roleKind', roleKindTitle(record.roleKind as RoleKind | undefined)),
+  },
+  {
+    key: 'sharePolicy',
+    title: '公开策略',
+    width: '15%',
+    render: (record) =>
+      optionTitle(record, 'sharePolicy', sharePolicyTitle(record.sharePolicy as RoleSharePolicy | undefined)),
+  },
+  {
+    key: 'systemManaged',
+    title: '系统托管',
+    width: '12%',
+    render: (record) => booleanTitle(record.systemManaged),
+  },
+  { key: 'enabled', title: '状态', type: 'enabledStatus', width: '10%' },
+]);
 const roleListReady = computed(() => Boolean(selectedScope.value));
 const roleDetailTitle = computed(() => {
   if (roleDetailMode.value === 'create') {
@@ -470,7 +507,7 @@ async function openRoleDetail(record: QueryListRecord, mode: RoleDetailMode) {
     if (!canCommitRoleDetailRequest(id, requestSeq)) {
       return;
     }
-    commitRoleDetailRecord(fullRecord);
+    commitRoleDetailRecord(fullRecord, mode);
   } catch (cause) {
     if (canCommitRoleDetailRequest(id, requestSeq)) {
       roleDetailLoadFailed.value = true;
@@ -617,11 +654,11 @@ function canCommitRoleDetailRequest(recordId: string, requestSeq: number) {
   return roleDetailRequestSeq.value === requestSeq && selectedRoleKey.value === recordId;
 }
 
-function commitRoleDetailRecord(record: Role) {
+function commitRoleDetailRecord(record: Role, nextMode: RoleDetailMode = 'view') {
   selectedRole.value = record;
   selectedRoleKey.value = record.id;
   roleDraft.value = copyRole(record);
-  roleDetailMode.value = 'view';
+  roleDetailMode.value = nextMode === 'edit' && record.systemManaged !== true ? 'edit' : 'view';
   roleDetailOpen.value = true;
   loadingRoleDetail.value = false;
   roleDetailLoadFailed.value = false;
@@ -748,6 +785,39 @@ function sharePolicyOptions(scopeType: RoleOwnerScopeType | undefined) {
   ];
 }
 
+function assignmentTypeTitle(value: RoleAssignmentType | undefined) {
+  return value === 'account' ? '账号角色' : '任职角色';
+}
+
+function roleKindTitle(value: RoleKind | undefined) {
+  const titles: Record<RoleKind, string> = {
+    standard: '标准角色',
+    group: '角色组',
+    dataGrant: '数据授权角色',
+    system: '系统角色',
+  };
+  return titles[value ?? 'standard'];
+}
+
+function sharePolicyTitle(value: RoleSharePolicy | undefined) {
+  const titles: Record<RoleSharePolicy, string> = {
+    private: '私有',
+    ownerAndChildren: '本级及下级',
+    tenant: '租户公开',
+    platform: '全局公开',
+  };
+  return titles[value ?? 'private'];
+}
+
+function booleanTitle(value: unknown) {
+  return value === true ? '是' : '否';
+}
+
+function optionTitle(record: QueryListRecord, fieldName: string, fallback: string) {
+  const title = record[`${fieldName}Title`];
+  return typeof title === 'string' && title.trim() ? title : fallback;
+}
+
 function roleToggleActionCode(record: Partial<Role>) {
   return record.enabled === false ? 'enable' : 'disable';
 }
@@ -802,7 +872,10 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
 </script>
 
 <template>
-  <section class="role-management-page">
+  <section
+    class="role-management-page"
+    :class="{ 'role-management-page-platform': !organizationPanelVisible }"
+  >
     <RecordExplorerPanel
       class="role-scope-panel"
       title="租户"
@@ -813,15 +886,19 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       @refresh="canBrowseTenants ? (tenantReloadKey += 1) : initializeTenantUserScope()"
       @update:search-keyword="tenantSearchKeyword = $event"
     >
-      <template #actions>
-        <UiButton
-          v-if="canSelectPlatformScope"
-          :type="selectedScope?.kind === 'platform' ? 'primary' : 'text'"
-          icon-name="app"
+      <button
+        v-if="canSelectPlatformScope"
+        class="role-platform-scope"
+        type="button"
+        @click="selectPlatformScope"
+      >
+        <UiRecordExplorerItem
           title="平台角色"
-          @click="selectPlatformScope"
+          secondary="全局范围"
+          clickable
+          :selected="selectedScope?.kind === 'platform'"
         />
-      </template>
+      </button>
       <button
         v-if="!canBrowseTenants && currentUserTenant"
         class="role-tenant-root-scope"
@@ -851,6 +928,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
     </RecordExplorerPanel>
 
     <RecordExplorerPanel
+      v-if="organizationPanelVisible"
       class="role-scope-panel"
       title="归属范围"
       refresh-title="刷新机构树"
@@ -891,6 +969,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       class="role-list-panel"
       :context="roleListContext"
       :title="selectedScope ? `角色列表 - ${selectedScope.title}` : '角色列表'"
+      :columns="roleListColumns"
       standard-crud-actions
       standard-crud-row-actions
       create-title="新建角色"
@@ -970,10 +1049,14 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
 .role-management-page {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(260px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 300px) minmax(240px, 300px) minmax(0, 1fr);
   gap: 12px;
   height: calc(100vh - 116px);
   overflow: hidden;
+}
+
+.role-management-page-platform {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
 }
 
 .role-scope-panel,
@@ -982,6 +1065,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
   min-height: 0;
 }
 
+.role-platform-scope,
 .role-tenant-root-scope {
   display: block;
   width: 100%;
@@ -1027,8 +1111,17 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
     grid-template-rows: minmax(0, 0.95fr) minmax(0, 1.3fr);
   }
 
+  .role-management-page-platform {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
   .role-list-panel {
     grid-column: 1 / -1;
+  }
+
+  .role-management-page-platform .role-list-panel {
+    grid-column: auto;
   }
 }
 
@@ -1043,6 +1136,11 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
 
   .role-list-panel {
     grid-column: auto;
+  }
+
+  .role-management-page-platform {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(180px, 0.65fr) minmax(360px, 1fr);
   }
 }
 </style>
