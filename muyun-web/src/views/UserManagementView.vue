@@ -154,7 +154,7 @@ const canSaveUser = computed(() => {
     return Boolean(selectedUser.value?.id) && userContext.can('update') === true;
   }
   if (userDetailMode.value === 'resetPassword') {
-    return Boolean(selectedUser.value?.id);
+    return Boolean(selectedUser.value?.id) && userContext.can('changePassword') === true;
   }
   return false;
 });
@@ -173,6 +173,7 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
       { key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit', disabled: savingUser.value },
       {
         key: 'resetPassword',
+        actionCode: 'changePassword',
         title: '重置密码',
         iconName: 'lock',
         disabled: savingUser.value,
@@ -191,7 +192,12 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
     { key: 'cancel', title: '取消', iconName: 'close', disabled: savingUser.value },
     {
       key: 'save',
-      actionCode: userDetailMode.value === 'create' ? 'create' : 'update',
+      actionCode:
+        userDetailMode.value === 'create'
+          ? 'create'
+          : userDetailMode.value === 'resetPassword'
+            ? 'changePassword'
+            : 'update',
       title: '保存',
       iconName: 'save',
       primary: true,

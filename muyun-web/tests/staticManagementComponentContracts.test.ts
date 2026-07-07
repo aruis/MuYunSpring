@@ -751,6 +751,11 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
   assert.match(userViewSource, /organizationId: \{ label: '所属机构'[\s\S]*readOnly: true/);
+  assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
+  assert.match(
+    userViewSource,
+    /userDetailMode\.value === 'resetPassword'[\s\S]*userContext\.can\('changePassword'\)/,
+  );
   assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /type="password"/);
   assert.match(inputSource, /type\?: 'text' \| 'password'/);
