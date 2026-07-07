@@ -85,6 +85,23 @@ test('record containers delegate chain errors to page feedback', () => {
   assert.doesNotMatch(layoutSource, /message error/);
 });
 
+test('record mode drawer owns detail mode branch switching', () => {
+  const drawerSource = readSource('src/platform-components/RecordModeDrawer.vue');
+  const indexSource = readSource('src/platform-components/index.ts');
+
+  assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
+  assert.match(drawerSource, /defineOptions\(\{ name: 'RecordModeDrawer' \}\)/);
+  assert.match(drawerSource, /viewMode: 'view'/);
+  assert.match(drawerSource, /const readonly = computed\(\(\) => props\.mode === props\.viewMode\)/);
+  assert.match(drawerSource, /props\.closeOnOutside \?\? readonly\.value/);
+  assert.match(drawerSource, /<template v-if="loading">/);
+  assert.match(drawerSource, /<template v-else-if="loadFailed">/);
+  assert.match(drawerSource, /<template v-else-if="readonly">/);
+  assert.match(drawerSource, /<template v-else>/);
+  assert.match(drawerSource, /<slot name="view" \/>/);
+  assert.match(drawerSource, /<slot name="form" \/>/);
+});
+
 test('record explorer panel focuses and closes search from keyboard', () => {
   const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
@@ -796,7 +813,10 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /height: calc\(100vh - 116px\)/);
   assert.match(systemUserViewSource, /overflow: hidden/);
   assert.match(systemUserViewSource, /<RecordQueryListPanel/);
-  assert.match(systemUserViewSource, /<RecordDetailDrawer/);
+  assert.match(systemUserViewSource, /<RecordModeDrawer/);
+  assert.match(systemUserViewSource, /:mode="detailMode"/);
+  assert.match(systemUserViewSource, /<template #view>/);
+  assert.match(systemUserViewSource, /<template #form>/);
   assert.match(systemUserViewSource, /<RecordDetailFields/);
   assert.match(systemUserViewSource, /<RecordFormFields/);
   assert.match(systemUserViewSource, /<RecordStatusSwitch/);
