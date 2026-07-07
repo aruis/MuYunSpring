@@ -10,15 +10,20 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.ScopedTreeWeb;
 import net.ximatai.muyun.spring.boot.web.TreeScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Optional;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理", route = "/iam/departments")
@@ -28,8 +33,15 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
         CrudWeb<Department, DepartmentService>,
         EnableWeb<Department, DepartmentService>,
         ScopedTreeWeb<Department, DepartmentService>,
+        MutationTenantScopeResolver<Department>,
         StaticModuleUiContributor {
+    private OrganizationService organizationService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
+
+    @Autowired
+    void setOrganizationService(OrganizationService organizationService) {
+        this.organizationService = organizationService;
+    }
 
     @Autowired(required = false)
     void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
@@ -78,8 +90,35 @@ public class DepartmentWebController extends WebSupport<DepartmentService> imple
                 : departmentTreeScope(organizationId);
     }
 
+    @Override
+    public Optional<String> tenantIdForCreate(Department record) {
+        return tenantIdForOrganization(record == null ? null : record.getOrganizationId());
+    }
+
+    @Override
+    public Optional<String> tenantIdForUpdate(String id, Department record) {
+        Department existing = service().select(id);
+        if (existing != null) {
+            return tenantIdForOrganization(existing.getOrganizationId());
+        }
+        return tenantIdForCreate(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForExistingRecord(String id) {
+        Department existing = service().select(id);
+        return tenantIdForOrganization(existing == null ? null : existing.getOrganizationId());
+    }
+
     private TreeScope departmentTreeScope(String organizationId) {
         String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
         return TreeScope.of(Criteria.of().eq("organizationId", validOrganizationId));
+    }
+
+    private Optional<String> tenantIdForOrganization(String organizationId) {
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        Organization organization = organizationService.requireEnabled(validOrganizationId,
+                "organization is not active: " + validOrganizationId);
+        return Optional.of(Preconditions.requireText(organization.getTenantId(), "organization.tenantId"));
     }
 }

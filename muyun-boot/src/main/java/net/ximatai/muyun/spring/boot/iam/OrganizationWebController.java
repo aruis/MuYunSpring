@@ -29,6 +29,9 @@ public class OrganizationWebController extends WebSupport<OrganizationService> i
     @Override
     public TreeScope treeScope(HttpServletRequest request) {
         String tenantId = resolveTreeTenantId(request.getParameter("tenantId"));
+        if (tenantId == null) {
+            return TreeScope.none();
+        }
         return TreeScope.tenant(Criteria.of().eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId), tenantId);
     }
 
@@ -38,7 +41,7 @@ public class OrganizationWebController extends WebSupport<OrganizationService> i
                 : requestedTenantId.trim();
         if (TenantContext.isSystem()) {
             if (normalized == null) {
-                throw new PlatformException("iam.organization tree requires tenantId under system context");
+                return null;
             }
             return normalized;
         }

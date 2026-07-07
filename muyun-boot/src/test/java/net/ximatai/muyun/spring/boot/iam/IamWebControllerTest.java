@@ -19,6 +19,8 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.department.Department;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationDao;
@@ -323,12 +325,25 @@ class IamWebControllerTest {
     }
 
     @Test
-    void shouldRejectOrganizationTreeWithoutTenantUnderSystemScope() throws Exception {
+    void shouldExposeOrganizationTreeWithoutTenantUnderSystemScope() throws Exception {
         currentUser = CurrentUser.systemUser("admin", "Admin");
+        Organization root = organization("org-1", "HQ", "Headquarters");
+        root.setTenantId("demo");
+        root.setParentId(TreeAbility.ROOT_ID);
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(List.of(root))
+                .thenReturn(List.of());
 
-        mvc.perform(get("/iam.organization/tree"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("iam.organization tree requires tenantId under system context"));
+        mvc.perform(get("/iam.organization/tree?flat=true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("org-1"))
+                .andExpect(jsonPath("$.records[0].tenantId").value("demo"));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(organizationDao, atLeastOnce())
+                .query(criteriaCaptor.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(criteriaCaptor.getAllValues())
+                .noneSatisfy(criteria -> assertThat(compiledCriteria(criteria)).contains("\"tenantId\" ="));
     }
 
     @Test
@@ -869,6 +884,45 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldCreateDepartmentInOrganizationTenantForSystemUser() throws Exception {
+        DepartmentService departmentService = mock(DepartmentService.class);
+        OrganizationService organizationService = mock(OrganizationService.class);
+        DepartmentWebController controller = new DepartmentWebController();
+        ReflectionTestUtils.setField(controller, "service", departmentService);
+        controller.setOrganizationService(organizationService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.systemUser("admin", "Admin"))))
+                .build();
+        Organization organization = organization("org-1", "HQ", "Headquarters");
+        organization.setTenantId("tenant_a");
+        organization.setEnabled(true);
+        Department saved = department("dept-1", "org-1", "FIN", "Finance");
+        saved.setTenantId("tenant_a");
+
+        when(organizationService.requireEnabled(any(), any())).thenReturn(organization);
+        when(departmentService.insert(any(Department.class))).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("tenant_a");
+            Department department = invocation.getArgument(0);
+            assertThat(department.getOrganizationId()).isEqualTo("org-1");
+            return "dept-1";
+        });
+        when(departmentService.select("dept-1")).thenReturn(saved);
+
+        mvc.perform(post("/iam.department/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {"organizationId":"org-1","code":"FIN","title":"Finance","enabled":true}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record.id").value("dept-1"))
+                .andExpect(jsonPath("$.record.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.record.organizationId").value("org-1"));
+    }
+
+    @Test
     void shouldExposeUserSelectorQuery() throws Exception {
         RoleService roleService = mock(RoleService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
@@ -923,6 +977,17 @@ class IamWebControllerTest {
         organization.setEnabled(Boolean.TRUE);
         organization.setSortOrder(1);
         return organization;
+    }
+
+    private Department department(String id, String organizationId, String code, String title) {
+        Department department = new Department();
+        department.setId(id);
+        department.setOrganizationId(organizationId);
+        department.setCode(code);
+        department.setTitle(title);
+        department.setEnabled(Boolean.TRUE);
+        department.setSortOrder(1);
+        return department;
     }
 
     private UserAccount user(String id, String username, String title) {
