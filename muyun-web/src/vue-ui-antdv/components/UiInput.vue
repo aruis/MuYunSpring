@@ -6,6 +6,7 @@ defineOptions({ name: 'UiInput' });
 
 defineProps<{
   value?: Primitive;
+  type?: 'text' | 'password' | 'email' | 'search' | 'number' | 'url';
   placeholder?: string;
   disabled?: boolean;
   autofocus?: boolean;
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 <template>
   <AInput
     :value="String(value ?? '')"
+    :type="type"
     :placeholder="placeholder"
     :disabled="disabled"
     :autofocus="autofocus"

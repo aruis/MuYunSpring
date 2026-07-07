@@ -8,6 +8,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  LockOutlined,
   PlusOutlined,
   PoweroffOutlined,
   ReloadOutlined,
@@ -25,6 +26,7 @@ export type UiIconName =
   | 'delete'
   | 'down'
   | 'edit'
+  | 'lock'
   | 'notification'
   | 'plus'
   | 'power'
@@ -44,6 +46,7 @@ const icons = {
   delete: DeleteOutlined,
   down: DownOutlined,
   edit: EditOutlined,
+  lock: LockOutlined,
   notification: BellOutlined,
   plus: PlusOutlined,
   power: PoweroffOutlined,

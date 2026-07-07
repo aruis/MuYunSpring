@@ -417,6 +417,35 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldCreateTenantUserUnderResolvedMutationTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("demo", "Demo")));
+        when(userAccountDao.insert(any())).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            UserAccount user = invocation.getArgument(0);
+            assertThat(user.getTenantId()).isEqualTo("demo");
+            assertThat(user.getPasswordHash()).startsWith("pbkdf2$");
+            return "user-1";
+        });
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(), List.of(user("user-1", "alice", "Alice")));
+
+        mvc.perform(post("/iam.user/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "tenantId":"demo",
+                                  "username":"alice",
+                                  "title":"Alice",
+                                  "password":"secret2"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record.id").value("user-1"))
+                .andExpect(jsonPath("$.record.username").value("alice"));
+    }
+
+    @Test
     void shouldCreateRoleWithCodeTitleEnumCodeThroughStandardCrudContract() throws Exception {
         currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
         Role saved = new Role();
@@ -574,6 +603,32 @@ class IamWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void shouldChangeTenantUserPasswordUnderResolvedMutationTenantForSystemUser() throws Exception {
+        currentUser = CurrentUser.systemUser("admin", "Admin");
+        UserAccount existing = user("user-1", "alice", "Alice");
+        existing.setTenantId("demo");
+        existing.setPasswordHash(new PasswordHashingService().hash("old-secret"));
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("demo", "Demo")));
+        when(userAccountDao.count(any(Criteria.class))).thenReturn(1L);
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(existing));
+        when(userAccountDao.updateById(any(UserAccount.class))).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("demo");
+            UserAccount updated = invocation.getArgument(0);
+            assertThat(new PasswordHashingService().matches("new-secret", updated.getPasswordHash())).isTrue();
+            return 1;
+        });
+
+        mvc.perform(post("/iam.user/changePassword/{id}", "user-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"password":"new-secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
     }
 
     @Test

@@ -125,6 +125,7 @@ test('static management explorers use unified item descriptors', () => {
     'DictionaryManagementView.vue',
     'MenuManagementView.vue',
     'EmployeeManagementView.vue',
+    'UserManagementView.vue',
     'RoleManagementView.vue',
   ];
 
@@ -712,6 +713,108 @@ test('role management keeps basic scope management separate from binding and aut
     contractsSource,
     /export type RoleSharePolicy = 'private' \| 'ownerAndChildren' \| 'tenant' \| 'platform'/,
   );
+});
+
+test('user management keeps account basics separate from employment binding and role authorization', () => {
+  const userViewSource = readSource('src/views/UserManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+  const contractsSource = readSource('src/web-contracts/index.ts');
+  const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
+  const iconSource = readSource('src/vue-ui-antdv/components/UiIcon.vue');
+
+  assert.match(routesSource, /moduleAlias: 'iam\.user'/);
+  assert.match(routesSource, /route: '\/iam\/users'/);
+  assert.match(userViewSource, /defineOptions\(\{ name: 'UserManagementView' \}\)/);
+  assert.match(userViewSource, /moduleAlias: 'iam\.tenant'/);
+  assert.match(userViewSource, /moduleAlias: 'iam\.organization'/);
+  assert.match(userViewSource, /moduleAlias: 'iam\.user'/);
+  assert.match(userViewSource, /user-management-page/);
+  assert.match(userViewSource, /<CrudRecordListExplorer/);
+  assert.match(userViewSource, /<TreeRecordExplorer/);
+  assert.match(userViewSource, /<RecordQueryListPanel/);
+  assert.match(userViewSource, /standard-crud-actions/);
+  assert.match(userViewSource, /standard-crud-row-actions/);
+  assert.match(userViewSource, /canBrowseTenants/);
+  assert.match(userViewSource, /currentUserTenant/);
+  assert.match(userViewSource, /initializeTenantUserScope/);
+  assert.match(userViewSource, /createScopedTreeModuleContext/);
+  assert.match(userViewSource, /treePath: '\/iam\.organization\/tree'/);
+  assert.match(userViewSource, /scopeFieldName: 'tenantId'/);
+  assert.match(userViewSource, /fieldName: 'tenantId'/);
+  assert.match(userViewSource, /fieldName: 'organizationId'/);
+  assert.match(userViewSource, /createScopedUserModuleContext/);
+  assert.match(userViewSource, /onMounted\(loadUserFormDefinition\)/);
+  assert.match(userViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
+  assert.match(userViewSource, /userFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
+  assert.match(userViewSource, /<RecordFormFields/);
+  assert.match(userViewSource, /:fields="userFormFieldDefinitions"/);
+  assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
+  assert.match(userViewSource, /username: \{ label: '账号'/);
+  assert.match(userViewSource, /organizationId: \{ label: '所属机构'[\s\S]*readOnly: true/);
+  assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
+  assert.match(userViewSource, /title: '修改密码'/);
+  assert.doesNotMatch(userViewSource, /重置密码/);
+  assert.match(
+    userViewSource,
+    /userDetailMode\.value === 'resetPassword'[\s\S]*userContext\.can\('changePassword'\)/,
+  );
+  assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
+  assert.match(userViewSource, /type="password"/);
+  assert.match(inputSource, /type\?: 'text' \| 'password'/);
+  assert.match(iconSource, /LockOutlined/);
+  assert.match(contractsSource, /export interface UserAccount extends StandardEnabledSortableEntity/);
+  assert.match(contractsSource, /username\?: string/);
+  assert.match(contractsSource, /password\?: string/);
+  assert.doesNotMatch(contractsSource, /passwordHash/);
+  assert.doesNotMatch(userViewSource, /iam\.employee_account/);
+  assert.doesNotMatch(userViewSource, /iam\.role_assignment/);
+  assert.doesNotMatch(userViewSource, /系统账号/);
+  assert.doesNotMatch(userViewSource, /operator: 'NULL'/);
+  assert.doesNotMatch(userViewSource, /permissionMatrix/);
+  assert.doesNotMatch(userViewSource, /sessionList|sessionAudit|revokeSession/);
+});
+
+test('system user management is a separate root account entry', () => {
+  const systemUserViewSource = readSource('src/views/SystemUserManagementView.vue');
+  const userViewSource = readSource('src/views/UserManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+
+  assert.match(routesSource, /moduleAlias: 'iam\.system_user'/);
+  assert.match(routesSource, /route: '\/iam\/system-users'/);
+  assert.match(systemUserViewSource, /defineOptions\(\{ name: 'SystemUserManagementView' \}\)/);
+  assert.match(systemUserViewSource, /moduleAlias: 'iam\.user'/);
+  assert.match(systemUserViewSource, /system-user-management-page/);
+  assert.match(systemUserViewSource, /height: calc\(100vh - 116px\)/);
+  assert.match(systemUserViewSource, /overflow: hidden/);
+  assert.match(systemUserViewSource, /<RecordQueryListPanel/);
+  assert.match(systemUserViewSource, /<RecordDetailDrawer/);
+  assert.match(systemUserViewSource, /<RecordDetailFields/);
+  assert.match(systemUserViewSource, /<RecordFormFields/);
+  assert.match(systemUserViewSource, /<RecordStatusSwitch/);
+  assert.match(systemUserViewSource, /<RecordActionBar/);
+  assert.match(systemUserViewSource, /fieldName: 'tenantId'/);
+  assert.match(systemUserViewSource, /operator: 'NULL'/);
+  assert.match(systemUserViewSource, /title="系统账号"/);
+  assert.match(systemUserViewSource, /function rowActionsOf/);
+  assert.match(systemUserViewSource, /actionCode: 'view'/);
+  assert.match(systemUserViewSource, /actionCode: 'update'/);
+  assert.match(systemUserViewSource, /actionCode: 'changePassword'/);
+  assert.match(systemUserViewSource, /title: '修改密码'/);
+  assert.doesNotMatch(systemUserViewSource, /重置密码/);
+  assert.match(
+    systemUserViewSource,
+    /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
+  );
+  assert.match(systemUserViewSource, /tenantId: undefined/);
+  assert.match(systemUserViewSource, /organizationId: undefined/);
+  assert.match(systemUserViewSource, /systemUserFormFieldDisabled/);
+  assert.doesNotMatch(systemUserViewSource, /<CrudRecordListExplorer/);
+  assert.doesNotMatch(systemUserViewSource, /<TreeRecordExplorer/);
+  assert.doesNotMatch(systemUserViewSource, /standard-crud-actions/);
+  assert.doesNotMatch(systemUserViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(systemUserViewSource, /actionCode: 'create'/);
+  assert.doesNotMatch(systemUserViewSource, /actionCode: 'delete'/);
+  assert.doesNotMatch(userViewSource, /iam\.system_user/);
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {

@@ -6,6 +6,11 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -37,7 +42,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         SortAbility<UserAccount>,
         ReferenceAbility<UserAccount>,
         DataScopeAbility<UserAccount>,
-        InitialDataAbility<UserAccount> {
+        InitialDataAbility<UserAccount>,
+        QueryAbility<UserAccount> {
     public static final String MODULE_ALIAS = "iam.user";
     public static final String PLATFORM_SUPER_ADMIN_USER_ID = "platform.user.super_admin";
     public static final String PLATFORM_SUPER_ADMIN_USERNAME = "admin";
@@ -116,8 +122,40 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN, QueryOperator.NULL).withTitle("租户"))
+                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属机构"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("username", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("账号").withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("姓名").withQuickSearch().withSortable())
+                .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("手机号").withQuickSearch())
+                .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("邮箱").withQuickSearch())
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间")
+                        .withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间")
+                        .withSortable())
+                .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"))
+                .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("username"))
+                .build();
+    }
+
+    @Override
     public void normalizeBeforeMutation(UserAccount user) {
-        user.setUsername(requireUsername(user.getUsername()));
+        String username = requireUsername(user.getUsername());
+        user.setUsername(username);
+        user.setTitle(normalizeBlank(user.getTitle()) == null ? username : user.getTitle().trim());
         user.setMobile(normalizeBlank(user.getMobile()));
         user.setEmail(normalizeBlank(user.getEmail()));
         user.setOrganizationId(normalizeBlank(user.getOrganizationId()));

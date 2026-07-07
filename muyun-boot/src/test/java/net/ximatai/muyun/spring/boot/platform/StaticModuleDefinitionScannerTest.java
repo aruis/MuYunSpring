@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionCategoryWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
+import net.ximatai.muyun.spring.boot.iam.SystemUserAccountWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
@@ -79,6 +80,7 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(PositionCategoryWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
             context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
+            context.registerBean(SystemUserAccountWebController.class);
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -88,7 +90,7 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
                     "iam.tenant", "iam.organization", "iam.department", "iam.employee",
-                    "iam.position_category", "iam.role", "iam.user");
+                    "iam.position_category", "iam.role", "iam.user", "iam.system_user");
             assertThat(byAlias.get("iam.tenant")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("租户管理");
@@ -261,6 +263,15 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.title()).isEqualTo("修改密码");
                             assertThat(action.dataAuth()).isTrue();
                         });
+            });
+            assertThat(byAlias.get("iam.system_user")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.moduleAlias()).isEqualTo("iam.system_user");
+                assertThat(definition.title()).isEqualTo("系统账号管理");
+                assertThat(definition.entryType()).isEqualTo(ModuleEntryType.ROUTE);
+                assertThat(definition.entryRoute()).isEqualTo("/iam/system-users");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactly("menu");
             });
         }
     }
