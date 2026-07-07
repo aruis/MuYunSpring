@@ -14,6 +14,7 @@ test('static business route registry exposes route prefixes for navigation resol
     '/config/applications',
     '/config/dictionaries',
     '/config/menus',
+    '/platform/security/passwords',
     '/iam/tenants',
     '/iam/organizations',
     '/iam/departments',
@@ -27,6 +28,7 @@ test('static business route registry exposes route prefixes for navigation resol
     'platform.application': '/config/applications',
     'platform.dictionary_category': '/config/dictionaries',
     'platform.menu_scheme': '/config/menus',
+    'iam.password_policy_rule': '/platform/security/passwords',
     'iam.tenant': '/iam/tenants',
     'iam.organization': '/iam/organizations',
     'iam.department': '/iam/departments',
@@ -66,6 +68,22 @@ test('static business route registry resolves by module alias for module menus',
 
   assert.equal(route?.route, '/config/applications');
   assert.equal(route?.moduleAlias, 'platform.application');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves password management module route', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/platform/security/passwords', moduleAlias: 'iam.password_policy_rule' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/platform/security/passwords');
+  assert.equal(route?.moduleAlias, 'iam.password_policy_rule');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 

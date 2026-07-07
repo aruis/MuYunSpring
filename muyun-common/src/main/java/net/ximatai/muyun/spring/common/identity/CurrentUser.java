@@ -5,7 +5,8 @@ public record CurrentUser(
         String username,
         String tenantId,
         String organizationId,
-        boolean system
+        boolean system,
+        boolean passwordChangeRequired
 ) {
     public CurrentUser {
         userId = requireText(userId, "userId");
@@ -15,15 +16,27 @@ public record CurrentUser(
     }
 
     public static CurrentUser tenantUser(String userId, String username, String tenantId) {
-        return new CurrentUser(userId, username, tenantId, null, false);
+        return tenantUser(userId, username, tenantId, null);
     }
 
     public static CurrentUser tenantUser(String userId, String username, String tenantId, String organizationId) {
-        return new CurrentUser(userId, username, tenantId, organizationId, false);
+        return tenantUser(userId, username, tenantId, organizationId, false);
+    }
+
+    public static CurrentUser tenantUser(String userId,
+                                         String username,
+                                         String tenantId,
+                                         String organizationId,
+                                         boolean passwordChangeRequired) {
+        return new CurrentUser(userId, username, tenantId, organizationId, false, passwordChangeRequired);
     }
 
     public static CurrentUser systemUser(String userId, String username) {
-        return new CurrentUser(userId, username, null, null, true);
+        return systemUser(userId, username, false);
+    }
+
+    public static CurrentUser systemUser(String userId, String username, boolean passwordChangeRequired) {
+        return new CurrentUser(userId, username, null, null, true, passwordChangeRequired);
     }
 
     private static String requireText(String value, String name) {

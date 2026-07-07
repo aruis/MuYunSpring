@@ -16,7 +16,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -66,7 +68,7 @@ class LoginWebControllerTest {
     @Test
     void shouldReturnUnauthorizedWhenLoginCredentialsAreInvalid() throws Exception {
         UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(anyString(), anyString(), anyString()))
+        when(userSessionService.login(anyString(), anyString(), anyString(), nullable(String.class), nullable(String.class)))
                 .thenThrow(new AuthenticationFailedException("invalid username or password"));
         LoginWebController controller = new LoginWebController(userSessionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
@@ -88,7 +90,7 @@ class LoginWebControllerTest {
     @Test
     void shouldReturnAuthenticationFailedWithoutLeakingInactiveTenantReason() throws Exception {
         UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(anyString(), anyString(), anyString()))
+        when(userSessionService.login(anyString(), anyString(), anyString(), nullable(String.class), nullable(String.class)))
                 .thenThrow(new AuthenticationFailedException("invalid username or password",
                         new RuntimeException("Tenant is not active: tenant-a")));
         LoginWebController controller = new LoginWebController(userSessionService);
@@ -111,7 +113,7 @@ class LoginWebControllerTest {
     @Test
     void shouldReturnBadRequestWhenLoginRequestIsMalformed() throws Exception {
         UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(isNull(), anyString(), anyString()))
+        when(userSessionService.login(isNull(), anyString(), anyString(), nullable(String.class), nullable(String.class)))
                 .thenThrow(new IllegalArgumentException("tenantId must not be null"));
         LoginWebController controller = new LoginWebController(userSessionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
@@ -128,5 +130,24 @@ class LoginWebControllerTest {
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("tenantId must not be null"));
+    }
+
+    @Test
+    void shouldChangeOwnPasswordForCurrentUser() throws Exception {
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        LoginWebController controller = new LoginWebController(userSessionService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addFilters(new CurrentUserWebFilter(() -> Optional.of(
+                        CurrentUser.tenantUser("user-1", "Alice", "tenant-a", "org-1"))))
+                .build();
+
+        mvc.perform(post("/iam.auth/changeOwnPassword")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                """))
+                .andExpect(status().isOk());
+
+        verify(userSessionService).changeOwnPassword("user-1", "old-secret", "new-secret");
     }
 }

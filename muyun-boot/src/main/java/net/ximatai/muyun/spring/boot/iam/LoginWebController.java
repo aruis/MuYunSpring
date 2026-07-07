@@ -22,8 +22,16 @@ public class LoginWebController {
     }
 
     @PostMapping("/login")
-    public LoginResult login(@RequestBody LoginRequest request) {
-        return userSessionService.login(request.tenantId(), request.username(), request.password());
+    public LoginResult login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        return userSessionService.login(request.tenantId(), request.username(), request.password(),
+                clientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+    }
+
+    @PostMapping("/changeOwnPassword")
+    public void changeOwnPassword(@RequestBody ChangeOwnPasswordRequest request) {
+        CurrentUser currentUser = CurrentUserContext.currentUser()
+                .orElseThrow(() -> new AuthenticationRequiredException("current user context is not available"));
+        userSessionService.changeOwnPassword(currentUser.userId(), request.currentPassword(), request.newPassword());
     }
 
     @PostMapping("/logout")
@@ -49,6 +57,17 @@ public class LoginWebController {
         return header.substring(prefix.length()).trim();
     }
 
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
     public record LoginRequest(String tenantId, String username, String password) {
+    }
+
+    public record ChangeOwnPasswordRequest(String currentPassword, String newPassword) {
     }
 }

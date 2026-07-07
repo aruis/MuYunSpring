@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MetadataService.MODULE_ALIAS, title = "平台元数据")
-@PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "元数据管理", order = 30)
+@PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "元数据管理", order = 30)
 @RequestMapping("/platform.metadata")
 public class MetadataWebController extends WebSupport<MetadataService> implements
         CrudWeb<Metadata, MetadataService>,

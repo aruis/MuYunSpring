@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
@@ -23,6 +25,8 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +36,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.employee", title = "职员管理", route = "/iam/employees")
@@ -41,10 +47,12 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         CrudWeb<Employee, EmployeeService>,
         EnableWeb<Employee, EmployeeService>,
         SortWeb<Employee, EmployeeService>,
+        MutationTenantScopeResolver<Employee>,
         StaticModuleUiContributor {
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeDelegationService employeeDelegationService;
+    private OrganizationService organizationService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
     @Autowired
@@ -54,6 +62,11 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
         this.employeeDelegationService = employeeDelegationService;
+    }
+
+    @Autowired
+    void setOrganizationService(OrganizationService organizationService) {
+        this.organizationService = organizationService;
     }
 
     @Autowired(required = false)
@@ -90,11 +103,31 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                 .build();
     }
 
+    @Override
+    public Optional<String> tenantIdForCreate(Employee record) {
+        return tenantIdForEmployee(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForUpdate(String id, Employee record) {
+        Employee existing = service().select(id);
+        if (existing != null) {
+            return tenantIdForEmployee(existing);
+        }
+        return tenantIdForCreate(record);
+    }
+
+    @Override
+    public Optional<String> tenantIdForExistingRecord(String id) {
+        return tenantIdForEmployee(service().select(id));
+    }
+
     @GetMapping("/{employeeId}/accounts")
     @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebListResponse<EmployeeAccount> accounts(@PathVariable String employeeId) {
-        return webScope(() -> new WebListResponse<>(employeeAccountService.accounts(employeeId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebListResponse<>(employeeAccountService.accounts(employeeId)));
     }
 
     @PostMapping("/{employeeId}/accounts")
@@ -102,7 +135,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public EmployeeAccount bindAccount(@PathVariable String employeeId,
                                        @RequestBody EmployeeAccount binding) {
-        return webScope(() -> employeeAccountService.select(employeeAccountService.bindAccount(employeeId, binding)));
+        return employeeRecordScope(employeeId,
+                () -> employeeAccountService.select(employeeAccountService.bindAccount(employeeId, binding)));
     }
 
     @PostMapping("/{employeeId}/accounts/{bindingId}/delete")
@@ -110,7 +144,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse deleteAccount(@PathVariable String employeeId,
                                           @PathVariable String bindingId) {
-        return webScope(() -> new WebCountResponse(employeeAccountService.deleteAccount(employeeId, bindingId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeeAccountService.deleteAccount(employeeId, bindingId)));
     }
 
     @PostMapping("/{employeeId}/accounts/{bindingId}/enable")
@@ -118,7 +153,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse enableAccount(@PathVariable String employeeId,
                                           @PathVariable String bindingId) {
-        return webScope(() -> new WebCountResponse(employeeAccountService.enableAccount(employeeId, bindingId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeeAccountService.enableAccount(employeeId, bindingId)));
     }
 
     @PostMapping("/{employeeId}/accounts/{bindingId}/disable")
@@ -126,7 +162,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse disableAccount(@PathVariable String employeeId,
                                            @PathVariable String bindingId) {
-        return webScope(() -> new WebCountResponse(employeeAccountService.disableAccount(employeeId, bindingId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeeAccountService.disableAccount(employeeId, bindingId)));
     }
 
     @PostMapping("/{employeeId}/accounts/{bindingId}/primary")
@@ -134,14 +171,16 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse makePrimaryAccount(@PathVariable String employeeId,
                                                @PathVariable String bindingId) {
-        return webScope(() -> new WebCountResponse(employeeAccountService.makePrimaryAccount(employeeId, bindingId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeeAccountService.makePrimaryAccount(employeeId, bindingId)));
     }
 
     @GetMapping("/{employeeId}/positions")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebListResponse<EmployeePosition> positions(@PathVariable String employeeId) {
-        return webScope(() -> new WebListResponse<>(employeePositionService.positions(employeeId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebListResponse<>(employeePositionService.positions(employeeId)));
     }
 
     @PostMapping("/{employeeId}/positions")
@@ -149,7 +188,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public EmployeePosition addPosition(@PathVariable String employeeId,
                                         @RequestBody EmployeePosition relation) {
-        return webScope(() -> employeePositionService.select(employeePositionService.addPosition(employeeId, relation)));
+        return employeeRecordScope(employeeId,
+                () -> employeePositionService.select(employeePositionService.addPosition(employeeId, relation)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/update")
@@ -158,7 +198,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     public EmployeePosition updatePosition(@PathVariable String employeeId,
                                            @PathVariable String relationId,
                                            @RequestBody EmployeePosition relation) {
-        return webScope(() -> {
+        return employeeRecordScope(employeeId, () -> {
             employeePositionService.updatePosition(employeeId, relationId, relation);
             return employeePositionService.select(relationId);
         });
@@ -169,7 +209,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse deletePosition(@PathVariable String employeeId,
                                            @PathVariable String relationId) {
-        return webScope(() -> new WebCountResponse(employeePositionService.deletePosition(employeeId, relationId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeePositionService.deletePosition(employeeId, relationId)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/enable")
@@ -177,7 +218,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse enablePosition(@PathVariable String employeeId,
                                            @PathVariable String relationId) {
-        return webScope(() -> new WebCountResponse(employeePositionService.enablePosition(employeeId, relationId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeePositionService.enablePosition(employeeId, relationId)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/disable")
@@ -185,7 +227,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse disablePosition(@PathVariable String employeeId,
                                             @PathVariable String relationId) {
-        return webScope(() -> new WebCountResponse(employeePositionService.disablePosition(employeeId, relationId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeePositionService.disablePosition(employeeId, relationId)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/primary")
@@ -193,7 +236,8 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse makePrimaryPosition(@PathVariable String employeeId,
                                                 @PathVariable String relationId) {
-        return webScope(() -> new WebCountResponse(employeePositionService.makePrimaryPosition(employeeId, relationId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebCountResponse(employeePositionService.makePrimaryPosition(employeeId, relationId)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/sort")
@@ -202,7 +246,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     public WebCountResponse sortPosition(@PathVariable String employeeId,
                                          @PathVariable String relationId,
                                          @RequestBody(required = false) SortWebRequest request) {
-        return webScope(() -> {
+        return employeeRecordScope(employeeId, () -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             employeePositionService.moveEmployeePosition(employeeId, relationId,
                     normalized.previousId(), normalized.nextId());
@@ -214,14 +258,16 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebListResponse<EmployeeDelegation> delegations(@PathVariable String employeeId) {
-        return webScope(() -> new WebListResponse<>(employeeDelegationService.delegationsByPrincipal(employeeId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebListResponse<>(employeeDelegationService.delegationsByPrincipal(employeeId)));
     }
 
     @GetMapping("/{employeeId}/delegated-to-me")
     @CustomActionEndpoint(value = "employeeDelegatedToMe", title = "职员受托代办",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebListResponse<EmployeeDelegation> delegatedToMe(@PathVariable String employeeId) {
-        return webScope(() -> new WebListResponse<>(employeeDelegationService.delegationsByDelegate(employeeId)));
+        return employeeRecordScope(employeeId,
+                () -> new WebListResponse<>(employeeDelegationService.delegationsByDelegate(employeeId)));
     }
 
     @PostMapping("/{employeeId}/delegations")
@@ -229,7 +275,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public EmployeeDelegation addDelegation(@PathVariable String employeeId,
                                             @RequestBody EmployeeDelegation delegation) {
-        return webScope(() -> employeeDelegationService.select(
+        return employeeRecordScope(employeeId, () -> employeeDelegationService.select(
                 employeeDelegationService.addDelegation(employeeId, delegation)));
     }
 
@@ -239,7 +285,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     public EmployeeDelegation updateDelegation(@PathVariable String employeeId,
                                                @PathVariable String delegationId,
                                                @RequestBody EmployeeDelegation delegation) {
-        return webScope(() -> {
+        return employeeRecordScope(employeeId, () -> {
             employeeDelegationService.updateDelegation(employeeId, delegationId, delegation);
             return employeeDelegationService.select(delegationId);
         });
@@ -250,7 +296,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse deleteDelegation(@PathVariable String employeeId,
                                              @PathVariable String delegationId) {
-        return webScope(() -> new WebCountResponse(
+        return employeeRecordScope(employeeId, () -> new WebCountResponse(
                 employeeDelegationService.deleteDelegation(employeeId, delegationId)));
     }
 
@@ -259,7 +305,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse enableDelegation(@PathVariable String employeeId,
                                              @PathVariable String delegationId) {
-        return webScope(() -> new WebCountResponse(
+        return employeeRecordScope(employeeId, () -> new WebCountResponse(
                 employeeDelegationService.enableDelegation(employeeId, delegationId)));
     }
 
@@ -268,7 +314,28 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse disableDelegation(@PathVariable String employeeId,
                                               @PathVariable String delegationId) {
-        return webScope(() -> new WebCountResponse(
+        return employeeRecordScope(employeeId, () -> new WebCountResponse(
                 employeeDelegationService.disableDelegation(employeeId, delegationId)));
+    }
+
+    private <R> R employeeRecordScope(String employeeId, Supplier<R> action) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, employeeId, () -> webScope(action));
+    }
+
+    private Optional<String> tenantIdForEmployee(Employee employee) {
+        if (employee == null) {
+            return Optional.empty();
+        }
+        if (employee.getTenantId() != null && !employee.getTenantId().isBlank()) {
+            return Optional.of(employee.getTenantId().trim());
+        }
+        String organizationId = employee.getOrganizationId();
+        if (organizationId == null || organizationId.isBlank()) {
+            return Optional.empty();
+        }
+        Organization organization = organizationService.requireEnabled(organizationId,
+                "organization is not active: " + organizationId);
+        return Optional.of(net.ximatai.muyun.spring.common.util.Preconditions.requireText(
+                organization.getTenantId(), "organization.tenantId"));
     }
 }

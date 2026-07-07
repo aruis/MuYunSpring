@@ -752,17 +752,26 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /username: \{ label: '账号'/);
   assert.match(userViewSource, /organizationId: \{ label: '所属机构'[\s\S]*readOnly: true/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
+  assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
-  assert.doesNotMatch(userViewSource, /重置密码/);
+  assert.match(userViewSource, /title: '重置密码'/);
+  assert.match(userViewSource, /temporaryPassword/);
   assert.match(
     userViewSource,
     /userDetailMode\.value === 'resetPassword'[\s\S]*userContext\.can\('changePassword'\)/,
   );
   assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
+  assert.match(userViewSource, /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /type="password"/);
   assert.match(inputSource, /type\?: 'text' \| 'password'/);
   assert.match(iconSource, /LockOutlined/);
   assert.match(contractsSource, /export interface UserAccount extends StandardEnabledSortableEntity/);
+  assert.match(
+    contractsSource,
+    /export type UserPasswordStatus = 'normal' \| 'initial' \| 'resetRequired' \| 'expired'/,
+  );
+  assert.match(contractsSource, /passwordStatusTitle\?: string/);
+  assert.match(contractsSource, /export interface ResetPasswordResponse/);
   assert.match(contractsSource, /username\?: string/);
   assert.match(contractsSource, /password\?: string/);
   assert.doesNotMatch(contractsSource, /passwordHash/);
@@ -799,11 +808,17 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /actionCode: 'view'/);
   assert.match(systemUserViewSource, /actionCode: 'update'/);
   assert.match(systemUserViewSource, /actionCode: 'changePassword'/);
+  assert.match(systemUserViewSource, /actionCode: 'resetPassword'/);
   assert.match(systemUserViewSource, /title: '修改密码'/);
-  assert.doesNotMatch(systemUserViewSource, /重置密码/);
+  assert.match(systemUserViewSource, /title: '重置密码'/);
+  assert.match(systemUserViewSource, /temporaryPassword/);
   assert.match(
     systemUserViewSource,
     /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
+  );
+  assert.match(
+    systemUserViewSource,
+    /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
   );
   assert.match(systemUserViewSource, /tenantId: undefined/);
   assert.match(systemUserViewSource, /organizationId: undefined/);
@@ -815,6 +830,30 @@ test('system user management is a separate root account entry', () => {
   assert.doesNotMatch(systemUserViewSource, /actionCode: 'create'/);
   assert.doesNotMatch(systemUserViewSource, /actionCode: 'delete'/);
   assert.doesNotMatch(userViewSource, /iam\.system_user/);
+});
+
+test('password management is a dedicated security settings page', () => {
+  const passwordViewSource = readSource('src/views/PasswordManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+  const contractsSource = readSource('src/web-contracts/index.ts');
+
+  assert.match(routesSource, /moduleAlias: 'iam\.password_policy_rule'/);
+  assert.match(routesSource, /route: '\/platform\/security\/passwords'/);
+  assert.match(passwordViewSource, /defineOptions\(\{ name: 'PasswordManagementView' \}\)/);
+  assert.match(passwordViewSource, /moduleAlias: 'iam\.password_policy_rule'/);
+  assert.match(passwordViewSource, /<StaticManagementLayout/);
+  assert.match(passwordViewSource, /<CrudRecordListExplorer/);
+  assert.match(passwordViewSource, /<RecordActionBar/);
+  assert.match(passwordViewSource, /<RecordStatusSwitch/);
+  assert.match(passwordViewSource, /密码试算/);
+  assert.match(passwordViewSource, /new RegExp\(rule\.pattern/);
+  assert.match(passwordViewSource, /scopeType: 'global'/);
+  assert.match(passwordViewSource, /ruleCode/);
+  assert.match(passwordViewSource, /pattern/);
+  assert.match(passwordViewSource, /message/);
+  assert.match(passwordViewSource, /description/);
+  assert.match(contractsSource, /export type PasswordPolicyScopeType = 'global' \| 'tenant'/);
+  assert.match(contractsSource, /export interface PasswordPolicyRule extends StandardEnabledSortableEntity/);
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {

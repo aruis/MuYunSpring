@@ -72,6 +72,47 @@ class DefaultTenantMenuProvisionerTest {
         assertThat(schemeId).hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH);
     }
 
+    @Test
+    void shouldRepairCopiedTenantMenuStructureWhenSystemMenuMoves() {
+        when(moduleService.resolveVisibleModule("iam.user")).thenReturn(module("iam.user"));
+        createSystemAdminMenuTree();
+        provisioner.afterTenantCreated("demo");
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Menu business = new Menu();
+            business.setId("platform.menu.group.business");
+            business.setSchemeId(MenuSchemeService.ADMIN_SCHEME_ID);
+            business.setParentId(TreeAbility.ROOT_ID);
+            business.setTitle("业务支撑");
+            business.setEnabled(Boolean.TRUE);
+            business.setSortOrder(2);
+            menuService.insert(business);
+
+            Menu systemUserMenu = menuService.list(Criteria.of()
+                            .eq("schemeId", MenuSchemeService.ADMIN_SCHEME_ID)
+                            .eq("moduleAlias", "iam.user"))
+                    .getFirst();
+            systemUserMenu.setParentId(business.getId());
+            menuService.update(systemUserMenu);
+        }
+
+        provisioner.afterTenantCreated("demo");
+
+        String schemeId = DefaultTenantMenuProvisioner.tenantAdminSchemeId("demo");
+        try (TenantContext.Scope ignored = TenantContext.use("demo")) {
+            Menu copiedBusiness = menuService.list(Criteria.of()
+                            .eq("schemeId", schemeId)
+                            .eq("title", "业务支撑"))
+                    .getFirst();
+            Menu copiedUser = menuService.list(Criteria.of()
+                            .eq("schemeId", schemeId)
+                            .eq("moduleAlias", "iam.user"))
+                    .getFirst();
+
+            assertThat(copiedUser.getParentId()).isEqualTo(copiedBusiness.getId());
+        }
+    }
+
     private void createSystemAdminMenuTree() {
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             MenuScheme scheme = new MenuScheme();

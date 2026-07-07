@@ -110,7 +110,7 @@ public class DefaultTenantMenuProvisioner implements TenantCreationProvisioner {
     private void ensureMenuCopy(Menu source, String targetSchemeId, String targetId, String targetParentId) {
         Menu existing = menuService.selectIgnoreSoftDelete(targetId);
         if (existing != null) {
-            validateExistingMenu(existing, targetSchemeId, targetParentId, source);
+            updateExistingMenuCopy(existing, targetSchemeId, targetParentId, source);
             return;
         }
         Menu target = new Menu();
@@ -131,12 +131,20 @@ public class DefaultTenantMenuProvisioner implements TenantCreationProvisioner {
         menuService.insert(target);
     }
 
-    private void validateExistingMenu(Menu existing, String targetSchemeId, String targetParentId, Menu source) {
+    private void updateExistingMenuCopy(Menu existing, String targetSchemeId, String targetParentId, Menu source) {
         if (!Objects.equals(existing.getSchemeId(), targetSchemeId)
-                || !Objects.equals(existing.getParentId(), targetParentId)
                 || !Objects.equals(existing.getModuleAlias(), source.getModuleAlias())) {
             throw new PlatformException("Default tenant menu identity drift: " + existing.getId());
         }
+        existing.setParentId(targetParentId);
+        existing.setOpenMode(source.getOpenMode());
+        existing.setRoute(source.getRoute());
+        existing.setExternalUrl(source.getExternalUrl());
+        existing.setPageMode(source.getPageMode());
+        existing.setDefaultUiConfigId(source.getDefaultUiConfigId());
+        existing.setDefaultQueryTemplateId(source.getDefaultQueryTemplateId());
+        existing.setEntryParamsJson(source.getEntryParamsJson());
+        menuService.update(existing);
     }
 
     private static String tenantMenuId(String tenantId, String sourceMenuId) {

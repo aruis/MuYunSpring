@@ -25,8 +25,10 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,7 +70,8 @@ class UserAccountServiceContractTest {
         QuerySchema schema = service.querySchema();
 
         assertThat(schema.fields()).extracting(QuerySchema.Field::name)
-                .contains("tenantId", "organizationId", "username", "title", "mobile", "email", "enabled");
+                .contains("tenantId", "organizationId", "username", "title", "mobile", "email", "enabled",
+                        "passwordStatus", "lastLoginAt");
         assertThat(field(schema, "tenantId").operators())
                 .containsExactly(QueryOperator.EQ, QueryOperator.IN, QueryOperator.NULL);
         assertThat(field(schema, "organizationId").operators()).containsExactly(QueryOperator.EQ, QueryOperator.IN);
@@ -95,6 +98,9 @@ class UserAccountServiceContractTest {
         assertThat(user.getAuthUserId()).isEqualTo(user.getId());
         assertThat(user.getAuthOrganizationId()).isEqualTo("org-1");
         assertThat(user.getAuthModuleAlias()).isEqualTo(UserAccountService.MODULE_ALIAS);
+        assertThat(user.getPasswordStatus()).isEqualTo(PasswordStatus.INITIAL);
+        assertThat(user.getPasswordChangedAt()).isNotNull();
+        assertThat(user.getFailedLoginCount()).isZero();
     }
 
     @Test
@@ -111,6 +117,58 @@ class UserAccountServiceContractTest {
         }
 
         assertThat(user.getTitle()).isEqualTo("alice");
+    }
+
+    @Test
+    void shouldValidatePasswordPolicyWhenWritingUserPassword() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        when(dao.insert(any())).thenAnswer(invocation -> {
+            invocation.<UserAccount>getArgument(0).setId("user-2");
+            return "user-2";
+        });
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(
+                List.of(),
+                List.of(user),
+                List.of(user)
+        );
+        when(dao.updateById(any(UserAccount.class))).thenReturn(1);
+        PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            UserAccount created = new UserAccount();
+            created.setUsername("bob");
+            service.createUser(created, "create1");
+            service.changePassword("user-1", "admin2");
+            service.changeOwnPassword("user-1", "admin2", "own3");
+        }
+
+        verify(passwordPolicyRuleService).validatePassword("create1");
+        verify(passwordPolicyRuleService).validatePassword("admin2");
+        verify(passwordPolicyRuleService).validatePassword("own3");
+    }
+
+    @Test
+    void shouldRejectPasswordWhenPolicyRuleFails() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
+        org.mockito.Mockito.doThrow(new net.ximatai.muyun.spring.common.exception.PlatformException("密码必须包含数字"))
+                .when(passwordPolicyRuleService).validatePassword("secret");
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            UserAccount user = new UserAccount();
+            user.setUsername("alice");
+            assertThatThrownBy(() -> service.createUser(user, "secret"))
+                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                    .hasMessageContaining("密码必须包含数字");
+        }
+
+        verify(dao, never()).insert(any());
     }
 
     @Test
@@ -148,6 +206,9 @@ class UserAccountServiceContractTest {
                      ))) {
             assertThat(service.changePassword("user-1", "secret2")).isEqualTo(1);
         }
+
+        assertThat(user.getPasswordStatus()).isEqualTo(PasswordStatus.NORMAL);
+        assertThat(user.getPasswordExpiresAt()).isNull();
 
         verify(dataScope).resolveReadScope(
                 eq(UserAccountService.MODULE_ALIAS),
@@ -208,6 +269,55 @@ class UserAccountServiceContractTest {
         }
 
         verify(dao, never()).updateById(any(UserAccount.class));
+    }
+
+    @Test
+    void shouldResetPasswordWithTemporaryPasswordAndRequiredStatus() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(dao.updateById(any(UserAccount.class))).thenReturn(1);
+        PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            UserAccountService.PasswordResetResult result = service.resetPassword("user-1");
+
+            assertThat(result.count()).isEqualTo(1);
+            assertThat(result.temporaryPassword()).isNotBlank();
+            assertThat(result.expiresAt()).isNotNull();
+            assertThat(passwordHashingService.matches(result.temporaryPassword(), user.getPasswordHash())).isTrue();
+            assertThat(user.getPasswordStatus()).isEqualTo(PasswordStatus.RESET_REQUIRED);
+            assertThat(user.getPasswordExpiresAt()).isEqualTo(result.expiresAt());
+        }
+
+        verify(passwordPolicyRuleService, atLeastOnce()).validatePassword(any());
+    }
+
+    @Test
+    void shouldPreserveSecurityFieldsWhenUpdatingProfile() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount existing = activeUser();
+        existing.setPasswordStatus(PasswordStatus.RESET_REQUIRED);
+        existing.setPasswordChangedAt(java.time.Instant.parse("2026-07-01T00:00:00Z"));
+        existing.setPasswordExpiresAt(java.time.Instant.parse("2026-07-02T00:00:00Z"));
+        existing.setFailedLoginCount(3);
+        existing.setLastLoginIp("127.0.0.1");
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserAccount profile = activeUser();
+        profile.setTitle("Alice Updated");
+        profile.setPasswordStatus(PasswordStatus.NORMAL);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
+
+        service.beforeUpdate(profile);
+
+        assertThat(profile.getPasswordStatus()).isEqualTo(PasswordStatus.RESET_REQUIRED);
+        assertThat(profile.getPasswordExpiresAt()).isEqualTo(existing.getPasswordExpiresAt());
+        assertThat(profile.getFailedLoginCount()).isEqualTo(3);
+        assertThat(profile.getLastLoginIp()).isEqualTo("127.0.0.1");
     }
 
     private UserAccount activeUser() {

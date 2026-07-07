@@ -47,9 +47,14 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         QueryAbility<Menu> {
     public static final String MODULE_ALIAS = "platform.menu";
     public static final String ADMIN_PLATFORM_GROUP_ID = "platform.menu.group.platform";
-    public static final String ADMIN_CONFIG_GROUP_ID = "platform.menu.group.config";
+    public static final String ADMIN_MODELING_GROUP_ID = "platform.menu.group.config";
+    public static final String ADMIN_CONFIG_GROUP_ID = ADMIN_MODELING_GROUP_ID;
     public static final String ADMIN_IDENTITY_GROUP_ID = "platform.menu.group.identity";
+    public static final String ADMIN_BUSINESS_SUPPORT_GROUP_ID = "platform.menu.group.business";
+    public static final String ADMIN_SECURITY_AUDIT_GROUP_ID = "platform.menu.group.security";
     public static final String ADMIN_OPS_GROUP_ID = "platform.menu.group.ops";
+    public static final String ADMIN_SETTINGS_GROUP_ID = "platform.menu.group.settings";
+    public static final String ADMIN_SECURITY_SETTINGS_GROUP_ID = ADMIN_SECURITY_AUDIT_GROUP_ID;
 
     private final MenuSchemeService schemeService;
     private final PlatformModuleService moduleService;
@@ -128,9 +133,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     public List<Menu> initialData() {
         return List.of(
                 group(ADMIN_PLATFORM_GROUP_ID, TreeAbility.ROOT_ID, "平台管理", 10),
-                group(ADMIN_CONFIG_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台配置与低代码运维", 10),
+                group(ADMIN_MODELING_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台建模", 10),
                 group(ADMIN_IDENTITY_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "组织与权限", 20),
-                group(ADMIN_OPS_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台运行运维", 30)
+                group(ADMIN_BUSINESS_SUPPORT_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "业务支撑", 30),
+                group(ADMIN_SECURITY_AUDIT_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "安全与审计", 40),
+                group(ADMIN_OPS_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "运行运维", 50),
+                group(ADMIN_SETTINGS_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台设置", 60)
         );
     }
 

@@ -62,9 +62,13 @@ class UserSessionServiceTest {
 
         assertThat(login.tokenType()).isEqualTo("Bearer");
         assertThat(login.issuedAt()).isEqualTo(clock.instant());
-        assertThat(login.currentUser()).isEqualTo(CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1"));
+        assertThat(login.currentUser()).isEqualTo(
+                CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1", true));
+        assertThat(login.passwordChangeRequired()).isTrue();
+        assertThat(login.passwordStatus()).isEqualTo(PasswordStatus.INITIAL);
         assertThat(persistedSession.get().getTenantId()).isEqualTo("tenant-a");
         assertThat(persistedSession.get().getUserId()).isEqualTo("user-1");
+        assertThat(persistedSession.get().getPasswordChangeRequired()).isTrue();
         assertThat(persistedSession.get().getTokenHash()).hasSize(64);
         assertThat(persistedSession.get().getTokenHash()).isNotEqualTo(login.token());
         assertThat(persistedSession.get().getExpiresAt()).isEqualTo(clock.instant().plusSeconds(43_200));
@@ -73,6 +77,8 @@ class UserSessionServiceTest {
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(persistedSession.get()));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
         assertThat(sessionService.currentUser(login.token())).contains(login.currentUser());
+        assertThat(user.getLastLoginAt()).isEqualTo(clock.instant());
+        assertThat(user.getFailedLoginCount()).isZero();
         assertThat(persistedSession.get().getLastSeenAt()).isEqualTo(clock.instant());
         verify(sessionDao).updateByIdAndVersion(persistedSession.get(), 0);
     }
@@ -179,6 +185,49 @@ class UserSessionServiceTest {
         assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "wrong-password"))
                 .isInstanceOf(AuthenticationFailedException.class)
                 .hasMessageContaining("invalid username or password");
+        assertThat(user.getLastFailedLoginAt()).isEqualTo(clock.instant());
+        assertThat(user.getFailedLoginCount()).isEqualTo(1);
+        verify(dao).updateByIdAndVersion(user, 0);
+        verify(sessionDao, never()).insert(any());
+    }
+
+    @Test
+    void shouldReturnPasswordChangeRequiredForInitialPassword() {
+        UserAccount user = activeUser();
+        user.setPasswordStatus(PasswordStatus.INITIAL);
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        captureInsertedSession(sessionDao);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1", "127.0.0.1", "Browser");
+
+        assertThat(login.passwordChangeRequired()).isTrue();
+        assertThat(login.passwordStatus()).isEqualTo(PasswordStatus.INITIAL);
+        assertThat(user.getLastLoginIp()).isEqualTo("127.0.0.1");
+        assertThat(user.getLastLoginUserAgent()).isEqualTo("Browser");
+    }
+
+    @Test
+    void shouldRejectExpiredResetPasswordWithoutIssuingSession() {
+        UserAccount user = activeUser();
+        user.setPasswordStatus(PasswordStatus.RESET_REQUIRED);
+        user.setPasswordExpiresAt(clock.instant().minusSeconds(1));
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "secret1"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("temporary password expired");
+
+        assertThat(user.getLastFailedLoginAt()).isEqualTo(clock.instant());
         verify(sessionDao, never()).insert(any());
     }
 
@@ -238,6 +287,27 @@ class UserSessionServiceTest {
         assertThat(session.getLastSeenAt()).isEqualTo(accessClock.instant());
         assertThat(session.getExpiresAt()).isEqualTo(session.getMaxExpiresAt());
         verify(sessionDao).updateByIdAndVersion(session, 3);
+    }
+
+    @Test
+    void shouldResolveRestrictedCurrentUserFromPasswordChangeRequiredSession() {
+        Clock accessClock = Clock.fixed(Instant.parse("2026-06-20T10:00:00Z"), ZoneOffset.UTC);
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(activeUser()));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-1");
+        session.setPasswordChangeRequired(Boolean.TRUE);
+        session.setIssuedAt(Instant.parse("2026-06-20T00:00:00Z"));
+        session.setLastSeenAt(accessClock.instant());
+        session.setExpiresAt(accessClock.instant().plusSeconds(600));
+        session.setMaxExpiresAt(accessClock.instant().plusSeconds(3600));
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+
+        assertThat(sessionService.currentUser("token-1")).contains(
+                CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1", true));
     }
 
     @Test

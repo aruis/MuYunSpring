@@ -62,6 +62,13 @@ class ActionEndpointAnnotationTest {
         assertThat(endpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
         assertThat(endpoint.dataAuth()).isTrue();
         assertThat(endpoint.recordIdPathVariable()).isEqualTo("id");
+
+        CustomActionEndpoint resetEndpoint = customEndpoint(UserAccountWebController.class, "resetPassword",
+                String.class);
+        assertThat(resetEndpoint.value()).isEqualTo("resetPassword");
+        assertThat(resetEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(resetEndpoint.dataAuth()).isTrue();
+        assertThat(resetEndpoint.recordIdPathVariable()).isEqualTo("id");
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {

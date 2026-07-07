@@ -39,6 +39,7 @@ import {
 } from '@muyun/vue-ui-antdv';
 import type {
   Organization,
+  ResetPasswordResponse,
   Tenant,
   UserAccount,
   WebCountResponse,
@@ -80,6 +81,7 @@ const savingUser = ref(false);
 const userDetailRequestSeq = ref(0);
 const userDraft = ref<Partial<UserAccount>>(createUserDraft(undefined, undefined));
 const passwordDraft = ref('');
+const resetPasswordResult = ref<ResetPasswordResponse>();
 const userFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
@@ -176,6 +178,13 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
         actionCode: 'changePassword',
         title: '修改密码',
         iconName: 'lock',
+        disabled: savingUser.value,
+      },
+      {
+        key: 'resetGeneratedPassword',
+        actionCode: 'resetPassword',
+        title: '重置密码',
+        iconName: 'reload',
         disabled: savingUser.value,
       },
       {
@@ -385,6 +394,7 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
   selectedUser.value = undefined;
   userDraft.value = copyUser(record as UserAccount);
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   loadingUserDetail.value = true;
   userDetailLoadFailed.value = false;
   const requestSeq = userDetailRequestSeq.value + 1;
@@ -417,6 +427,7 @@ function closeUserDetail() {
   userDetailOpen.value = false;
   userDetailMode.value = 'view';
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   userDraft.value = selectedUser.value
     ? copyUser(selectedUser.value)
     : createUserDraft(selectedTenant.value, selectedOrganization.value);
@@ -432,6 +443,7 @@ function cancelUserDetail() {
   }
   userDraft.value = copyUser(selectedUser.value);
   passwordDraft.value = '';
+  resetPasswordResult.value = undefined;
   userDetailMode.value = 'view';
   loadingUserDetail.value = false;
   userDetailLoadFailed.value = false;
@@ -456,7 +468,12 @@ function handleUserDetailAction(action: RecordActionItem) {
   }
   if (action.key === 'resetPassword' && selectedUser.value) {
     passwordDraft.value = '';
+    resetPasswordResult.value = undefined;
     userDetailMode.value = 'resetPassword';
+    return;
+  }
+  if (action.key === 'resetGeneratedPassword' && selectedUser.value) {
+    void resetUserLoginPassword();
     return;
   }
   if (action.key === 'delete') {
@@ -522,6 +539,27 @@ async function resetUserPassword() {
     onExecuted: async (_, user) => {
       const refreshed = await userContext.crud.view(user.id!);
       commitUserDetailRecord(refreshed);
+      userReloadKey.value += 1;
+    },
+  });
+}
+
+async function resetUserLoginPassword() {
+  await executeStaticRecordAction<UserAccount, ResetPasswordResponse>({
+    loading: savingUser,
+    source: 'user-management',
+    record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
+    canExecute: () => userContext.can('resetPassword') === true,
+    deniedMessage: '当前用户无权重置用户密码',
+    execute: (user) =>
+      userContext.http.request<ResetPasswordResponse>({
+        method: 'POST',
+        path: `/iam.user/resetPassword/${encodeURIComponent(user.id!)}`,
+      }),
+    onExecuted: async (result, user) => {
+      const refreshed = await userContext.crud.view(user.id!);
+      commitUserDetailRecord(refreshed);
+      resetPasswordResult.value = result;
       userReloadKey.value += 1;
     },
   });
@@ -860,6 +898,14 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
           :fallback="userFormFieldFallback"
           :display-of="userDetailDisplayValue"
         />
+        <div
+          v-if="userDetailMode === 'view' && resetPasswordResult?.temporaryPassword"
+          class="user-password-reset-result"
+        >
+          <span>临时密码</span>
+          <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
+          <small v-if="resetPasswordResult.expiresAt">有效期至 {{ resetPasswordResult.expiresAt }}</small>
+        </div>
 
         <form v-else class="user-form" @submit.prevent="saveUser">
           <label>
@@ -948,6 +994,22 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.user-password-reset-result {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--muyun-border);
+  border-radius: 8px;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 13px;
+}
+
+.user-password-reset-result small {
+  color: var(--muyun-text-muted);
 }
 
 .user-detail-state {

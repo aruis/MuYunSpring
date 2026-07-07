@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.code.CodeSequenceStateWebController;
 import net.ximatai.muyun.spring.boot.iam.DepartmentWebController;
 import net.ximatai.muyun.spring.boot.iam.EmployeeWebController;
 import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
+import net.ximatai.muyun.spring.boot.iam.PasswordPolicyRuleWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionCategoryWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
@@ -81,6 +82,7 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
             context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
             context.registerBean(SystemUserAccountWebController.class);
+            context.registerBean(PasswordPolicyRuleWebController.class);
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -90,7 +92,8 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
                     "iam.tenant", "iam.organization", "iam.department", "iam.employee",
-                    "iam.position_category", "iam.role", "iam.user", "iam.system_user");
+                    "iam.position_category", "iam.role", "iam.user", "iam.system_user",
+                    "iam.password_policy_rule");
             assertThat(byAlias.get("iam.tenant")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("租户管理");
@@ -249,7 +252,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("用户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "userSelector", "changePassword");
+                                "sort", "enable", "disable", "userSelector", "changePassword", "resetPassword");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("userSelector"))
                         .singleElement()
                         .satisfies(action -> {
@@ -263,6 +266,12 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.title()).isEqualTo("修改密码");
                             assertThat(action.dataAuth()).isTrue();
                         });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("resetPassword"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("重置密码");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
             });
             assertThat(byAlias.get("iam.system_user")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
@@ -272,6 +281,14 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.entryRoute()).isEqualTo("/iam/system-users");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactly("menu");
+            });
+            assertThat(byAlias.get("iam.password_policy_rule")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.moduleAlias()).isEqualTo("iam.password_policy_rule");
+                assertThat(definition.title()).isEqualTo("密码策略规则");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactly("menu", "create", "view", "update", "delete", "query",
+                                "sort", "enable", "disable");
             });
         }
     }

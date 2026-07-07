@@ -36,6 +36,35 @@ test('auth logout posts bearer token to backend logout endpoint', async () => {
   }
 });
 
+test('auth change own password posts bearer token to backend endpoint', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push(new Request(input, init));
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    const authClient = createAuthClient(createHttpClient({ baseUrl: 'http://api.local' }));
+
+    await authClient.changeOwnPassword(
+      { currentPassword: 'old-secret', newPassword: 'new-secret' },
+      'token-1',
+    );
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'http://api.local/iam.auth/changeOwnPassword');
+    assert.equal(requests[0].method, 'POST');
+    assert.equal(requests[0].headers.get('Authorization'), 'Bearer token-1');
+    assert.deepEqual(await requests[0].json(), {
+      currentPassword: 'old-secret',
+      newPassword: 'new-secret',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('http client sends platform trace header', async () => {
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;

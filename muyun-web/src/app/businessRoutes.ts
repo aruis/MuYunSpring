@@ -6,6 +6,7 @@ import DictionaryManagementView from '../views/DictionaryManagementView.vue';
 import EmployeeManagementView from '../views/EmployeeManagementView.vue';
 import MenuManagementView from '../views/MenuManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
+import PasswordManagementView from '../views/PasswordManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
 import RoleManagementView from '../views/RoleManagementView.vue';
 import SystemUserManagementView from '../views/SystemUserManagementView.vue';
@@ -33,6 +34,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/config/menus',
     moduleAlias: 'platform.menu_scheme',
     component: MenuManagementView,
+  },
+  {
+    route: '/platform/security/passwords',
+    moduleAlias: 'iam.password_policy_rule',
+    component: PasswordManagementView,
   },
   {
     route: '/iam/tenants',
