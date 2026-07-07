@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
@@ -15,7 +16,6 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
@@ -371,16 +371,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     private <T> T roleRecordScope(String roleId, Supplier<T> action) {
-        if (!TenantContext.isSystem()) {
-            return webScope(action);
-        }
-        Optional<String> tenantId = tenantIdForExistingRecord(roleId);
-        if (tenantId.isEmpty()) {
-            return webScope(action);
-        }
-        try (TenantContext.Scope ignored = TenantContext.use(tenantId.get())) {
-            return webScope(action);
-        }
+        return MutationTenantScopeExecutor.forExistingRecord(this, roleId, () -> webScope(action));
     }
 
     private List<Menu> flattenMenus(List<Menu> menus) {

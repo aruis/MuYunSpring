@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.ResolvableType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,8 +33,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Supplier;
 
 public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         extends ScopedWeb<S>, RecordLabelWeb<T> {
@@ -190,7 +187,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     default WebRecordResponse<T> insert(@RequestBody T record) {
-        return mutationTenantScope(mutationTenantIdForCreate(record), () -> webScope(() -> {
+        return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
             return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
@@ -201,7 +198,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.UPDATE)
     default WebRecordResponse<T> update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
-        return mutationTenantScope(mutationTenantIdForUpdate(id, record), () -> webScope(() -> {
+        return MutationTenantScopeExecutor.forUpdate(this, id, record, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
             T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
@@ -212,56 +209,11 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     default WebCountResponse delete(@PathVariable String id) {
-        return mutationTenantScope(mutationTenantIdForExistingRecord(id), () -> webScope(() -> {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
             T record = service().select(id);
             return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
         }));
-    }
-
-    private Optional<String> mutationTenantIdForCreate(T record) {
-        if (!TenantContext.isSystem()) {
-            return Optional.empty();
-        }
-        if (!(this instanceof MutationTenantScopeResolver<?> resolver)) {
-            return Optional.empty();
-        }
-        @SuppressWarnings("unchecked")
-        MutationTenantScopeResolver<T> typed = (MutationTenantScopeResolver<T>) resolver;
-        return typed.tenantIdForCreate(record);
-    }
-
-    private Optional<String> mutationTenantIdForUpdate(String id, T record) {
-        if (!TenantContext.isSystem()) {
-            return Optional.empty();
-        }
-        if (!(this instanceof MutationTenantScopeResolver<?> resolver)) {
-            return Optional.empty();
-        }
-        @SuppressWarnings("unchecked")
-        MutationTenantScopeResolver<T> typed = (MutationTenantScopeResolver<T>) resolver;
-        return typed.tenantIdForUpdate(id, record);
-    }
-
-    private Optional<String> mutationTenantIdForExistingRecord(String id) {
-        if (!TenantContext.isSystem()) {
-            return Optional.empty();
-        }
-        if (!(this instanceof MutationTenantScopeResolver<?> resolver)) {
-            return Optional.empty();
-        }
-        @SuppressWarnings("unchecked")
-        MutationTenantScopeResolver<T> typed = (MutationTenantScopeResolver<T>) resolver;
-        return typed.tenantIdForExistingRecord(id);
-    }
-
-    private <R> R mutationTenantScope(Optional<String> tenantId, Supplier<R> action) {
-        if (!TenantContext.isSystem() || tenantId.isEmpty()) {
-            return action.get();
-        }
-        try (TenantContext.Scope ignored = TenantContext.use(tenantId.get())) {
-            return action.get();
-        }
     }
 
     private T selectForAction(PlatformAction action, String id) {
