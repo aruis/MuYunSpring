@@ -55,6 +55,19 @@ public class StaticRecordReadProjectionService {
         return projectResponse(response, projection);
     }
 
+    public boolean supportsDefaultListQuery(String moduleAlias, Object recordService) {
+        if (projectionQueryExecutor == null) {
+            return false;
+        }
+        StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
+        if (definition == null || definition.projectionJoins().isEmpty()) {
+            return false;
+        }
+        return defaultListProjection(moduleAlias, recordService)
+                .filter(projection -> projection.postReadTransforms().isEmpty())
+                .isPresent();
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> Optional<WebPageResponse<T>> queryDefaultList(String moduleAlias,
                                                             Criteria criteria,

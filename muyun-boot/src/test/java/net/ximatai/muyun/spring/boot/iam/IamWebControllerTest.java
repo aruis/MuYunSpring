@@ -1098,6 +1098,7 @@ class IamWebControllerTest {
                 .addFilters(new CurrentUserWebFilter(() ->
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
+        when(projectionService.supportsDefaultListQuery(any(), any())).thenReturn(true);
         when(projectionService.queryDefaultList(
                 any(),
                 any(Criteria.class),

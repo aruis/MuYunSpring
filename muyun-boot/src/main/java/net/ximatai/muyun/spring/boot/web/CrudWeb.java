@@ -181,6 +181,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         if (projectionService == null || !(this instanceof StaticModuleUiContributor contributor)) {
             return java.util.Optional.empty();
         }
+        String moduleAlias = contributor.moduleUiDefinition().moduleAlias();
+        if (!projectionService.supportsDefaultListQuery(moduleAlias, service())) {
+            return java.util.Optional.empty();
+        }
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
         Criteria criteria = queryCriteria(request);
@@ -191,7 +195,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             Criteria activeCriteria = service().activeCriteria(scope.criteria());
             return dataScopeAbility.withDataScopeTenant(scope,
                     () -> projectionService.queryDefaultList(
-                            contributor.moduleUiDefinition().moduleAlias(),
+                            moduleAlias,
                             activeCriteria,
                             pageRequest,
                             service(),
@@ -200,7 +204,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         }
         Criteria activeCriteria = service().activeCriteria(criteria);
         return projectionService.queryDefaultList(
-                contributor.moduleUiDefinition().moduleAlias(),
+                moduleAlias,
                 activeCriteria,
                 pageRequest,
                 service(),
