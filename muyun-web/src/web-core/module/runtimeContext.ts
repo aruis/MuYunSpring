@@ -20,6 +20,28 @@ export interface ModuleRuntimeAction {
   authorizationDecision?: string;
 }
 
+export interface ModuleActionState {
+  actionCode: string;
+  available: boolean;
+  reason?: string;
+  authorized?: boolean;
+  recordId?: string;
+  definition?: ModuleRuntimeAction;
+  actionLevel?: ModuleRuntimeAction['actionLevel'];
+  title?: string;
+}
+
+export interface ModuleRecordActionAvailability {
+  recordId: string;
+  actions: ModuleRecordActionDecision[];
+}
+
+export interface ModuleRecordActionDecision {
+  actionCode: string;
+  available: boolean;
+  reason?: string;
+}
+
 export interface ModuleRuntimeContext {
   moduleAlias: string;
   title?: string;
@@ -40,8 +62,11 @@ export interface ModuleRuntimeContextState {
   snapshot(): ModuleRuntimeContext | undefined;
   error(): AppError | undefined;
   hasAbility(ability: ModuleAbilityCode | string): boolean | undefined;
-  action(actionCode: string): ModuleRuntimeAction | undefined;
-  can(actionCode: string): boolean | undefined;
+  action(actionCode: string, recordId?: string): ModuleActionState | undefined;
+  runtimeAction(actionCode: string): ModuleRuntimeAction | undefined;
+  can(actionCode: string, recordId?: string): boolean | undefined;
+  recordActions(recordId: string): Promise<ModuleRecordActionAvailability>;
+  recordActionsSnapshot(recordId: string): ModuleRecordActionAvailability | undefined;
 }
 
 export function createModuleRuntimeContextState(
@@ -50,6 +75,8 @@ export function createModuleRuntimeContextState(
 ): ModuleRuntimeContextState {
   const current = shallowRef<ModuleRuntimeContext>();
   const currentError = shallowRef<AppError>();
+  const recordActionSnapshots = shallowRef(new Map<string, ModuleRecordActionAvailability>());
+  const recordActionLoading = new Map<string, Promise<ModuleRecordActionAvailability>>();
   let loading: Promise<ModuleRuntimeContext> | undefined;
   const load = () => {
     loading ??= http
@@ -68,6 +95,30 @@ export function createModuleRuntimeContextState(
       });
     return loading;
   };
+  const recordActions = (recordId: string) => {
+    const normalizedRecordId = requireRecordId(recordId);
+    const existing = recordActionLoading.get(normalizedRecordId);
+    if (existing) {
+      return existing;
+    }
+    const request = http
+      .request<ModuleRecordActionAvailability>({
+        path: `/${encodeURIComponent(moduleAlias)}/actions/${encodeURIComponent(normalizedRecordId)}`,
+      })
+      .then((availability) => {
+        const next = new Map(recordActionSnapshots.value);
+        next.set(normalizedRecordId, availability);
+        recordActionSnapshots.value = next;
+        recordActionLoading.delete(normalizedRecordId);
+        return availability;
+      })
+      .catch((cause) => {
+        recordActionLoading.delete(normalizedRecordId);
+        throw cause;
+      });
+    recordActionLoading.set(normalizedRecordId, request);
+    return request;
+  };
   const ready = load();
   ready.catch(() => {
     // Keep background context loading from becoming an unhandled rejection.
@@ -84,9 +135,15 @@ export function createModuleRuntimeContextState(
       }
       return runtimeAbilityCodes(context).includes(ability);
     },
-    action: (actionCode) => current.value?.actions.find((action) => action.actionCode === actionCode),
-    can: (actionCode) =>
-      current.value?.actions.find((action) => action.actionCode === actionCode)?.authorized,
+    action: (actionCode, recordId) =>
+      actionState(current.value, recordActionSnapshots.value, actionCode, recordId),
+    runtimeAction: (actionCode) => runtimeAction(current.value, actionCode),
+    can: (actionCode, recordId) => {
+      return actionState(current.value, recordActionSnapshots.value, actionCode, recordId)?.available;
+    },
+    recordActions,
+    recordActionsSnapshot: (recordId) =>
+      recordId == null || !recordId.trim() ? undefined : recordActionSnapshots.value.get(recordId.trim()),
   };
 }
 
@@ -104,6 +161,69 @@ function runtimeAbilityCodes(context: ModuleRuntimeContext): string[] {
   return context.abilities ?? context.capabilities.map(abilityCodeOfCapability);
 }
 
+function actionState(
+  context: ModuleRuntimeContext | undefined,
+  records: Map<string, ModuleRecordActionAvailability>,
+  actionCode: string,
+  recordId?: string,
+): ModuleActionState | undefined {
+  const normalizedActionCode = requireActionCode(actionCode);
+  const definition = runtimeAction(context, normalizedActionCode);
+  const normalizedRecordId = recordId == null || !recordId.trim() ? undefined : recordId.trim();
+  if (normalizedRecordId) {
+    if (!definition) {
+      return undefined;
+    }
+    const recordDecision = records
+      .get(normalizedRecordId)
+      ?.actions.find((action) => action.actionCode === normalizedActionCode);
+    if (!recordDecision) {
+      return undefined;
+    }
+    return {
+      actionCode: normalizedActionCode,
+      available: recordDecision.available,
+      reason: recordDecision.reason,
+      authorized: definition?.authorized,
+      recordId: normalizedRecordId,
+      definition,
+      actionLevel: definition?.actionLevel,
+      title: definition?.title,
+    };
+  }
+  if (!definition) {
+    return undefined;
+  }
+  return {
+    actionCode: normalizedActionCode,
+    available: definition.authorized,
+    reason: definition.authorized ? undefined : definition.authorizationDecision,
+    authorized: definition.authorized,
+    definition,
+    actionLevel: definition.actionLevel,
+    title: definition.title,
+  };
+}
+
+function runtimeAction(context: ModuleRuntimeContext | undefined, actionCode: string) {
+  const normalizedActionCode = requireActionCode(actionCode);
+  return context?.actions.find((action) => action.actionCode === normalizedActionCode);
+}
+
 function abilityCodeOfCapability(capability: string) {
   return capability.toLowerCase().replace(/_([a-z])/g, (_match, char: string) => char.toUpperCase());
+}
+
+function requireRecordId(recordId: string) {
+  if (recordId == null || !recordId.trim()) {
+    throw new Error('recordId must not be blank');
+  }
+  return recordId.trim();
+}
+
+function requireActionCode(actionCode: string) {
+  if (actionCode == null || !actionCode.trim()) {
+    throw new Error('actionCode must not be blank');
+  }
+  return actionCode.trim();
 }

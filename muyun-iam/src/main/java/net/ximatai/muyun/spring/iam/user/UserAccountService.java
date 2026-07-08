@@ -21,12 +21,16 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.RecordActionAvailabilityContributor;
+import net.ximatai.muyun.spring.common.platform.RecordActionAvailabilityDecision;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -45,7 +49,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         ReferenceAbility<UserAccount>,
         DataScopeAbility<UserAccount>,
         InitialDataAbility<UserAccount>,
-        QueryAbility<UserAccount> {
+        QueryAbility<UserAccount>,
+        RecordActionAvailabilityContributor {
     public static final String MODULE_ALIAS = "iam.user";
     public static final String PLATFORM_SUPER_ADMIN_USER_ID = "platform.user.super_admin";
     public static final String PLATFORM_SUPER_ADMIN_USERNAME = "admin";
@@ -140,6 +145,20 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     @Override
+    public Optional<RecordActionAvailabilityDecision> availability(String moduleAlias,
+                                                                  String actionCode,
+                                                                  String recordId) {
+        if (!MODULE_ALIAS.equals(moduleAlias)
+                || (!"changePassword".equals(actionCode) && !"resetPassword".equals(actionCode))) {
+            return Optional.empty();
+        }
+        return CurrentUserContext.currentUser()
+                .filter(currentUser -> currentUser.userId().equals(recordId))
+                .map(currentUser -> RecordActionAvailabilityDecision.unavailable(
+                        "cannot administrate current user's password"));
+    }
+
+    @Override
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptor.builder(MODULE_ALIAS)
                 .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
@@ -221,8 +240,20 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         return insert(user);
     }
 
+    public UserAccount selectForView(String userId) {
+        String validUserId = Preconditions.requireText(userId, "userId");
+        if (TenantContext.isSystem()) {
+            UserAccount systemUser = selectSystemUser(validUserId);
+            if (systemUser != null) {
+                return systemUser;
+            }
+        }
+        return DataScopeAbility.super.selectForAction(PlatformAction.VIEW, validUserId);
+    }
+
     public int changePassword(String userId, String newPassword) {
         String validUserId = Preconditions.requireText(userId, "userId");
+        rejectCurrentUserPasswordAdministration(validUserId);
         requireRecordScope(currentRecordMutationPolicy(), List.of(validUserId));
         UserAccount user = requireEnabled(validUserId,
                 "user is not active: " + userId);
@@ -236,6 +267,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
 
     public PasswordResetResult resetPassword(String userId) {
         String validUserId = Preconditions.requireText(userId, "userId");
+        rejectCurrentUserPasswordAdministration(validUserId);
         requireRecordScope(resetPasswordPolicy(), List.of(validUserId));
         UserAccount user = requireEnabled(validUserId,
                 "user is not active: " + userId);
@@ -339,6 +371,22 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                         .eq("username", user.getUsername())
                         .eqNullable("tenantId", user.getTenantId()),
                 "username must be unique within tenant: " + user.getUsername());
+    }
+
+    private UserAccount selectSystemUser(String userId) {
+        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("system user account view")) {
+            UserAccount user = select(userId);
+            return user != null && normalizeBlank(user.getTenantId()) == null ? user : null;
+        }
+    }
+
+    private void rejectCurrentUserPasswordAdministration(String userId) {
+        CurrentUserContext.currentUser()
+                .filter(currentUser -> currentUser.userId().equals(userId))
+                .ifPresent(currentUser -> {
+                    throw new PlatformException(
+                            "cannot administrate current user's password; use change own password");
+                });
     }
 
     private String requireUsername(String username) {

@@ -35,7 +35,7 @@ const emit = defineEmits<{
 }>();
 
 const action = computed(() => props.context.action(props.actionCode));
-const authorized = computed(() => props.context.can(props.actionCode) === true);
+const authorized = computed(() => action.value?.available === true);
 const buttonDisabled = computed(() => props.loading || props.disabled || !authorized.value);
 const buttonTitle = computed(() => props.title ?? action.value?.title);
 

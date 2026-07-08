@@ -98,6 +98,7 @@ class IamWebControllerTest {
 
     @BeforeEach
     void setUp() {
+        objectMapper.findAndRegisterModules();
         objectMapper.registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
         currentUser = null;
         tenantDao = mock(TenantDao.class);
@@ -649,6 +650,52 @@ class IamWebControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void shouldViewSystemUserThroughSystemScope() throws Exception {
+        currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
+        UserAccount admin = user(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin",
+                UserAccountService.PLATFORM_SUPER_ADMIN_USER_TITLE);
+        admin.setTenantId(null);
+        admin.setPasswordHash(new PasswordHashingService().hash("admin123"));
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(admin));
+
+        mvc.perform(get("/iam.user/view/{id}", UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID))
+                .andExpect(jsonPath("$.username").value("admin"))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void shouldRejectResettingCurrentUserPassword() throws Exception {
+        currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
+
+        mvc.perform(post("/iam.user/resetPassword/{id}", UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("cannot administrate current user's password; use change own password"));
+
+        verify(userAccountDao, never()).updateById(any(UserAccount.class));
+    }
+
+    @Test
+    void shouldRejectChangingCurrentUserPasswordThroughAdministrationEndpoint() throws Exception {
+        currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
+
+        mvc.perform(post("/iam.user/changePassword/{id}", UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID)
+                        .contentType("application/json")
+                        .content("""
+                                {"password":"new-secret"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("cannot administrate current user's password; use change own password"));
+
+        verify(userAccountDao, never()).updateById(any(UserAccount.class));
     }
 
     @Test

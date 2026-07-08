@@ -3,6 +3,8 @@ import type { HttpClient } from '../http';
 import { createModuleAbilities, type ModuleAbilities } from './abilities';
 import {
   createModuleRuntimeContextState,
+  type ModuleActionState,
+  type ModuleRecordActionAvailability,
   type ModuleRuntimeAction,
   type ModuleRuntimeContextState,
 } from './runtimeContext';
@@ -20,8 +22,11 @@ export interface ModuleContext<TRecord> {
   crud: StaticModuleCrudClient<TRecord>;
   runtime: ModuleRuntimeContextState;
   abilities: ModuleAbilities<TRecord>;
-  action(actionCode: string): ModuleRuntimeAction | undefined;
-  can(actionCode: string): boolean | undefined;
+  action(actionCode: string, recordId?: string): ModuleActionState | undefined;
+  runtimeAction(actionCode: string): ModuleRuntimeAction | undefined;
+  can(actionCode: string, recordId?: string): boolean | undefined;
+  recordActions(recordId: string): Promise<ModuleRecordActionAvailability>;
+  recordActionsSnapshot(recordId: string): ModuleRecordActionAvailability | undefined;
 }
 
 export interface ModuleTreeContext<TRecord> extends ModuleContext<TRecord> {
@@ -133,7 +138,10 @@ function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): Module
     runtime,
     abilities: createModuleAbilities(moduleAlias, runtime, { crud, tree, enable }),
     action: runtime.action,
+    runtimeAction: runtime.runtimeAction,
     can: runtime.can,
+    recordActions: runtime.recordActions,
+    recordActionsSnapshot: runtime.recordActionsSnapshot,
   };
 }
 

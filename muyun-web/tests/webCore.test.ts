@@ -143,7 +143,19 @@ test('module context creates standard CRUD capabilities from configured http fac
     const request = new Request(input, init);
     requests.push(request);
     if (request.url.endsWith('/context')) {
-      return Response.json(runtimeContext());
+      return Response.json({
+        ...runtimeContext(),
+        moduleAlias: 'iam.user',
+        actions: [
+          ...runtimeContext().actions,
+          {
+            actionCode: 'resetPassword',
+            permissionActionCode: 'resetPassword',
+            title: 'Reset Password',
+            authorized: true,
+          },
+        ],
+      });
     }
     return Response.json({ records: [] });
   };
@@ -164,6 +176,8 @@ test('module context creates standard CRUD capabilities from configured http fac
     assert.equal(requests[1].method, 'POST');
     assert.deepEqual(await requests[1].json(), { keyword: '总部' });
     assert.equal(context.runtime.can('update'), true);
+    assert.equal(context.runtime.action('update')?.available, true);
+    assert.equal(context.runtime.action('update')?.title, 'Update');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -187,6 +201,109 @@ test('module runtime authorization updates Vue computed state after context load
     await nextTick();
 
     assert.equal(canCreate.value, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module context resolves record action availability by record id', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/context')) {
+      return Response.json({
+        ...runtimeContext(),
+        actions: [
+          ...runtimeContext().actions,
+          {
+            actionCode: 'resetPassword',
+            permissionActionCode: 'resetPassword',
+            title: 'Reset Password',
+            authorized: true,
+          },
+        ],
+      });
+    }
+    return Response.json({
+      recordId: 'platform.user.super_admin',
+      actions: [
+        { actionCode: 'update', available: true },
+        {
+          actionCode: 'resetPassword',
+          available: false,
+          reason: "cannot administrate current user's password",
+        },
+      ],
+    });
+  };
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleContext({ moduleAlias: 'iam.user' });
+
+    await context.runtime.ready;
+
+    assert.equal(context.can('update'), true);
+    assert.equal(context.action('update')?.available, true);
+    assert.equal(context.can('resetPassword', 'platform.user.super_admin'), undefined);
+    assert.equal(context.action('resetPassword', 'platform.user.super_admin'), undefined);
+
+    const availability = await context.recordActions('platform.user.super_admin');
+
+    assert.equal(requests[1].url, 'http://api.local/iam.user/actions/platform.user.super_admin');
+    assert.equal(availability.recordId, 'platform.user.super_admin');
+    assert.equal(context.can('update', 'platform.user.super_admin'), true);
+    assert.equal(context.action('update', 'platform.user.super_admin')?.available, true);
+    assert.equal(context.can('resetPassword', 'platform.user.super_admin'), false);
+    assert.deepEqual(
+      {
+        available: context.action('resetPassword', 'platform.user.super_admin')?.available,
+        reason: context.action('resetPassword', 'platform.user.super_admin')?.reason,
+      },
+      {
+        available: false,
+        reason: "cannot administrate current user's password",
+      },
+    );
+    assert.equal(
+      context.recordActionsSnapshot('platform.user.super_admin')?.actions[1]?.reason,
+      "cannot administrate current user's password",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module context ignores record action decisions without runtime definition', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    if (request.url.endsWith('/context')) {
+      return Response.json(runtimeContext());
+    }
+    return Response.json({
+      recordId: 'org-1',
+      actions: [{ actionCode: 'ghost', available: true }],
+    });
+  };
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleContext({ moduleAlias: 'iam.organization' });
+
+    await context.runtime.ready;
+    await context.recordActions('org-1');
+
+    assert.equal(context.can('ghost', 'org-1'), undefined);
+    assert.equal(context.action('ghost', 'org-1'), undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -781,8 +781,9 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /temporaryPassword/);
   assert.match(
     userViewSource,
-    /userDetailMode\.value === 'resetPassword'[\s\S]*userContext\.can\('changePassword'\)/,
+    /userDetailMode\.value === 'resetPassword'[\s\S]*const userId = selectedUser\.value\?\.id[\s\S]*userContext\.can\('changePassword', userId\)/,
   );
+  assert.match(userViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /type="password"/);
@@ -836,6 +837,7 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /actionCode: 'update'/);
   assert.match(systemUserViewSource, /actionCode: 'changePassword'/);
   assert.match(systemUserViewSource, /actionCode: 'resetPassword'/);
+  assert.match(systemUserViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(systemUserViewSource, /title: '修改密码'/);
   assert.match(systemUserViewSource, /title: '重置密码'/);
   assert.match(systemUserViewSource, /temporaryPassword/);

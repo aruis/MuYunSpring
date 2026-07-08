@@ -17,25 +17,29 @@ export interface ResolvedRecordActionItem extends RecordActionItem {
   key: string;
   actionCode?: string;
   authorized: boolean;
+  reason?: string;
   disabled: boolean;
   loading: boolean;
 }
 
 export function resolveRecordActions(
-  context: Pick<ModuleContext<unknown>, 'can'>,
+  context: Pick<ModuleContext<unknown>, 'action'>,
   actions: RecordActionItem[],
   defaultLoading = false,
+  recordId?: string,
 ): ResolvedRecordActionItem[] {
   return actions
     .filter((action) => action.visible !== false)
     .map((action, index) => {
-      const authorized = action.actionCode ? context.can(action.actionCode) === true : true;
+      const actionState = action.actionCode ? context.action(action.actionCode, recordId) : undefined;
+      const authorized = action.actionCode ? actionState?.available === true : true;
       const loading = action.loading ?? defaultLoading;
       return {
         ...action,
         key: action.key ?? action.actionCode ?? `action-${index}`,
         iconName: action.iconName ?? defaultActionIcon(action),
         authorized,
+        reason: actionState?.reason,
         disabled: loading || action.disabled === true || !authorized,
         loading,
       };

@@ -11,6 +11,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.boot.platform.PlatformModuleRuntimeActionWebController;
+import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailability;
+import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
@@ -41,7 +44,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = DynamicRecordWebController.class)
+@WebMvcTest(controllers = {
+        DynamicRecordWebController.class,
+        PlatformModuleRuntimeActionWebController.class
+})
 @Import({
         DynamicRecordWebControllerIT.StaticContractController.class,
         CurrentUserWebFilter.class,
@@ -61,6 +67,9 @@ class DynamicRecordWebControllerIT {
 
     @MockitoBean
     private ActiveTenantVerifier activeTenantVerifier;
+
+    @MockitoBean
+    private PlatformRecordActionAvailabilityService recordActionAvailabilityService;
 
     @Autowired
     DynamicRecordWebControllerIT(MockMvc mvc) {
@@ -104,19 +113,20 @@ class DynamicRecordWebControllerIT {
     }
 
     @Test
-    void shouldRouteRecordActionAvailabilityBeforeGenericActionPath() throws Exception {
-        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
-        record.setId("contract-1");
-        when(recordService.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(recordService.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
-        when(recordService.actions(MODULE)).thenReturn(List.of(action("submit", EntityActionLevel.RECORD)));
-        when(recordService.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
-                .thenReturn(DynamicActionAvailability.available("submit"));
+    void shouldRouteRecordActionAvailabilityThroughPlatformRuntimeActionController() throws Exception {
+        when(recordActionAvailabilityService.recordActions(MODULE, "contract-1"))
+                .thenReturn(new PlatformRecordActionAvailability(
+                        "contract-1",
+                        List.of(new PlatformRecordActionAvailability.Action("submit", true, null))
+                ));
 
         mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].action.code").value("submit"))
-                .andExpect(jsonPath("$[0].available").value(true));
+                .andExpect(jsonPath("$.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.actions[0].actionCode").value("submit"))
+                .andExpect(jsonPath("$.actions[0].available").value(true));
+
+        verifyNoInteractions(recordService);
     }
 
     @Test

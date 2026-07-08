@@ -2138,9 +2138,6 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[1].code").value("archive"))
                 .andExpect(jsonPath("$[2]").doesNotExist());
 
-        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").doesNotExist());
     }
 
     @Test
@@ -2325,45 +2322,6 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: ENABLE"));
-    }
-
-    @Test
-    void shouldExposeRecordActionAvailabilityWithoutListAndBatchActions() throws Exception {
-        DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
-        DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
-        DynamicActionDescriptor preview = action("preview", EntityActionLevel.ANY);
-        DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
-        DynamicRecord existing = new DynamicRecord(entity()).setValue("code", "C-001");
-        existing.setId("contract-1");
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(existing);
-        when(service.actions(MODULE)).thenReturn(List.of(export, submit, preview, archive));
-        when(service.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
-                .thenReturn(DynamicActionAvailability.unavailable("submit", "只有草稿合同可以提交"));
-        when(service.actionAvailability(eq(MODULE), eq("preview"), any(DynamicRecord.class)))
-                .thenReturn(DynamicActionAvailability.available("preview"));
-
-        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].action.code").value("submit"))
-                .andExpect(jsonPath("$[0].available").value(false))
-                .andExpect(jsonPath("$[0].message").value("只有草稿合同可以提交"))
-                .andExpect(jsonPath("$[1].action.code").value("preview"))
-                .andExpect(jsonPath("$[1].available").value(true))
-                .andExpect(jsonPath("$[2]").doesNotExist());
-
-        ArgumentCaptor<DynamicRecord> record = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(service).actionAvailability(eq(MODULE), eq("submit"), record.capture());
-        assertThat(record.getValue().getId()).isEqualTo("contract-1");
-    }
-
-    @Test
-    void shouldRejectRecordActionAvailabilityWhenRecordDoesNotExist() throws Exception {
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-
-        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "missing"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic record does not exist: missing"));
     }
 
     @Test
@@ -2770,15 +2728,6 @@ class DynamicRecordWebControllerTest {
                         .content(json(Map.of("ids", List.of("contract-1")))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic action does not support batch path: publish"));
-    }
-
-    @Test
-    void shouldTreatActionsPathAsRecordActionQueryInsteadOfExecution() throws Exception {
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-
-        mvc.perform(get("/{moduleAlias}/actions/{actionCode}", MODULE, "submit"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic record does not exist: submit"));
     }
 
     @Test
