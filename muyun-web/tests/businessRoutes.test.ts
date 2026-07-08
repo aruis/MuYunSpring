@@ -87,6 +87,18 @@ test('static business route registry resolves password management module route',
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 
+test('static business route registry resolves password management URL under platform namespace', () => {
+  const descriptor = pageDescriptorFromUrl('/platform/security/passwords', { businessRoutePrefixes });
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.hostType, 'business-route-host');
+  assert.deepEqual(descriptor.target, {
+    route: '/platform/security/passwords',
+    query: undefined,
+  });
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
 test('static business route registry resolves tenant management module route', () => {
   const descriptor: BusinessRoutePageDescriptor = {
     pageType: 'business-route',

@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.iam.user;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
@@ -15,9 +14,8 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Getter
 @Setter
 @Table(name = "iam_password_policy_rule", comment = "Password policy regex rule")
-@CompositeIndex(columns = {"scope_type", "scope_key", "rule_code"}, unique = true)
 @InitialDataFields(
-        managed = {"scopeType", "scopeId", "scopeKey", "ruleCode", "pattern", "message", "description"},
+        managed = {"scopeType", "scopeId", "scopeKey", "pattern", "message", "description"},
         operator = {"title", "enabled", "sortOrder"}
 )
 public class PasswordPolicyRule extends StandardEnabledSortableEntity {
@@ -34,10 +32,6 @@ public class PasswordPolicyRule extends StandardEnabledSortableEntity {
     @Column(name = "scope_key", type = ColumnType.VARCHAR, length = 96, nullable = false,
             comment = "Stable non-null policy scope key", defaultVal = @Default(varchar = "global:"))
     private String scopeKey = "global:";
-
-    @Column(name = "rule_code", type = ColumnType.VARCHAR, length = 64, nullable = false,
-            comment = "Password policy rule code")
-    private String ruleCode;
 
     @Column(name = "pattern", type = ColumnType.VARCHAR, length = 512, nullable = false,
             comment = "Java regular expression")

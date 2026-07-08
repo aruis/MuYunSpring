@@ -274,7 +274,7 @@ function ruleItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
   const rule = record as PasswordPolicyRule;
   return {
     title: ruleTitle(rule),
-    secondary: rule.ruleCode ?? rule.id,
+    secondary: rule.pattern ?? rule.id,
     tag: rule.enabled === false ? '停用' : undefined,
     muted: rule.enabled === false,
   };
@@ -282,7 +282,7 @@ function ruleItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
 
 function matchesRule(record: CrudRecordListBase, keyword: string) {
   const rule = record as PasswordPolicyRule;
-  return [rule.title, rule.ruleCode, rule.pattern, rule.message, rule.description, rule.id]
+  return [rule.title, rule.pattern, rule.message, rule.description, rule.id]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(keyword));
 }
@@ -294,7 +294,6 @@ function copyRule(rule: PasswordPolicyRule): PasswordPolicyRule {
 function emptyRuleDraft(): PasswordPolicyRule {
   return {
     scopeType: 'global',
-    ruleCode: '',
     title: '',
     pattern: '',
     message: '',
@@ -310,7 +309,6 @@ function normalizeRuleDraft(rule: PasswordPolicyRule): PasswordPolicyRule {
     scopeType: 'global',
     scopeId: undefined,
     scopeKey: undefined,
-    ruleCode: rule.ruleCode?.trim(),
     title: rule.title?.trim(),
     pattern: rule.pattern?.trim(),
     message: rule.message?.trim(),
@@ -321,9 +319,6 @@ function normalizeRuleDraft(rule: PasswordPolicyRule): PasswordPolicyRule {
 }
 
 function validateRule(rule: PasswordPolicyRule) {
-  if (!rule.ruleCode) {
-    return '请输入规则编码';
-  }
   if (!rule.title) {
     return '请输入规则名称';
   }
@@ -345,14 +340,14 @@ function checkPasswordRule(rule: PasswordPolicyRule, password: string): Password
   try {
     const passed = new RegExp(rule.pattern ?? '').test(password);
     return {
-      key: rule.id ?? rule.ruleCode ?? rule.title ?? rule.pattern ?? '',
+      key: rule.id ?? rule.title ?? rule.pattern ?? '',
       title: ruleTitle(rule),
       message: rule.message ?? '未配置失败提示',
       passed,
     };
   } catch {
     return {
-      key: rule.id ?? rule.ruleCode ?? rule.title ?? rule.pattern ?? '',
+      key: rule.id ?? rule.title ?? rule.pattern ?? '',
       title: ruleTitle(rule),
       message: rule.message ?? '未配置失败提示',
       passed: false,
@@ -362,7 +357,7 @@ function checkPasswordRule(rule: PasswordPolicyRule, password: string): Password
 }
 
 function ruleTitle(rule: Partial<PasswordPolicyRule>) {
-  return rule.title || rule.ruleCode || rule.id || '未命名规则';
+  return rule.title || rule.id || '未命名规则';
 }
 
 function blankToUndefined(value: string | undefined) {
@@ -376,7 +371,7 @@ function blankToUndefined(value: string | undefined) {
     v-model:sidebar-search-keyword="searchKeyword"
     sidebar-title="密码规则"
     refresh-title="刷新密码规则"
-    sidebar-search-placeholder="搜索规则名称、编码、正则或提示"
+    sidebar-search-placeholder="搜索规则名称、正则或提示"
     :mode="mode"
     :card-title="cardTitle"
     @refresh="reloadKey += 1"
@@ -434,10 +429,6 @@ function blankToUndefined(value: string | undefined) {
         <label>
           <span>规则名称</span>
           <UiInput v-model:value="draft.title" :disabled="readonly" />
-        </label>
-        <label>
-          <span>规则编码</span>
-          <UiInput v-model:value="draft.ruleCode" :disabled="readonly" />
         </label>
         <label class="wide">
           <span>正则表达式</span>

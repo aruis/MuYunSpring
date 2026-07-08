@@ -54,10 +54,10 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
     @Override
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, PasswordPolicyRule.class,
-                List.of("id", "scopeType", "scopeId", "ruleCode", "title", "pattern", "message",
+                List.of("id", "scopeType", "scopeId", "title", "pattern", "message",
                         "enabled", "sortOrder", "createdAt", "updatedAt"),
                 Sort.asc(PlatformAbilityFields.SORT_FIELD),
-                Sort.asc("ruleCode"));
+                Sort.asc("title"));
     }
 
     @Override
@@ -88,7 +88,7 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
                         .eq("enabled", Boolean.TRUE),
                 ALL,
                 Sort.asc(PlatformAbilityFields.SORT_FIELD),
-                Sort.asc("ruleCode"));
+                Sort.asc("title"));
         return rules.isEmpty() ? List.of(DEFAULT_MIN_LENGTH_RULE) : rules;
     }
 
@@ -109,15 +109,9 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
                 ? null
                 : Preconditions.requireText(rule.getScopeId(), "scopeId").trim());
         rule.setScopeKey(scopeKey(rule));
-        String ruleCode = Preconditions.requireText(rule.getRuleCode(), "ruleCode").trim();
-        rule.setRuleCode(ruleCode);
+        rule.setTitle(Preconditions.requireText(rule.getTitle(), "title").trim());
         rule.setPattern(Preconditions.requireText(rule.getPattern(), "pattern"));
         rule.setMessage(Preconditions.requireText(rule.getMessage(), "message").trim());
-        if (rule.getTitle() == null || rule.getTitle().isBlank()) {
-            rule.setTitle(ruleCode);
-        } else {
-            rule.setTitle(rule.getTitle().trim());
-        }
         if (rule.getEnabled() == null) {
             rule.setEnabled(Boolean.TRUE);
         }
@@ -144,7 +138,6 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
         PasswordPolicyRule rule = new PasswordPolicyRule();
         rule.setScopeType(PasswordPolicyScopeType.GLOBAL);
         rule.setScopeKey(GLOBAL_SCOPE_KEY);
-        rule.setRuleCode("min_length");
         rule.setTitle("密码长度");
         rule.setPattern("^.{6,}$");
         rule.setMessage("密码长度不能少于 6 位");

@@ -44,7 +44,7 @@ class PasswordPolicyRuleServiceTest {
     void shouldValidateEnabledRulesByRegexAndMessage() {
         PasswordPolicyRuleDao dao = mock(PasswordPolicyRuleDao.class);
         when(dao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class))).thenReturn(List.of(
-                rule("contains_digit", "^.*\\d.*$", "密码必须包含数字", 20)
+                rule("密码必须包含数字", "^.*\\d.*$", "密码必须包含数字", 20)
         ));
         PasswordPolicyRuleService service = new PasswordPolicyRuleService(dao);
 
@@ -60,7 +60,7 @@ class PasswordPolicyRuleServiceTest {
         PasswordPolicyRuleDao dao = mock(PasswordPolicyRuleDao.class);
         PasswordPolicyRuleService service = new PasswordPolicyRuleService(dao);
         PasswordPolicyRule rule = new PasswordPolicyRule();
-        rule.setRuleCode(" contains_upper ");
+        rule.setTitle(" 包含大写字母 ");
         rule.setPattern("^.*[A-Z].*$");
         rule.setMessage(" 密码必须包含大写字母 ");
 
@@ -69,8 +69,7 @@ class PasswordPolicyRuleServiceTest {
         assertThat(rule.getScopeType()).isEqualTo(PasswordPolicyScopeType.GLOBAL);
         assertThat(rule.getScopeId()).isNull();
         assertThat(rule.getScopeKey()).isEqualTo("global:");
-        assertThat(rule.getRuleCode()).isEqualTo("contains_upper");
-        assertThat(rule.getTitle()).isEqualTo("contains_upper");
+        assertThat(rule.getTitle()).isEqualTo("包含大写字母");
         assertThat(rule.getMessage()).isEqualTo("密码必须包含大写字母");
 
         rule.setPattern("[");
@@ -79,12 +78,11 @@ class PasswordPolicyRuleServiceTest {
                 .hasMessageContaining("invalid password policy regex");
     }
 
-    private PasswordPolicyRule rule(String code, String pattern, String message, int sortOrder) {
+    private PasswordPolicyRule rule(String title, String pattern, String message, int sortOrder) {
         PasswordPolicyRule rule = new PasswordPolicyRule();
         rule.setScopeType(PasswordPolicyScopeType.GLOBAL);
         rule.setScopeKey("global:");
-        rule.setRuleCode(code);
-        rule.setTitle(code);
+        rule.setTitle(title);
         rule.setPattern(pattern);
         rule.setMessage(message);
         rule.setEnabled(Boolean.TRUE);
