@@ -117,8 +117,10 @@ class StaticRecordReadProjectionServiceTest {
         org.mockito.Mockito.verify(jdbcOperations).queryForList(sqlCaptor.capture(), paramsCaptor.capture());
         String dataSql = sqlCaptor.getValue();
         assertThat(dataSql).startsWith("select ");
-        assertThat(dataSql).contains("\"id\"", "\"tenantId\"", "\"version\"", "\"username\"",
+        assertThat(dataSql).contains("\"id\"", "\"username\"",
                 "\"employeeNo\"", "\"employeeTitle\"", " from (");
+        assertThat(dataSql.substring(0, dataSql.indexOf(" from (")))
+                .doesNotContain("\"tenantId\"", "\"version\"", "\"deleted\"");
         assertThat(dataSql).contains("\"main\".\"password_status\" as \"passwordStatus\"");
         assertThat(dataSql).contains("\"main\".\"created_at\" as \"createdAt\"");
         assertThat(dataSql).contains("\"main\".\"last_login_at\" as \"lastLoginAt\"");

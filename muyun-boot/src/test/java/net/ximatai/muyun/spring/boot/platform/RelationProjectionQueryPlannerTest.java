@@ -36,7 +36,8 @@ class RelationProjectionQueryPlannerTest {
                 "username", "passwordStatus");
         assertThat(plan.projectedFields()).doesNotContain("employeeNo", "employeeTitle");
         assertThat(plan.responseFields()).containsExactlyInAnyOrder(
-                "id", "tenantId", "version", "username", "employeeNo", "employeeTitle");
+                "id", "username", "employeeNo", "employeeTitle");
+        assertThat(plan.responseFields()).doesNotContain("tenantId", "version", "deleted");
         assertThat(plan.relationOutputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "employeeTitle");
         assertThat(plan.baseSql())
@@ -65,6 +66,13 @@ class RelationProjectionQueryPlannerTest {
         assertThatThrownBy(() -> RelationProjectionQueryPlanner.plan(definition, projection, DBInfo.Type.POSTGRESQL))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cardinality is not safe for page join");
+    }
+
+    @Test
+    void shouldRequireExplicitJoinCardinality() {
+        assertThatThrownBy(() -> userDefinition(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection join cardinality must not be null");
     }
 
     private StaticModuleDefinition userDefinition() {

@@ -9,19 +9,13 @@ public record RelationProjectionJoinDefinition(String relationCode,
                                                EntityDefinition targetEntity,
                                                RelationProjectionCardinality cardinality,
                                                List<RelationProjectionJoinStep> steps) {
-    public RelationProjectionJoinDefinition(String relationCode,
-                                            EntityDefinition targetEntity,
-                                            List<RelationProjectionJoinStep> steps) {
-        this(relationCode, targetEntity, RelationProjectionCardinality.ONE_TO_ONE, steps);
-    }
-
     public RelationProjectionJoinDefinition {
         relationCode = PlatformNameRules.requireIdentifier(relationCode, "relationCode");
         if (targetEntity == null) {
             throw new IllegalArgumentException("projection join target entity must not be null");
         }
         if (cardinality == null) {
-            cardinality = RelationProjectionCardinality.ONE_TO_ONE;
+            throw new IllegalArgumentException("projection join cardinality must not be null: " + relationCode);
         }
         if (!relationCode.equals(targetEntity.alias())) {
             throw new IllegalArgumentException("projection join target entity alias must match relation code: "

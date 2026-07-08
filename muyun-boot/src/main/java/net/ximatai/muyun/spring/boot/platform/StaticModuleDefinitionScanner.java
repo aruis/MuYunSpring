@@ -62,7 +62,7 @@ public class StaticModuleDefinitionScanner {
                 module.externalUrl(),
                 java.util.Set.of(module.capabilities()),
                 actions(beanClass, java.util.Set.of(module.capabilities())),
-                entities(beanClass, module, projectionJoins),
+                entities(bean, module, projectionJoins),
                 uiDefinition(bean, module),
                 projectionJoins
         );
@@ -107,10 +107,10 @@ public class StaticModuleDefinitionScanner {
         return ModuleEntryType.MODULE;
     }
 
-    private List<EntityDefinition> entities(Class<?> beanClass,
+    private List<EntityDefinition> entities(Object bean,
                                             PlatformStaticModule module,
                                             List<RelationProjectionJoinDefinition> projectionJoins) {
-        Object service = service(beanClass);
+        Object service = service(bean);
         if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
         }
@@ -145,20 +145,11 @@ public class StaticModuleDefinitionScanner {
         return moduleName.substring(lastSeparator + 1);
     }
 
-    private Object service(Class<?> beanClass) {
-        try {
-            String[] beanNames = applicationContext.getBeanNamesForType(beanClass);
-            if (beanNames.length == 0) {
-                return null;
-            }
-            Object bean = applicationContext.getBean(beanNames[0]);
-            if (!(bean instanceof ScopedWeb<?> scopedWeb)) {
-                return null;
-            }
-            return scopedWeb.service();
-        } catch (RuntimeException ignored) {
+    private Object service(Object bean) {
+        if (!(bean instanceof ScopedWeb<?> scopedWeb)) {
             return null;
         }
+        return scopedWeb.service();
     }
 
     private void validateScopeAlias(Class<?> beanClass, PlatformStaticModule module) {
@@ -218,7 +209,7 @@ public class StaticModuleDefinitionScanner {
             contributionActions(beanClass, contribution)
                     .forEach(action -> mergeContributionAction(target.moduleAlias(), beanClass, merged, action));
             List<EntityDefinition> entities = mergeContributionEntities(
-                    target.moduleAlias(), beanClass, target.entities(), contributionEntities(beanClass, contribution));
+                    target.moduleAlias(), beanClass, target.entities(), contributionEntities(bean, contribution));
             ModuleUiDefinition uiDefinition = mergeContributionUiDefinition(
                     target.moduleAlias(),
                     beanClass,
@@ -242,9 +233,9 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
-    private List<EntityDefinition> contributionEntities(Class<?> beanClass,
+    private List<EntityDefinition> contributionEntities(Object bean,
                                                         PlatformStaticActionContribution contribution) {
-        Object service = service(beanClass);
+        Object service = service(bean);
         if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
         }

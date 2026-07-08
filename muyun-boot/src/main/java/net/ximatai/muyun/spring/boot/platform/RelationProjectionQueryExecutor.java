@@ -7,7 +7,6 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SortDirection;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnBean(NamedParameterJdbcOperations.class)
 public class RelationProjectionQueryExecutor {
     private final NamedParameterJdbcOperations jdbcOperations;
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
@@ -62,7 +60,7 @@ public class RelationProjectionQueryExecutor {
             if (!plan.projectedFields().contains(fieldName)) {
                 throw new IllegalArgumentException("projection query field is not projected: " + fieldName);
             }
-            return RelationProjectionQueryPlanner.quote(fieldName, plan.databaseType());
+            return fieldName;
         }, plan.databaseType());
     }
 

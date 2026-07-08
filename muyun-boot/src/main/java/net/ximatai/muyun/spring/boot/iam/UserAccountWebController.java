@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionCardinality;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinCondition;
 import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinContributor;
@@ -150,6 +151,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                                 FieldDefinition.string("employeeDepartmentId", "职员部门").column("department_id")
                         )
                 ),
+                RelationProjectionCardinality.ONE_TO_ONE,
                 java.util.List.of(
                         new RelationProjectionJoinStep(
                                 "public",
