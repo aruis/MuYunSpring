@@ -4,12 +4,12 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 import java.util.List;
 
-public record StaticProjectionJoinStep(String schemaName,
-                                       String tableName,
-                                       String tableAlias,
-                                       List<StaticProjectionJoinCondition> conditions,
-                                       List<StaticProjectionJoinFilter> filters) {
-    public StaticProjectionJoinStep {
+public record RelationProjectionJoinStep(String schemaName,
+                                         String tableName,
+                                         String tableAlias,
+                                         List<RelationProjectionJoinCondition> conditions,
+                                         List<RelationProjectionJoinFilter> filters) {
+    public RelationProjectionJoinStep {
         schemaName = schemaName == null || schemaName.isBlank() ? "public"
                 : PlatformNameRules.requireDatabaseName(schemaName, "schemaName");
         tableName = PlatformNameRules.requireDatabaseName(tableName, "tableName");

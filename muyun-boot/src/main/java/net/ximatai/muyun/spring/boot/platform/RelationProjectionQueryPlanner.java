@@ -12,13 +12,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
-public final class StaticProjectionQueryPlanner {
-    private StaticProjectionQueryPlanner() {
+public final class RelationProjectionQueryPlanner {
+    private RelationProjectionQueryPlanner() {
     }
 
-    public static StaticProjectionSqlPlan plan(StaticModuleDefinition definition,
-                                               RecordReadProjection projection,
-                                               DBInfo.Type databaseType) {
+    public static RelationProjectionSqlPlan plan(StaticModuleDefinition definition,
+                                                 RecordReadProjection projection,
+                                                 DBInfo.Type databaseType,
+                                                 java.util.Set<String> requiredMainFields) {
         if (definition == null) {
             throw new IllegalArgumentException("static module definition must not be null");
         }
@@ -33,10 +34,12 @@ public final class StaticProjectionQueryPlanner {
         if (definition.entities().isEmpty() || definition.projectionJoins().isEmpty()) {
             return emptyPlan(definition, dbType);
         }
+        java.util.Set<String> requiredFields = requiredMainFields == null ? java.util.Set.of()
+                : java.util.Set.copyOf(requiredMainFields);
 
         EntityDefinition mainEntity = definition.entities().getFirst();
         Map<String, EntityDefinition> entities = entitiesByAlias(definition.entities());
-        Map<String, StaticProjectionJoinDefinition> joins = joinsByRelation(definition.projectionJoins());
+        Map<String, RelationProjectionJoinDefinition> joins = joinsByRelation(definition.projectionJoins());
         LinkedHashSet<ViewFieldRef> relationFields = projection.outputFields().stream()
                 .filter(field -> field.relationCode() != null)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -44,23 +47,27 @@ public final class StaticProjectionQueryPlanner {
             return emptyPlan(definition, dbType);
         }
 
+        Map<String, FieldDefinition> mainFields = fieldsByName(mainEntity);
         LinkedHashMap<String, SelectField> selectFields = new LinkedHashMap<>();
-        for (FieldDefinition field : mainEntity.fields()) {
-            addSelectField(selectFields, new SelectField(
-                    StaticProjectionSqlNames.MAIN_ALIAS,
-                    field.columnName(),
-                    field.fieldName()
-            ));
-        }
+        addMainProjectionFields(selectFields, mainFields, projection, requiredFields);
         addStandardMainFields(selectFields);
+        LinkedHashSet<String> queryableFields = new LinkedHashSet<>(selectFields.keySet());
 
+        LinkedHashSet<String> responseFields = new LinkedHashSet<>(projection.internalReadFields());
+        projection.outputFields().stream()
+                .map(ViewFieldRef::fieldName)
+                .forEach(responseFields::add);
         LinkedHashSet<String> requiredRelations = new LinkedHashSet<>();
         for (ViewFieldRef field : relationFields) {
             EntityDefinition target = entities.get(field.relationCode());
-            StaticProjectionJoinDefinition join = joins.get(field.relationCode());
+            RelationProjectionJoinDefinition join = joins.get(field.relationCode());
             if (target == null || join == null) {
                 throw new IllegalArgumentException("projection relation is not declared: "
                         + definition.moduleAlias() + "." + field.relationCode());
+            }
+            if (!join.cardinality().safeForPageJoin()) {
+                throw new IllegalArgumentException("projection relation cardinality is not safe for page join: "
+                        + definition.moduleAlias() + "." + field.relationCode() + "." + join.cardinality());
             }
             FieldDefinition targetField = target.fields().stream()
                     .filter(item -> item.fieldName().equals(field.fieldName()))
@@ -85,47 +92,78 @@ public final class StaticProjectionQueryPlanner {
         sql.append(" from ")
                 .append(qualifiedTable(mainEntity, dbType))
                 .append(" ")
-                .append(quote(StaticProjectionSqlNames.MAIN_ALIAS, dbType));
+                .append(quote(RelationProjectionSqlNames.MAIN_ALIAS, dbType));
         for (String relationCode : requiredRelations) {
             appendJoin(sql, params, joins.get(relationCode), dbType);
         }
-        return new StaticProjectionSqlPlan(
+        return new RelationProjectionSqlPlan(
                 sql.toString(),
                 params,
-                selectFields.keySet(),
-                List.copyOf(relationFields)
+                queryableFields,
+                responseFields,
+                List.copyOf(relationFields),
+                dbType
         );
     }
 
-    private static StaticProjectionSqlPlan emptyPlan(StaticModuleDefinition definition, DBInfo.Type databaseType) {
-        return new StaticProjectionSqlPlan("select * from " + qualifiedTable(definition.entities().getFirst(), databaseType),
-                Map.of(), java.util.Set.of(), List.of());
+    public static RelationProjectionSqlPlan plan(StaticModuleDefinition definition,
+                                                 RecordReadProjection projection,
+                                                 DBInfo.Type databaseType) {
+        return plan(definition, projection, databaseType, java.util.Set.of());
+    }
+
+    private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition, DBInfo.Type databaseType) {
+        return new RelationProjectionSqlPlan("select * from " + qualifiedTable(definition.entities().getFirst(), databaseType),
+                Map.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType);
+    }
+
+    private static void addMainProjectionFields(LinkedHashMap<String, SelectField> selectFields,
+                                                Map<String, FieldDefinition> mainFields,
+                                                RecordReadProjection projection,
+                                                java.util.Set<String> requiredMainFields) {
+        LinkedHashSet<String> fieldNames = new LinkedHashSet<>(projection.internalReadFields());
+        projection.outputFields().stream()
+                .filter(field -> field.relationCode() == null)
+                .map(ViewFieldRef::fieldName)
+                .forEach(fieldNames::add);
+        fieldNames.addAll(requiredMainFields);
+        for (String fieldName : fieldNames) {
+            FieldDefinition field = mainFields.get(fieldName);
+            if (field == null) {
+                continue;
+            }
+            addSelectField(selectFields, new SelectField(
+                    RelationProjectionSqlNames.MAIN_ALIAS,
+                    field.columnName(),
+                    field.fieldName()
+            ));
+        }
     }
 
     private static void addStandardMainFields(LinkedHashMap<String, SelectField> selectFields) {
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.ID_COLUMN, StandardEntitySchema.ID_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.TENANT_ID_COLUMN, StandardEntitySchema.TENANT_ID_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.DELETED_COLUMN, StandardEntitySchema.DELETED_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.DELETED_AT_COLUMN, StandardEntitySchema.DELETED_AT_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.CREATED_AT_COLUMN, StandardEntitySchema.CREATED_AT_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.UPDATED_BY_COLUMN, StandardEntitySchema.UPDATED_BY_FIELD));
-        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.UPDATED_AT_COLUMN, StandardEntitySchema.UPDATED_AT_FIELD));
     }
 
     private static void addSelectField(LinkedHashMap<String, SelectField> selectFields, SelectField field) {
         PlatformNameRules.requireFieldName(field.outputName(), "projectionOutputField");
-        StaticProjectionSqlNames.requireColumn(field.columnName(), "columnName");
+        RelationProjectionSqlNames.requireColumn(field.columnName(), "columnName");
         SelectField existing = selectFields.putIfAbsent(field.outputName(), field);
         if (existing != null && (!existing.tableAlias().equals(field.tableAlias())
                 || !existing.columnName().equals(field.columnName()))) {
@@ -135,9 +173,9 @@ public final class StaticProjectionQueryPlanner {
 
     private static void appendJoin(StringBuilder sql,
                                    Map<String, Object> params,
-                                   StaticProjectionJoinDefinition join,
+                                   RelationProjectionJoinDefinition join,
                                    DBInfo.Type databaseType) {
-        for (StaticProjectionJoinStep step : join.steps()) {
+        for (RelationProjectionJoinStep step : join.steps()) {
             int filterIndex = 0;
             sql.append(" left join ")
                     .append(qualifiedTable(step.schemaName(), step.tableName(), databaseType))
@@ -145,12 +183,12 @@ public final class StaticProjectionQueryPlanner {
                     .append(quote(step.tableAlias(), databaseType))
                     .append(" on ");
             List<String> predicates = new ArrayList<>();
-            for (StaticProjectionJoinCondition condition : step.conditions()) {
+            for (RelationProjectionJoinCondition condition : step.conditions()) {
                 predicates.add(qualified(condition.leftAlias(), condition.leftColumn(), databaseType)
                         + " = "
                         + qualified(condition.rightAlias(), condition.rightColumn(), databaseType));
             }
-            for (StaticProjectionJoinFilter filter : step.filters()) {
+            for (RelationProjectionJoinFilter filter : step.filters()) {
                 String paramName = "__join_" + join.relationCode() + "_" + step.tableAlias() + "_" + filterIndex++;
                 predicates.add(qualified(filter.tableAlias(), filter.columnName(), databaseType) + " = :" + paramName);
                 params.put(paramName, filter.value());
@@ -167,9 +205,17 @@ public final class StaticProjectionQueryPlanner {
         return java.util.Collections.unmodifiableMap(byAlias);
     }
 
-    private static Map<String, StaticProjectionJoinDefinition> joinsByRelation(List<StaticProjectionJoinDefinition> joins) {
-        LinkedHashMap<String, StaticProjectionJoinDefinition> byRelation = new LinkedHashMap<>();
-        for (StaticProjectionJoinDefinition join : joins) {
+    private static Map<String, FieldDefinition> fieldsByName(EntityDefinition entity) {
+        LinkedHashMap<String, FieldDefinition> byName = new LinkedHashMap<>();
+        for (FieldDefinition field : entity.fields()) {
+            byName.putIfAbsent(field.fieldName(), field);
+        }
+        return java.util.Collections.unmodifiableMap(byName);
+    }
+
+    private static Map<String, RelationProjectionJoinDefinition> joinsByRelation(List<RelationProjectionJoinDefinition> joins) {
+        LinkedHashMap<String, RelationProjectionJoinDefinition> byRelation = new LinkedHashMap<>();
+        for (RelationProjectionJoinDefinition join : joins) {
             if (byRelation.putIfAbsent(join.relationCode(), join) != null) {
                 throw new IllegalArgumentException("duplicate projection relation: " + join.relationCode());
             }

@@ -2,10 +2,10 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
-final class StaticProjectionSqlNames {
+final class RelationProjectionSqlNames {
     static final String MAIN_ALIAS = "main";
 
-    private StaticProjectionSqlNames() {
+    private RelationProjectionSqlNames() {
     }
 
     static String requireAlias(String value, String name) {

@@ -51,7 +51,7 @@ public class StaticModuleDefinitionScanner {
 
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
         validateScopeAlias(beanClass, module);
-        List<StaticProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
+        List<RelationProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
         return new StaticModuleDefinition(
                 module.application(),
                 module.alias(),
@@ -68,11 +68,11 @@ public class StaticModuleDefinitionScanner {
         );
     }
 
-    private List<StaticProjectionJoinDefinition> projectionJoins(Object bean) {
-        if (!(bean instanceof StaticProjectionJoinContributor contributor)) {
+    private List<RelationProjectionJoinDefinition> projectionJoins(Object bean) {
+        if (!(bean instanceof RelationProjectionJoinContributor contributor)) {
             return List.of();
         }
-        List<StaticProjectionJoinDefinition> joins = contributor.projectionJoins();
+        List<RelationProjectionJoinDefinition> joins = contributor.projectionJoins();
         return joins == null ? List.of() : List.copyOf(joins);
     }
 
@@ -109,7 +109,7 @@ public class StaticModuleDefinitionScanner {
 
     private List<EntityDefinition> entities(Class<?> beanClass,
                                             PlatformStaticModule module,
-                                            List<StaticProjectionJoinDefinition> projectionJoins) {
+                                            List<RelationProjectionJoinDefinition> projectionJoins) {
         Object service = service(beanClass);
         if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
@@ -125,7 +125,7 @@ public class StaticModuleDefinitionScanner {
                 modelClass
         );
         entities.put(mainEntity.alias(), mainEntity);
-        for (StaticProjectionJoinDefinition join : projectionJoins) {
+        for (RelationProjectionJoinDefinition join : projectionJoins) {
             EntityDefinition target = join.targetEntity();
             if (entities.containsKey(target.alias())) {
                 throw new IllegalStateException("static projection join entity conflicts with module entity: "

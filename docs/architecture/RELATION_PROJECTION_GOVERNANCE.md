@@ -14,7 +14,7 @@
 
 ## 设计口径
 
-当前静态侧先以 `StaticProjectionJoinDefinition` 作为入口验证能力。长期目标不是扩张 `StaticProjection*`，而是把它收敛为来源无关的关联投影定义。
+当前已以 `RelationProjectionJoinDefinition` 作为来源无关的关联投影定义雏形。静态侧先通过 Java contributor 接入；动态侧未来应把元数据引用、模块关系和字典标题编译到同一种定义，而不是另起动态专用 planner。
 
 推荐长期抽象：
 
@@ -50,22 +50,22 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 
 ## 短期补强
 
-短期目标是把当前静态 SQL 投影 MVP 收住边界，避免能力扩散后形成安全和分页风险。
+短期目标是把当前 SQL 投影能力收住边界，避免能力扩散后形成安全和分页风险。
 
 1. SQL 投影只返回 `RecordReadProjection.outputFields + id + 必需内部字段`，不默认投影主表全部字段。
 2. 增加字段输出保护测试，证明 SQL Map 输出路径不会绕过脱敏、隐藏和字段读策略。
 3. `postReadTransforms` 非空时继续回退实体查询，直到 SQL 输出路径有统一字段保护执行器。
-4. 给关联定义增加 `cardinality`，列表 SQL join 默认只允许 `ONE_TO_ONE` 和 `MANY_TO_ONE`。
-5. 明确 relation 字段默认只可展示；是否可过滤、可排序必须由投影定义或查询字段契约显式声明。
+4. 关联定义通过 `cardinality` 约束列表 SQL join 默认只允许 `ONE_TO_ONE` 和 `MANY_TO_ONE`。
+5. relation 字段默认只可展示；是否可过滤、可排序必须由投影定义或查询字段契约显式声明。
 6. 为用户到职员的 `bound_employee` 补真实链路测试，覆盖租户过滤、软删中间表、软删职员、未绑定账号、分页和条件查询。
-7. 数据库类型不应长期写死在执行器内；短期 PostgreSQL 可作为当前运行假设，但 planner/executor 接口应保留真实 DB 类型来源。
+7. 数据库类型不应写死在执行器内；短期 PostgreSQL 可作为默认 provider，后续按真实数据源或运行态配置接入。
 
 ## 中期平台化
 
 中期目标是把静态侧验证过的能力沉淀为动静共享的平台查询能力。
 
-1. 将 `StaticProjection*` 抽象上移为来源无关的 `RelationProjection*` 或 `RecordProjection*`。
-2. 静态 `StaticProjectionJoinContributor` 编译为通用 `RelationProjectionDefinition`。
+1. 继续把 `RelationProjection*` 从静态列表专用能力推进为来源无关的读投影平台能力。
+2. 静态 `RelationProjectionJoinContributor` 保持轻量业务声明，动态侧后续编译为相同 relation 定义。
 3. 动态引用字段、模块关系和字典标题也编译为同一种 `RelationProjectionDefinition`。
 4. `RecordReadProjectionPlanner` 统一决定输出字段、内部读取字段、强制投影字段和 post-read transform。
 5. `ProjectionQueryPlanner` 统一负责 select、from、join、where 外层包装、排序、分页和参数绑定。
@@ -73,6 +73,7 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 7. projection plan 可以缓存，但必须按静态模块定义版本、动态元数据运行态版本、UI 配置版本或查询模板版本失效。
 8. relation 字段的筛选和排序纳入 `QueryDescriptor` 或后续 `ProjectionQueryDescriptor`，避免“投影了就能查”的隐式扩权。
 9. 数据权限策略进入 relation 定义，区分“源记录可见即可展示有限摘要”和“目标模块也必须满足数据权限”。
+10. 标准租户、软删和启停等 join 过滤应由平台根据 relation 目标实体能力生成，业务 contributor 只声明关系路径和业务过滤事实。
 
 ## 长期统一
 

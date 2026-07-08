@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.CompiledCriteria;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
@@ -18,16 +17,15 @@ import java.util.Map;
 
 @Component
 @ConditionalOnBean(NamedParameterJdbcOperations.class)
-public class StaticProjectionQueryExecutor {
+public class RelationProjectionQueryExecutor {
     private final NamedParameterJdbcOperations jdbcOperations;
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
-    private final DBInfo.Type databaseType = DBInfo.Type.POSTGRESQL;
 
-    public StaticProjectionQueryExecutor(NamedParameterJdbcOperations jdbcOperations) {
+    public RelationProjectionQueryExecutor(NamedParameterJdbcOperations jdbcOperations) {
         this.jdbcOperations = jdbcOperations;
     }
 
-    public PageResult<Map<String, Object>> page(StaticProjectionSqlPlan plan,
+    public PageResult<Map<String, Object>> page(RelationProjectionSqlPlan plan,
                                                 Criteria criteria,
                                                 PageRequest pageRequest,
                                                 Sort... sorts) {
@@ -40,7 +38,7 @@ public class StaticProjectionQueryExecutor {
         params.putAll(compiled.getParams());
         String where = where(compiled);
         String orderBy = orderBy(plan, sorts);
-        String dataSql = "select * from (" + plan.baseSql() + ") q"
+        String dataSql = "select " + responseSelect(plan) + " from (" + plan.baseSql() + ") q"
                 + where
                 + orderBy
                 + " limit :__limit offset :__offset";
@@ -58,14 +56,14 @@ public class StaticProjectionQueryExecutor {
         return PageResult.of(records, total == null ? 0 : total, page);
     }
 
-    private CompiledCriteria compileCriteria(StaticProjectionSqlPlan plan, Criteria criteria) {
+    private CompiledCriteria compileCriteria(RelationProjectionSqlPlan plan, Criteria criteria) {
         Criteria actual = criteria == null ? Criteria.of() : criteria;
         return criteriaSqlCompiler.compile(actual, fieldName -> {
             if (!plan.projectedFields().contains(fieldName)) {
                 throw new IllegalArgumentException("projection query field is not projected: " + fieldName);
             }
-            return StaticProjectionQueryPlanner.quote(fieldName, databaseType);
-        }, databaseType);
+            return RelationProjectionQueryPlanner.quote(fieldName, plan.databaseType());
+        }, plan.databaseType());
     }
 
     private String where(CompiledCriteria criteria) {
@@ -75,7 +73,7 @@ public class StaticProjectionQueryExecutor {
         return " where " + criteria.getSql();
     }
 
-    private String orderBy(StaticProjectionSqlPlan plan, Sort... sorts) {
+    private String orderBy(RelationProjectionSqlPlan plan, Sort... sorts) {
         if (sorts == null || sorts.length == 0) {
             return "";
         }
@@ -84,9 +82,18 @@ public class StaticProjectionQueryExecutor {
                     if (!plan.projectedFields().contains(sort.getField())) {
                         throw new IllegalArgumentException("projection sort field is not projected: " + sort.getField());
                     }
-                    return StaticProjectionQueryPlanner.quote(sort.getField(), databaseType)
+                    return RelationProjectionQueryPlanner.quote(sort.getField(), plan.databaseType())
                             + " " + (sort.getDirection() == SortDirection.DESC ? "desc" : "asc");
                 })
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private String responseSelect(RelationProjectionSqlPlan plan) {
+        if (plan.responseFields().isEmpty()) {
+            return "*";
+        }
+        return plan.responseFields().stream()
+                .map(field -> RelationProjectionQueryPlanner.quote(field, plan.databaseType()))
                 .collect(java.util.stream.Collectors.joining(", "));
     }
 }
