@@ -16,11 +16,6 @@ export interface WorkbenchMegaMenuModel {
   activeDeepRoot?: WorkbenchMenuNode;
 }
 
-interface WeightedMegaMenuColumn {
-  groups: WorkbenchMenuNode[];
-  weight: number;
-}
-
 export function createWorkbenchMenuNodes(nodes: MenuTreeNode[]): WorkbenchMenuNode[] {
   return nodes.map(createWorkbenchMenuNode);
 }
@@ -110,20 +105,33 @@ function buildMegaMenuColumns(groups: WorkbenchMenuNode[], columnCount: number):
   }
 
   const normalizedColumnCount = Math.max(1, Math.min(Math.floor(columnCount), groups.length));
-  const columns: WeightedMegaMenuColumn[] = Array.from({ length: normalizedColumnCount }, () => ({
-    groups: [],
-    weight: 0,
-  }));
+  const columns: WorkbenchMenuNode[][] = Array.from({ length: normalizedColumnCount }, () => []);
+  const targetWeight =
+    groups.reduce((total, group) => total + menuGroupWeight(group), 0) / normalizedColumnCount;
+  let columnIndex = 0;
+  let currentWeight = 0;
 
-  for (const group of groups) {
-    const column = columns.reduce((lightest, current) =>
-      current.weight < lightest.weight ? current : lightest,
-    );
-    column.groups.push(group);
-    column.weight += menuGroupWeight(group);
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index];
+    const groupWeight = menuGroupWeight(group);
+    const remainingGroups = groups.length - index;
+    const remainingColumns = normalizedColumnCount - columnIndex;
+    const currentColumn = columns[columnIndex];
+    const shouldStartNextColumn =
+      currentColumn.length > 0 &&
+      columnIndex < normalizedColumnCount - 1 &&
+      (remainingGroups <= remainingColumns || currentWeight + groupWeight > targetWeight);
+
+    if (shouldStartNextColumn) {
+      columnIndex += 1;
+      currentWeight = 0;
+    }
+
+    columns[columnIndex].push(group);
+    currentWeight += groupWeight;
   }
 
-  return columns.map((column) => column.groups);
+  return columns;
 }
 
 function menuGroupWeight(group: WorkbenchMenuNode): number {

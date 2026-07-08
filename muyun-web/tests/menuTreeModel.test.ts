@@ -87,7 +87,7 @@ test('buildWorkbenchMegaMenuModel exposes groups and active deep tree root', () 
   assert.equal(model.activeDeepRoot?.record.id, 'dictionary');
 });
 
-test('buildWorkbenchMegaMenuModel packs groups into columns by estimated height', () => {
+test('buildWorkbenchMegaMenuModel packs ordered groups into height-aware columns', () => {
   const [root] = createWorkbenchMenuNodes([
     {
       record: {
@@ -107,7 +107,11 @@ test('buildWorkbenchMegaMenuModel packs groups into columns by estimated height'
 
   assert.deepEqual(
     model.columns.map((column) => column.map((group) => group.record.id)),
-    [['long'], ['identity', 'operation'], ['support']],
+    [['long'], ['identity'], ['support', 'operation']],
+  );
+  assert.deepEqual(
+    model.columns.flat().map((group) => group.record.id),
+    ['long', 'identity', 'support', 'operation'],
   );
 });
 
