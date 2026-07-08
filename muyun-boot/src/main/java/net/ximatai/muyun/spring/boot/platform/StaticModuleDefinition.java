@@ -21,7 +21,7 @@ public record StaticModuleDefinition(
         List<StaticModuleActionDefinition> actions,
         List<EntityDefinition> entities,
         ModuleUiDefinition uiDefinition,
-        List<StaticProjectionJoinDefinition> projectionJoins
+        List<RelationProjectionJoinDefinition> projectionJoins
 ) {
     public StaticModuleDefinition(String applicationAlias,
                                   String moduleAlias,

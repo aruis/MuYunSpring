@@ -19,11 +19,11 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
-import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinCondition;
-import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinContributor;
-import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinFilter;
-import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinStep;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinCondition;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinContributor;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinDefinition;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinFilter;
+import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinStep;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -66,7 +66,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         EnableWeb<UserAccount, UserAccountService>,
         MutationTenantScopeResolver<UserAccount>,
         StaticModuleUiContributor,
-        StaticProjectionJoinContributor {
+        RelationProjectionJoinContributor {
     private static final ActionExecutionPolicy USER_SELECTOR_POLICY = new ActionExecutionPolicy(
             "userSelector",
             PlatformActionLevel.LIST,
@@ -135,8 +135,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     @Override
-    public java.util.List<StaticProjectionJoinDefinition> projectionJoins() {
-        return java.util.List.of(new StaticProjectionJoinDefinition(
+    public java.util.List<RelationProjectionJoinDefinition> projectionJoins() {
+        return java.util.List.of(new RelationProjectionJoinDefinition(
                 "bound_employee",
                 new EntityDefinition(
                         "bound_employee",
@@ -151,30 +151,30 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                         )
                 ),
                 java.util.List.of(
-                        new StaticProjectionJoinStep(
+                        new RelationProjectionJoinStep(
                                 "public",
                                 "iam_employee_account",
                                 "bound_employee_account",
                                 java.util.List.of(
-                                        new StaticProjectionJoinCondition("main", "tenant_id",
+                                        new RelationProjectionJoinCondition("main", "tenant_id",
                                                 "bound_employee_account", "tenant_id"),
-                                        new StaticProjectionJoinCondition("main", "id",
+                                        new RelationProjectionJoinCondition("main", "id",
                                                 "bound_employee_account", "user_id")
                                 ),
-                                java.util.List.of(new StaticProjectionJoinFilter(
+                                java.util.List.of(new RelationProjectionJoinFilter(
                                         "bound_employee_account", "deleted", Boolean.FALSE))
                         ),
-                        new StaticProjectionJoinStep(
+                        new RelationProjectionJoinStep(
                                 "public",
                                 "iam_employee",
                                 "bound_employee",
                                 java.util.List.of(
-                                        new StaticProjectionJoinCondition("bound_employee_account", "tenant_id",
+                                        new RelationProjectionJoinCondition("bound_employee_account", "tenant_id",
                                                 "bound_employee", "tenant_id"),
-                                        new StaticProjectionJoinCondition("bound_employee_account", "employee_id",
+                                        new RelationProjectionJoinCondition("bound_employee_account", "employee_id",
                                                 "bound_employee", "id")
                                 ),
-                                java.util.List.of(new StaticProjectionJoinFilter(
+                                java.util.List.of(new RelationProjectionJoinFilter(
                                         "bound_employee", "deleted", Boolean.FALSE))
                         )
                 )

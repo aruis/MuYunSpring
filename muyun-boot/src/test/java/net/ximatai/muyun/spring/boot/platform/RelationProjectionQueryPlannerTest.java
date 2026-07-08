@@ -11,8 +11,9 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class StaticProjectionQueryPlannerTest {
+class RelationProjectionQueryPlannerTest {
     @Test
     void shouldPlanSqlJoinProjectionForStaticRelationFields() {
         StaticModuleDefinition definition = userDefinition();
@@ -22,27 +23,55 @@ class StaticProjectionQueryPlannerTest {
                 compilation.readModel()
         );
 
-        StaticProjectionSqlPlan plan = StaticProjectionQueryPlanner.plan(definition, projection, DBInfo.Type.POSTGRESQL);
+        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                definition,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of("passwordStatus", "createdAt")
+        );
 
         assertThat(plan.hasRelationProjection()).isTrue();
         assertThat(plan.projectedFields()).contains(
                 "id", "tenantId", "deleted", "createdAt", "updatedAt",
-                "username", "employeeNo", "employeeTitle");
+                "username", "passwordStatus");
+        assertThat(plan.projectedFields()).doesNotContain("employeeNo", "employeeTitle");
+        assertThat(plan.responseFields()).containsExactlyInAnyOrder(
+                "id", "tenantId", "version", "username", "employeeNo", "employeeTitle");
         assertThat(plan.relationOutputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "employeeTitle");
         assertThat(plan.baseSql())
                 .contains("from \"public\".\"iam_user\" \"main\"")
+                .contains("\"main\".\"password_status\" as \"passwordStatus\"")
                 .contains("left join \"public\".\"iam_employee_account\" \"bound_employee_account\"")
                 .contains("\"main\".\"id\" = \"bound_employee_account\".\"user_id\"")
                 .contains("left join \"public\".\"iam_employee\" \"bound_employee\"")
                 .contains("\"bound_employee_account\".\"employee_id\" = \"bound_employee\".\"id\"")
                 .contains("\"bound_employee\".\"title\" as \"employeeTitle\"");
+        assertThat(plan.baseSql()).doesNotContain("\"main\".\"enabled\" as \"enabled\"");
         assertThat(plan.baseParams())
                 .containsEntry("__join_bound_employee_bound_employee_account_0", Boolean.FALSE)
                 .containsEntry("__join_bound_employee_bound_employee_0", Boolean.FALSE);
     }
 
+    @Test
+    void shouldRejectUnsafePageJoinCardinality() {
+        StaticModuleDefinition definition = userDefinition(RelationProjectionCardinality.ONE_TO_MANY);
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(definition);
+        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+                compilation.uiDescriptor(),
+                compilation.readModel()
+        );
+
+        assertThatThrownBy(() -> RelationProjectionQueryPlanner.plan(definition, projection, DBInfo.Type.POSTGRESQL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cardinality is not safe for page join");
+    }
+
     private StaticModuleDefinition userDefinition() {
+        return userDefinition(RelationProjectionCardinality.ONE_TO_ONE);
+    }
+
+    private StaticModuleDefinition userDefinition(RelationProjectionCardinality cardinality) {
         return new StaticModuleDefinition(
                 "iam",
                 "iam.user",
@@ -80,7 +109,7 @@ class StaticProjectionQueryPlannerTest {
                                 .field("bound_employee", "employeeNo", field -> field.label("职员工号"))
                                 .field("bound_employee", "employeeTitle", field -> field.label("职员姓名")))
                         .build(),
-                List.of(new StaticProjectionJoinDefinition(
+                List.of(new RelationProjectionJoinDefinition(
                         "bound_employee",
                         new EntityDefinition(
                                 "bound_employee",
@@ -91,31 +120,32 @@ class StaticProjectionQueryPlannerTest {
                                         FieldDefinition.string("employeeTitle", "职员姓名").column("title")
                                 )
                         ),
+                        cardinality,
                         List.of(
-                                new StaticProjectionJoinStep(
+                                new RelationProjectionJoinStep(
                                         "public",
                                         "iam_employee_account",
                                         "bound_employee_account",
                                         List.of(
-                                                new StaticProjectionJoinCondition("main", "tenant_id",
+                                                new RelationProjectionJoinCondition("main", "tenant_id",
                                                         "bound_employee_account", "tenant_id"),
-                                                new StaticProjectionJoinCondition("main", "id",
+                                                new RelationProjectionJoinCondition("main", "id",
                                                         "bound_employee_account", "user_id")
                                         ),
-                                        List.of(new StaticProjectionJoinFilter(
+                                        List.of(new RelationProjectionJoinFilter(
                                                 "bound_employee_account", "deleted", Boolean.FALSE))
                                 ),
-                                new StaticProjectionJoinStep(
+                                new RelationProjectionJoinStep(
                                         "public",
                                         "iam_employee",
                                         "bound_employee",
                                         List.of(
-                                                new StaticProjectionJoinCondition("bound_employee_account", "tenant_id",
+                                                new RelationProjectionJoinCondition("bound_employee_account", "tenant_id",
                                                         "bound_employee", "tenant_id"),
-                                                new StaticProjectionJoinCondition("bound_employee_account", "employee_id",
+                                                new RelationProjectionJoinCondition("bound_employee_account", "employee_id",
                                                         "bound_employee", "id")
                                         ),
-                                        List.of(new StaticProjectionJoinFilter(
+                                        List.of(new RelationProjectionJoinFilter(
                                                 "bound_employee", "deleted", Boolean.FALSE))
                                 )
                         )

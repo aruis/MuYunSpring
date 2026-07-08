@@ -295,6 +295,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.projectionJoins()).singleElement()
                         .satisfies(join -> {
                             assertThat(join.relationCode()).isEqualTo("bound_employee");
+                            assertThat(join.cardinality()).isEqualTo(RelationProjectionCardinality.ONE_TO_ONE);
                             assertThat(join.steps()).hasSize(2);
                         });
                 assertThat(definition.uiDefinition()).isNotNull();
