@@ -864,10 +864,13 @@ test('system user management is a separate root account entry', () => {
 test('password management is a dedicated security settings page', () => {
   const passwordViewSource = readSource('src/views/PasswordManagementView.vue');
   const routesSource = readSource('src/app/businessRoutes.ts');
+  const startupSource = readSource('src/app/appWorkbenchStartup.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
 
   assert.match(routesSource, /moduleAlias: 'iam\.password_policy_rule'/);
   assert.match(routesSource, /route: '\/platform\/security\/passwords'/);
+  assert.match(startupSource, /businessModuleRoutes/);
+  assert.match(startupSource, /businessRoutePrefixes/);
   assert.match(passwordViewSource, /defineOptions\(\{ name: 'PasswordManagementView' \}\)/);
   assert.match(passwordViewSource, /moduleAlias: 'iam\.password_policy_rule'/);
   assert.match(passwordViewSource, /<StaticManagementLayout/);
@@ -877,12 +880,14 @@ test('password management is a dedicated security settings page', () => {
   assert.match(passwordViewSource, /密码试算/);
   assert.match(passwordViewSource, /new RegExp\(rule\.pattern/);
   assert.match(passwordViewSource, /scopeType: 'global'/);
-  assert.match(passwordViewSource, /ruleCode/);
+  assert.doesNotMatch(passwordViewSource, /ruleCode/);
+  assert.doesNotMatch(passwordViewSource, /规则编码/);
   assert.match(passwordViewSource, /pattern/);
   assert.match(passwordViewSource, /message/);
   assert.match(passwordViewSource, /description/);
   assert.match(contractsSource, /export type PasswordPolicyScopeType = 'global' \| 'tenant'/);
   assert.match(contractsSource, /export interface PasswordPolicyRule extends StandardEnabledSortableEntity/);
+  assert.doesNotMatch(contractsSource, /ruleCode/);
 });
 
 test('workbench exposes own password change through auth boundary', () => {

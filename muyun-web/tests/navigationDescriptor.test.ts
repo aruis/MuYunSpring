@@ -122,6 +122,27 @@ test('resolvePageDescriptor carries route menu module alias for business module 
   assert.equal(descriptor.target.moduleAlias, 'iam.organization');
 });
 
+test('resolvePageDescriptor lets registered business routes under platform namespace override broad platform prefix', () => {
+  const target = getMenuNavigationTarget({
+    id: 'passwords',
+    schemeId: 'default',
+    title: '密码管理',
+    openMode: 'tab',
+    route: '/platform/security/passwords',
+    moduleAlias: 'iam.password_policy_rule',
+  });
+
+  assert.ok(target);
+  const descriptor = resolvePageDescriptor(target, {
+    businessRoutePrefixes: ['/platform/security/passwords'],
+  });
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.hostType, 'business-route-host');
+  assert.equal(descriptor.target.route, '/platform/security/passwords');
+  assert.equal(descriptor.target.moduleAlias, 'iam.password_policy_rule');
+});
+
 test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptors', () => {
   const descriptor = resolvePageDescriptor({
     menuId: 'customer-module',

@@ -470,15 +470,14 @@ function isBusinessRouteTarget(target: RoutePageTarget, options: PageDescriptorR
 
 function isBusinessRoutePath(path: string, options: PageDescriptorUrlParseOptions): boolean {
   const businessPrefixes = options.businessRoutePrefixes ?? defaultBusinessRoutePrefixes;
-  if (businessPrefixes.length === 0) {
+  const businessPrefixLength = longestMatchingRoutePrefixLength(path, businessPrefixes);
+  if (businessPrefixLength < 0) {
     return false;
   }
 
   const platformPrefixes = options.platformRoutePrefixes ?? defaultPlatformRoutePrefixes;
-  return (
-    businessPrefixes.some((prefix) => matchesRoutePrefix(path, prefix)) &&
-    !platformPrefixes.some((prefix) => matchesRoutePrefix(path, prefix))
-  );
+  const platformPrefixLength = longestMatchingRoutePrefixLength(path, platformPrefixes);
+  return platformPrefixLength < 0 || businessPrefixLength > platformPrefixLength;
 }
 
 function stableTargetKeyOf(descriptor: PageDescriptor): string {
@@ -530,6 +529,17 @@ function appendParam(params: URLSearchParams, key: string, value: RouteQueryPrim
 function matchesRoutePrefix(path: string, prefix: string): boolean {
   const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
   return path === normalizedPrefix || path.startsWith(`${normalizedPrefix}/`);
+}
+
+function longestMatchingRoutePrefixLength(path: string, prefixes: string[]): number {
+  let longest = -1;
+  for (const prefix of prefixes) {
+    const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+    if (matchesRoutePrefix(path, normalizedPrefix)) {
+      longest = Math.max(longest, normalizedPrefix.length);
+    }
+  }
+  return longest;
 }
 
 function parseUrl(url: string): URL {

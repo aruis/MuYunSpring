@@ -537,7 +537,6 @@ export interface PasswordPolicyRule extends StandardEnabledSortableEntity {
   scopeTypeTitle?: string;
   scopeId?: string;
   scopeKey?: string;
-  ruleCode?: string;
   pattern?: string;
   message?: string;
   description?: string;
