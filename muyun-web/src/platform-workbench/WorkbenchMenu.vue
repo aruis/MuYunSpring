@@ -34,6 +34,14 @@ const emit = defineEmits<{
   invalidMenu: [menu: MenuRecord];
 }>();
 
+const MEGA_GROUP_COLUMN_MIN_WIDTH = 168;
+const MEGA_GROUP_COLUMN_GAP = 18;
+const MEGA_GROUP_HORIZONTAL_PADDING = 28;
+const MEGA_DEEP_PANEL_WIDTH = 280;
+const MEGA_PANEL_MAX_WIDTH = 1040;
+const MEGA_PANEL_SIDE_MARGIN = 24;
+const MEGA_PANEL_MAX_HEIGHT = 620;
+
 const menuShell = ref<HTMLElement>();
 const megaPanel = ref<HTMLElement>();
 const menuFilter = ref('');
@@ -46,6 +54,8 @@ const activeRootTop = ref(0);
 const activeRootHeight = ref(34);
 const megaPanelWidth = ref(0);
 const megaPanelHeight = ref(0);
+const megaPanelPreferredWidth = ref(820);
+const megaGroupColumnCount = ref(3);
 
 const menuNodes = computed(() => createWorkbenchMenuNodes(props.menus));
 const filteredMenus = computed(() => filterWorkbenchMenuNodes(menuNodes.value, menuFilter.value));
@@ -58,10 +68,11 @@ const activeRootNode = computed(() =>
 );
 const megaMenuModel = computed(() =>
   activeRootNode.value
-    ? buildWorkbenchMegaMenuModel(activeRootNode.value, activeDeepRootId.value)
+    ? buildWorkbenchMegaMenuModel(activeRootNode.value, activeDeepRootId.value, megaGroupColumnCount.value)
     : undefined,
 );
 const activeDeepRootNode = computed(() => megaMenuModel.value?.activeDeepRoot);
+const megaColumnCount = computed(() => megaMenuModel.value?.columns.length ?? 1);
 const megaOutlinePath = computed(() => {
   const activeLeft = activeRootLeft.value;
   const activeTop = activeRootTop.value;
@@ -127,7 +138,7 @@ function updateMegaPanelTop(target: EventTarget | null | undefined) {
   const rect = target.getBoundingClientRect();
   const shellRect = menuShell.value?.getBoundingClientRect();
   const shellTop = shellRect?.top ?? 0;
-  const panelHeight = Math.min(window.innerHeight - 16, 620);
+  const panelHeight = Math.min(window.innerHeight - 16, MEGA_PANEL_MAX_HEIGHT);
   const idealTop = rect.top;
   const maxTop = Math.max(8, window.innerHeight - panelHeight - 8);
   const panelTop = Math.min(Math.max(idealTop, 8), maxTop);
@@ -137,8 +148,8 @@ function updateMegaPanelTop(target: EventTarget | null | undefined) {
   activeRootLeft.value = Math.round(rect.left - shellLeft);
   activeRootTop.value = Math.round(rect.top - shellTop);
   activeRootHeight.value = Math.round(rect.height);
-  megaPanelWidth.value = Math.min(820, window.innerWidth - megaPanelLeft.value - 24);
   megaPanelHeight.value = panelHeight;
+  updateMegaPanelLayout();
 }
 
 function updateMegaPanelSize() {
@@ -151,8 +162,45 @@ function updateMegaPanelSize() {
   megaPanelHeight.value = Math.round(rect.height);
 }
 
+function updateMegaPanelLayout() {
+  const availableWidth = availableMegaPanelWidth();
+  const deepPanelWidth = activeDeepRootId.value ? MEGA_DEEP_PANEL_WIDTH : 0;
+  const maxGroupWidth = Math.max(0, Math.min(availableWidth, MEGA_PANEL_MAX_WIDTH) - deepPanelWidth);
+  const groupCount = activeRootNode.value?.children.length ?? 0;
+  const columnCount = Math.max(
+    1,
+    Math.min(
+      4,
+      groupCount || 1,
+      Math.floor(
+        (maxGroupWidth - MEGA_GROUP_HORIZONTAL_PADDING + MEGA_GROUP_COLUMN_GAP) /
+          (MEGA_GROUP_COLUMN_MIN_WIDTH + MEGA_GROUP_COLUMN_GAP),
+      ) || 1,
+    ),
+  );
+  const groupWidth =
+    columnCount * MEGA_GROUP_COLUMN_MIN_WIDTH +
+    Math.max(0, columnCount - 1) * MEGA_GROUP_COLUMN_GAP +
+    MEGA_GROUP_HORIZONTAL_PADDING;
+  const preferredWidth = Math.min(availableWidth, MEGA_PANEL_MAX_WIDTH, groupWidth + deepPanelWidth);
+
+  megaGroupColumnCount.value = columnCount;
+  megaPanelPreferredWidth.value = Math.max(280, preferredWidth);
+  megaPanelWidth.value = megaPanelPreferredWidth.value;
+}
+
+function availableMegaPanelWidth() {
+  const shellLeft = menuShell.value?.getBoundingClientRect().left ?? 0;
+  const panelViewportLeft = shellLeft + megaPanelLeft.value;
+  return Math.max(280, window.innerWidth - panelViewportLeft - MEGA_PANEL_SIDE_MARGIN);
+}
+
 function keepDeepRoot(node: WorkbenchMenuNode) {
   activeDeepRootId.value = node.hasChildren ? node.record.id : undefined;
+  void nextTick(() => {
+    updateMegaPanelLayout();
+    updateMegaPanelSize();
+  });
 }
 
 function isSelectedRoot(node: WorkbenchMenuNode) {
@@ -226,41 +274,49 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
       :style="{
         '--mega-panel-top': `${megaPanelTop}px`,
         '--mega-panel-left': `${megaPanelLeft}px`,
+        '--mega-panel-width': `${megaPanelPreferredWidth}px`,
+        '--mega-column-count': megaColumnCount,
       }"
     >
       <div class="mega-body" :class="{ 'has-deep': activeDeepRootNode }">
         <div class="mega-groups">
-          <section v-for="group in megaMenuModel?.groups ?? []" :key="group.record.id" class="mega-group">
-            <button
-              class="mega-group-title"
-              :class="{ navigable: group.navigable }"
-              type="button"
-              :disabled="!group.navigable"
-              @click="selectMenuNode(group)"
-            >
-              <span>{{ group.record.title }}</span>
-            </button>
-
-            <div class="mega-entry-list">
+          <div
+            v-for="(column, columnIndex) in megaMenuModel?.columns ?? []"
+            :key="`mega-column-${columnIndex}`"
+            class="mega-column"
+          >
+            <section v-for="group in column" :key="group.record.id" class="mega-group">
               <button
-                v-for="entry in group.children"
-                :key="entry.record.id"
-                class="mega-entry"
-                :class="{
-                  navigable: entry.navigable,
-                  active: activeDeepRootNode?.record.id === entry.record.id,
-                  branch: entry.hasChildren,
-                }"
+                class="mega-group-title"
+                :class="{ navigable: group.navigable }"
                 type="button"
-                :disabled="!entry.navigable && !entry.hasChildren"
-                @mouseenter="keepDeepRoot(entry)"
-                @focus="keepDeepRoot(entry)"
-                @click="entry.navigable && selectMenuNode(entry)"
+                :disabled="!group.navigable"
+                @click="selectMenuNode(group)"
               >
-                <span>{{ entry.record.title }}</span>
+                <span>{{ group.record.title }}</span>
               </button>
-            </div>
-          </section>
+
+              <div class="mega-entry-list">
+                <button
+                  v-for="entry in group.children"
+                  :key="entry.record.id"
+                  class="mega-entry"
+                  :class="{
+                    navigable: entry.navigable,
+                    active: activeDeepRootNode?.record.id === entry.record.id,
+                    branch: entry.hasChildren,
+                  }"
+                  type="button"
+                  :disabled="!entry.navigable && !entry.hasChildren"
+                  @mouseenter="keepDeepRoot(entry)"
+                  @focus="keepDeepRoot(entry)"
+                  @click="entry.navigable && selectMenuNode(entry)"
+                >
+                  <span>{{ entry.record.title }}</span>
+                </button>
+              </div>
+            </section>
+          </div>
         </div>
 
         <aside v-if="activeDeepRootNode" class="mega-deep-panel">
@@ -470,7 +526,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   left: var(--mega-panel-left);
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  width: min(820px, calc(100vw - var(--mega-panel-left) - 24px));
+  width: min(var(--mega-panel-width), calc(100vw - var(--mega-panel-left) - 24px));
   max-height: calc(100vh - 16px);
   border: 0;
   border-radius: 0 8px 8px 0;
@@ -524,13 +580,20 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 
 .mega-groups {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  grid-template-columns: repeat(var(--mega-column-count), minmax(168px, 1fr));
   align-content: start;
-  gap: 16px 18px;
+  gap: 18px;
   min-width: 0;
   max-height: calc(100vh - 16px);
   padding: 14px;
   overflow: auto;
+}
+
+.mega-column {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
 }
 
 .mega-group {
@@ -653,6 +716,10 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   .mega-groups {
     grid-template-columns: minmax(0, 1fr);
     max-height: none;
+  }
+
+  .mega-column {
+    gap: 14px;
   }
 
   .mega-deep-panel {

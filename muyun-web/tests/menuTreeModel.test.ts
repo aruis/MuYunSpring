@@ -86,3 +86,66 @@ test('buildWorkbenchMegaMenuModel exposes groups and active deep tree root', () 
   );
   assert.equal(model.activeDeepRoot?.record.id, 'dictionary');
 });
+
+test('buildWorkbenchMegaMenuModel packs groups into columns by estimated height', () => {
+  const [root] = createWorkbenchMenuNodes([
+    {
+      record: {
+        id: 'root',
+        schemeId: 'default',
+        title: '平台管理',
+      },
+      children: [
+        menuGroup('long', '平台配置与低代码运维', ['应用管理', '模块管理', '元数据管理', '低代码治理']),
+        menuGroup('identity', '组织与权限', ['租户管理']),
+        menuGroup('support', '业务支撑', ['编码规则']),
+        menuGroup('operation', '平台运行运维', ['工作流运维']),
+      ],
+    },
+  ]);
+  const model = buildWorkbenchMegaMenuModel(root, undefined, 3);
+
+  assert.deepEqual(
+    model.columns.map((column) => column.map((group) => group.record.id)),
+    [['long'], ['identity', 'operation'], ['support']],
+  );
+});
+
+test('buildWorkbenchMegaMenuModel caps column count by group count', () => {
+  const [root] = createWorkbenchMenuNodes([
+    {
+      record: {
+        id: 'root',
+        schemeId: 'default',
+        title: '平台管理',
+      },
+      children: [
+        menuGroup('config', '平台配置', ['应用管理']),
+        menuGroup('identity', '组织与权限', ['用户管理']),
+      ],
+    },
+  ]);
+  const model = buildWorkbenchMegaMenuModel(root, undefined, 4);
+
+  assert.equal(model.columns.length, 2);
+});
+
+function menuGroup(id: string, title: string, children: string[]): MenuTreeNode {
+  return {
+    record: {
+      id,
+      schemeId: 'default',
+      title,
+    },
+    children: children.map((childTitle, index) => ({
+      record: {
+        id: `${id}-${index}`,
+        schemeId: 'default',
+        title: childTitle,
+        openMode: 'tab',
+        moduleAlias: `platform.${id}_${index}`,
+      },
+      children: [],
+    })),
+  };
+}

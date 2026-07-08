@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { MenuNavigationTarget, MenuRecord } from '@muyun/web-contracts';
 import type { WorkbenchMenuNode } from './menuTreeModel';
 
@@ -7,14 +6,11 @@ defineOptions({ name: 'WorkbenchMenuTree' });
 
 const props = defineProps<{
   node: WorkbenchMenuNode;
-  level?: number;
 }>();
 
 const emit = defineEmits<{
   selectMenu: [menu: MenuRecord, target: MenuNavigationTarget];
 }>();
-
-const depth = computed(() => props.level ?? 0);
 
 function handleClick() {
   if (props.node.target) {
@@ -28,7 +24,7 @@ function handleChildSelect(menu: MenuRecord, menuTarget: MenuNavigationTarget) {
 </script>
 
 <template>
-  <li class="deep-node" :style="{ '--depth': depth }">
+  <li class="deep-node">
     <button
       class="deep-node-button"
       :class="{ navigable: node.navigable, branch: node.hasChildren }"
@@ -45,7 +41,6 @@ function handleChildSelect(menu: MenuRecord, menuTarget: MenuNavigationTarget) {
         v-for="child in node.children"
         :key="child.record.id"
         :node="child"
-        :level="depth + 1"
         @select-menu="handleChildSelect"
       />
     </ul>
@@ -67,7 +62,7 @@ function handleChildSelect(menu: MenuRecord, menuTarget: MenuNavigationTarget) {
   gap: 8px;
   width: 100%;
   min-height: 30px;
-  padding: 5px 8px 5px calc(8px + var(--depth) * 12px);
+  padding: 5px 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;

@@ -12,7 +12,13 @@ export interface WorkbenchMenuNode {
 export interface WorkbenchMegaMenuModel {
   root: WorkbenchMenuNode;
   groups: WorkbenchMenuNode[];
+  columns: WorkbenchMenuNode[][];
   activeDeepRoot?: WorkbenchMenuNode;
+}
+
+interface WeightedMegaMenuColumn {
+  groups: WorkbenchMenuNode[];
+  weight: number;
 }
 
 export function createWorkbenchMenuNodes(nodes: MenuTreeNode[]): WorkbenchMenuNode[] {
@@ -86,13 +92,52 @@ export function firstDeepRootIdOf(node: WorkbenchMenuNode): string | undefined {
 export function buildWorkbenchMegaMenuModel(
   root: WorkbenchMenuNode,
   activeDeepRootId: string | undefined,
+  columnCount = 3,
 ): WorkbenchMegaMenuModel {
   const node = activeDeepRootId ? findWorkbenchMenuNodeById(root.children, activeDeepRootId) : undefined;
+  const groups = root.children;
   return {
     root,
-    groups: root.children,
+    groups,
+    columns: buildMegaMenuColumns(groups, columnCount),
     activeDeepRoot: node?.hasChildren ? node : undefined,
   };
+}
+
+function buildMegaMenuColumns(groups: WorkbenchMenuNode[], columnCount: number): WorkbenchMenuNode[][] {
+  if (groups.length === 0) {
+    return [];
+  }
+
+  const normalizedColumnCount = Math.max(1, Math.min(Math.floor(columnCount), groups.length));
+  const columns: WeightedMegaMenuColumn[] = Array.from({ length: normalizedColumnCount }, () => ({
+    groups: [],
+    weight: 0,
+  }));
+
+  for (const group of groups) {
+    const column = columns.reduce((lightest, current) =>
+      current.weight < lightest.weight ? current : lightest,
+    );
+    column.groups.push(group);
+    column.weight += menuGroupWeight(group);
+  }
+
+  return columns.map((column) => column.groups);
+}
+
+function menuGroupWeight(group: WorkbenchMenuNode): number {
+  const titleWeight = titleLengthWeight(group.record.title);
+  const childWeight = group.children.reduce((total, child) => {
+    const branchWeight = child.hasChildren ? 0.7 + child.children.length * 0.25 : 0;
+    return total + 1 + branchWeight + titleLengthWeight(child.record.title) * 0.4;
+  }, 0);
+
+  return 1.25 + titleWeight + childWeight;
+}
+
+function titleLengthWeight(title: string): number {
+  return Math.max(0, Math.ceil(title.length / 10) - 1) * 0.35;
 }
 
 function createWorkbenchMenuNode(node: MenuTreeNode): WorkbenchMenuNode {
