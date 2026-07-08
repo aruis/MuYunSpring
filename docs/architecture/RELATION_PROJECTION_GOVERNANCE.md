@@ -16,6 +16,8 @@
 
 当前已以 `RelationProjectionJoinDefinition` 作为来源无关的关联投影定义雏形。静态侧先通过 Java contributor 接入；动态侧未来应把元数据引用、模块关系和字典标题编译到同一种定义，而不是另起动态专用 planner。
 
+当前运行态已沉淀 `RelationProjectionReadService` 作为读投影门面，统一编排必需字段收集、SQL plan 构建、分页执行和响应字段边界。静态列表入口只负责把静态模块编译成 `RecordReadProjection` 后调用该门面；动态侧未来不应复制静态 service 的编排，而应把动态元数据编译到同一组 definition/projection 后复用该门面。
+
 推荐长期抽象：
 
 ```text
@@ -64,7 +66,7 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 
 中期目标是把静态侧验证过的能力沉淀为动静共享的平台查询能力。
 
-1. 继续把 `RelationProjection*` 从静态列表专用能力推进为来源无关的读投影平台能力。
+1. 继续把 `RelationProjection*` 从静态列表专用能力推进为来源无关的读投影平台能力，运行态入口以 `RelationProjectionReadService` 为准。
 2. 静态 `RelationProjectionJoinContributor` 保持轻量业务声明，动态侧后续编译为相同 relation 定义。
 3. 动态引用字段、模块关系和字典标题也编译为同一种 `RelationProjectionDefinition`。
 4. `RecordReadProjectionPlanner` 统一决定输出字段、内部读取字段、强制投影字段和 post-read transform。
