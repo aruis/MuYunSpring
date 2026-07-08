@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -97,10 +98,7 @@ public class StaticRecordReadProjectionService {
     private java.util.Set<String> requiredMainFields(Criteria criteria, Sort... sorts) {
         java.util.LinkedHashSet<String> fields = new java.util.LinkedHashSet<>();
         if (criteria != null) {
-            criteria.getClauses().stream()
-                    .map(CriteriaClause::getField)
-                    .filter(field -> field != null && !field.isBlank())
-                    .forEach(fields::add);
+            collectCriteriaFields(criteria.getRoot(), fields);
         }
         if (sorts != null) {
             java.util.Arrays.stream(sorts)
@@ -110,6 +108,23 @@ public class StaticRecordReadProjectionService {
                     .forEach(fields::add);
         }
         return java.util.Set.copyOf(fields);
+    }
+
+    private void collectCriteriaFields(CriteriaGroup group, java.util.Set<String> fields) {
+        if (group == null) {
+            return;
+        }
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = entry.getNode();
+            if (node instanceof CriteriaClause clause) {
+                String field = clause.getField();
+                if (field != null && !field.isBlank()) {
+                    fields.add(field);
+                }
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collectCriteriaFields(childGroup, fields);
+            }
+        }
     }
 
     private Optional<RecordReadProjection> defaultListProjection(String moduleAlias, Object recordService) {

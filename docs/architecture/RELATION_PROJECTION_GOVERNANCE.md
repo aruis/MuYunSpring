@@ -73,6 +73,7 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 7. projection plan 可以缓存，但必须按静态模块定义版本、动态元数据运行态版本、UI 配置版本或查询模板版本失效。
 8. relation 字段的筛选和排序纳入 `QueryDescriptor` 或后续 `ProjectionQueryDescriptor`，避免“投影了就能查”的隐式扩权。
 9. 数据权限策略进入 relation 定义，区分“源记录可见即可展示有限摘要”和“目标模块也必须满足数据权限”。
+10. 标准租户、软删和启停等 join 过滤应由平台根据 relation 目标实体能力生成，业务 contributor 只声明关系路径和业务过滤事实。
 
 ## 长期统一
 
