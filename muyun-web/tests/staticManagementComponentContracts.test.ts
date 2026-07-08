@@ -468,7 +468,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
-  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(contractsSource, /optionTitleField\?: string/);
+  assert.match(panelSource, /titleField\?: string/);
+  assert.match(panelSource, /titleField: fieldByName\(field\.fieldRef\.fieldName\)\?\.optionTitleField/);
+  assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(panelSource, /return value \? '是' : '否'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
@@ -729,7 +732,7 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
   assert.doesNotMatch(roleViewSource, /rolePermissions/);
-  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
   assert.match(

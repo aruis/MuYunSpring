@@ -3,10 +3,14 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -132,6 +136,45 @@ class StaticRecordReadProjectionServiceTest {
                 "__join_bound_employee_bound_employee_0");
     }
 
+    @Test
+    void shouldPopulateOptionTitlesForRelationProjectionSqlResponse() {
+        NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
+        StaticRecordReadProjectionService service = new StaticRecordReadProjectionService(
+                new StaticModuleDefinitionCatalog(List.of(userRelationDefinitionWithPasswordStatusColumn())),
+                new RelationProjectionQueryExecutor(jdbcOperations),
+                new RelationProjectionDatabaseTypeProvider(),
+                new OptionSourceRegistry(List.of(new CodeTitleEnumOptionSourceProvider()))
+        );
+        @SuppressWarnings("rawtypes")
+        CrudAbility recordService = mock(CrudAbility.class);
+        when(recordService.modelClass()).thenReturn(UserAccount.class);
+        when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
+                .thenReturn(List.of(Map.of(
+                        "id", "user-1",
+                        "username", "alice",
+                        "passwordStatus", "normal",
+                        "employeeNo", "E001",
+                        "employeeTitle", "Alice"
+                )));
+        when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
+                .thenReturn(1L);
+
+        WebPageResponse<?> response = service.queryDefaultList(
+                "iam.user",
+                Criteria.of(),
+                PageRequest.of(1, 20),
+                recordService
+        ).orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> output = (Map<String, Object>) response.records().getFirst();
+        assertThat(output)
+                .containsEntry("passwordStatus", "normal")
+                .containsEntry("passwordStatusTitle", "正常")
+                .containsEntry("employeeNo", "E001")
+                .containsEntry("employeeTitle", "Alice");
+    }
+
     private static StaticModuleDefinition staticDefinition() {
         return new StaticModuleDefinition(
                 "iam",
@@ -162,6 +205,23 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition userRelationDefinition() {
+        return userRelationDefinition(false);
+    }
+
+    private static StaticModuleDefinition userRelationDefinitionWithPasswordStatusColumn() {
+        return userRelationDefinition(true);
+    }
+
+    private static StaticModuleDefinition userRelationDefinition(boolean includePasswordStatusColumn) {
+        ModuleUiDefinition.Builder uiBuilder = ModuleUiDefinition.builder("iam.user")
+                .listView(list -> {
+                    list.field("username");
+                    if (includePasswordStatusColumn) {
+                        list.field("passwordStatus");
+                    }
+                    list.field("bound_employee", "employeeNo", field -> field.label("职员工号"));
+                    list.field("bound_employee", "employeeTitle", field -> field.label("职员姓名"));
+                });
         return new StaticModuleDefinition(
                 "iam",
                 "iam.user",
@@ -193,12 +253,7 @@ class StaticRecordReadProjectionServiceTest {
                                 )
                         )
                 ),
-                ModuleUiDefinition.builder("iam.user")
-                        .listView(list -> list
-                                .field("username")
-                                .field("bound_employee", "employeeNo", field -> field.label("职员工号"))
-                                .field("bound_employee", "employeeTitle", field -> field.label("职员姓名")))
-                        .build(),
+                uiBuilder.build(),
                 List.of(new RelationProjectionJoinDefinition(
                         "bound_employee",
                         new EntityDefinition(

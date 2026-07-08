@@ -333,6 +333,7 @@ export interface QuerySchemaField {
   defaultOperator?: QueryOperator;
   quickSearch?: boolean;
   sortable?: boolean;
+  optionTitleField?: string;
 }
 
 export interface QuerySchemaQuickSearch {
