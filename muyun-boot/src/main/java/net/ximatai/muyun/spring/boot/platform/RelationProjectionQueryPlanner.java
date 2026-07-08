@@ -53,7 +53,8 @@ public final class RelationProjectionQueryPlanner {
         addStandardMainFields(selectFields);
         LinkedHashSet<String> queryableFields = new LinkedHashSet<>(selectFields.keySet());
 
-        LinkedHashSet<String> responseFields = new LinkedHashSet<>(projection.internalReadFields());
+        LinkedHashSet<String> responseFields = new LinkedHashSet<>();
+        responseFields.add(StandardEntitySchema.ID_FIELD);
         projection.outputFields().stream()
                 .map(ViewFieldRef::fieldName)
                 .forEach(responseFields::add);

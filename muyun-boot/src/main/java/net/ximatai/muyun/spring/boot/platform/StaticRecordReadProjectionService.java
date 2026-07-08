@@ -15,11 +15,12 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Component
 public class StaticRecordReadProjectionService {
     private final StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
-    private final RelationProjectionQueryExecutor projectionQueryExecutor;
+    private final Supplier<RelationProjectionQueryExecutor> projectionQueryExecutor;
     private final RelationProjectionDatabaseTypeProvider databaseTypeProvider;
 
     public StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog) {
@@ -31,15 +32,23 @@ public class StaticRecordReadProjectionService {
                                              ObjectProvider<RelationProjectionQueryExecutor> projectionQueryExecutor,
                                              ObjectProvider<RelationProjectionDatabaseTypeProvider> databaseTypeProvider) {
         this(staticModuleDefinitionCatalog,
-                projectionQueryExecutor == null ? null : projectionQueryExecutor.getIfAvailable(),
+                projectionQueryExecutor == null ? null : projectionQueryExecutor::getIfAvailable,
                 databaseTypeProvider == null ? null : databaseTypeProvider.getIfAvailable());
     }
 
     StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
                                       RelationProjectionQueryExecutor projectionQueryExecutor,
                                       RelationProjectionDatabaseTypeProvider databaseTypeProvider) {
+        this(staticModuleDefinitionCatalog,
+                (Supplier<RelationProjectionQueryExecutor>) () -> projectionQueryExecutor,
+                databaseTypeProvider);
+    }
+
+    private StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
+                                              Supplier<RelationProjectionQueryExecutor> projectionQueryExecutor,
+                                              RelationProjectionDatabaseTypeProvider databaseTypeProvider) {
         this.staticModuleDefinitionCatalog = staticModuleDefinitionCatalog;
-        this.projectionQueryExecutor = projectionQueryExecutor;
+        this.projectionQueryExecutor = projectionQueryExecutor == null ? () -> null : projectionQueryExecutor;
         this.databaseTypeProvider = databaseTypeProvider == null
                 ? new RelationProjectionDatabaseTypeProvider()
                 : databaseTypeProvider;
@@ -56,7 +65,7 @@ public class StaticRecordReadProjectionService {
     }
 
     public boolean supportsDefaultListQuery(String moduleAlias, Object recordService) {
-        if (projectionQueryExecutor == null) {
+        if (projectionQueryExecutor() == null) {
             return false;
         }
         StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
@@ -74,7 +83,8 @@ public class StaticRecordReadProjectionService {
                                                             PageRequest pageRequest,
                                                             Object recordService,
                                                             Sort... sorts) {
-        if (projectionQueryExecutor == null) {
+        RelationProjectionQueryExecutor executor = projectionQueryExecutor();
+        if (executor == null) {
             return Optional.empty();
         }
         StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
@@ -103,9 +113,13 @@ public class StaticRecordReadProjectionService {
         if (!plan.hasRelationProjection()) {
             return Optional.empty();
         }
-        PageResult<Map<String, Object>> page = projectionQueryExecutor.page(plan, criteria, pageRequest, sorts);
+        PageResult<Map<String, Object>> page = executor.page(plan, criteria, pageRequest, sorts);
         WebPageResponse response = WebPageResponse.from(page);
         return Optional.of(response);
+    }
+
+    private RelationProjectionQueryExecutor projectionQueryExecutor() {
+        return projectionQueryExecutor.get();
     }
 
     private java.util.Set<String> requiredMainFields(Criteria criteria, Sort... sorts) {

@@ -3,6 +3,10 @@ package net.ximatai.muyun.spring.boot;
 import com.fasterxml.jackson.databind.JsonNode;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
@@ -52,6 +56,15 @@ class MuYunSpringApplicationContextIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private StaticRecordReadProjectionService staticRecordReadProjectionService;
+
+    @Autowired
+    private StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
+
+    @Autowired
+    private UserAccountService userAccountService;
 
     private TestRestTemplate restTemplate;
 
@@ -148,6 +161,66 @@ class MuYunSpringApplicationContextIT {
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    @Test
+    void shouldQueryUserListWithBoundEmployeeProjectionThroughRealDatabase() {
+        String tenantId = "tenant_projection_it";
+        seedUserEmployeeProjectionRecords(tenantId);
+        assertThat(staticModuleDefinitionCatalog.find(UserAccountService.MODULE_ALIAS))
+                .get()
+                .satisfies(definition -> {
+                    assertThat(definition.entities()).isNotEmpty();
+                    assertThat(definition.projectionJoins()).isNotEmpty();
+                });
+        assertThat(staticRecordReadProjectionService.supportsDefaultListQuery(
+                UserAccountService.MODULE_ALIAS, userAccountService)).isTrue();
+
+        WebPageResponse<?> firstPage = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(1, 2),
+                userAccountService,
+                Sort.asc("username")
+        ).orElseThrow();
+
+        assertThat(firstPage.total()).isEqualTo(4);
+        assertThat(firstPage.records()).hasSize(2);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> alice = (Map<String, Object>) firstPage.records().get(0);
+        assertThat(alice)
+                .containsEntry("id", "projection_user_alice")
+                .containsEntry("username", "alice_projection")
+                .containsEntry("employeeNo", "E-PROJ-001")
+                .containsEntry("employeeTitle", "Alice Employee");
+        assertThat(alice).containsEntry("passwordStatus", "ACTIVE");
+        assertThat(alice).doesNotContainKeys("tenantId", "version", "deleted", "createdAt");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> bob = (Map<String, Object>) firstPage.records().get(1);
+        assertThat(bob)
+                .containsEntry("id", "projection_user_bob")
+                .containsEntry("username", "bob_projection");
+        assertThat(bob.get("employeeNo")).isNull();
+        assertThat(bob.get("employeeTitle")).isNull();
+
+        WebPageResponse<?> secondPage = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(2, 2),
+                userAccountService,
+                Sort.asc("username")
+        ).orElseThrow();
+
+        assertThat(secondPage.total()).isEqualTo(4);
+        assertThat(secondPage.records()).hasSize(2);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> charlie = (Map<String, Object>) secondPage.records().get(0);
+        assertThat(charlie).containsEntry("username", "charlie_projection");
+        assertThat(charlie.get("employeeNo")).isNull();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dave = (Map<String, Object>) secondPage.records().get(1);
+        assertThat(dave).containsEntry("username", "dave_projection");
+        assertThat(dave.get("employeeNo")).isNull();
+    }
+
     private HttpHeaders bearerHeaders(String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -174,5 +247,55 @@ class MuYunSpringApplicationContextIT {
                 tableName,
                 columnName);
         return count != null && count > 0;
+    }
+
+    private void seedUserEmployeeProjectionRecords(String tenantId) {
+        jdbcTemplate.update("delete from iam_employee_account where tenant_id = ?", tenantId);
+        jdbcTemplate.update("delete from iam_employee where tenant_id = ?", tenantId);
+        jdbcTemplate.update("delete from iam_user where tenant_id = ?", tenantId);
+        insertUser(tenantId, "projection_user_alice", "alice_projection");
+        insertUser(tenantId, "projection_user_bob", "bob_projection");
+        insertUser(tenantId, "projection_user_charlie", "charlie_projection");
+        insertUser(tenantId, "projection_user_dave", "dave_projection");
+        insertEmployee(tenantId, "projection_emp_alice", "E-PROJ-001", "Alice Employee", false);
+        insertEmployee(tenantId, "projection_emp_charlie", "E-PROJ-003", "Charlie Employee", false);
+        insertEmployee(tenantId, "projection_emp_dave", "E-PROJ-004", "Dave Employee", true);
+        insertEmployeeAccount(tenantId, "projection_bind_alice", "projection_emp_alice",
+                "projection_user_alice", false);
+        insertEmployeeAccount(tenantId, "projection_bind_charlie", "projection_emp_charlie",
+                "projection_user_charlie", true);
+        insertEmployeeAccount(tenantId, "projection_bind_dave", "projection_emp_dave",
+                "projection_user_dave", false);
+    }
+
+    private void insertUser(String tenantId, String id, String username) {
+        jdbcTemplate.update("""
+                        insert into iam_user (
+                            id, tenant_id, title, username, password_hash, password_status,
+                            enabled, deleted, auth_user_id, auth_module_alias
+                        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                id, tenantId, username, username, "test-password-hash", "ACTIVE",
+                Boolean.TRUE, Boolean.FALSE, id, UserAccountService.MODULE_ALIAS);
+    }
+
+    private void insertEmployee(String tenantId, String id, String employeeNo, String title, boolean deleted) {
+        jdbcTemplate.update("""
+                        insert into iam_employee (
+                            id, tenant_id, title, organization_id, department_id, employee_no,
+                            enabled, deleted
+                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                id, tenantId, title, "projection_org", "projection_dept", employeeNo,
+                Boolean.TRUE, deleted);
+    }
+
+    private void insertEmployeeAccount(String tenantId, String id, String employeeId, String userId, boolean deleted) {
+        jdbcTemplate.update("""
+                        insert into iam_employee_account (
+                            id, tenant_id, employee_id, user_id, deleted
+                        ) values (?, ?, ?, ?, ?)
+                        """,
+                id, tenantId, employeeId, userId, deleted);
     }
 }
