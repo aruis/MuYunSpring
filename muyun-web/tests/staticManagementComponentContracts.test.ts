@@ -885,6 +885,27 @@ test('password management is a dedicated security settings page', () => {
   assert.match(contractsSource, /export interface PasswordPolicyRule extends StandardEnabledSortableEntity/);
 });
 
+test('workbench exposes own password change through auth boundary', () => {
+  const appSource = readSource('src/App.vue');
+  const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
+  const dialogSource = readSource('src/app/ChangeOwnPasswordDialog.vue');
+  const authClientSource = readSource('src/web-core/clients.ts');
+
+  assert.match(workbenchSource, /key: 'changePassword'/);
+  assert.match(workbenchSource, /title: '修改密码'/);
+  assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
+  assert.match(appSource, /authClient\.changeOwnPassword/);
+  assert.match(appSource, /effectiveAuthToken/);
+  assert.match(appSource, /currentPassword: currentPassword\.value/);
+  assert.match(appSource, /newPassword: newPassword\.value/);
+  assert.match(dialogSource, /defineOptions\(\{ name: 'ChangeOwnPasswordDialog' \}\)/);
+  assert.match(dialogSource, /autocomplete="current-password"/);
+  assert.match(dialogSource, /autocomplete="new-password"/);
+  assert.match(authClientSource, /path: '\/iam\.auth\/changeOwnPassword'/);
+  assert.doesNotMatch(appSource, /iam\.user\/changePassword/);
+  assert.doesNotMatch(appSource, /iam\.user\/resetPassword/);
+});
+
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
   const hostSource = readSource('src/platform-workbench/hosts/DynamicModuleHost.vue');
 
