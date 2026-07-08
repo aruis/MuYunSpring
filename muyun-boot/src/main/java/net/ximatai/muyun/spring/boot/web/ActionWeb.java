@@ -8,10 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
-public interface ActionWeb<S, Q, D, A, R> extends ScopedWeb<S> {
+public interface ActionWeb<S, Q, D, R> extends ScopedWeb<S> {
     List<D> listActions();
-
-    List<A> listRecordActions(String recordId);
 
     R executeListAction(String actionCode, Q request);
 
@@ -22,11 +20,6 @@ public interface ActionWeb<S, Q, D, A, R> extends ScopedWeb<S> {
     @GetMapping("/actions")
     default List<D> actions() {
         return webScope(this::listActions);
-    }
-
-    @GetMapping("/actions/{recordId}")
-    default List<A> recordActions(@PathVariable String recordId) {
-        return webScope(() -> listRecordActions(recordId));
     }
 
     @PostMapping("/" + PlatformWebPathRules.ACTION_CODE_PATH)

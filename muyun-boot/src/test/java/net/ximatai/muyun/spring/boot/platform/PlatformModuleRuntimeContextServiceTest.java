@@ -1,11 +1,18 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.RecordActionAvailabilityDecision;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -17,6 +24,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
@@ -39,7 +48,12 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PlatformModuleRuntimeContextServiceTest {
@@ -374,6 +388,330 @@ class PlatformModuleRuntimeContextServiceTest {
                 });
     }
 
+    @Test
+    void shouldResolveRecordActionAvailabilityFromActionAuthDataAuthAndBusinessContributor() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        when(moduleService.resolveVisibleModule("iam.user"))
+                .thenReturn(module("iam.user", "用户管理", ModuleKind.STATIC));
+        when(actionService.listByModuleAliases(List.of("iam.user"))).thenReturn(List.of());
+        StaticModuleDefinition definition = new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                List.of(
+                        StaticModuleActionDefinition.platformAction(PlatformAction.QUERY),
+                        StaticModuleActionDefinition.platformAction(PlatformAction.VIEW),
+                        StaticModuleActionDefinition.platformAction(PlatformAction.UPDATE),
+                        StaticModuleActionDefinition.recordAction("resetPassword", "重置密码"),
+                        new StaticModuleActionDefinition(
+                                "touchAny",
+                                "touchAny",
+                                "全级别动作",
+                                EntityActionLevel.ANY,
+                                EntityActionAccessMode.AUTH_REQUIRED,
+                                true,
+                                false,
+                                null
+                        )
+                )
+        );
+        ScopedModuleAbility scopedAbility = mock(ScopedModuleAbility.class);
+        when(scopedAbility.getModuleAlias()).thenReturn("iam.user");
+        doAnswer(invocation -> {
+            ActionExecutionPolicy policy = invocation.getArgument(0);
+            if (PlatformAction.UPDATE.matches(policy.actionCode())) {
+                throw new PlatformException("denied");
+            }
+            return null;
+        }).when(scopedAbility).requireRecordScope(any(ActionExecutionPolicy.class), any());
+        PlatformModuleRuntimeContextService runtimeContextService = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of(definition)),
+                null,
+                null,
+                null,
+                allowAllPolicy()
+        );
+        PlatformRecordActionAvailabilityService service = new PlatformRecordActionAvailabilityService(
+                runtimeContextService,
+                null,
+                null,
+                List.of(scopedAbility),
+                List.of((moduleAlias, actionCode, recordId) -> {
+                    if ("iam.user".equals(moduleAlias) && "resetPassword".equals(actionCode)) {
+                        return java.util.Optional.of(RecordActionAvailabilityDecision.unavailable(
+                                "cannot administrate current user's password"));
+                    }
+                    return java.util.Optional.empty();
+                })
+        );
+
+        PlatformRecordActionAvailability availability = service.recordActions("iam.user", "user-1");
+
+        assertThat(availability.recordId()).isEqualTo("user-1");
+        assertThat(availability.actions()).extracting(PlatformRecordActionAvailability.Action::actionCode)
+                .containsExactly("view", "update", "resetPassword", "touchAny")
+                .doesNotContain("query");
+        assertThat(availability.actions()).filteredOn(action -> "view".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.available()).isTrue();
+                    assertThat(action.reason()).isNull();
+                });
+        assertThat(availability.actions()).filteredOn(action -> "update".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.available()).isFalse();
+                    assertThat(action.reason()).isEqualTo("no data auth");
+                });
+        assertThat(availability.actions()).filteredOn(action -> "resetPassword".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.available()).isFalse();
+                    assertThat(action.reason()).isEqualTo("cannot administrate current user's password");
+                });
+    }
+
+    @Test
+    void shouldResolveDynamicRecordActionAvailabilityThroughUnifiedResolver() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
+        DynamicRecord record = new DynamicRecord(entity("contract",
+                Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)));
+        record.setId("contract-1");
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", "合同", ModuleKind.DYNAMIC));
+        when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
+        when(dynamicRecordService.describe("sales.contract")).thenReturn(new DynamicModuleDescriptor(
+                "sales.contract",
+                "合同",
+                "contract",
+                List.of(
+                        dynamicAction("export", EntityActionLevel.LIST),
+                        dynamicAction("submit", EntityActionLevel.RECORD),
+                        dynamicAction("preview", EntityActionLevel.ANY),
+                        dynamicAction("archive", EntityActionLevel.BATCH)
+                ),
+                List.of(dynamicEntity("contract", "CRUD")),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        when(dynamicRecordService.mainEntityAlias("sales.contract")).thenReturn("contract");
+        when(dynamicRecordService.select("sales.contract", "contract", "contract-1")).thenReturn(record);
+        when(dynamicRecordService.actions("sales.contract")).thenReturn(List.of(
+                dynamicAction("export", EntityActionLevel.LIST),
+                dynamicAction("submit", EntityActionLevel.RECORD),
+                dynamicAction("preview", EntityActionLevel.ANY),
+                dynamicAction("archive", EntityActionLevel.BATCH)
+        ));
+        when(dynamicRecordService.actionAuthorizationAvailability("sales.contract", "contract", "submit",
+                Set.of("contract-1"))).thenReturn(DynamicActionAvailability.available("submit"));
+        when(dynamicRecordService.actionAuthorizationAvailability("sales.contract", "contract", "preview",
+                Set.of("contract-1"))).thenReturn(DynamicActionAvailability.available("preview"));
+        when(dynamicRecordService.actionAvailability("sales.contract", "submit", record))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "只有草稿合同可以提交"));
+        when(dynamicRecordService.actionAvailability("sales.contract", "preview", record))
+                .thenReturn(DynamicActionAvailability.available("preview"));
+        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        PlatformModuleRuntimeContextService runtimeContextService = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of()),
+                dynamicRecordService,
+                null,
+                null,
+                allowAllPolicy()
+        );
+        PlatformRecordActionAvailabilityService service = new PlatformRecordActionAvailabilityService(
+                runtimeContextService,
+                dynamicRecordService,
+                new PlatformDynamicModuleScopeService(activeTenantVerifier),
+                List.of(),
+                List.of()
+        );
+
+        PlatformRecordActionAvailability availability;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            availability = service.recordActions("sales.contract", "contract-1");
+        }
+
+        assertThat(availability.recordId()).isEqualTo("contract-1");
+        assertThat(availability.actions()).extracting(PlatformRecordActionAvailability.Action::actionCode)
+                .containsExactly("submit", "preview");
+        assertThat(availability.actions()).filteredOn(action -> "submit".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.available()).isFalse();
+                    assertThat(action.reason()).isEqualTo("只有草稿合同可以提交");
+                });
+        assertThat(availability.actions()).filteredOn(action -> "preview".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> assertThat(action.available()).isTrue());
+        verify(activeTenantVerifier).verifyActiveTenant("tenant-a");
+    }
+
+    @Test
+    void shouldRejectDynamicRecordActionAvailabilityWithoutTenantContext() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
+        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", "合同", ModuleKind.DYNAMIC));
+        when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
+        when(dynamicRecordService.describe("sales.contract")).thenReturn(new DynamicModuleDescriptor(
+                "sales.contract",
+                "合同",
+                "contract",
+                List.of(dynamicAction("submit", EntityActionLevel.RECORD)),
+                List.of(dynamicEntity("contract", "CRUD")),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        PlatformModuleRuntimeContextService runtimeContextService = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of()),
+                dynamicRecordService,
+                null,
+                null,
+                allowAllPolicy()
+        );
+        PlatformRecordActionAvailabilityService service = new PlatformRecordActionAvailabilityService(
+                runtimeContextService,
+                dynamicRecordService,
+                new PlatformDynamicModuleScopeService(activeTenantVerifier),
+                List.of(),
+                List.of()
+        );
+
+        TenantContext.clear();
+
+        assertThatThrownBy(() -> service.recordActions("sales.contract", "contract-1"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessage("sales.contract requires tenant context");
+        verify(activeTenantVerifier, never()).verifyActiveTenant(any());
+    }
+
+    @Test
+    void shouldUseRuntimeContextActionsForDynamicRecordAvailability() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
+        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        DynamicRecord record = new DynamicRecord(entity("contract",
+                Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)));
+        record.setId("contract-1");
+        PlatformModuleAction disabledSubmit = action("sales.contract", PlatformAction.UPDATE);
+        disabledSubmit.setActionCode("submit");
+        disabledSubmit.setEnabled(Boolean.FALSE);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", "合同", ModuleKind.DYNAMIC));
+        when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of(disabledSubmit));
+        when(dynamicRecordService.describe("sales.contract")).thenReturn(new DynamicModuleDescriptor(
+                "sales.contract",
+                "合同",
+                "contract",
+                List.of(
+                        dynamicAction("submit", EntityActionLevel.RECORD),
+                        dynamicAction("preview", EntityActionLevel.RECORD)
+                ),
+                List.of(dynamicEntity("contract", "CRUD")),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        when(dynamicRecordService.actions("sales.contract")).thenReturn(List.of(
+                dynamicAction("submit", EntityActionLevel.RECORD),
+                dynamicAction("preview", EntityActionLevel.RECORD)
+        ));
+        when(dynamicRecordService.actionAuthorizationAvailability("sales.contract", "contract", "preview",
+                Set.of("contract-1"))).thenReturn(DynamicActionAvailability.available("preview"));
+        when(dynamicRecordService.select("sales.contract", "contract", "contract-1")).thenReturn(record);
+        when(dynamicRecordService.actionAvailability("sales.contract", "preview", record))
+                .thenReturn(DynamicActionAvailability.available("preview"));
+        PlatformModuleRuntimeContextService runtimeContextService = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of()),
+                dynamicRecordService,
+                null,
+                null,
+                allowAllPolicy()
+        );
+        PlatformRecordActionAvailabilityService service = new PlatformRecordActionAvailabilityService(
+                runtimeContextService,
+                dynamicRecordService,
+                new PlatformDynamicModuleScopeService(activeTenantVerifier),
+                List.of(),
+                List.of()
+        );
+
+        PlatformRecordActionAvailability availability;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            availability = service.recordActions("sales.contract", "contract-1");
+        }
+
+        assertThat(availability.actions()).extracting(PlatformRecordActionAvailability.Action::actionCode)
+                .containsExactly("preview");
+        verify(dynamicRecordService, never()).actionAuthorizationAvailability("sales.contract",
+                "contract", "submit", Set.of("contract-1"));
+    }
+
+    @Test
+    void shouldRejectDynamicRecordActionAvailabilityWhenRecordDoesNotExist() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
+        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", "合同", ModuleKind.DYNAMIC));
+        when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
+        when(dynamicRecordService.describe("sales.contract")).thenReturn(new DynamicModuleDescriptor(
+                "sales.contract",
+                "合同",
+                "contract",
+                List.of(dynamicAction("submit", EntityActionLevel.RECORD)),
+                List.of(dynamicEntity("contract", "CRUD")),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        when(dynamicRecordService.mainEntityAlias("sales.contract")).thenReturn("contract");
+        when(dynamicRecordService.actions("sales.contract"))
+                .thenReturn(List.of(dynamicAction("submit", EntityActionLevel.RECORD)));
+        when(dynamicRecordService.actionAuthorizationAvailability("sales.contract", "contract", "submit",
+                Set.of("missing"))).thenReturn(DynamicActionAvailability.available("submit"));
+        PlatformModuleRuntimeContextService runtimeContextService = new PlatformModuleRuntimeContextService(
+                moduleService,
+                actionService,
+                new StaticModuleDefinitionCatalog(List.of()),
+                dynamicRecordService,
+                null,
+                null,
+                allowAllPolicy()
+        );
+        PlatformRecordActionAvailabilityService service = new PlatformRecordActionAvailabilityService(
+                runtimeContextService,
+                dynamicRecordService,
+                new PlatformDynamicModuleScopeService(activeTenantVerifier),
+                List.of(),
+                List.of()
+        );
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> service.recordActions("sales.contract", "missing"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("dynamic record does not exist: missing");
+        }
+    }
+
 
     private PlatformModule module(String alias, String title, ModuleKind moduleKind) {
         PlatformModule module = new PlatformModule();
@@ -384,6 +722,9 @@ class PlatformModuleRuntimeContextServiceTest {
         module.setEntryType(ModuleEntryType.ROUTE);
         module.setEntryRoute("/iam/organizations");
         return module;
+    }
+
+    private interface ScopedModuleAbility extends CrudAbility<PlatformModule>, DataScopeAbility<PlatformModule> {
     }
 
     private EntityDefinition entity(String alias, Set<EntityCapability> capabilities) {
@@ -421,6 +762,25 @@ class PlatformModuleRuntimeContextServiceTest {
                 false,
                 null,
                 EntityActionExecutorType.STANDARD,
+                null
+        );
+    }
+
+    private DynamicActionDescriptor dynamicAction(String code, EntityActionLevel level) {
+        return new DynamicActionDescriptor(
+                code,
+                code,
+                true,
+                level,
+                EntityActionCategory.CUSTOM,
+                EntityActionAccessMode.AUTH_REQUIRED,
+                true,
+                true,
+                null,
+                null,
+                false,
+                null,
+                EntityActionExecutorType.SERVICE,
                 null
         );
     }

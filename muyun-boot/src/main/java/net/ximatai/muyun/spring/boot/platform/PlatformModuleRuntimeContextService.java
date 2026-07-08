@@ -368,6 +368,18 @@ public class PlatformModuleRuntimeContextService {
         );
     }
 
+    private ActionExecutionPolicy policy(PlatformModuleRuntimeAction action) {
+        return new ActionExecutionPolicy(
+                action.actionCode(),
+                action.actionLevel(),
+                action.accessMode(),
+                action.actionAuth(),
+                action.dataAuth(),
+                action.defaultGrantPolicy(),
+                inheritActionCode(action.actionCode(), action.permissionActionCode(), action.actionAuth())
+        );
+    }
+
     private Authorization authorize(String moduleAlias, ActionExecutionPolicy policy) {
         try {
             ActionAuthorizationResult result = actionExecutionPolicyService.authorize(
@@ -476,7 +488,7 @@ public class PlatformModuleRuntimeContextService {
         return capabilities;
     }
 
-    private String inheritActionCode(String actionCode, String permissionActionCode, boolean actionAuth) {
+    static String inheritActionCode(String actionCode, String permissionActionCode, boolean actionAuth) {
         if (!actionAuth || permissionActionCode == null || permissionActionCode.isBlank()
                 || actionCode.equals(permissionActionCode)) {
             return null;

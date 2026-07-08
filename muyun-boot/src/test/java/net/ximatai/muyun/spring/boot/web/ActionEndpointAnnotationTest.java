@@ -40,7 +40,6 @@ class ActionEndpointAnnotationTest {
     @Test
     void shouldNotTreatActionListEndpointsAsBusinessActionEndpoints() throws Exception {
         assertThat(ActionWeb.class.getMethod("actions").getAnnotation(ActionEndpoint.class)).isNull();
-        assertThat(ActionWeb.class.getMethod("recordActions", String.class).getAnnotation(ActionEndpoint.class)).isNull();
     }
 
     @Test

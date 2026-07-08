@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
+import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -31,7 +32,6 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -127,13 +127,11 @@ public class DynamicRecordWebController implements
         ActionWeb<DynamicEntityOperations,
                 DynamicWebActionRequest,
                 DynamicActionDescriptor,
-                DynamicWebActionAvailabilityResponse,
                 DynamicWebActionExecutionResponse>,
         ReferenceWeb<DynamicEntityOperations,
                 DynamicWebReferenceRequest,
                 DynamicReferenceResolveResponse> {
     private final DynamicRecordService recordService;
-    private final ActiveTenantVerifier activeTenantVerifier;
     private final CodeBusinessPreviewService codeBusinessPreviewService;
     private final ReferenceRecordGenerationFacade referenceRecordGenerationFacade;
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
@@ -143,6 +141,7 @@ public class DynamicRecordWebController implements
     private final RecordAttachmentAccessService recordAttachmentAccessService;
     private final RecordDuplicateCheckService duplicateCheckService;
     private final PlatformRecordNavigationService navigationService;
+    private final PlatformDynamicModuleScopeService dynamicModuleScopeService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final int SUMMARY_MAX_RECORDS = 10_000;
@@ -256,7 +255,6 @@ public class DynamicRecordWebController implements
                                       RecordDuplicateCheckService duplicateCheckService,
                                       PlatformRecordNavigationService navigationService) {
         this.recordService = recordService;
-        this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
         this.referenceRecordGenerationFacade = referenceRecordGenerationFacade;
         this.pageConfigSnapshotService = pageConfigSnapshotService;
@@ -266,6 +264,7 @@ public class DynamicRecordWebController implements
         this.recordAttachmentAccessService = recordAttachmentAccessService;
         this.duplicateCheckService = duplicateCheckService;
         this.navigationService = navigationService;
+        this.dynamicModuleScopeService = new PlatformDynamicModuleScopeService(activeTenantVerifier);
     }
 
     @Override
@@ -1236,23 +1235,6 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    public List<DynamicWebActionAvailabilityResponse> listRecordActions(String recordId) {
-        String moduleAlias = DynamicWebRequest.moduleAlias();
-        String entityAlias = mainEntityAlias(moduleAlias);
-        DynamicRecord record = recordService.select(moduleAlias, entityAlias, recordId);
-        if (record == null) {
-            throw new IllegalArgumentException("dynamic record does not exist: " + recordId);
-        }
-        return recordService.actions(moduleAlias).stream()
-                .filter(DynamicRecordWebController::isRecordAction)
-                .filter(action -> recordService.actionAuthorizationAvailability(
-                        moduleAlias, entityAlias, action.code(), Set.of(recordId)).available())
-                .map(action -> DynamicWebActionAvailabilityResponse.from(action,
-                        recordService.actionAvailability(moduleAlias, action.code(), record)))
-                .toList();
-    }
-
-    @Override
     public DynamicWebActionExecutionResponse executeListAction(String actionCode, DynamicWebActionRequest request) {
         String moduleAlias = DynamicWebRequest.moduleAlias();
         requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
@@ -1587,9 +1569,7 @@ public class DynamicRecordWebController implements
     }
 
     private <T> T tenantScope(String moduleAlias, Supplier<T> action) {
-        String tenantId = TenantContext.currentTenantId()
-                .orElseThrow(() -> new PlatformException(moduleAlias + " requires tenant context"));
-        activeTenantVerifier.verifyActiveTenant(tenantId);
+        dynamicModuleScopeService.requireTenantScope(moduleAlias);
         return action.get();
     }
 
@@ -1699,7 +1679,4 @@ public class DynamicRecordWebController implements
         return current.getMessage();
     }
 
-    private static boolean isRecordAction(DynamicActionDescriptor action) {
-        return action.actionLevel() == EntityActionLevel.RECORD || action.actionLevel() == EntityActionLevel.ANY;
-    }
 }

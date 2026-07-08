@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class UserAccountServiceContractTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+        CurrentUserContext.clear();
         ActionExecutionContextHolder.clear();
     }
 
@@ -294,6 +296,46 @@ class UserAccountServiceContractTest {
         }
 
         verify(passwordPolicyRuleService, atLeastOnce()).validatePassword(any());
+    }
+
+    @Test
+    void shouldRejectCurrentUserPasswordAdministration() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
+            assertThatThrownBy(() -> service.changePassword("user-1", "secret2"))
+                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                    .hasMessageContaining("cannot administrate current user's password");
+            assertThatThrownBy(() -> service.resetPassword("user-1"))
+                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                    .hasMessageContaining("cannot administrate current user's password");
+        }
+
+        verify(dao, never()).updateById(any(UserAccount.class));
+    }
+
+    @Test
+    void shouldContributeCurrentUserPasswordAdministrationAvailability() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+
+        try (CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
+            assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-1"))
+                    .hasValueSatisfying(decision -> {
+                        assertThat(decision.available()).isFalse();
+                        assertThat(decision.reason()).isEqualTo("cannot administrate current user's password");
+                    });
+            assertThat(service.availability(UserAccountService.MODULE_ALIAS, "changePassword", "user-1"))
+                    .hasValueSatisfying(decision -> assertThat(decision.available()).isFalse());
+            assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-2"))
+                    .isEmpty();
+        }
     }
 
     @Test

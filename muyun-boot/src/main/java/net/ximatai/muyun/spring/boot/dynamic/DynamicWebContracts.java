@@ -7,8 +7,6 @@ import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryCriteria;
 import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
-import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
@@ -231,15 +229,6 @@ record DynamicWebActionContext(String moduleAlias,
                 context.recordId(),
                 context.traceId()
         );
-    }
-}
-
-record DynamicWebActionAvailabilityResponse(DynamicActionDescriptor action,
-                                            boolean available,
-                                            String message) {
-    static DynamicWebActionAvailabilityResponse from(DynamicActionDescriptor action,
-                                                    DynamicActionAvailability availability) {
-        return new DynamicWebActionAvailabilityResponse(action, availability.available(), availability.message());
     }
 }
 

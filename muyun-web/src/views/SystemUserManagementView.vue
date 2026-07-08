@@ -76,7 +76,8 @@ const canSaveUser = computed(() => {
     return Boolean(selectedUser.value?.id) && userContext.can('update') === true;
   }
   if (detailMode.value === 'resetPassword') {
-    return Boolean(selectedUser.value?.id) && userContext.can('changePassword') === true;
+    const userId = selectedUser.value?.id;
+    return Boolean(userId) && userContext.can('changePassword', userId) === true;
   }
   return false;
 });
@@ -348,7 +349,7 @@ async function resetUserLoginPassword() {
     loading: savingUser,
     source: 'system-user-management',
     record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
-    canExecute: () => userContext.can('resetPassword') === true,
+    canExecute: (user) => userContext.can('resetPassword', user.id) === true,
     deniedMessage: '当前用户无权重置系统账号密码',
     execute: (user) =>
       userContext.http.request<ResetPasswordResponse>({
@@ -510,7 +511,12 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
         />
       </template>
       <template #actions>
-        <RecordActionBar :context="systemUserContext" :actions="detailActions" @action="handleDetailAction" />
+        <RecordActionBar
+          :context="systemUserContext"
+          :actions="detailActions"
+          :record-id="selectedUser?.id"
+          @action="handleDetailAction"
+        />
       </template>
 
       <template #loading>
