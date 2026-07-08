@@ -35,14 +35,12 @@ class EmployeeAccountServiceContractTest {
         when(dao.insert(any())).thenReturn("binding-1");
         ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
         EmployeeAccountService service = service(dao, tenantVerifier);
-        EmployeeAccount binding = binding("employee-1", "user-1", true);
+        EmployeeAccount binding = binding("employee-1", "user-1");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             service.insert(binding);
         }
 
-        assertThat(binding.getEnabled()).isTrue();
-        assertThat(binding.getPrimaryAccount()).isTrue();
         assertThat(binding.getTenantId()).isEqualTo("tenant_a");
         verify(tenantVerifier).verifyActiveTenant("tenant_a");
     }
@@ -57,7 +55,7 @@ class EmployeeAccountServiceContractTest {
         when(userAccountService.requireEnabled(eq("user-1"), any())).thenReturn(user("user-1"));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            service.beforeInsert(binding("employee-1", "user-1", false));
+            service.beforeInsert(binding("employee-1", "user-1"));
         }
 
         verify(employeeService).requireEnabled(eq("employee-1"), any());
@@ -65,33 +63,23 @@ class EmployeeAccountServiceContractTest {
     }
 
     @Test
-    void shouldAllowMultipleAccountsForSameEmployee() {
-        EmployeeAccountService service = service(mock(EmployeeAccountDao.class));
-
-        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            service.beforeInsert(binding("employee-1", "user-1", false));
-            service.beforeInsert(binding("employee-1", "user-2", false));
-        }
-    }
-
-    @Test
-    void shouldRejectDuplicateEmployeeAccountBinding() {
-        EmployeeAccount existing = binding("employee-1", "user-1", false);
+    void shouldRejectBindingSameEmployeeToAnotherUser() {
+        EmployeeAccount existing = binding("employee-1", "user-1");
         existing.setId("binding-existing");
         EmployeeAccountDao dao = mock(EmployeeAccountDao.class);
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
         EmployeeAccountService service = service(dao);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThatThrownBy(() -> service.beforeInsert(binding("employee-1", "user-1", false)))
+            assertThatThrownBy(() -> service.beforeInsert(binding("employee-1", "user-2")))
                     .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("already exists");
+                    .hasMessageContaining("only one user account");
         }
     }
 
     @Test
     void shouldRejectBindingSameUserToAnotherEmployee() {
-        EmployeeAccount existing = binding("employee-2", "user-1", false);
+        EmployeeAccount existing = binding("employee-2", "user-1");
         existing.setId("binding-existing");
         EmployeeAccountDao dao = mock(EmployeeAccountDao.class);
         when(dao.query(any(Criteria.class), any(PageRequest.class)))
@@ -100,7 +88,7 @@ class EmployeeAccountServiceContractTest {
         EmployeeAccountService service = service(dao);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThatThrownBy(() -> service.beforeInsert(binding("employee-1", "user-1", false)))
+            assertThatThrownBy(() -> service.beforeInsert(binding("employee-1", "user-1")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("only one employee");
         }
@@ -118,7 +106,7 @@ class EmployeeAccountServiceContractTest {
                 dao, activeTenantVerifier(), employeeService, userAccountService);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThatThrownBy(() -> service.insert(binding("employee-1", "user-1", false)))
+            assertThatThrownBy(() -> service.insert(binding("employee-1", "user-1")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("user account is not active");
         }
@@ -131,74 +119,85 @@ class EmployeeAccountServiceContractTest {
         EmployeeAccountService service = service(mock(EmployeeAccountDao.class));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThatThrownBy(() -> service.insert(binding(" ", "user-1", false)))
+            assertThatThrownBy(() -> service.insert(binding(" ", "user-1")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("employeeId");
-            assertThatThrownBy(() -> service.insert(binding("employee-1", " ", false)))
+            assertThatThrownBy(() -> service.insert(binding("employee-1", " ")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("userId");
         }
     }
 
     @Test
-    void shouldResolveEmployeeScopedAccountsAndEmployeeIdOfUser() {
+    void shouldResolveEmployeeAccountAndEmployeeIdOfUser() {
         EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
-        EmployeeAccount binding = binding("employee-1", "user-1", true);
-        binding.setEnabled(Boolean.FALSE);
+        EmployeeAccount binding = binding("employee-1", "user-1");
         doReturn(List.of(binding)).when(service).list(any(Criteria.class), any(PageRequest.class));
 
-        assertThat(service.accounts("employee-1")).containsExactly(binding);
+        assertThat(service.accountOfEmployee("employee-1")).isEqualTo(binding);
         assertThat(service.employeeIdOfUser("user-1")).isEqualTo("employee-1");
     }
 
     @Test
     void shouldDeleteBindingPhysicallyWhenUnbindingAccount() {
         EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
-        EmployeeAccount binding = binding("employee-1", "user-1", true);
+        EmployeeAccount binding = binding("employee-1", "user-1");
         binding.setId("binding-1");
         binding.setVersion(1);
-        doReturn(binding).when(service).select("binding-1");
+        doReturn(binding).when(service).accountOfEmployee("employee-1");
         doReturn(1).when(service).delete(binding);
 
-        assertThat(service.deleteAccount("employee-1", "binding-1")).isEqualTo(1);
+        assertThat(service.unbindAccount("employee-1")).isEqualTo(1);
 
         verify(service).delete(binding);
     }
 
     @Test
-    void shouldRejectOperationsAcrossEmployees() {
+    void shouldIgnoreUnbindingWhenEmployeeHasNoAccount() {
         EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
-        EmployeeAccount binding = binding("employee-1", "user-1", true);
-        binding.setId("binding-1");
-        doReturn(binding).when(service).select("binding-1");
+        doReturn(null).when(service).accountOfEmployee("employee-1");
 
-        assertThatThrownBy(() -> service.deleteAccount("employee-2", "binding-1"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("does not belong to employee");
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.unbindAccount("employee-1")).isZero();
+        }
     }
 
     @Test
-    void shouldSwitchPrimaryAccountWithinSameEmployee() {
-        EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
-        EmployeeAccount existingPrimary = binding("employee-1", "user-1", true);
-        existingPrimary.setId("binding-old");
-        existingPrimary.setEnabled(Boolean.TRUE);
-        EmployeeAccount target = binding("employee-1", "user-2", false);
-        target.setId("binding-new");
-        target.setEnabled(Boolean.FALSE);
-        doReturn(target).when(service).select("binding-new");
-        doReturn(List.of(existingPrimary)).when(service).list(any(Criteria.class), any(PageRequest.class));
-        doReturn(1).when(service).update(any(EmployeeAccount.class));
+    void shouldProvisionUserAccountAndBindEmployeeInOneServiceAction() {
+        EmployeeService employeeService = mock(EmployeeService.class);
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        EmployeeAccountService service = spy(new EmployeeAccountService(
+                mock(EmployeeAccountDao.class), activeTenantVerifier(), employeeService, userAccountService));
+        Employee employee = employee("employee-1");
+        employee.setTitle("Alice");
+        employee.setMobile("13800000000");
+        employee.setEmail("alice@example.com");
+        employee.setOrganizationId("org-1");
+        UserAccount account = new UserAccount();
+        account.setUsername("alice");
+        account.setPassword("secret1");
+        UserAccount persisted = user("user-1");
+        persisted.setUsername("alice");
+        EmployeeAccount binding = binding("employee-1", "user-1");
+        binding.setId("binding-1");
 
-        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThat(service.makePrimaryAccount("employee-1", "binding-new")).isEqualTo(2);
-        }
+        doReturn(null).when(service).accountOfEmployee("employee-1");
+        when(employeeService.requireEnabled(eq("employee-1"), any())).thenReturn(employee);
+        when(userAccountService.insert(any(UserAccount.class))).thenReturn("user-1");
+        when(userAccountService.select("user-1")).thenReturn(persisted);
+        doReturn("binding-1").when(service).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
+        doReturn(binding).when(service).select("binding-1");
 
-        assertThat(existingPrimary.getPrimaryAccount()).isFalse();
-        assertThat(target.getPrimaryAccount()).isTrue();
-        assertThat(target.getEnabled()).isTrue();
-        verify(service).update(existingPrimary);
-        verify(service).update(target);
+        EmployeeAccountService.AccountProvisionResult result = service.provisionAccount("employee-1", account);
+
+        assertThat(result.user()).isEqualTo(persisted);
+        assertThat(result.binding()).isEqualTo(binding);
+        assertThat(account.getTitle()).isNull();
+        assertThat(account.getMobile()).isNull();
+        assertThat(account.getEmail()).isNull();
+        assertThat(account.getOrganizationId()).isNull();
+        assertThat(account.getEnabled()).isTrue();
+        verify(service).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
     }
 
     private EmployeeAccountService service(EmployeeAccountDao dao) {
@@ -214,11 +213,10 @@ class EmployeeAccountServiceContractTest {
         return new EmployeeAccountService(dao, tenantVerifier, employeeService, userAccountService);
     }
 
-    private EmployeeAccount binding(String employeeId, String userId, boolean primaryAccount) {
+    private EmployeeAccount binding(String employeeId, String userId) {
         EmployeeAccount binding = new EmployeeAccount();
         binding.setEmployeeId(employeeId);
         binding.setUserId(userId);
-        binding.setPrimaryAccount(primaryAccount);
         return binding;
     }
 

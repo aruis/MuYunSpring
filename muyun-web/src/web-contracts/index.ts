@@ -479,11 +479,18 @@ export interface Employee extends StandardEnabledSortableEntity {
   email?: string;
 }
 
+export interface EmployeeAccount extends StandardEntity {
+  employeeId?: string;
+  userId?: string;
+}
+
+export interface EmployeeAccountProvisionResponse {
+  user?: UserAccount;
+  binding?: EmployeeAccount;
+}
+
 export interface UserAccount extends StandardEnabledSortableEntity {
   username?: string;
-  mobile?: string;
-  email?: string;
-  organizationId?: string;
   password?: string;
   passwordStatus?: UserPasswordStatus;
   passwordStatusTitle?: string;
@@ -495,6 +502,15 @@ export interface UserAccount extends StandardEnabledSortableEntity {
   lastFailedLoginAt?: string;
   failedLoginCount?: number;
   lockedUntil?: string;
+}
+
+export interface UserEmployeeBindingView {
+  bindingId?: string;
+  employeeId?: string;
+  employeeNo?: string;
+  employeeTitle?: string;
+  organizationId?: string;
+  departmentId?: string;
 }
 
 export type UserPasswordStatus = 'normal' | 'initial' | 'resetRequired' | 'expired';

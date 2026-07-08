@@ -749,22 +749,16 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(routesSource, /route: '\/iam\/users'/);
   assert.match(userViewSource, /defineOptions\(\{ name: 'UserManagementView' \}\)/);
   assert.match(userViewSource, /moduleAlias: 'iam\.tenant'/);
-  assert.match(userViewSource, /moduleAlias: 'iam\.organization'/);
   assert.match(userViewSource, /moduleAlias: 'iam\.user'/);
   assert.match(userViewSource, /user-management-page/);
   assert.match(userViewSource, /<CrudRecordListExplorer/);
-  assert.match(userViewSource, /<TreeRecordExplorer/);
   assert.match(userViewSource, /<RecordQueryListPanel/);
   assert.match(userViewSource, /standard-crud-actions/);
   assert.match(userViewSource, /standard-crud-row-actions/);
   assert.match(userViewSource, /canBrowseTenants/);
   assert.match(userViewSource, /currentUserTenant/);
   assert.match(userViewSource, /initializeTenantUserScope/);
-  assert.match(userViewSource, /createScopedTreeModuleContext/);
-  assert.match(userViewSource, /treePath: '\/iam\.organization\/tree'/);
-  assert.match(userViewSource, /scopeFieldName: 'tenantId'/);
   assert.match(userViewSource, /fieldName: 'tenantId'/);
-  assert.match(userViewSource, /fieldName: 'organizationId'/);
   assert.match(userViewSource, /createScopedUserModuleContext/);
   assert.match(userViewSource, /onMounted\(loadUserFormDefinition\)/);
   assert.match(userViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
@@ -773,7 +767,7 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:fields="userFormFieldDefinitions"/);
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
-  assert.match(userViewSource, /organizationId: \{ label: '所属机构'[\s\S]*readOnly: true/);
+  assert.match(userViewSource, /enabled: \{ label: '允许登录'/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
@@ -801,6 +795,8 @@ test('user management keeps account basics separate from employment binding and 
   assert.doesNotMatch(contractsSource, /passwordHash/);
   assert.doesNotMatch(userViewSource, /iam\.employee_account/);
   assert.doesNotMatch(userViewSource, /iam\.role_assignment/);
+  assert.doesNotMatch(userViewSource, /moduleAlias: 'iam\.organization'/);
+  assert.doesNotMatch(userViewSource, /fieldName: 'organizationId'/);
   assert.doesNotMatch(userViewSource, /系统账号/);
   assert.doesNotMatch(userViewSource, /operator: 'NULL'/);
   assert.doesNotMatch(userViewSource, /permissionMatrix/);
@@ -850,7 +846,7 @@ test('system user management is a separate root account entry', () => {
     /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
   );
   assert.match(systemUserViewSource, /tenantId: undefined/);
-  assert.match(systemUserViewSource, /organizationId: undefined/);
+  assert.match(systemUserViewSource, /enabled: \{ label: '允许登录'/);
   assert.match(systemUserViewSource, /systemUserFormFieldDisabled/);
   assert.doesNotMatch(systemUserViewSource, /<CrudRecordListExplorer/);
   assert.doesNotMatch(systemUserViewSource, /<TreeRecordExplorer/);

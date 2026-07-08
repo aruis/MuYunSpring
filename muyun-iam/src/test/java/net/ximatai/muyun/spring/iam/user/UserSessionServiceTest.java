@@ -45,8 +45,6 @@ class UserSessionServiceTest {
 
         UserAccount user = new UserAccount();
         user.setUsername("alice");
-        user.setTitle("Alice");
-        user.setOrganizationId("org-1");
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             userService.createUser(user, "secret1");
         }
@@ -63,7 +61,7 @@ class UserSessionServiceTest {
         assertThat(login.tokenType()).isEqualTo("Bearer");
         assertThat(login.issuedAt()).isEqualTo(clock.instant());
         assertThat(login.currentUser()).isEqualTo(
-                CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1", true));
+                CurrentUser.tenantUser("user-1", "alice", "tenant-a", null, true));
         assertThat(login.passwordChangeRequired()).isTrue();
         assertThat(login.passwordStatus()).isEqualTo(PasswordStatus.INITIAL);
         assertThat(persistedSession.get().getTenantId()).isEqualTo("tenant-a");

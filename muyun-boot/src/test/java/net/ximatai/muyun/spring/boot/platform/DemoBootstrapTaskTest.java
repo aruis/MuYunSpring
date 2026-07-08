@@ -382,14 +382,13 @@ class DemoBootstrapTaskTest {
 
             assertThat(user).isNotNull();
             assertThat(user.getUsername()).isEqualTo("demo_admin");
-            assertThat(user.getOrganizationId()).isEqualTo(DemoBootstrapTask.ORGANIZATION_ID);
+            assertThat(user.getOrganizationId()).isNull();
             assertThat(user.getTenantId()).isEqualTo(DemoBootstrapTask.TENANT_ALIAS);
             assertThat(userAccountService.passwordMatches(user, "demo123")).isTrue();
 
             assertThat(binding).isNotNull();
             assertThat(binding.getEmployeeId()).isEqualTo(DemoBootstrapTask.EMPLOYEE_ID);
             assertThat(binding.getUserId()).isEqualTo(DemoBootstrapTask.USER_ID);
-            assertThat(binding.getPrimaryAccount()).isTrue();
 
             assertThat(role).isNotNull();
             assertThat(role.getTitle()).isEqualTo(RoleService.TENANT_ADMIN_ROLE_TITLE);

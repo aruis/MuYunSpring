@@ -80,6 +80,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -655,8 +656,7 @@ class IamWebControllerTest {
     @Test
     void shouldViewSystemUserThroughSystemScope() throws Exception {
         currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
-        UserAccount admin = user(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin",
-                UserAccountService.PLATFORM_SUPER_ADMIN_USER_TITLE);
+        UserAccount admin = user(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin", "admin");
         admin.setTenantId(null);
         admin.setPasswordHash(new PasswordHashingService().hash("admin123"));
         when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
@@ -1036,14 +1036,14 @@ class IamWebControllerTest {
         existing.setTenantId("tenant_a");
 
         when(employeeService.select("employee-1")).thenReturn(existing);
-        when(employeeAccountService.accounts("employee-1")).thenAnswer(invocation -> {
+        when(employeeAccountService.accountOfEmployee("employee-1")).thenAnswer(invocation -> {
             assertThat(TenantContext.currentTenantId()).contains("tenant_a");
-            return List.of();
+            return null;
         });
 
-        mvc.perform(get("/iam.employee/employee-1/accounts"))
+        mvc.perform(get("/iam.employee/employee-1/account"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records").isArray());
+                .andExpect(content().string(""));
     }
 
     @Test
@@ -1057,7 +1057,6 @@ class IamWebControllerTest {
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
         UserAccount alice = user("user-2", "alice", "Alice");
-        alice.setOrganizationId("org-1");
         when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
         userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
 
@@ -1066,14 +1065,13 @@ class IamWebControllerTest {
                         .content("""
                                 {
                                   "roleId":"role-1",
-                                  "organizationId":"org-1",
                                   "keyword":"ali"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("user-2"))
                 .andExpect(jsonPath("$.records[0].username").value("alice"))
-                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"));
+                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist());
 
         verify(roleService).userIds("role-1");
         assertThat(userAccountService.scopedPolicies)

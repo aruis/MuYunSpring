@@ -72,14 +72,13 @@ class UserAccountServiceContractTest {
         QuerySchema schema = service.querySchema();
 
         assertThat(schema.fields()).extracting(QuerySchema.Field::name)
-                .contains("tenantId", "organizationId", "username", "title", "mobile", "email", "enabled",
-                        "passwordStatus", "lastLoginAt");
+                .contains("tenantId", "username", "enabled", "passwordStatus", "lastLoginAt")
+                .doesNotContain("organizationId", "title", "mobile", "email", "sortOrder");
         assertThat(field(schema, "tenantId").operators())
                 .containsExactly(QueryOperator.EQ, QueryOperator.IN, QueryOperator.NULL);
-        assertThat(field(schema, "organizationId").operators()).containsExactly(QueryOperator.EQ, QueryOperator.IN);
-        assertThat(schema.quickSearch().fields()).containsExactly("username", "title", "mobile", "email");
+        assertThat(schema.quickSearch().fields()).containsExactly("username");
         assertThat(schema.defaultSorts()).extracting(QuerySchema.DefaultSort::field)
-                .containsExactly("sortOrder", "username");
+                .containsExactly("username");
     }
 
     @Test
@@ -91,15 +90,23 @@ class UserAccountServiceContractTest {
         UserAccount user = new UserAccount();
         user.setUsername("alice");
         user.setTitle("Alice");
+        user.setMobile("13800000000");
+        user.setEmail("alice@example.test");
         user.setOrganizationId("org-1");
+        user.setSortOrder(1);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             service.createUser(user, "secret1");
         }
 
         assertThat(user.getAuthUserId()).isEqualTo(user.getId());
-        assertThat(user.getAuthOrganizationId()).isEqualTo("org-1");
+        assertThat(user.getAuthOrganizationId()).isNull();
         assertThat(user.getAuthModuleAlias()).isEqualTo(UserAccountService.MODULE_ALIAS);
+        assertThat(user.getTitle()).isEqualTo("alice");
+        assertThat(user.getMobile()).isNull();
+        assertThat(user.getEmail()).isNull();
+        assertThat(user.getOrganizationId()).isNull();
+        assertThat(user.getSortOrder()).isNull();
         assertThat(user.getPasswordStatus()).isEqualTo(PasswordStatus.INITIAL);
         assertThat(user.getPasswordChangedAt()).isNotNull();
         assertThat(user.getFailedLoginCount()).isZero();

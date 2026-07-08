@@ -9,7 +9,6 @@ import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
@@ -18,6 +17,14 @@ import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
+import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinCondition;
+import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinContributor;
+import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinFilter;
+import net.ximatai.muyun.spring.boot.platform.StaticProjectionJoinStep;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -28,7 +35,13 @@ import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -51,8 +64,9 @@ import java.util.Optional;
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
         EnableWeb<UserAccount, UserAccountService>,
-        SortWeb<UserAccount, UserAccountService>,
-        MutationTenantScopeResolver<UserAccount> {
+        MutationTenantScopeResolver<UserAccount>,
+        StaticModuleUiContributor,
+        StaticProjectionJoinContributor {
     private static final ActionExecutionPolicy USER_SELECTOR_POLICY = new ActionExecutionPolicy(
             "userSelector",
             PlatformActionLevel.LIST,
@@ -65,16 +79,106 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
 
     private final UserSessionService userSessionService;
     private final RoleService roleService;
+    private final EmployeeAccountService employeeAccountService;
+    private final EmployeeService employeeService;
+    private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
     public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService) {
-        this(userSessionService, null);
+        this(userSessionService, null, null, null);
+    }
+
+    public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService,
+                                    ObjectProvider<RoleService> roleService) {
+        this(userSessionService, roleService, null, null);
     }
 
     @Autowired
     public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService,
-                                    ObjectProvider<RoleService> roleService) {
+                                    ObjectProvider<RoleService> roleService,
+                                    ObjectProvider<EmployeeAccountService> employeeAccountService,
+                                    ObjectProvider<EmployeeService> employeeService) {
         this.userSessionService = userSessionService == null ? null : userSessionService.getIfAvailable();
         this.roleService = roleService == null ? null : roleService.getIfAvailable();
+        this.employeeAccountService = employeeAccountService == null ? null : employeeAccountService.getIfAvailable();
+        this.employeeService = employeeService == null ? null : employeeService.getIfAvailable();
+    }
+
+    @Autowired(required = false)
+    void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
+        this.staticRecordReadProjectionService = staticRecordReadProjectionService;
+    }
+
+    @Override
+    public StaticRecordReadProjectionService staticRecordReadProjectionService() {
+        return staticRecordReadProjectionService;
+    }
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(UserAccountService.MODULE_ALIAS)
+                .listView(list -> list
+                        .title("用户列表")
+                        .field("username", field -> field.label("账号").width("180px"))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus")
+                                .width("90px").align("center"))
+                        .field("passwordStatus", field -> field.label("密码状态").width("120px"))
+                        .field("bound_employee", "employeeNo", field -> field.label("职员工号").width("150px"))
+                        .field("bound_employee", "employeeTitle", field -> field.label("职员姓名").width("150px"))
+                        .field("lastLoginAt", field -> field.label("最后登录时间").width("180px")))
+                .formView(form -> form
+                        .title("用户账号")
+                        .field("username", field -> field.label("账号").required())
+                        .field("enabled", field -> field.label("启用状态").uiType("enabledStatus"))
+                        .field("passwordStatus", field -> field.label("密码状态").readOnly())
+                        .field("lastLoginAt", field -> field.label("最后登录时间").readOnly()))
+                .build();
+    }
+
+    @Override
+    public java.util.List<StaticProjectionJoinDefinition> projectionJoins() {
+        return java.util.List.of(new StaticProjectionJoinDefinition(
+                "bound_employee",
+                new EntityDefinition(
+                        "bound_employee",
+                        "iam_employee",
+                        "绑定职员",
+                        java.util.List.of(
+                                FieldDefinition.string("employeeId", "职员ID").column("id"),
+                                FieldDefinition.string("employeeNo", "职员工号").column("employee_no"),
+                                FieldDefinition.string("employeeTitle", "职员姓名").column("title"),
+                                FieldDefinition.string("employeeOrganizationId", "职员机构").column("organization_id"),
+                                FieldDefinition.string("employeeDepartmentId", "职员部门").column("department_id")
+                        )
+                ),
+                java.util.List.of(
+                        new StaticProjectionJoinStep(
+                                "public",
+                                "iam_employee_account",
+                                "bound_employee_account",
+                                java.util.List.of(
+                                        new StaticProjectionJoinCondition("main", "tenant_id",
+                                                "bound_employee_account", "tenant_id"),
+                                        new StaticProjectionJoinCondition("main", "id",
+                                                "bound_employee_account", "user_id")
+                                ),
+                                java.util.List.of(new StaticProjectionJoinFilter(
+                                        "bound_employee_account", "deleted", Boolean.FALSE))
+                        ),
+                        new StaticProjectionJoinStep(
+                                "public",
+                                "iam_employee",
+                                "bound_employee",
+                                java.util.List.of(
+                                        new StaticProjectionJoinCondition("bound_employee_account", "tenant_id",
+                                                "bound_employee", "tenant_id"),
+                                        new StaticProjectionJoinCondition("bound_employee_account", "employee_id",
+                                                "bound_employee", "id")
+                                ),
+                                java.util.List.of(new StaticProjectionJoinFilter(
+                                        "bound_employee", "deleted", Boolean.FALSE))
+                        )
+                )
+        ));
     }
 
     @Override
@@ -149,6 +253,23 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         });
     }
 
+    @GetMapping("/{id}/employee-binding")
+    @CustomActionEndpoint(value = "employeeBinding", title = "绑定职员",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    public UserEmployeeBindingView employeeBinding(@PathVariable String id) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            if (employeeAccountService == null || employeeService == null) {
+                return UserEmployeeBindingView.empty();
+            }
+            EmployeeAccount binding = employeeAccountService.accountOfUser(id);
+            if (binding == null) {
+                return UserEmployeeBindingView.empty();
+            }
+            Employee employee = employeeService.select(binding.getEmployeeId());
+            return UserEmployeeBindingView.from(binding, employee);
+        }));
+    }
+
     public record ChangePasswordRequest(String password) {
     }
 
@@ -156,13 +277,12 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     public record UserSelectorRequest(
-            String organizationId,
             String roleId,
             String keyword,
             Boolean enabledOnly,
             WebPageRequest page
     ) {
-        static final UserSelectorRequest EMPTY = new UserSelectorRequest(null, null, null, Boolean.TRUE, null);
+        static final UserSelectorRequest EMPTY = new UserSelectorRequest(null, null, Boolean.TRUE, null);
 
         WebPageRequest pageOrDefault() {
             return page == null ? WebPageRequest.DEFAULT : page;
@@ -171,20 +291,36 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
 
     public record UserSelectorItem(
             String id,
-            String username,
-            String title,
-            String organizationId,
-            String mobile,
-            String email
+            String username
     ) {
         static UserSelectorItem from(UserAccount user) {
             return new UserSelectorItem(
                     user.getId(),
-                    user.getUsername(),
-                    user.getTitle(),
-                    user.getOrganizationId(),
-                    user.getMobile(),
-                    user.getEmail()
+                    user.getUsername()
+            );
+        }
+    }
+
+    public record UserEmployeeBindingView(
+            String bindingId,
+            String employeeId,
+            String employeeNo,
+            String employeeTitle,
+            String organizationId,
+            String departmentId
+    ) {
+        static UserEmployeeBindingView empty() {
+            return new UserEmployeeBindingView(null, null, null, null, null, null);
+        }
+
+        static UserEmployeeBindingView from(EmployeeAccount binding, Employee employee) {
+            return new UserEmployeeBindingView(
+                    binding.getId(),
+                    binding.getEmployeeId(),
+                    employee == null ? null : employee.getEmployeeNo(),
+                    employee == null ? null : employee.getTitle(),
+                    employee == null ? null : employee.getOrganizationId(),
+                    employee == null ? null : employee.getDepartmentId()
             );
         }
     }
@@ -193,9 +329,6 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         Criteria criteria = Criteria.of();
         if (!Boolean.FALSE.equals(request.enabledOnly())) {
             criteria.eq("enabled", Boolean.TRUE);
-        }
-        if (request.organizationId() != null && !request.organizationId().isBlank()) {
-            criteria.eq("organizationId", request.organizationId().trim());
         }
         if (request.roleId() != null && !request.roleId().isBlank()) {
             if (roleService == null) {
@@ -212,8 +345,6 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             String keyword = request.keyword().trim();
             Criteria keywordCriteria = Criteria.of();
             keywordCriteria.orGroup(Criteria.of().like("username", keyword).getRoot());
-            keywordCriteria.orGroup(Criteria.of().like("mobile", keyword).getRoot());
-            keywordCriteria.orGroup(Criteria.of().like("email", keyword).getRoot());
             criteria.andGroup(keywordCriteria.getRoot());
         }
         return criteria;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   CrudRecordListExplorer,
   RecordActionBar,
@@ -10,8 +11,6 @@ import {
   RecordMetaSection,
   RecordQueryListPanel,
   RecordStatusSwitch,
-  TreeRecordExplorer,
-  createScopedTreeModuleContext,
   executeStaticFormSave,
   executeStaticRecordAction,
   presentPlatformError,
@@ -26,22 +25,13 @@ import {
   type RecordFormRecord,
   type RecordQueryListColumn,
   type ResolvedRecordActionItem,
-  type TreeRecordBase,
 } from '@muyun/platform-components';
-import {
-  UiButton,
-  UiEmpty,
-  UiError,
-  UiInput,
-  UiRecordExplorerItem,
-  UiSpin,
-  confirmAction,
-} from '@muyun/vue-ui-antdv';
+import { UiButton, UiError, UiInput, UiRecordExplorerItem, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
 import type {
-  Organization,
   ResetPasswordResponse,
   Tenant,
   UserAccount,
+  UserEmployeeBindingView,
   WebCountResponse,
   WebQueryRequest,
 } from '@muyun/web-contracts';
@@ -51,26 +41,16 @@ import { useCurrentUserContext } from '../app/currentUserContext';
 defineOptions({ name: 'UserManagementView' });
 
 type UserDetailMode = 'view' | 'create' | 'edit' | 'resetPassword';
-type UserFormFieldName =
-  | 'username'
-  | 'title'
-  | 'mobile'
-  | 'email'
-  | 'organizationId'
-  | 'enabled'
-  | 'sortOrder';
+type UserFormFieldName = 'username' | 'enabled';
 
 const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
-const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
 const currentUser = useCurrentUserContext();
+const router = useRouter();
 const tenantSearchKeyword = ref('');
-const organizationSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
-const organizationReloadKey = ref(0);
 const userReloadKey = ref(0);
 const selectedTenant = ref<Tenant>();
-const selectedOrganization = ref<Organization>();
 const selectedUserKey = ref<string>();
 const selectedUser = ref<UserAccount>();
 const userDetailOpen = ref(false);
@@ -79,13 +59,15 @@ const loadingUserDetail = ref(false);
 const userDetailLoadFailed = ref(false);
 const savingUser = ref(false);
 const userDetailRequestSeq = ref(0);
-const userDraft = ref<Partial<UserAccount>>(createUserDraft(undefined, undefined));
+const userDraft = ref<Partial<UserAccount>>(createUserDraft(undefined));
 const passwordDraft = ref('');
 const resetPasswordResult = ref<ResetPasswordResponse>();
 const userFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const userEmployeeBinding = ref<UserEmployeeBindingView>();
+const loadingUserEmployeeBinding = ref(false);
+const userEmployeeBindingLoadFailed = ref(false);
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
-const selectedTenantId = computed(() => selectedTenant.value?.id);
 const canBrowseTenants = computed(() => currentUser?.value?.system === true);
 const currentUserTenant = computed<Tenant | undefined>(() => {
   const tenantId = currentUser?.value?.tenantId;
@@ -99,41 +81,21 @@ const currentUserTenant = computed<Tenant | undefined>(() => {
     enabled: true,
   } as Tenant;
 });
-const organizationTreeContext = computed(() =>
-  createScopedTreeModuleContext(organizationContext, {
-    scopeFieldName: 'tenantId',
-    scopeValue: selectedTenantId.value,
-    treePath: '/iam.organization/tree',
-  }),
-);
 const userListContext = computed(
-  () =>
-    createScopedUserModuleContext(
-      userContext,
-      selectedTenant.value,
-      selectedOrganization.value,
-    ) as ModuleContext<QueryListRecord>,
+  () => createScopedUserModuleContext(userContext, selectedTenant.value) as ModuleContext<QueryListRecord>,
 );
 const userListReady = computed(() => Boolean(selectedTenant.value?.id));
-const organizationPanelVisible = computed(() => Boolean(selectedTenant.value));
 const userListColumns = computed<RecordQueryListColumn[]>(() => [
-  { key: 'username', title: '账号', width: '18%' },
-  { key: 'title', title: '姓名', width: '18%' },
-  {
-    key: 'organizationId',
-    title: '所属机构',
-    width: '18%',
-    render: (record) => organizationDisplayValue(record.organizationId),
-  },
-  { key: 'mobile', title: '手机号', width: '16%' },
-  { key: 'email', title: '邮箱', width: '18%' },
-  { key: 'enabled', title: '状态', type: 'enabledStatus', width: '10%' },
+  { key: 'username', title: '账号', width: '26%' },
+  { key: 'passwordStatusTitle', title: '密码状态', width: '18%' },
+  { key: 'lastLoginAt', title: '最后登录', width: '26%' },
+  { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
 ]);
 const userListTitle = computed(() => {
   if (!selectedTenant.value) {
     return '用户列表';
   }
-  return `用户列表 - ${selectedOrganization.value ? organizationTitle(selectedOrganization.value) : tenantTitle(selectedTenant.value)}`;
+  return `用户列表 - ${tenantTitle(selectedTenant.value)}`;
 });
 const userDetailTitle = computed(() => {
   if (userDetailMode.value === 'create') {
@@ -218,41 +180,18 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
 });
 const userFormFieldFallback = computed<Record<UserFormFieldName, RecordFormFieldFallback>>(() => ({
   username: { label: '账号', required: true, visible: true, placeholder: '请输入登录账号' },
-  title: { label: '姓名', visible: true, placeholder: '请输入姓名或显示名' },
-  mobile: { label: '手机号', visible: true, placeholder: '请输入手机号' },
-  email: { label: '邮箱', visible: true, placeholder: '请输入邮箱' },
-  organizationId: { label: '所属机构', visible: true, readOnly: true },
-  enabled: { label: '启用状态', visible: true, controlType: 'enabledStatus' },
-  sortOrder: { label: '排序号', visible: true, placeholder: '请输入排序号' },
+  enabled: { label: '允许登录', visible: true, controlType: 'enabledStatus' },
 }));
-const userFormFieldNames = computed<UserFormFieldName[]>(() => [
-  'username',
-  'title',
-  'mobile',
-  'email',
-  'organizationId',
-  'enabled',
-  'sortOrder',
-]);
+const userFormFieldNames = computed<UserFormFieldName[]>(() => ['username', 'enabled']);
 
 onMounted(loadUserFormDefinition);
 
 watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
 
 watch(selectedTenant, () => {
-  selectedOrganization.value = undefined;
   selectedUserKey.value = undefined;
   selectedUser.value = undefined;
-  userDraft.value = createUserDraft(selectedTenant.value, undefined);
-  closeUserDetail();
-  organizationReloadKey.value += 1;
-  userReloadKey.value += 1;
-});
-
-watch(selectedOrganization, () => {
-  selectedUserKey.value = undefined;
-  selectedUser.value = undefined;
-  userDraft.value = createUserDraft(selectedTenant.value, selectedOrganization.value);
+  userDraft.value = createUserDraft(selectedTenant.value);
   closeUserDetail();
   userReloadKey.value += 1;
 });
@@ -269,28 +208,20 @@ async function loadUserFormDefinition() {
 function createScopedUserModuleContext(
   context: ModuleContext<UserAccount>,
   tenant: Tenant | undefined,
-  organization: Organization | undefined,
 ): ModuleContext<UserAccount> {
   return {
     ...context,
     crud: {
       ...context.crud,
-      query: (request) => context.crud.query(scopedUserQuery(request, tenant, organization)),
+      query: (request) => context.crud.query(scopedUserQuery(request, tenant)),
     },
   };
 }
 
-function scopedUserQuery(
-  request: WebQueryRequest | undefined,
-  tenant: Tenant | undefined,
-  organization: Organization | undefined,
-): WebQueryRequest {
+function scopedUserQuery(request: WebQueryRequest | undefined, tenant: Tenant | undefined): WebQueryRequest {
   const conditions = [...(request?.conditions ?? [])];
   if (tenant?.id) {
     conditions.push({ fieldName: 'tenantId', operator: 'EQ', values: [tenant.id] });
-  }
-  if (organization?.id) {
-    conditions.push({ fieldName: 'organizationId', operator: 'EQ', values: [organization.id] });
   }
   return { ...request, conditions };
 }
@@ -316,20 +247,6 @@ function selectTenant(record: Tenant) {
     return;
   }
   selectedTenant.value = record;
-}
-
-function selectOrganization(record: Organization) {
-  if (!record.id || !canLeaveUserDetailContext()) {
-    return;
-  }
-  selectedOrganization.value = record;
-}
-
-function clearOrganizationScope() {
-  if (!canLeaveUserDetailContext()) {
-    return;
-  }
-  selectedOrganization.value = undefined;
 }
 
 function handleUserListAction(action: RecordActionItem) {
@@ -372,7 +289,7 @@ function startCreateUser() {
   }
   selectedUser.value = undefined;
   selectedUserKey.value = undefined;
-  userDraft.value = createUserDraft(selectedTenant.value, selectedOrganization.value);
+  userDraft.value = createUserDraft(selectedTenant.value);
   passwordDraft.value = '';
   userDetailMode.value = 'create';
   loadingUserDetail.value = false;
@@ -394,6 +311,7 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
   userDetailMode.value = mode;
   selectedUser.value = undefined;
   userDraft.value = copyUser(record as UserAccount);
+  resetUserEmployeeBinding();
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   loadingUserDetail.value = true;
@@ -405,7 +323,10 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
     if (!canCommitUserDetailRequest(id, requestSeq)) {
       return;
     }
-    commitUserDetailRecord(fullRecord, mode);
+    const detailSeq = commitUserDetailRecord(fullRecord, mode);
+    if (mode === 'view') {
+      void loadUserEmployeeBinding(fullRecord, detailSeq);
+    }
   } catch (cause) {
     if (canCommitUserDetailRequest(id, requestSeq)) {
       userDetailLoadFailed.value = true;
@@ -427,11 +348,10 @@ function closeUserDetail() {
   userDetailLoadFailed.value = false;
   userDetailOpen.value = false;
   userDetailMode.value = 'view';
+  resetUserEmployeeBinding();
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
-  userDraft.value = selectedUser.value
-    ? copyUser(selectedUser.value)
-    : createUserDraft(selectedTenant.value, selectedOrganization.value);
+  userDraft.value = selectedUser.value ? copyUser(selectedUser.value) : createUserDraft(selectedTenant.value);
 }
 
 function cancelUserDetail() {
@@ -443,6 +363,7 @@ function cancelUserDetail() {
     return;
   }
   userDraft.value = copyUser(selectedUser.value);
+  void loadUserEmployeeBinding(selectedUser.value, userDetailRequestSeq.value);
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   userDetailMode.value = 'view';
@@ -505,13 +426,7 @@ async function saveUser() {
     canSave: () => canSaveUser.value,
     deniedMessage: '当前用户无权保存用户',
     createRecord: () =>
-      normalizedUserDraft(
-        userDraft.value,
-        selectedTenant.value,
-        selectedOrganization.value,
-        userDetailMode.value,
-        passwordDraft.value,
-      ),
+      normalizedUserDraft(userDraft.value, selectedTenant.value, userDetailMode.value, passwordDraft.value),
     validateRecord: validateUserDraft,
     save: (draft, mode) =>
       mode === 'edit' && selectedUser.value?.id
@@ -602,7 +517,7 @@ async function removeUser(record: Partial<UserAccount> | QueryListRecord | undef
       if (selectedUserKey.value === String(target.id)) {
         selectedUserKey.value = undefined;
         selectedUser.value = undefined;
-        userDraft.value = createUserDraft(selectedTenant.value, selectedOrganization.value);
+        userDraft.value = createUserDraft(selectedTenant.value);
         userDetailOpen.value = false;
         userDetailMode.value = 'view';
         loadingUserDetail.value = false;
@@ -632,17 +547,53 @@ function commitUserDetailRecord(record: UserAccount, nextMode: UserDetailMode = 
   loadingUserDetail.value = false;
   userDetailLoadFailed.value = false;
   userDetailRequestSeq.value += 1;
+  const requestSeq = userDetailRequestSeq.value;
+  if (userDetailMode.value !== 'view') {
+    resetUserEmployeeBinding();
+  }
+  return requestSeq;
 }
 
-function createUserDraft(
-  tenant: Tenant | undefined,
-  organization: Organization | undefined,
-): Partial<UserAccount> {
+async function loadUserEmployeeBinding(
+  record: Partial<UserAccount> = selectedUser.value ?? userDraft.value,
+  requestSeq = userDetailRequestSeq.value,
+) {
+  const userId = record.id;
+  if (!userId) {
+    resetUserEmployeeBinding();
+    return;
+  }
+  loadingUserEmployeeBinding.value = true;
+  userEmployeeBindingLoadFailed.value = false;
+  try {
+    const binding = await userContext.http.request<UserEmployeeBindingView>({
+      path: `/iam.user/${encodeURIComponent(userId)}/employee-binding`,
+    });
+    if (canCommitUserDetailRequest(userId, requestSeq)) {
+      userEmployeeBinding.value = binding;
+    }
+  } catch (cause) {
+    if (canCommitUserDetailRequest(userId, requestSeq)) {
+      userEmployeeBindingLoadFailed.value = true;
+      presentPlatformError(cause, { source: 'user-management', phase: 'load' });
+    }
+  } finally {
+    if (canCommitUserDetailRequest(userId, requestSeq)) {
+      loadingUserEmployeeBinding.value = false;
+    }
+  }
+}
+
+function resetUserEmployeeBinding() {
+  userEmployeeBinding.value = undefined;
+  loadingUserEmployeeBinding.value = false;
+  userEmployeeBindingLoadFailed.value = false;
+}
+
+function createUserDraft(tenant: Tenant | undefined): Partial<UserAccount> {
   return {
     tenantId: tenant?.id,
-    organizationId: organization?.id,
     enabled: true,
-    sortOrder: 100,
   };
 }
 
@@ -653,20 +604,13 @@ function copyUser(record: Partial<UserAccount>): Partial<UserAccount> {
 function normalizedUserDraft(
   draft: Partial<UserAccount>,
   tenant: Tenant | undefined,
-  organization: Organization | undefined,
   mode: UserDetailMode,
   password: string,
 ): UserAccount {
   const record = {
-    ...draft,
     tenantId: tenant?.id ?? draft.tenantId,
-    organizationId: (organization?.id ?? draft.organizationId?.trim()) || undefined,
     username: draft.username?.trim(),
-    title: draft.title?.trim() || undefined,
-    mobile: draft.mobile?.trim() || undefined,
-    email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
-    sortOrder: normalizeSortOrder(draft.sortOrder),
     password: mode === 'create' ? password.trim() : undefined,
   } as UserAccount;
   return record;
@@ -693,7 +637,7 @@ function validateUserDraft(draft: UserAccount) {
 }
 
 function userFormFieldDisabled(fieldName: string) {
-  return fieldName === 'organizationId' || (fieldName === 'username' && userDetailMode.value === 'edit');
+  return fieldName === 'username' && userDetailMode.value === 'edit';
 }
 
 function updateUserDraftField(fieldName: string, value: string | number | boolean | undefined) {
@@ -703,45 +647,42 @@ function updateUserDraftField(fieldName: string, value: string | number | boolea
   };
 }
 
-function normalizeSortOrder(value: unknown) {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 100;
-  }
-  const parsed = Number(String(value ?? '').trim());
-  return Number.isFinite(parsed) ? parsed : 100;
-}
-
 function userToggleActionCode(record: Partial<UserAccount>) {
   return record.enabled === false ? 'enable' : 'disable';
 }
 
 function userTitle(record: Partial<UserAccount> | QueryListRecord | undefined) {
-  return String(record?.title ?? record?.username ?? record?.id ?? '用户');
+  return String(record?.username ?? record?.id ?? '用户');
 }
 
 function tenantTitle(record: Tenant | CrudRecordListBase | undefined) {
   return String(record?.title ?? record?.alias ?? record?.id ?? '未命名租户');
 }
 
-function organizationTitle(record: Organization | TreeRecordBase | undefined) {
-  return String(record?.title ?? record?.code ?? record?.id ?? '未命名机构');
+const userDetailDisplayValue = () => undefined;
+
+function userEmployeeBindingTitle(binding: UserEmployeeBindingView | undefined) {
+  if (!binding?.employeeId) {
+    return '未绑定职员';
+  }
+  return String(binding.employeeTitle ?? binding.employeeNo ?? binding.employeeId);
 }
 
-function organizationDisplayValue(value: unknown) {
-  if (!value) {
-    return '-';
+function userEmployeeBindingDescription(binding: UserEmployeeBindingView | undefined) {
+  if (!binding?.employeeId) {
+    return '账号未关联职员身份';
   }
-  if (selectedOrganization.value?.id === value) {
-    return organizationTitle(selectedOrganization.value);
-  }
-  return String(value);
+  return [
+    binding.employeeNo ? `编号 ${binding.employeeNo}` : undefined,
+    binding.organizationId ? `机构 ${binding.organizationId}` : undefined,
+    binding.departmentId ? `部门 ${binding.departmentId}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' / ');
 }
 
-function userDetailDisplayValue(fieldName: string, value: unknown) {
-  if (fieldName === 'organizationId') {
-    return organizationDisplayValue(value);
-  }
-  return undefined;
+function openEmployeeManagement() {
+  void router.push('/iam/employees');
 }
 
 function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
@@ -751,21 +692,10 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
     muted: record.enabled === false,
   };
 }
-
-function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescriptor {
-  return {
-    title: organizationTitle(record),
-    secondary: record.code ?? record.id,
-    muted: record.enabled === false,
-  };
-}
 </script>
 
 <template>
-  <section
-    class="user-management-page"
-    :class="{ 'user-management-page-no-tenant': !organizationPanelVisible }"
-  >
+  <section class="user-management-page">
     <RecordExplorerPanel
       class="user-scope-panel"
       title="租户"
@@ -804,43 +734,6 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       />
     </RecordExplorerPanel>
 
-    <RecordExplorerPanel
-      v-if="organizationPanelVisible"
-      class="user-scope-panel"
-      title="机构"
-      refresh-title="刷新机构树"
-      :search-keyword="organizationSearchKeyword"
-      search-placeholder="搜索机构名称、编码或 ID"
-      :searchable="Boolean(selectedTenant)"
-      @refresh="organizationReloadKey += 1"
-      @update:search-keyword="organizationSearchKeyword = $event"
-    >
-      <UiEmpty v-if="!selectedTenant" description="请选择左侧租户" />
-      <template v-else>
-        <button class="user-scope-entry" type="button" @click="clearOrganizationScope">
-          <UiRecordExplorerItem
-            :title="tenantTitle(selectedTenant)"
-            secondary="全部用户"
-            clickable
-            :selected="!selectedOrganization"
-          />
-        </button>
-        <TreeRecordExplorer
-          :context="organizationTreeContext"
-          :selected-id="selectedOrganization?.id"
-          :reload-key="organizationReloadKey"
-          :keyword="organizationSearchKeyword"
-          search-mode="none"
-          search-trigger="external"
-          empty-description="当前租户暂无机构"
-          loading-tip="加载机构树"
-          fallback-title="未命名机构"
-          :item-of="organizationItemOf"
-          @select="selectOrganization($event as Organization)"
-        />
-      </template>
-    </RecordExplorerPanel>
-
     <RecordQueryListPanel
       class="user-list-panel"
       :context="userListContext"
@@ -852,9 +745,9 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       :selected-key="selectedUserKey"
       :reload-key="userReloadKey"
       :ready="userListReady"
-      quick-search-placeholder="搜索账号、姓名、手机号或邮箱"
-      empty-description="当前范围暂无用户"
-      waiting-description="请选择账号范围"
+      quick-search-placeholder="搜索账号"
+      empty-description="当前租户暂无账号"
+      waiting-description="请选择租户"
       @action="handleUserListAction"
       @row-action="handleUserRowAction"
       @row-dblclick="handleUserRowDblclick"
@@ -900,6 +793,21 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
           :fallback="userFormFieldFallback"
           :display-of="userDetailDisplayValue"
         />
+        <section v-if="userDetailMode === 'view'" class="user-employee-binding">
+          <div class="user-employee-binding-header">
+            <strong>绑定职员</strong>
+            <UiButton type="text" icon-name="search" @click="openEmployeeManagement">到职员管理查看</UiButton>
+          </div>
+          <UiSpin v-if="loadingUserEmployeeBinding" tip="加载绑定职员" />
+          <div v-else-if="userEmployeeBindingLoadFailed" class="user-employee-binding-state">
+            <UiError message="无法加载绑定职员" />
+            <UiButton icon-name="reload" @click="loadUserEmployeeBinding()">重试</UiButton>
+          </div>
+          <div v-else class="user-employee-binding-card">
+            <span>{{ userEmployeeBindingTitle(userEmployeeBinding) }}</span>
+            <small>{{ userEmployeeBindingDescription(userEmployeeBinding) }}</small>
+          </div>
+        </section>
         <div
           v-if="userDetailMode === 'view' && resetPasswordResult?.temporaryPassword"
           class="user-password-reset-result"
@@ -939,7 +847,6 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
         <RecordMetaSection
           v-if="userDetailMode !== 'create' && userDetailMode !== 'resetPassword'"
           :record="userDraft"
-          show-sort-order
         />
       </template>
     </RecordDetailDrawer>
@@ -950,14 +857,10 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
 .user-management-page {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(240px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 12px;
   height: calc(100vh - 116px);
   overflow: hidden;
-}
-
-.user-management-page-no-tenant {
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
 }
 
 .user-scope-panel,
@@ -998,6 +901,43 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
   gap: 4px;
 }
 
+.user-employee-binding {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--muyun-border);
+  border-radius: 8px;
+  background: var(--muyun-hover-subtle);
+}
+
+.user-employee-binding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.user-employee-binding-header strong {
+  color: var(--muyun-text);
+  font-size: 14px;
+}
+
+.user-employee-binding-card,
+.user-employee-binding-state {
+  display: grid;
+  gap: 6px;
+}
+
+.user-employee-binding-card span {
+  color: var(--muyun-text);
+  font-weight: 600;
+}
+
+.user-employee-binding-card small {
+  color: var(--muyun-text-muted);
+}
+
 .user-password-reset-result {
   display: grid;
   gap: 6px;
@@ -1035,7 +975,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
 @media (max-width: 760px) {
   .user-management-page {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(180px, 0.65fr) minmax(220px, 0.8fr) minmax(360px, 1fr);
+    grid-template-rows: minmax(180px, 0.65fr) minmax(360px, 1fr);
     height: auto;
     min-height: calc(100vh - 116px);
     overflow: visible;

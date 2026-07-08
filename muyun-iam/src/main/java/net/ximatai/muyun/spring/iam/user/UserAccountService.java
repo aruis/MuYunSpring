@@ -4,7 +4,6 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
-import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
@@ -45,7 +44,6 @@ import java.util.function.Supplier;
 public class UserAccountService extends TenantActiveScopedService<UserAccount> implements
         SoftDeleteAbility<UserAccount>,
         EnableAbility<UserAccount>,
-        SortAbility<UserAccount>,
         ReferenceAbility<UserAccount>,
         DataScopeAbility<UserAccount>,
         InitialDataAbility<UserAccount>,
@@ -54,7 +52,6 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public static final String MODULE_ALIAS = "iam.user";
     public static final String PLATFORM_SUPER_ADMIN_USER_ID = "platform.user.super_admin";
     public static final String PLATFORM_SUPER_ADMIN_USERNAME = "admin";
-    public static final String PLATFORM_SUPER_ADMIN_USER_TITLE = "平台超级管理员";
     private static final int TEMPORARY_PASSWORD_MAX_ATTEMPTS = 32;
 
     private final PasswordHashingService passwordHashingService;
@@ -131,11 +128,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setId(PLATFORM_SUPER_ADMIN_USER_ID);
         user.setUsername(PLATFORM_SUPER_ADMIN_USERNAME);
         user.setPassword(initialAdminSettings.initialPassword());
-        user.setTitle(PLATFORM_SUPER_ADMIN_USER_TITLE);
         user.setAuthUserId(user.getId());
         user.setAuthModuleAlias(MODULE_ALIAS);
         user.setEnabled(Boolean.TRUE);
-        user.setSortOrder(1);
         return List.of(user);
     }
 
@@ -163,24 +158,15 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         return QueryDescriptor.builder(MODULE_ALIAS)
                 .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
                 .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN, QueryOperator.NULL).withTitle("租户"))
-                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属机构"))
                 .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
                 .field(QueryField.of("username", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("账号").withQuickSearch().withSortable())
-                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("姓名").withQuickSearch().withSortable())
-                .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("手机号").withQuickSearch())
-                .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withTitle("邮箱").withQuickSearch())
                 .field(QueryField.of("passwordStatus", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
                         .withTitle("密码状态"))
                 .field(QueryField.of("lastLoginAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
                                 QueryOperator.BETWEEN)
                         .withTitle("最后登录时间")
                         .withSortable())
-                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
-                        .withTitle("排序号").withSortable())
                 .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
                                 QueryOperator.BETWEEN)
                         .withTitle("创建时间")
@@ -189,7 +175,6 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                                 QueryOperator.BETWEEN)
                         .withTitle("更新时间")
                         .withSortable())
-                .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"))
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("username"))
                 .build();
     }
@@ -198,11 +183,12 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public void normalizeBeforeMutation(UserAccount user) {
         String username = requireUsername(user.getUsername());
         user.setUsername(username);
-        user.setTitle(normalizeBlank(user.getTitle()) == null ? username : user.getTitle().trim());
-        user.setMobile(normalizeBlank(user.getMobile()));
-        user.setEmail(normalizeBlank(user.getEmail()));
-        user.setOrganizationId(normalizeBlank(user.getOrganizationId()));
-        user.setAuthOrganizationId(user.getOrganizationId());
+        user.setTitle(username);
+        user.setMobile(null);
+        user.setEmail(null);
+        user.setOrganizationId(null);
+        user.setSortOrder(null);
+        user.setAuthOrganizationId(null);
         user.setAuthModuleAlias(MODULE_ALIAS);
     }
 

@@ -29,6 +29,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
+import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
+import net.ximatai.muyun.spring.iam.user.UserAccountDao;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
@@ -80,7 +83,15 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(PositionWebController.class);
             context.registerBean(PositionCategoryWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
-            context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
+            UserAccountService userAccountService = new UserAccountService(mock(UserAccountDao.class),
+                    mock(net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier.class),
+                    new PasswordHashingService());
+            context.registerBean(UserAccountService.class, () -> userAccountService);
+            context.registerBean(UserAccountWebController.class, () -> {
+                UserAccountWebController controller = new UserAccountWebController(null);
+                ReflectionTestUtils.setField(controller, "service", userAccountService);
+                return controller;
+            });
             context.registerBean(SystemUserAccountWebController.class);
             context.registerBean(PasswordPolicyRuleWebController.class);
             context.refresh();
@@ -252,7 +263,8 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("用户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "userSelector", "changePassword", "resetPassword");
+                                "enable", "disable", "userSelector", "changePassword", "resetPassword",
+                                "employeeBinding");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("userSelector"))
                         .singleElement()
                         .satisfies(action -> {
@@ -271,6 +283,28 @@ class StaticModuleDefinitionScannerTest {
                         .satisfies(action -> {
                             assertThat(action.title()).isEqualTo("重置密码");
                             assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeBinding"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("绑定职员");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.entities()).extracting(EntityDefinition::alias)
+                        .contains("user", "bound_employee");
+                assertThat(definition.projectionJoins()).singleElement()
+                        .satisfies(join -> {
+                            assertThat(join.relationCode()).isEqualTo("bound_employee");
+                            assertThat(join.steps()).hasSize(2);
+                        });
+                assertThat(definition.uiDefinition()).isNotNull();
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
+                                    .contains(null, "bound_employee");
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .contains("username", "employeeNo", "employeeTitle");
                         });
             });
             assertThat(byAlias.get("iam.system_user")).satisfies(definition -> {

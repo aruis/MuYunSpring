@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -157,6 +158,12 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
+            if (request == null || !request.unpagedEnabled()) {
+                java.util.Optional<WebPageResponse<T>> projected = queryStaticProjectedDefaultList(request);
+                if (projected.isPresent()) {
+                    return projected.get();
+                }
+            }
             WebPageResponse<T> response;
             if (request != null && request.unpagedEnabled()) {
                 List<T> records = WebOutputSupport.records(service(), queryListRecords(request), FieldOutputContext.LIST);
@@ -166,6 +173,37 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             }
             return projectStaticDefaultList(response);
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Optional<WebPageResponse<T>> queryStaticProjectedDefaultList(WebQueryRequest request) {
+        StaticRecordReadProjectionService projectionService = staticRecordReadProjectionService();
+        if (projectionService == null || !(this instanceof StaticModuleUiContributor contributor)) {
+            return java.util.Optional.empty();
+        }
+        WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
+        PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
+        Criteria criteria = queryCriteria(request);
+        Sort[] sorts = querySorts(request);
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<T> dataScopeAbility = DataScopeAbility.cast(service());
+            DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(actionPolicy(PlatformAction.QUERY), criteria);
+            return dataScopeAbility.withDataScopeTenant(scope,
+                    () -> projectionService.queryDefaultList(
+                            contributor.moduleUiDefinition().moduleAlias(),
+                            scope.criteria(),
+                            pageRequest,
+                            service(),
+                            sorts
+                    ));
+        }
+        return projectionService.queryDefaultList(
+                contributor.moduleUiDefinition().moduleAlias(),
+                criteria,
+                pageRequest,
+                service(),
+                sorts
+        );
     }
 
     private WebPageResponse<T> projectStaticDefaultList(WebPageResponse<T> response) {
