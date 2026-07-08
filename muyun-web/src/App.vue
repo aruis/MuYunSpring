@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
+import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
 import {
@@ -13,6 +14,7 @@ import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
 import { businessModuleRoutes, businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
+import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
 import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
 import {
@@ -31,6 +33,12 @@ const activeTabKey = ref<string>();
 const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
+const changePasswordOpen = ref(false);
+const changePasswordSaving = ref(false);
+const changePasswordError = ref<string>();
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
@@ -85,9 +93,82 @@ async function handleAuthenticated(token: string) {
 }
 
 async function handleUserCommand(command: string) {
+  if (command === 'changePassword') {
+    openChangeOwnPasswordDialog();
+    return;
+  }
   if (command === 'logout') {
     await handleLogout();
   }
+}
+
+function openChangeOwnPasswordDialog() {
+  currentPassword.value = '';
+  newPassword.value = '';
+  confirmPassword.value = '';
+  changePasswordError.value = undefined;
+  changePasswordOpen.value = true;
+}
+
+function closeChangeOwnPasswordDialog() {
+  if (changePasswordSaving.value) {
+    return;
+  }
+  changePasswordOpen.value = false;
+  changePasswordError.value = undefined;
+}
+
+async function submitChangeOwnPassword() {
+  if (changePasswordSaving.value) {
+    return;
+  }
+  const validationError = validateChangeOwnPassword();
+  if (validationError) {
+    changePasswordError.value = validationError;
+    return;
+  }
+  const token = effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN);
+  if (!token) {
+    changePasswordError.value = '登录已失效，请重新登录';
+    return;
+  }
+  changePasswordSaving.value = true;
+  changePasswordError.value = undefined;
+  try {
+    await authClient.changeOwnPassword(
+      {
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value,
+      },
+      token,
+    );
+    changePasswordOpen.value = false;
+    currentPassword.value = '';
+    newPassword.value = '';
+    confirmPassword.value = '';
+    presentPlatformMessage('密码已修改', { source: 'change-own-password', tone: 'success' });
+  } catch (cause) {
+    const error = presentPlatformError(cause, { source: 'change-own-password-dialog', phase: 'action' });
+    changePasswordError.value = error.message;
+  } finally {
+    changePasswordSaving.value = false;
+  }
+}
+
+function validateChangeOwnPassword() {
+  if (!currentPassword.value.trim()) {
+    return '请输入当前密码';
+  }
+  if (!newPassword.value.trim()) {
+    return '请输入新密码';
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    return '两次输入的新密码不一致';
+  }
+  if (currentPassword.value === newPassword.value) {
+    return '新密码不能与当前密码相同';
+  }
+  return undefined;
 }
 
 async function handleLogout() {
@@ -217,4 +298,14 @@ function requiresLogin(cause: unknown) {
       <WorkbenchOutlet v-else :descriptor="pageDescriptor" />
     </template>
   </Workbench>
+  <ChangeOwnPasswordDialog
+    v-model:current-password="currentPassword"
+    v-model:new-password="newPassword"
+    v-model:confirm-password="confirmPassword"
+    :open="changePasswordOpen"
+    :saving="changePasswordSaving"
+    :error="changePasswordError"
+    @close="closeChangeOwnPasswordDialog"
+    @submit="submitChangeOwnPassword"
+  />
 </template>

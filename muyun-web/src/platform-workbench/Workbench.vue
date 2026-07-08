@@ -56,6 +56,7 @@ const tenantLabel = computed(() => currentUser.value?.tenantId ?? '系统工作�
 const activePageTypeLabel = computed(() => pageTypeLabelOf(activePageDescriptor.value?.pageType));
 const activeTargetLabel = computed(() => targetLabelOf(activePageDescriptor.value));
 const userMenuItems: UiDropdownItem[] = [
+  { key: 'changePassword', title: '修改密码' },
   { key: 'profile', title: '个人信息' },
   { key: 'settings', title: '偏好设置' },
   { key: 'logout', title: '退出登录', danger: true },
