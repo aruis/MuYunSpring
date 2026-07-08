@@ -755,6 +755,8 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /<RecordQueryListPanel/);
   assert.match(userViewSource, /standard-crud-actions/);
   assert.match(userViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(userViewSource, /userListColumns/);
+  assert.doesNotMatch(userViewSource, /:columns=/);
   assert.match(userViewSource, /canBrowseTenants/);
   assert.match(userViewSource, /currentUserTenant/);
   assert.match(userViewSource, /initializeTenantUserScope/);

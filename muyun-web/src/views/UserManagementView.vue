@@ -23,7 +23,6 @@ import {
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
-  type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
 import { UiButton, UiError, UiInput, UiRecordExplorerItem, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
@@ -85,12 +84,6 @@ const userListContext = computed(
   () => createScopedUserModuleContext(userContext, selectedTenant.value) as ModuleContext<QueryListRecord>,
 );
 const userListReady = computed(() => Boolean(selectedTenant.value?.id));
-const userListColumns = computed<RecordQueryListColumn[]>(() => [
-  { key: 'username', title: '账号', width: '26%' },
-  { key: 'passwordStatusTitle', title: '密码状态', width: '18%' },
-  { key: 'lastLoginAt', title: '最后登录', width: '26%' },
-  { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
-]);
 const userListTitle = computed(() => {
   if (!selectedTenant.value) {
     return '用户列表';
@@ -738,7 +731,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       class="user-list-panel"
       :context="userListContext"
       :title="userListTitle"
-      :columns="userListColumns"
       standard-crud-actions
       standard-crud-row-actions
       create-title="新建用户"
