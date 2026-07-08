@@ -796,6 +796,11 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(contractsSource, /password\?: string/);
   assert.doesNotMatch(contractsSource, /passwordHash/);
   assert.doesNotMatch(userViewSource, /iam\.employee_account/);
+  assert.doesNotMatch(userViewSource, /employee-binding/);
+  assert.doesNotMatch(userViewSource, /UserEmployeeBindingView/);
+  assert.doesNotMatch(userViewSource, /loadUserEmployeeBinding/);
+  assert.doesNotMatch(userViewSource, /user-employee-binding/);
+  assert.doesNotMatch(userViewSource, /绑定职员/);
   assert.doesNotMatch(userViewSource, /iam\.role_assignment/);
   assert.doesNotMatch(userViewSource, /moduleAlias: 'iam\.organization'/);
   assert.doesNotMatch(userViewSource, /fieldName: 'organizationId'/);
