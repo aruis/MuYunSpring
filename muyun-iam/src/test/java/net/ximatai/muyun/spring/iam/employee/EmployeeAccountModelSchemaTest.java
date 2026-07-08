@@ -14,24 +14,16 @@ class EmployeeAccountModelSchemaTest {
         TableWrapper table = mapper.toTable(EmployeeAccount.class);
 
         assertThat(table.getName()).isEqualTo("iam_employee_account");
-        assertThat(columnDefault(table, "primary_account")).isEqualTo("FALSE");
-        assertThat(columnDefault(table, "enabled")).isEqualTo("TRUE");
+        assertThat(table.getColumns()).noneSatisfy(column ->
+                assertThat(column.getName()).isIn("primary_account", "enabled"));
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isTrue();
-                    assertThat(index.getColumns()).containsExactly("tenant_id", "employee_id", "user_id");
+                    assertThat(index.getColumns()).containsExactly("tenant_id", "employee_id");
                 })
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isTrue();
                     assertThat(index.getColumns()).containsExactly("tenant_id", "user_id");
                 });
-    }
-
-    private String columnDefault(TableWrapper table, String columnName) {
-        return table.getColumns().stream()
-                .filter(column -> columnName.equals(column.getName()))
-                .findFirst()
-                .orElseThrow()
-                .getDefaultValue();
     }
 }

@@ -21,8 +21,8 @@ import java.time.Instant;
 @CompositeIndex(columns = {"tenant_id", "username"}, unique = true)
 @InitialDataFields(
         identity = {"tenantId", "username"},
-        managed = {"organizationId", "authUserId", "authOrganizationId", "authModuleAlias"},
-        operator = {"title", "mobile", "email", "enabled", "sortOrder"}
+        managed = {"authUserId", "authModuleAlias"},
+        operator = {"enabled"}
 )
 public class UserAccount extends StandardDataScopedEnabledSortableEntity {
     @Column(name = "username", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Username")

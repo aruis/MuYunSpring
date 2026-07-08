@@ -41,7 +41,6 @@
 | TD-002 | 聚合装配出的 child 已明确按 RAW 查询读取，并有契约测试锁住不执行 child service 完整 `afterSelect`；HYDRATED 聚合读取暂未开放 | 单独读取子实体和父聚合带出子实体的语义仍需保持使用者可预期 | 出现需要嵌套聚合或深度加载的业务场景时，设计显式 HYDRATED 入口 |
 | TD-010 | 引用能力的标题、选项和字段投影已明确按 RAW 读取目标记录，并有契约测试锁住不触发目标 service `afterSelect`；更通用的加载模式暂未设计 | 复杂聚合读取时，引用、父子关系和缓存可能需要更明确的加载深度策略 | 出现跨层级 HYDRATED 引用读取需求时，再设计统一加载模式 |
 | TD-015 | 职员任岗主岗唯一仍缺少强并发保护 | 已提供事务性主岗切换能力，常规请求会先降级同职员其他启用主岗再设置目标主岗；但没有条件唯一索引或显式锁时，强并发写入仍可能绕过应用层预查 | 进入组织人事并发导入或平台级条件唯一约束建设时，补条件唯一索引或显式锁 |
-| TD-016 | 职员主账号唯一仍缺少强并发保护 | 已提供事务性主账号切换能力，常规请求会先降级同职员其他启用主账号再设置目标主账号；但没有条件唯一索引或显式锁时，强并发写入仍可能绕过应用层预查 | 进入账号开通批处理、多端账号治理或平台级条件唯一约束建设时，补条件唯一索引或显式锁 |
 | TD-017 | 外部写入、后台任务和异步批次尚未建设专题流水 | 平台运行审计只记录动作入口和必要身份上下文，不能解释幂等、重试、回执、批次进度和失败恢复 | 进入外部系统接入、统一后台任务调度或异步导入执行时，按 [审计与专题流水边界](platform/AUDIT_AND_PROCESS_LOG_BOUNDARY.md)、[外部写入接入边界](platform/EXTERNAL_WRITE_BOUNDARY.md) 和 [后台任务与异步批次边界](platform/BACKGROUND_JOB_AND_BATCH_BOUNDARY.md) 建设对应专题流水 |
 | TD-020 | 工作日历和 SLA 仍停留在自然时间边界 | `BusinessCalendarService` 当前默认实现只表达自然 elapsed time，workflow 超期仍按节点激活时刻加自然分钟数计算，不跳过节假日或非工作时间；`BusinessCalendar.workingTimeAware` 只能区分自然日历和未来工作日历能力，不是完整日历类型模型 | 进入审批 SLA、工单 SLA 或营业时间承诺时，补 calendar type/能力枚举、工作时段、节假日、时区归属和 SLA 计算策略，再接入 workflow 节点定义 |
 | TD-021 | 登录 session 生命周期审计和清理策略尚未完整模型化 | 当前 session 已持久化到 `iam_user_session`，支持 token hash、滑动过期、绝对过期、多端登录、登出和用户失效撤销；但过期 session 只在访问时拒绝，不立即写入撤销状态，也没有后台清理、保留周期和审计汇总策略 | 进入登录安全审计、运维会话管理、长期运行数据清理或账号安全治理时，设计 session 过期落库、清理任务、保留周期和审计查询 |
@@ -51,6 +50,7 @@
 | TD-025 | 后端业务异常提示尚未形成可展示中文口径 | 当前部分业务拒绝原因仍直接抛出英文技术文案，例如岗位分类被岗位引用时返回 `position category is referenced by positions`；前端全局提示会忠实展示后端 message，不在页面侧翻译业务异常 | 进入统一错误码、业务异常本地化、管理端全局提示治理或生产可用性收口时，为业务异常补稳定错误码、中文默认文案和必要参数，明确前端展示 message 与 traceId 的边界 |
 | TD-026 | 应用归属引用保护仍缺少贡献式检查契约 | 当前删除应用时只在 `ApplicationService` 中显式检查模块、元数据和字典类目等已接入引用；仓库内其他 `applicationAlias` 归属模型后续增多时，如果继续扩硬编码清单，容易遗漏并产生孤儿配置数据 | 进入计量单位、工作流、配置包或更多应用归属模型的删除治理时，沉淀应用归属引用检查贡献接口或注册表，由各业务能力贡献引用存在性、展示名称和错误详情，`ApplicationService` 只编排统一拒绝语义 |
 | TD-028 | `QuerySchema` 外部查询值描述仍过于粗糙 | `QuerySchema.ExternalCriteria` 目前只暴露 key，并固定为 `OBJECT` / `PAGE_CONTEXT`，缺少字段结构、来源语义和校验契约；随着静态查询模板、动态页面上下文和外部查询值增多，ability 层可能继续携带页面交付语义 | 后续扩展 external query values 前，引入 `ExternalCriteriaDescriptor` 或等价能力契约，由能力层声明 valueType、来源、对象字段结构和校验边界，Web 层只负责序列化 |
+| TD-029 | 关联投影查询仍处于静态侧 MVP | 当前已能让静态用户列表通过 SQL join 投影绑定职员摘要，但尚未完成输出字段收敛、cardinality 约束、动态元数据接入、relation 字段查询排序声明、projection plan 缓存和循环保护 | 按 [关联投影查询治理](architecture/RELATION_PROJECTION_GOVERNANCE.md) 分阶段回收，先补短期硬化，再推进来源无关的 `RelationProjection` 平台能力 |
 
 ## 运维治理触发回收
 

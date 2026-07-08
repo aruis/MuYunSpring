@@ -9,8 +9,10 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -80,6 +82,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -655,8 +658,7 @@ class IamWebControllerTest {
     @Test
     void shouldViewSystemUserThroughSystemScope() throws Exception {
         currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
-        UserAccount admin = user(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin",
-                UserAccountService.PLATFORM_SUPER_ADMIN_USER_TITLE);
+        UserAccount admin = user(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin", "admin");
         admin.setTenantId(null);
         admin.setPasswordHash(new PasswordHashingService().hash("admin123"));
         when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
@@ -1036,14 +1038,14 @@ class IamWebControllerTest {
         existing.setTenantId("tenant_a");
 
         when(employeeService.select("employee-1")).thenReturn(existing);
-        when(employeeAccountService.accounts("employee-1")).thenAnswer(invocation -> {
+        when(employeeAccountService.accountOfEmployee("employee-1")).thenAnswer(invocation -> {
             assertThat(TenantContext.currentTenantId()).contains("tenant_a");
-            return List.of();
+            return null;
         });
 
-        mvc.perform(get("/iam.employee/employee-1/accounts"))
+        mvc.perform(get("/iam.employee/employee-1/account"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records").isArray());
+                .andExpect(content().string(""));
     }
 
     @Test
@@ -1057,7 +1059,6 @@ class IamWebControllerTest {
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
         UserAccount alice = user("user-2", "alice", "Alice");
-        alice.setOrganizationId("org-1");
         when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
         userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
 
@@ -1066,14 +1067,13 @@ class IamWebControllerTest {
                         .content("""
                                 {
                                   "roleId":"role-1",
-                                  "organizationId":"org-1",
                                   "keyword":"ali"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("user-2"))
                 .andExpect(jsonPath("$.records[0].username").value("alice"))
-                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"));
+                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist());
 
         verify(roleService).userIds("role-1");
         assertThat(userAccountService.scopedPolicies)
@@ -1082,6 +1082,50 @@ class IamWebControllerTest {
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
         assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void shouldApplyActiveCriteriaBeforeUserProjectionQuery() throws Exception {
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
+        UserAccountWebController controller = new UserAccountWebController(null);
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        controller.setStaticRecordReadProjectionService(projectionService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(projectionService.queryDefaultList(
+                any(),
+                any(Criteria.class),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        )).thenReturn(java.util.Optional.of(WebPageResponse.from(PageResult.of(List.of(Map.of(
+                "id", "user-2",
+                "username", "alice"
+        )), 1, PageRequest.of(1, 20)))));
+
+        mvc.perform(post("/iam.user/query"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].username").value("alice"));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(projectionService).queryDefaultList(
+                any(),
+                criteriaCaptor.capture(),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        );
+        String sql = compiledCriteria(criteriaCaptor.getValue());
+        assertThat(sql).contains("authUserId");
+        assertThat(sql).contains("tenantId");
+        assertThat(sql).contains("deleted");
+        verify(userAccountDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 
     private Tenant tenant(String alias, String title) {

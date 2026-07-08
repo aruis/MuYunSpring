@@ -33,7 +33,7 @@ import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 defineOptions({ name: 'SystemUserManagementView' });
 
 type SystemUserDetailMode = 'view' | 'edit' | 'resetPassword';
-type SystemUserFormFieldName = 'username' | 'title' | 'mobile' | 'email' | 'enabled' | 'sortOrder';
+type SystemUserFormFieldName = 'username' | 'enabled';
 
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
 const selectedUserKey = ref<string>();
@@ -54,12 +54,10 @@ const systemUserContext = computed(
   () => createSystemUserModuleContext(userContext) as ModuleContext<QueryListRecord>,
 );
 const columns = computed<RecordQueryListColumn[]>(() => [
-  { key: 'username', title: '账号', width: '18%' },
-  { key: 'title', title: '姓名', width: '18%' },
-  { key: 'mobile', title: '手机号', width: '16%' },
-  { key: 'email', title: '邮箱', width: '18%' },
-  { key: 'enabled', title: '状态', type: 'enabledStatus', width: '10%' },
-  { key: 'sortOrder', title: '排序', width: '10%' },
+  { key: 'username', title: '账号', width: '26%' },
+  { key: 'passwordStatusTitle', title: '密码状态', width: '18%' },
+  { key: 'lastLoginAt', title: '最后登录', width: '26%' },
+  { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
 ]);
 const detailTitle = computed(() => {
   if (detailMode.value === 'resetPassword') {
@@ -125,20 +123,9 @@ const detailActions = computed<RecordActionItem[]>(() => {
 });
 const formFieldFallback = computed<Record<SystemUserFormFieldName, RecordFormFieldFallback>>(() => ({
   username: { label: '账号', required: true, visible: true, placeholder: '请输入登录账号' },
-  title: { label: '姓名', visible: true, placeholder: '请输入姓名或显示名' },
-  mobile: { label: '手机号', visible: true, placeholder: '请输入手机号' },
-  email: { label: '邮箱', visible: true, placeholder: '请输入邮箱' },
-  enabled: { label: '启用状态', visible: true, controlType: 'enabledStatus' },
-  sortOrder: { label: '排序号', visible: true, placeholder: '请输入排序号' },
+  enabled: { label: '允许登录', visible: true, controlType: 'enabledStatus' },
 }));
-const formFieldNames = computed<SystemUserFormFieldName[]>(() => [
-  'username',
-  'title',
-  'mobile',
-  'email',
-  'enabled',
-  'sortOrder',
-]);
+const formFieldNames = computed<SystemUserFormFieldName[]>(() => ['username', 'enabled']);
 
 onMounted(loadFormDefinition);
 
@@ -405,7 +392,6 @@ function commitDetailRecord(record: UserAccount, nextMode: SystemUserDetailMode 
 function createSystemUserDraft(): Partial<UserAccount> {
   return {
     enabled: true,
-    sortOrder: 100,
   };
 }
 
@@ -415,15 +401,9 @@ function copySystemUser(record: Partial<UserAccount>): Partial<UserAccount> {
 
 function normalizedSystemUserDraft(draft: Partial<UserAccount>): UserAccount {
   return {
-    ...draft,
     tenantId: undefined,
-    organizationId: undefined,
     username: draft.username?.trim(),
-    title: draft.title?.trim() || undefined,
-    mobile: draft.mobile?.trim() || undefined,
-    email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
-    sortOrder: normalizeSortOrder(draft.sortOrder),
     password: undefined,
   } as UserAccount;
 }
@@ -453,20 +433,12 @@ function updateUserDraftField(fieldName: string, value: string | number | boolea
   };
 }
 
-function normalizeSortOrder(value: unknown) {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 100;
-  }
-  const parsed = Number(String(value ?? '').trim());
-  return Number.isFinite(parsed) ? parsed : 100;
-}
-
 function systemUserToggleActionCode(record: Partial<UserAccount>) {
   return record.enabled === false ? 'enable' : 'disable';
 }
 
 function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefined) {
-  return String(record?.title ?? record?.username ?? record?.id ?? '系统账号');
+  return String(record?.username ?? record?.id ?? '系统账号');
 }
 </script>
 
@@ -543,7 +515,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
           <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
           <small v-if="resetPasswordResult.expiresAt">有效期至 {{ resetPasswordResult.expiresAt }}</small>
         </div>
-        <RecordMetaSection :record="userDraft" show-sort-order />
+        <RecordMetaSection :record="userDraft" />
       </template>
 
       <template #form>
@@ -570,7 +542,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
             />
           </label>
         </form>
-        <RecordMetaSection v-if="detailMode !== 'resetPassword'" :record="userDraft" show-sort-order />
+        <RecordMetaSection v-if="detailMode !== 'resetPassword'" :record="userDraft" />
       </template>
     </RecordModeDrawer>
   </section>

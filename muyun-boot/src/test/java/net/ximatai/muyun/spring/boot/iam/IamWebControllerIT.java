@@ -53,6 +53,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -568,46 +569,49 @@ class IamWebControllerIT {
 
     @Test
     void shouldBindEmployeeAccountEndpointsInRealMvcContext() throws Exception {
-        EmployeeAccount binding = employeeAccount("binding-1", "employee-1", "user-2", true);
+        EmployeeAccount binding = employeeAccount("binding-1", "employee-1", "user-2");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeAccountService.accounts("employee-1")).thenReturn(List.of(binding));
+        when(employeeAccountService.accountOfEmployee("employee-1")).thenReturn(binding);
         when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
         when(employeeAccountService.select("binding-1")).thenReturn(binding);
-        when(employeeAccountService.deleteAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.enableAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.disableAccount("employee-1", "binding-1")).thenReturn(1);
-        when(employeeAccountService.makePrimaryAccount("employee-1", "binding-1")).thenReturn(1);
+        when(employeeAccountService.unbindAccount("employee-1")).thenReturn(1);
+        UserAccount provisioned = new UserAccount();
+        provisioned.setId("user-2");
+        provisioned.setUsername("alice");
+        when(employeeAccountService.provisionAccount(eq("employee-1"), any(UserAccount.class)))
+                .thenReturn(new EmployeeAccountService.AccountProvisionResult(provisioned, binding));
 
-        mvc.perform(get("/iam.employee/employee-1/accounts"))
+        mvc.perform(get("/iam.employee/employee-1/account"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].id").value("binding-1"))
-                .andExpect(jsonPath("$.records[0].primaryAccount").value(true));
+                .andExpect(jsonPath("$.id").value("binding-1"));
 
-        mvc.perform(post("/iam.employee/employee-1/accounts")
+        mvc.perform(post("/iam.employee/employee-1/account")
                         .contentType("application/json")
                         .content("""
-                                {"userId":"user-2","primaryAccount":true}
+                                {"userId":"user-2"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("binding-1"))
                 .andExpect(jsonPath("$.userId").value("user-2"));
 
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/delete"))
+        mvc.perform(post("/iam.employee/employee-1/account/provision")
+                        .contentType("application/json")
+                        .content("""
+                                {"username":"alice","password":"secret1"}
+                                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/enable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/disable"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
-        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/primary"))
+                .andExpect(jsonPath("$.user.id").value("user-2"))
+                .andExpect(jsonPath("$.binding.id").value("binding-1"));
+
+        mvc.perform(post("/iam.employee/employee-1/account/delete"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        verify(employeeAccountService).accounts("employee-1");
+        verify(employeeAccountService).accountOfEmployee("employee-1");
         verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
+        verify(employeeAccountService).provisionAccount(eq("employee-1"), any(UserAccount.class));
+        verify(employeeAccountService).unbindAccount("employee-1");
     }
 
     @Test
@@ -870,13 +874,11 @@ class IamWebControllerIT {
         return grant;
     }
 
-    private EmployeeAccount employeeAccount(String id, String employeeId, String userId, boolean primaryAccount) {
+    private EmployeeAccount employeeAccount(String id, String employeeId, String userId) {
         EmployeeAccount binding = new EmployeeAccount();
         binding.setId(id);
         binding.setEmployeeId(employeeId);
         binding.setUserId(userId);
-        binding.setPrimaryAccount(primaryAccount);
-        binding.setEnabled(Boolean.TRUE);
         return binding;
     }
 

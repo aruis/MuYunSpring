@@ -20,7 +20,8 @@ public record StaticModuleDefinition(
         Set<EntityCapability> capabilities,
         List<StaticModuleActionDefinition> actions,
         List<EntityDefinition> entities,
-        ModuleUiDefinition uiDefinition
+        ModuleUiDefinition uiDefinition,
+        List<StaticProjectionJoinDefinition> projectionJoins
 ) {
     public StaticModuleDefinition(String applicationAlias,
                                   String moduleAlias,
@@ -33,7 +34,7 @@ public record StaticModuleDefinition(
                                   List<StaticModuleActionDefinition> actions,
                                   List<EntityDefinition> entities) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
-                capabilities, actions, entities, null);
+                capabilities, actions, entities, null, List.of());
     }
 
     public StaticModuleDefinition(String applicationAlias,
@@ -42,7 +43,7 @@ public record StaticModuleDefinition(
                                   String parentModuleAlias,
                                   List<StaticModuleActionDefinition> actions) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
-                Set.of(), actions, List.of(), null);
+                Set.of(), actions, List.of(), null, List.of());
     }
 
     public StaticModuleDefinition(String applicationAlias,
@@ -52,7 +53,22 @@ public record StaticModuleDefinition(
                                   Set<EntityCapability> capabilities,
                                   List<StaticModuleActionDefinition> actions) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
-                capabilities, actions, List.of(), null);
+                capabilities, actions, List.of(), null, List.of());
+    }
+
+    public StaticModuleDefinition(String applicationAlias,
+                                  String moduleAlias,
+                                  String title,
+                                  String parentModuleAlias,
+                                  ModuleEntryType entryType,
+                                  String entryRoute,
+                                  String entryExternalUrl,
+                                  Set<EntityCapability> capabilities,
+                                  List<StaticModuleActionDefinition> actions,
+                                  List<EntityDefinition> entities,
+                                  ModuleUiDefinition uiDefinition) {
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
+                capabilities, actions, entities, uiDefinition, List.of());
     }
 
     public StaticModuleDefinition {
@@ -81,6 +97,7 @@ public record StaticModuleDefinition(
             throw new IllegalArgumentException("static module UI definition alias must match module alias: "
                     + moduleAlias + " != " + uiDefinition.moduleAlias());
         }
+        projectionJoins = projectionJoins == null ? List.of() : List.copyOf(projectionJoins);
     }
 
     public boolean supports(EntityCapability capability) {

@@ -51,6 +51,7 @@ public class StaticModuleDefinitionScanner {
 
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
         validateScopeAlias(beanClass, module);
+        List<StaticProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
         return new StaticModuleDefinition(
                 module.application(),
                 module.alias(),
@@ -61,9 +62,18 @@ public class StaticModuleDefinitionScanner {
                 module.externalUrl(),
                 java.util.Set.of(module.capabilities()),
                 actions(beanClass, java.util.Set.of(module.capabilities())),
-                entities(beanClass, module),
-                uiDefinition(bean, module)
+                entities(beanClass, module, projectionJoins),
+                uiDefinition(bean, module),
+                projectionJoins
         );
+    }
+
+    private List<StaticProjectionJoinDefinition> projectionJoins(Object bean) {
+        if (!(bean instanceof StaticProjectionJoinContributor contributor)) {
+            return List.of();
+        }
+        List<StaticProjectionJoinDefinition> joins = contributor.projectionJoins();
+        return joins == null ? List.of() : List.copyOf(joins);
     }
 
     private ModuleUiDefinition uiDefinition(Object bean, PlatformStaticModule module) {
@@ -97,7 +107,9 @@ public class StaticModuleDefinitionScanner {
         return ModuleEntryType.MODULE;
     }
 
-    private List<EntityDefinition> entities(Class<?> beanClass, PlatformStaticModule module) {
+    private List<EntityDefinition> entities(Class<?> beanClass,
+                                            PlatformStaticModule module,
+                                            List<StaticProjectionJoinDefinition> projectionJoins) {
         Object service = service(beanClass);
         if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
@@ -106,11 +118,22 @@ public class StaticModuleDefinitionScanner {
         if (modelClass == null || modelClass == Object.class) {
             return List.of();
         }
-        return List.of(new StaticEntityDefinitionCompiler().compile(
+        LinkedHashMap<String, EntityDefinition> entities = new LinkedHashMap<>();
+        EntityDefinition mainEntity = new StaticEntityDefinitionCompiler().compile(
                 entityAlias(module),
                 module.title(),
                 modelClass
-        ));
+        );
+        entities.put(mainEntity.alias(), mainEntity);
+        for (StaticProjectionJoinDefinition join : projectionJoins) {
+            EntityDefinition target = join.targetEntity();
+            if (entities.containsKey(target.alias())) {
+                throw new IllegalStateException("static projection join entity conflicts with module entity: "
+                        + module.alias() + "." + target.alias());
+            }
+            entities.put(target.alias(), target);
+        }
+        return List.copyOf(entities.values());
     }
 
     private String entityAlias(PlatformStaticModule module) {
@@ -213,7 +236,8 @@ public class StaticModuleDefinitionScanner {
                     target.capabilities(),
                     List.copyOf(merged.values()),
                     entities,
-                    uiDefinition
+                    uiDefinition,
+                    target.projectionJoins()
             ));
         }
     }

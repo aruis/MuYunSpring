@@ -191,10 +191,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         user.setId(USER_ID);
         user.setUsername(properties.getAdminUsername());
         user.setPassword(properties.getAdminInitialPassword());
-        user.setOrganizationId(ORGANIZATION_ID);
-        user.setTitle(properties.getEmployeeTitle());
         user.setEnabled(Boolean.TRUE);
-        user.setSortOrder(1);
         userAccountService.insert(user);
         return user;
     }
@@ -209,8 +206,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         binding.setId(EMPLOYEE_ACCOUNT_ID);
         binding.setEmployeeId(EMPLOYEE_ID);
         binding.setUserId(USER_ID);
-        binding.setPrimaryAccount(Boolean.TRUE);
-        binding.setEnabled(Boolean.TRUE);
         employeeAccountService.insert(binding);
         return binding;
     }
@@ -250,7 +245,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     private void validateExistingTenantAdminUser(UserAccount user) {
         requireEqual("demo admin user tenant", TENANT_ALIAS, user.getTenantId());
         requireEqual("demo admin username", properties.getAdminUsername(), user.getUsername());
-        requireEqual("demo admin organization", ORGANIZATION_ID, user.getOrganizationId());
     }
 
     private void validateExistingEmployeeAccount(EmployeeAccount account) {
