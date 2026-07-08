@@ -26,7 +26,8 @@ class StaticProjectionQueryPlannerTest {
 
         assertThat(plan.hasRelationProjection()).isTrue();
         assertThat(plan.projectedFields()).contains(
-                "id", "tenantId", "deleted", "username", "employeeNo", "employeeTitle");
+                "id", "tenantId", "deleted", "createdAt", "updatedAt",
+                "username", "employeeNo", "employeeTitle");
         assertThat(plan.relationOutputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "employeeTitle");
         assertThat(plan.baseSql())

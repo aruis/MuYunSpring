@@ -9,8 +9,10 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -1080,6 +1082,50 @@ class IamWebControllerTest {
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
         assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void shouldApplyActiveCriteriaBeforeUserProjectionQuery() throws Exception {
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
+        UserAccountWebController controller = new UserAccountWebController(null);
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        controller.setStaticRecordReadProjectionService(projectionService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(projectionService.queryDefaultList(
+                any(),
+                any(Criteria.class),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        )).thenReturn(java.util.Optional.of(WebPageResponse.from(PageResult.of(List.of(Map.of(
+                "id", "user-2",
+                "username", "alice"
+        )), 1, PageRequest.of(1, 20)))));
+
+        mvc.perform(post("/iam.user/query"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].username").value("alice"));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(projectionService).queryDefaultList(
+                any(),
+                criteriaCaptor.capture(),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        );
+        String sql = compiledCriteria(criteriaCaptor.getValue());
+        assertThat(sql).contains("authUserId");
+        assertThat(sql).contains("tenantId");
+        assertThat(sql).contains("deleted");
+        verify(userAccountDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 
     private Tenant tenant(String alias, String title) {

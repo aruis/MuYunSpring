@@ -111,6 +111,16 @@ public final class StaticProjectionQueryPlanner {
                 StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_FIELD));
         addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.DELETED_COLUMN, StandardEntitySchema.DELETED_FIELD));
+        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.DELETED_AT_COLUMN, StandardEntitySchema.DELETED_AT_FIELD));
+        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_FIELD));
+        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.CREATED_AT_COLUMN, StandardEntitySchema.CREATED_AT_FIELD));
+        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.UPDATED_BY_COLUMN, StandardEntitySchema.UPDATED_BY_FIELD));
+        addSelectField(selectFields, new SelectField(StaticProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.UPDATED_AT_COLUMN, StandardEntitySchema.UPDATED_AT_FIELD));
     }
 
     private static void addSelectField(LinkedHashMap<String, SelectField> selectFields, SelectField field) {

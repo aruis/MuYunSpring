@@ -188,18 +188,20 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         if (service() instanceof DataScopeAbility<?>) {
             DataScopeAbility<T> dataScopeAbility = DataScopeAbility.cast(service());
             DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(actionPolicy(PlatformAction.QUERY), criteria);
+            Criteria activeCriteria = service().activeCriteria(scope.criteria());
             return dataScopeAbility.withDataScopeTenant(scope,
                     () -> projectionService.queryDefaultList(
                             contributor.moduleUiDefinition().moduleAlias(),
-                            scope.criteria(),
+                            activeCriteria,
                             pageRequest,
                             service(),
                             sorts
                     ));
         }
+        Criteria activeCriteria = service().activeCriteria(criteria);
         return projectionService.queryDefaultList(
                 contributor.moduleUiDefinition().moduleAlias(),
-                criteria,
+                activeCriteria,
                 pageRequest,
                 service(),
                 sorts
