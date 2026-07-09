@@ -468,7 +468,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
-  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(contractsSource, /optionTitleField\?: string/);
+  assert.match(panelSource, /titleField\?: string/);
+  assert.match(panelSource, /titleField: fieldByName\(field\.fieldRef\.fieldName\)\?\.optionTitleField/);
+  assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(panelSource, /return value \? '是' : '否'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
@@ -729,7 +732,7 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
   assert.doesNotMatch(roleViewSource, /rolePermissions/);
-  assert.match(panelSource, /record\[`\$\{fieldName\}Title`\]/);
+  assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
   assert.match(
@@ -755,6 +758,8 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /<RecordQueryListPanel/);
   assert.match(userViewSource, /standard-crud-actions/);
   assert.match(userViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(userViewSource, /userListColumns/);
+  assert.doesNotMatch(userViewSource, /:columns=/);
   assert.match(userViewSource, /canBrowseTenants/);
   assert.match(userViewSource, /currentUserTenant/);
   assert.match(userViewSource, /initializeTenantUserScope/);
@@ -794,6 +799,11 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(contractsSource, /password\?: string/);
   assert.doesNotMatch(contractsSource, /passwordHash/);
   assert.doesNotMatch(userViewSource, /iam\.employee_account/);
+  assert.doesNotMatch(userViewSource, /employee-binding/);
+  assert.doesNotMatch(userViewSource, /UserEmployeeBindingView/);
+  assert.doesNotMatch(userViewSource, /loadUserEmployeeBinding/);
+  assert.doesNotMatch(userViewSource, /user-employee-binding/);
+  assert.doesNotMatch(userViewSource, /绑定职员/);
   assert.doesNotMatch(userViewSource, /iam\.role_assignment/);
   assert.doesNotMatch(userViewSource, /moduleAlias: 'iam\.organization'/);
   assert.doesNotMatch(userViewSource, /fieldName: 'organizationId'/);

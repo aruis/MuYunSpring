@@ -4,7 +4,9 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,31 +20,44 @@ import java.util.Optional;
 public class StaticRecordReadProjectionService {
     private final StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
     private final RelationProjectionReadService relationProjectionReadService;
+    private final OptionSourceRegistry optionSourceRegistry;
 
     public StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog) {
-        this(staticModuleDefinitionCatalog, (RelationProjectionReadService) null);
+        this(staticModuleDefinitionCatalog, (RelationProjectionReadService) null, null);
     }
 
     @Autowired
     public StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
-                                             ObjectProvider<RelationProjectionReadService> relationProjectionReadService) {
+                                             ObjectProvider<RelationProjectionReadService> relationProjectionReadService,
+                                             ObjectProvider<OptionSourceRegistry> optionSourceRegistry) {
         this(staticModuleDefinitionCatalog,
-                relationProjectionReadService == null ? null : relationProjectionReadService.getIfAvailable());
+                relationProjectionReadService == null ? null : relationProjectionReadService.getIfAvailable(),
+                optionSourceRegistry == null ? null : optionSourceRegistry.getIfAvailable());
     }
 
     StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
                                       RelationProjectionQueryExecutor projectionQueryExecutor,
                                       RelationProjectionDatabaseTypeProvider databaseTypeProvider) {
+        this(staticModuleDefinitionCatalog, projectionQueryExecutor, databaseTypeProvider, null);
+    }
+
+    StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
+                                      RelationProjectionQueryExecutor projectionQueryExecutor,
+                                      RelationProjectionDatabaseTypeProvider databaseTypeProvider,
+                                      OptionSourceRegistry optionSourceRegistry) {
         this(staticModuleDefinitionCatalog,
-                new RelationProjectionReadService(projectionQueryExecutor, databaseTypeProvider));
+                new RelationProjectionReadService(projectionQueryExecutor, databaseTypeProvider),
+                optionSourceRegistry);
     }
 
     private StaticRecordReadProjectionService(StaticModuleDefinitionCatalog staticModuleDefinitionCatalog,
-                                              RelationProjectionReadService relationProjectionReadService) {
+                                              RelationProjectionReadService relationProjectionReadService,
+                                              OptionSourceRegistry optionSourceRegistry) {
         this.staticModuleDefinitionCatalog = staticModuleDefinitionCatalog;
         this.relationProjectionReadService = relationProjectionReadService == null
                 ? new RelationProjectionReadService()
                 : relationProjectionReadService;
+        this.optionSourceRegistry = optionSourceRegistry;
     }
 
     public <T> WebPageResponse<T> projectDefaultList(String moduleAlias,
@@ -95,8 +110,29 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        WebPageResponse response = WebPageResponse.from(page);
+        List<Map<String, Object>> records = RecordReadProjectionOptionTitleProjector.project(
+                modelClass(recordService),
+                projection,
+                page.getRecords(),
+                optionSourceRegistry
+        );
+        WebPageResponse response = new WebPageResponse(
+                records,
+                page.getTotal(),
+                page.getPageNum(),
+                page.getPageSize(),
+                page.getPages(),
+                page.isTotalKnown(),
+                null
+        );
         return Optional.of(response);
+    }
+
+    private Class<?> modelClass(Object recordService) {
+        if (recordService instanceof CrudAbility<?> crudAbility) {
+            return crudAbility.modelClass();
+        }
+        return null;
     }
 
     private Optional<RecordReadProjection> defaultListProjection(String moduleAlias, Object recordService) {

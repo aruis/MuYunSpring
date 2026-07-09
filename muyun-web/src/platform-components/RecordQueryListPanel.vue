@@ -33,6 +33,7 @@ export interface RecordQueryListColumn {
   type?: 'text' | 'enabledStatus';
   width?: string;
   align?: 'left' | 'center' | 'right';
+  titleField?: string;
   render?: (record: QueryListRecord) => string;
 }
 
@@ -592,11 +593,11 @@ function recordKey(record: QueryListRecord) {
 }
 
 function cellValue(record: QueryListRecord, column: RecordQueryListColumn) {
-  return column.render?.(record) ?? displayRecordFieldValue(record, column.key);
+  return column.render?.(record) ?? displayRecordFieldValue(record, column.key, column.titleField);
 }
 
-function displayRecordFieldValue(record: QueryListRecord, fieldName: string) {
-  const titleValue = record[`${fieldName}Title`];
+function displayRecordFieldValue(record: QueryListRecord, fieldName: string, titleField?: string) {
+  const titleValue = record[titleField ?? `${fieldName}Title`];
   if (typeof titleValue === 'string' && titleValue.trim()) {
     return titleValue;
   }
@@ -622,6 +623,7 @@ function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined)
       type: field.uiType === 'enabledStatus' ? 'enabledStatus' : 'text',
       width: field.width,
       align: columnAlign(field.align),
+      titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
     }));
 }
 

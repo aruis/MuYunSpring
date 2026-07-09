@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import {
   CrudRecordListExplorer,
   RecordActionBar,
@@ -23,7 +22,6 @@ import {
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
-  type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
 import { UiButton, UiError, UiInput, UiRecordExplorerItem, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
@@ -31,7 +29,6 @@ import type {
   ResetPasswordResponse,
   Tenant,
   UserAccount,
-  UserEmployeeBindingView,
   WebCountResponse,
   WebQueryRequest,
 } from '@muyun/web-contracts';
@@ -46,7 +43,6 @@ type UserFormFieldName = 'username' | 'enabled';
 const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
 const currentUser = useCurrentUserContext();
-const router = useRouter();
 const tenantSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
 const userReloadKey = ref(0);
@@ -63,9 +59,6 @@ const userDraft = ref<Partial<UserAccount>>(createUserDraft(undefined));
 const passwordDraft = ref('');
 const resetPasswordResult = ref<ResetPasswordResponse>();
 const userFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
-const userEmployeeBinding = ref<UserEmployeeBindingView>();
-const loadingUserEmployeeBinding = ref(false);
-const userEmployeeBindingLoadFailed = ref(false);
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const canBrowseTenants = computed(() => currentUser?.value?.system === true);
@@ -85,12 +78,6 @@ const userListContext = computed(
   () => createScopedUserModuleContext(userContext, selectedTenant.value) as ModuleContext<QueryListRecord>,
 );
 const userListReady = computed(() => Boolean(selectedTenant.value?.id));
-const userListColumns = computed<RecordQueryListColumn[]>(() => [
-  { key: 'username', title: '账号', width: '26%' },
-  { key: 'passwordStatusTitle', title: '密码状态', width: '18%' },
-  { key: 'lastLoginAt', title: '最后登录', width: '26%' },
-  { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
-]);
 const userListTitle = computed(() => {
   if (!selectedTenant.value) {
     return '用户列表';
@@ -311,7 +298,6 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
   userDetailMode.value = mode;
   selectedUser.value = undefined;
   userDraft.value = copyUser(record as UserAccount);
-  resetUserEmployeeBinding();
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   loadingUserDetail.value = true;
@@ -323,10 +309,7 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
     if (!canCommitUserDetailRequest(id, requestSeq)) {
       return;
     }
-    const detailSeq = commitUserDetailRecord(fullRecord, mode);
-    if (mode === 'view') {
-      void loadUserEmployeeBinding(fullRecord, detailSeq);
-    }
+    commitUserDetailRecord(fullRecord, mode);
   } catch (cause) {
     if (canCommitUserDetailRequest(id, requestSeq)) {
       userDetailLoadFailed.value = true;
@@ -348,7 +331,6 @@ function closeUserDetail() {
   userDetailLoadFailed.value = false;
   userDetailOpen.value = false;
   userDetailMode.value = 'view';
-  resetUserEmployeeBinding();
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   userDraft.value = selectedUser.value ? copyUser(selectedUser.value) : createUserDraft(selectedTenant.value);
@@ -363,7 +345,6 @@ function cancelUserDetail() {
     return;
   }
   userDraft.value = copyUser(selectedUser.value);
-  void loadUserEmployeeBinding(selectedUser.value, userDetailRequestSeq.value);
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   userDetailMode.value = 'view';
@@ -548,46 +529,7 @@ function commitUserDetailRecord(record: UserAccount, nextMode: UserDetailMode = 
   userDetailLoadFailed.value = false;
   userDetailRequestSeq.value += 1;
   const requestSeq = userDetailRequestSeq.value;
-  if (userDetailMode.value !== 'view') {
-    resetUserEmployeeBinding();
-  }
   return requestSeq;
-}
-
-async function loadUserEmployeeBinding(
-  record: Partial<UserAccount> = selectedUser.value ?? userDraft.value,
-  requestSeq = userDetailRequestSeq.value,
-) {
-  const userId = record.id;
-  if (!userId) {
-    resetUserEmployeeBinding();
-    return;
-  }
-  loadingUserEmployeeBinding.value = true;
-  userEmployeeBindingLoadFailed.value = false;
-  try {
-    const binding = await userContext.http.request<UserEmployeeBindingView>({
-      path: `/iam.user/${encodeURIComponent(userId)}/employee-binding`,
-    });
-    if (canCommitUserDetailRequest(userId, requestSeq)) {
-      userEmployeeBinding.value = binding;
-    }
-  } catch (cause) {
-    if (canCommitUserDetailRequest(userId, requestSeq)) {
-      userEmployeeBindingLoadFailed.value = true;
-      presentPlatformError(cause, { source: 'user-management', phase: 'load' });
-    }
-  } finally {
-    if (canCommitUserDetailRequest(userId, requestSeq)) {
-      loadingUserEmployeeBinding.value = false;
-    }
-  }
-}
-
-function resetUserEmployeeBinding() {
-  userEmployeeBinding.value = undefined;
-  loadingUserEmployeeBinding.value = false;
-  userEmployeeBindingLoadFailed.value = false;
 }
 
 function createUserDraft(tenant: Tenant | undefined): Partial<UserAccount> {
@@ -661,30 +603,6 @@ function tenantTitle(record: Tenant | CrudRecordListBase | undefined) {
 
 const userDetailDisplayValue = () => undefined;
 
-function userEmployeeBindingTitle(binding: UserEmployeeBindingView | undefined) {
-  if (!binding?.employeeId) {
-    return '未绑定职员';
-  }
-  return String(binding.employeeTitle ?? binding.employeeNo ?? binding.employeeId);
-}
-
-function userEmployeeBindingDescription(binding: UserEmployeeBindingView | undefined) {
-  if (!binding?.employeeId) {
-    return '账号未关联职员身份';
-  }
-  return [
-    binding.employeeNo ? `编号 ${binding.employeeNo}` : undefined,
-    binding.organizationId ? `机构 ${binding.organizationId}` : undefined,
-    binding.departmentId ? `部门 ${binding.departmentId}` : undefined,
-  ]
-    .filter(Boolean)
-    .join(' / ');
-}
-
-function openEmployeeManagement() {
-  void router.push('/iam/employees');
-}
-
 function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
   return {
     title: tenantTitle(record),
@@ -738,7 +656,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       class="user-list-panel"
       :context="userListContext"
       :title="userListTitle"
-      :columns="userListColumns"
       standard-crud-actions
       standard-crud-row-actions
       create-title="新建用户"
@@ -793,21 +710,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
           :fallback="userFormFieldFallback"
           :display-of="userDetailDisplayValue"
         />
-        <section v-if="userDetailMode === 'view'" class="user-employee-binding">
-          <div class="user-employee-binding-header">
-            <strong>绑定职员</strong>
-            <UiButton type="text" icon-name="search" @click="openEmployeeManagement">到职员管理查看</UiButton>
-          </div>
-          <UiSpin v-if="loadingUserEmployeeBinding" tip="加载绑定职员" />
-          <div v-else-if="userEmployeeBindingLoadFailed" class="user-employee-binding-state">
-            <UiError message="无法加载绑定职员" />
-            <UiButton icon-name="reload" @click="loadUserEmployeeBinding()">重试</UiButton>
-          </div>
-          <div v-else class="user-employee-binding-card">
-            <span>{{ userEmployeeBindingTitle(userEmployeeBinding) }}</span>
-            <small>{{ userEmployeeBindingDescription(userEmployeeBinding) }}</small>
-          </div>
-        </section>
         <div
           v-if="userDetailMode === 'view' && resetPasswordResult?.temporaryPassword"
           class="user-password-reset-result"
@@ -899,43 +801,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-
-.user-employee-binding {
-  display: grid;
-  gap: 10px;
-  margin: 14px 0;
-  padding: 12px;
-  border: 1px solid var(--muyun-border);
-  border-radius: 8px;
-  background: var(--muyun-hover-subtle);
-}
-
-.user-employee-binding-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.user-employee-binding-header strong {
-  color: var(--muyun-text);
-  font-size: 14px;
-}
-
-.user-employee-binding-card,
-.user-employee-binding-state {
-  display: grid;
-  gap: 6px;
-}
-
-.user-employee-binding-card span {
-  color: var(--muyun-text);
-  font-weight: 600;
-}
-
-.user-employee-binding-card small {
-  color: var(--muyun-text-muted);
 }
 
 .user-password-reset-result {
