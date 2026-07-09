@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
@@ -23,6 +24,7 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -158,7 +160,10 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     @Override
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
-                ModuleReadProjection.of("organization.title", "organizationTitle")
+                ModuleReadProjection.of(
+                        ModuleReferencePath.from(Employee::getOrganizationId)
+                                .select(Organization::getTitle),
+                        "organizationTitle")
         );
     }
 

@@ -67,8 +67,17 @@ public class StaticModuleDefinitionScanner {
                 uiDefinition(bean, module),
                 references(bean),
                 readProjections(bean),
+                modelClass(bean),
                 projectionJoins
         );
+    }
+
+    private Class<?> modelClass(Object bean) {
+        Object service = service(bean);
+        if (service instanceof CrudAbility<?> ability) {
+            return ability.modelClass();
+        }
+        return null;
     }
 
     private List<StaticModuleReferenceDefinition> references(Object bean) {
@@ -92,6 +101,7 @@ public class StaticModuleDefinitionScanner {
         return projections.stream()
                 .map(projection -> new StaticModuleReadProjectionDefinition(
                         projection.path(),
+                        projection.referencePath(),
                         projection.outputField(),
                         projection.filterable(),
                         projection.sortable()
@@ -265,6 +275,7 @@ public class StaticModuleDefinitionScanner {
                     uiDefinition,
                     target.references(),
                     target.readProjections(),
+                    target.modelClass(),
                     target.projectionJoins()
             ));
         }

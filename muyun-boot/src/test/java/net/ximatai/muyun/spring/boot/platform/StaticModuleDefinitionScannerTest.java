@@ -168,7 +168,13 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::targetModuleAlias)
                         .containsExactly("iam.organization");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
-                        .containsExactly("organization.title");
+                        .containsOnlyNulls();
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().steps().getFirst().referenceField().fieldName())
+                        .containsExactly("organizationId");
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().targetField().fieldName())
+                        .containsExactly("title");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
                         .containsExactly("organizationTitle");
                 assertThat(definition.uiDefinition()).isNotNull();
@@ -314,7 +320,15 @@ class StaticModuleDefinitionScannerTest {
                         .containsExactly("user");
                 assertThat(definition.projectionJoins()).isEmpty();
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
-                        .containsExactly("employee_account.employee.employeeNo", "employee_account.employee.title");
+                        .containsOnlyNulls();
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().steps().stream()
+                                .map(step -> step.referenceField().fieldName())
+                                .toList())
+                        .containsExactly(List.of("userId", "employeeId"), List.of("userId", "employeeId"));
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().targetField().fieldName())
+                        .containsExactly("employeeNo", "title");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
                         .containsExactly("employeeNo", "employeeTitle");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::filterable)

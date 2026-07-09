@@ -29,7 +29,7 @@ private String employeeId;
 
 | 字段 | 含义 |
 | --- | --- |
-| `code` | 引用路径片段。为空时从字段名推导，例如 `employeeId -> employee`。 |
+| `code` | 引用短码，主要用于展示、兼容和动态侧保留。静态读投影不应依赖它作为主契约。 |
 | `target` | 目标静态 service 类型。目标类型必须暴露 `public static String MODULE_ALIAS`。 |
 | `targetModuleAlias` | 目标模块别名。保留给静态引用动态模块或无 service 类型的场景。 |
 | `targetField` | 目标字段。当前静态运行态只支持 `id`。 |
@@ -37,7 +37,8 @@ private String employeeId;
 `target` 和 `targetModuleAlias` 必须二选一。当前不支持非主键引用；需要唯一键引用时，应先补清楚索引、唯一性、字段类型和运行态校验契约。
 
 引用关系描述的是模型事实，不描述 UI 要展示哪些字段，也不描述 SQL join。普通业务模块不应手写 join SQL。
-同一模块内引用 `code` 必须唯一，避免引用路径解析出现隐式歧义。
+同一模块内引用 `code` 必须唯一，避免兼容路径解析出现隐式歧义。静态 service 推荐使用字段引用链，
+以模型字段本身作为引用路径抓手。
 
 ## 读投影声明
 
@@ -48,23 +49,40 @@ class UserAccountService implements ModuleReadProjectionContributor {
     @Override
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
-                ModuleReadProjection.filterable("employee_account.employee.employeeNo", "employeeNo"),
-                ModuleReadProjection.of("employee_account.employee.title", "employeeTitle")
+                ModuleReadProjection.filterable(
+                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                                .then(EmployeeAccount::getEmployeeId)
+                                .select(Employee::getEmployeeNo),
+                        "employeeNo"),
+                ModuleReadProjection.of(
+                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                                .then(EmployeeAccount::getEmployeeId)
+                                .select(Employee::getTitle),
+                        "employeeTitle")
         );
     }
 }
 ```
 
-`path` 使用引用路径加目标字段：
+静态链路优先使用 Java getter method reference 描述引用路径：
 
-```text
-employee_account.employee.employeeNo
+```java
+ModuleReferencePath.from(Employee::getOrganizationId)
+        .select(Organization::getTitle)
 ```
+
+`from(...)` 表示从当前模块主模型的引用字段出发，`then(...)` 表示沿上一跳目标模型继续走一个引用字段，
+`inverse(...)` 表示通过一个候选桥接模型的字段反向命中当前模块。每一跳都必须落到真实 Java 字段，
+并且该字段必须声明 `@ModuleReference`。
 
 `outputField` 是当前模块对外暴露的稳定字段名。UI、查询接口和前端只消费 `outputField`，不直接消费跨模块路径。
 同一模块内 `outputField` 必须唯一，并且不能覆盖主实体字段或平台标准字段。
 
-把“带出哪些关联字段”放在 service 上，是为了让后续其它模块引用当前模块时，可以复用当前模块已经定义好的读投影能力。例如后续 `C -> A` 时，`C` 有机会消费 `A` service 暴露的关联摘要，而不是重新理解 `A -> B` 的内部 join 细节。
+把“带出哪些关联字段”放在当前 service 上，是为了稳定当前模块自己的读 API。若出现 `A -> B -> C`，
+且 A 需要带出 C 的字段，A service 应显式声明 `A.bId -> B.cId -> C.field` 的字段引用链；
+不应通过消费 B service 的 `outputField` 间接形成投影依赖。
+
+字符串 `path` API 仅作为动态元数据、兼容迁移或临时逃生口保留。普通静态 service 不推荐新增字符串路径声明。
 
 ## 查询能力
 
@@ -72,9 +90,9 @@ employee_account.employee.employeeNo
 
 | 声明方式 | 可展示 | 可排序 | 可过滤 |
 | --- | --- | --- | --- |
-| `ModuleReadProjection.of(path, outputField)` | 是 | 是 | 否 |
-| `ModuleReadProjection.sortableOnly(path, outputField)` | 是 | 是 | 否 |
-| `ModuleReadProjection.filterable(path, outputField)` | 是 | 是 | 是 |
+| `ModuleReadProjection.of(referencePath, outputField)` | 是 | 是 | 否 |
+| `ModuleReadProjection.sortableOnly(referencePath, outputField)` | 是 | 是 | 否 |
+| `ModuleReadProjection.filterable(referencePath, outputField)` | 是 | 是 | 是 |
 
 过滤必须显式开启。展示字段不会因为已经被 select 出来就自动获得过滤能力。
 
@@ -82,8 +100,8 @@ employee_account.employee.employeeNo
 
 | 输出字段 | 路径 | 能力 |
 | --- | --- | --- |
-| `employeeNo` | `employee_account.employee.employeeNo` | 展示、排序、过滤 |
-| `employeeTitle` | `employee_account.employee.title` | 展示、排序 |
+| `employeeNo` | `EmployeeAccount.userId(inverse) -> EmployeeAccount.employeeId -> Employee.employeeNo` | 展示、排序、过滤 |
+| `employeeTitle` | `EmployeeAccount.userId(inverse) -> EmployeeAccount.employeeId -> Employee.title` | 展示、排序 |
 
 SQL plan 内部按语义拆分字段集合：
 
@@ -104,15 +122,15 @@ SQL plan 内部按语义拆分字段集合：
         .field("employeeTitle"))
 ```
 
-UI 不直接写 `employee_account.employee.title`，也不声明 SQL join。跨模块路径是后端 service 和平台 planner 的内部契约。
+UI 不直接写跨模块路径，也不声明 SQL join。跨模块字段引用链是后端 service 和平台 planner 的内部契约。
 
 ## SQL 运行时边界
 
 静态引用路径由平台解析成 join plan。当前支持：
 
 1. 直接引用：当前模块字段引用目标模块主记录。
-2. 反向桥接引用：候选模块引用当前模块，路径片段命中候选模块主实体别名。
-3. 递归路径：例如 `employee_account.employee`。
+2. 反向桥接引用：候选模块的具体字段引用当前模块。
+3. 递归路径：例如 `EmployeeAccount.userId(inverse) -> EmployeeAccount.employeeId`。
 
 运行时 join 会自动附加租户等值和软删过滤。当前只面向适合分页列表的 `N:1` 或 `1:1` 摘要读取，不承诺一对多展开。
 

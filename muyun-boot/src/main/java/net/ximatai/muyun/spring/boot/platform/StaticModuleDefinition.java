@@ -25,6 +25,7 @@ public record StaticModuleDefinition(
         ModuleUiDefinition uiDefinition,
         List<StaticModuleReferenceDefinition> references,
         List<StaticModuleReadProjectionDefinition> readProjections,
+        Class<?> modelClass,
         List<RelationProjectionJoinDefinition> projectionJoins
 ) {
     public StaticModuleDefinition(String applicationAlias,
@@ -88,7 +89,7 @@ public record StaticModuleDefinition(
         ModuleUiDefinition uiDefinition,
         List<RelationProjectionJoinDefinition> projectionJoins) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
-                capabilities, actions, entities, uiDefinition, List.of(), List.of(), projectionJoins);
+                capabilities, actions, entities, uiDefinition, List.of(), List.of(), null, projectionJoins);
     }
 
     public StaticModuleDefinition(String applicationAlias,
@@ -105,7 +106,25 @@ public record StaticModuleDefinition(
                                   List<StaticModuleReferenceDefinition> references,
                                   List<StaticModuleReadProjectionDefinition> readProjections) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
-                capabilities, actions, entities, uiDefinition, references, readProjections, List.of());
+                capabilities, actions, entities, uiDefinition, references, readProjections, null, List.of());
+    }
+
+    public StaticModuleDefinition(String applicationAlias,
+                                  String moduleAlias,
+                                  String title,
+                                  String parentModuleAlias,
+                                  ModuleEntryType entryType,
+                                  String entryRoute,
+                                  String entryExternalUrl,
+                                  Set<EntityCapability> capabilities,
+                                  List<StaticModuleActionDefinition> actions,
+                                  List<EntityDefinition> entities,
+                                  ModuleUiDefinition uiDefinition,
+                                  List<StaticModuleReferenceDefinition> references,
+                                  List<StaticModuleReadProjectionDefinition> readProjections,
+                                  List<RelationProjectionJoinDefinition> projectionJoins) {
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
+                capabilities, actions, entities, uiDefinition, references, readProjections, null, projectionJoins);
     }
 
     public StaticModuleDefinition {

@@ -133,6 +133,7 @@ public class MuYunSpringIdentityConfiguration {
                 null,
                 StaticModuleReferenceCompiler.compile(EmployeeAccount.class),
                 List.of(),
+                EmployeeAccount.class,
                 List.of()
         );
     }

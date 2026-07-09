@@ -174,25 +174,34 @@ public final class RelationProjectionQueryPlanner {
             StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
                     ? readProjection(definition, field.fieldName())
                     : null;
-            String path = readProjection == null
-                    ? field.relationCode() + "." + field.fieldName()
-                    : readProjection.path();
-            int lastSeparator = path.lastIndexOf('.');
-            if (lastSeparator < 0) {
-                if (readProjection != null) {
-                    throw new IllegalArgumentException("projection reference path is invalid: "
-                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + path);
+            StaticModuleReferencePathResolver.Traversal traversal;
+            String targetFieldName;
+            String unresolvedPath;
+            if (readProjection != null && readProjection.referencePath() != null) {
+                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, readProjection.referencePath());
+                targetFieldName = readProjection.referencePath().targetField().fieldName();
+                unresolvedPath = readProjection.referencePath().toString();
+            } else {
+                String path = readProjection == null
+                        ? field.relationCode() + "." + field.fieldName()
+                        : readProjection.path();
+                int lastSeparator = path.lastIndexOf('.');
+                if (lastSeparator < 0) {
+                    if (readProjection != null) {
+                        throw new IllegalArgumentException("projection reference path is invalid: "
+                                + definition.moduleAlias() + "." + readProjection.outputField() + "." + path);
+                    }
+                    return null;
                 }
-                return null;
+                String relationPath = path.substring(0, lastSeparator);
+                targetFieldName = path.substring(lastSeparator + 1);
+                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath);
+                unresolvedPath = relationPath;
             }
-            String relationPath = path.substring(0, lastSeparator);
-            String targetFieldName = path.substring(lastSeparator + 1);
-            StaticModuleReferencePathResolver.Traversal traversal =
-                    StaticModuleReferencePathResolver.resolve(modules, definition, relationPath);
             if (traversal == null) {
                 if (readProjection != null) {
                     throw new IllegalArgumentException("projection reference path is not declared: "
-                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + relationPath);
+                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + unresolvedPath);
                 }
                 return null;
             }

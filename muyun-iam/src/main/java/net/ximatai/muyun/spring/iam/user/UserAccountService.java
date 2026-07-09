@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
@@ -28,6 +29,8 @@ import net.ximatai.muyun.spring.common.platform.RecordActionAvailabilityDecision
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
@@ -185,8 +188,16 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     @Override
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
-                ModuleReadProjection.filterable("employee_account.employee.employeeNo", "employeeNo"),
-                ModuleReadProjection.of("employee_account.employee.title", "employeeTitle")
+                ModuleReadProjection.filterable(
+                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                                .then(EmployeeAccount::getEmployeeId)
+                                .select(Employee::getEmployeeNo),
+                        "employeeNo"),
+                ModuleReadProjection.of(
+                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                                .then(EmployeeAccount::getEmployeeId)
+                                .select(Employee::getTitle),
+                        "employeeTitle")
         );
     }
 
