@@ -1099,6 +1099,8 @@ class IamWebControllerTest {
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
         when(projectionService.supportsDefaultListQuery(any(), any())).thenReturn(true);
+        when(projectionService.queryCriteria(any(), any(), any())).thenReturn(Criteria.of());
+        when(projectionService.querySorts(any(), any(), any())).thenReturn(new Sort[0]);
         when(projectionService.queryDefaultList(
                 any(),
                 any(Criteria.class),

@@ -5,6 +5,12 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
@@ -80,6 +86,16 @@ public class StaticRecordReadProjectionService {
                 .isPresent();
     }
 
+    public Criteria queryCriteria(String moduleAlias, Object recordService, QueryRequest request) {
+        QueryDescriptor descriptor = projectionAwareQueryDescriptor(moduleAlias, recordService);
+        return new QueryCompiler(descriptor).criteria(request);
+    }
+
+    public Sort[] querySorts(String moduleAlias, Object recordService, QueryRequest request) {
+        QueryDescriptor descriptor = projectionAwareQueryDescriptor(moduleAlias, recordService);
+        return new QueryCompiler(descriptor).sorts(request);
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> Optional<WebPageResponse<T>> queryDefaultList(String moduleAlias,
                                                             Criteria criteria,
@@ -134,6 +150,34 @@ public class StaticRecordReadProjectionService {
             return crudAbility.modelClass();
         }
         return null;
+    }
+
+    private QueryDescriptor projectionAwareQueryDescriptor(String moduleAlias, Object recordService) {
+        QueryDescriptor base = recordService instanceof QueryAbility<?> queryAbility
+                ? queryAbility.queryDescriptor()
+                : QueryDescriptor.builder(moduleAlias).build();
+        QueryDescriptor.Builder builder = QueryDescriptor.builder(base.scopeName());
+        base.fields().forEach(builder::field);
+        for (String key : base.externalCriteriaKeys()) {
+            builder.externalCriteria(key, base.externalCriteriaResolver(key));
+        }
+        for (Sort sort : base.defaultSorts()) {
+            builder.defaultSort(sort);
+        }
+        staticModuleDefinitionCatalog.find(moduleAlias)
+                .stream()
+                .flatMap(definition -> definition.readProjections().stream())
+                .filter(projection -> projection.filterable() || projection.sortable())
+                .forEach(projection -> builder.field(queryField(recordService, projection)));
+        return builder.build();
+    }
+
+    private QueryField queryField(Object recordService, StaticModuleReadProjectionDefinition projection) {
+        QueryField field = QueryDescriptors.field(modelClass(recordService), projection.outputField());
+        if (projection.sortable()) {
+            field = field.withSortable();
+        }
+        return field;
     }
 
     private Optional<RecordReadProjection> defaultListProjection(String moduleAlias, Object recordService) {

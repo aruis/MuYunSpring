@@ -179,6 +179,10 @@ public final class RelationProjectionQueryPlanner {
                     : readProjection.path();
             int lastSeparator = path.lastIndexOf('.');
             if (lastSeparator < 0) {
+                if (readProjection != null) {
+                    throw new IllegalArgumentException("projection reference path is invalid: "
+                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + path);
+                }
                 return null;
             }
             String relationPath = path.substring(0, lastSeparator);
@@ -186,6 +190,10 @@ public final class RelationProjectionQueryPlanner {
             StaticModuleReferencePathResolver.Traversal traversal =
                     StaticModuleReferencePathResolver.resolve(modules, definition, relationPath);
             if (traversal == null) {
+                if (readProjection != null) {
+                    throw new IllegalArgumentException("projection reference path is not declared: "
+                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + relationPath);
+                }
                 return null;
             }
             for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {

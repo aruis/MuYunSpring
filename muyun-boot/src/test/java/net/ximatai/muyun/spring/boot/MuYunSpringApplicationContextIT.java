@@ -6,7 +6,11 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
@@ -31,7 +35,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -266,6 +276,74 @@ class MuYunSpringApplicationContextIT {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("projection query field is not projected: employeeTitle");
+
+        String token = issueSuperAdminSessionToken();
+        HttpHeaders headers = bearerHeaders(token);
+        WebQueryRequest httpFilterRequest = new WebQueryRequest(
+                new WebPageRequest(1, 20),
+                List.of(
+                        new WebQueryCondition("tenantId", "EQ", List.of(tenantId)),
+                        new WebQueryCondition("employeeNo", "EQ", List.of("E-PROJ-001"))
+                ),
+                List.of(new WebSort("employeeTitle", false))
+        );
+        ResponseEntity<JsonNode> httpFiltered = restTemplate.exchange(
+                "/iam.user/query", HttpMethod.POST, new HttpEntity<>(httpFilterRequest, headers), JsonNode.class);
+
+        assertThat(httpFiltered.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(httpFiltered.getBody()).isNotNull();
+        assertThat(httpFiltered.getBody().path("records")).hasSize(1);
+        JsonNode httpAlice = httpFiltered.getBody().path("records").get(0);
+        assertThat(httpAlice.path("username").asText()).isEqualTo("alice_projection");
+        assertThat(httpAlice.path("employeeNo").asText()).isEqualTo("E-PROJ-001");
+        assertThat(httpAlice.path("employeeTitle").asText()).isEqualTo("Alice Employee");
+
+        WebQueryRequest httpRejectRequest = new WebQueryRequest(
+                new WebPageRequest(1, 20),
+                List.of(
+                        new WebQueryCondition("tenantId", "EQ", List.of(tenantId)),
+                        new WebQueryCondition("employeeTitle", "EQ", List.of("Alice Employee"))
+                ),
+                List.of()
+        );
+        ResponseEntity<JsonNode> httpRejected = restTemplate.exchange(
+                "/iam.user/query", HttpMethod.POST, new HttpEntity<>(httpRejectRequest, headers), JsonNode.class);
+
+        assertThat(httpRejected.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(httpRejected.getBody()).isNotNull();
+        assertThat(httpRejected.getBody().path("message").asText())
+                .contains("projection query field is not projected: employeeTitle");
+    }
+
+    private String issueSuperAdminSessionToken() {
+        String token = "projection-http-token-" + System.nanoTime();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        jdbcTemplate.update("""
+                        insert into iam_user_session (
+                            id, user_id, username, token_hash, issued_at, expires_at,
+                            max_expires_at, last_seen_at, password_change_required, deleted
+                        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                "proj_http_" + Long.toUnsignedString(System.nanoTime(), 36),
+                UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
+                UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
+                tokenHash(token),
+                Timestamp.from(now),
+                Timestamp.from(now.plus(1, ChronoUnit.HOURS)),
+                Timestamp.from(now.plus(1, ChronoUnit.DAYS)),
+                Timestamp.from(now),
+                Boolean.FALSE,
+                Boolean.FALSE);
+        return token;
+    }
+
+    private String tokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
     }
 
     private HttpHeaders bearerHeaders(String token) {

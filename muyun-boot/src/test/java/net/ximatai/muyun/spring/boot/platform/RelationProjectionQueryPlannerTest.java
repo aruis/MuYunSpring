@@ -143,7 +143,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     @Test
-    void shouldFallbackWhenReferencePathCannotResolve() {
+    void shouldRejectReadProjectionPathCannotResolve() {
         StaticModuleDefinition user = userReferenceDefinitionWithOutput("missing.employee.title", "employeeTitle");
         StaticModuleDefinition binding = employeeAccountReferenceDefinition();
         StaticModuleDefinition employee = employeeReferenceDefinition();
@@ -153,15 +153,16 @@ class RelationProjectionQueryPlannerTest {
                 compilation.readModel()
         );
 
-        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+        assertThatThrownBy(() -> RelationProjectionQueryPlanner.plan(
                 List.of(user, binding, employee),
                 user,
                 projection,
                 DBInfo.Type.POSTGRESQL,
                 Set.of()
-        );
-
-        assertThat(plan.hasRelationProjection()).isFalse();
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection reference path is not declared: "
+                        + "iam.user.employeeTitle.missing.employee");
     }
 
     @Test
