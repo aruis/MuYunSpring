@@ -86,6 +86,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                 .listView(list -> list
                         .title("职员列表")
                         .field("employeeNo", field -> field.label("职员编号").width("150px"))
+                        .field("organizationTitle", field -> field.label("所属机构").width("160px"))
                         .field("title", field -> field.label("职员姓名").width("150px"))
                         .field("mobile", field -> field.label("手机号").width("150px"))
                         .field("email", field -> field.label("邮箱"))

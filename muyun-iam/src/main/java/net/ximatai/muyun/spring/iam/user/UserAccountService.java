@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.ability.query.QueryField;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
@@ -45,6 +47,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         SoftDeleteAbility<UserAccount>,
         EnableAbility<UserAccount>,
         ReferenceAbility<UserAccount>,
+        ModuleReadProjectionContributor,
         DataScopeAbility<UserAccount>,
         InitialDataAbility<UserAccount>,
         QueryAbility<UserAccount>,
@@ -177,6 +180,14 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                         .withSortable())
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("username"))
                 .build();
+    }
+
+    @Override
+    public List<ModuleReadProjection> moduleReadProjections() {
+        return List.of(
+                ModuleReadProjection.filterable("employee_account.employee.employeeNo", "employeeNo"),
+                ModuleReadProjection.of("employee_account.employee.title", "employeeTitle")
+        );
     }
 
     @Override

@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest(
@@ -169,7 +170,7 @@ class MuYunSpringApplicationContextIT {
                 .get()
                 .satisfies(definition -> {
                     assertThat(definition.entities()).isNotEmpty();
-                    assertThat(definition.projectionJoins()).isNotEmpty();
+                    assertThat(definition.projectionJoins()).isEmpty();
                 });
         assertThat(staticRecordReadProjectionService.supportsDefaultListQuery(
                 UserAccountService.MODULE_ALIAS, userAccountService)).isTrue();
@@ -219,6 +220,52 @@ class MuYunSpringApplicationContextIT {
         Map<String, Object> dave = (Map<String, Object>) secondPage.records().get(1);
         assertThat(dave).containsEntry("username", "dave_projection");
         assertThat(dave.get("employeeNo")).isNull();
+
+        WebPageResponse<?> sortedByEmployeeTitle = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(1, 4),
+                userAccountService,
+                Sort.asc("employeeTitle")
+        ).orElseThrow();
+
+        assertThat(sortedByEmployeeTitle.records()).hasSize(4);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> firstByEmployeeTitle = (Map<String, Object>) sortedByEmployeeTitle.records().getFirst();
+        assertThat(firstByEmployeeTitle)
+                .containsEntry("username", "alice_projection")
+                .containsEntry("employeeTitle", "Alice Employee");
+
+        WebPageResponse<?> filteredByEmployeeNo = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("employeeNo", "E-PROJ-001"),
+                PageRequest.of(1, 20),
+                userAccountService,
+                Sort.asc("username")
+        ).orElseThrow();
+
+        assertThat(filteredByEmployeeNo.records()).singleElement()
+                .satisfies(record -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> output = (Map<String, Object>) record;
+                    assertThat(output)
+                            .containsEntry("username", "alice_projection")
+                            .containsEntry("employeeNo", "E-PROJ-001");
+                });
+        assertThatThrownBy(() -> staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("employeeTitle", "Alice Employee"),
+                PageRequest.of(1, 20),
+                userAccountService
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection query field is not projected: employeeTitle");
     }
 
     private HttpHeaders bearerHeaders(String token) {

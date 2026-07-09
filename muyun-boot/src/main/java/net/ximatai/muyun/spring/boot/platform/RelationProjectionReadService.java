@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -47,13 +48,41 @@ public class RelationProjectionReadService {
     public boolean supportsListQuery(StaticModuleDefinition definition, RecordReadProjection projection) {
         return projectionQueryExecutor() != null
                 && definition != null
-                && !definition.projectionJoins().isEmpty()
                 && projection != null
+                && (!definition.projectionJoins().isEmpty()
+                || !definition.references().isEmpty()
+                || hasReadProjectionOutput(definition, projection)
+                || projection.outputFields().stream()
+                        .filter(field -> field.relationCode() != null)
+                        .anyMatch(field -> field.relationCode().contains(".")))
                 && projection.postReadTransforms().isEmpty()
-                && projection.outputFields().stream().anyMatch(field -> field.relationCode() != null);
+                && (hasReadProjectionOutput(definition, projection)
+                || projection.outputFields().stream().anyMatch(field -> field.relationCode() != null));
+    }
+
+    private boolean hasReadProjectionOutput(StaticModuleDefinition definition, RecordReadProjection projection) {
+        if (definition.readProjections().isEmpty()) {
+            return false;
+        }
+        java.util.Set<String> outputFields = definition.readProjections().stream()
+                .map(StaticModuleReadProjectionDefinition::outputField)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return projection.outputFields().stream()
+                .filter(field -> field.relationCode() == null)
+                .map(ViewFieldRef::fieldName)
+                .anyMatch(outputFields::contains);
     }
 
     public Optional<PageResult<Map<String, Object>>> queryList(StaticModuleDefinition definition,
+                                                              RecordReadProjection projection,
+                                                              Criteria criteria,
+                                                              PageRequest pageRequest,
+                                                              Sort... sorts) {
+        return queryList(List.of(definition), definition, projection, criteria, pageRequest, sorts);
+    }
+
+    public Optional<PageResult<Map<String, Object>>> queryList(java.util.List<StaticModuleDefinition> definitions,
+                                                              StaticModuleDefinition definition,
                                                               RecordReadProjection projection,
                                                               Criteria criteria,
                                                               PageRequest pageRequest,
@@ -63,6 +92,7 @@ public class RelationProjectionReadService {
             return Optional.empty();
         }
         RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                definitions,
                 definition,
                 projection,
                 databaseTypeProvider.databaseType(),

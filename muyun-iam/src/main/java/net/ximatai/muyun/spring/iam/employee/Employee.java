@@ -6,10 +6,12 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReference;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 
 @Getter
 @Setter
@@ -22,6 +24,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 public class Employee extends StandardEnabledSortableEntity {
     @Column(name = "organization_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Organization id")
+    @ModuleReference(target = OrganizationService.class)
     private String organizationId;
 
     @Column(name = "department_id", type = ColumnType.VARCHAR, length = 32, nullable = false,

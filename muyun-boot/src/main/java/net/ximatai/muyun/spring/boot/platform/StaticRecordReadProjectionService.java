@@ -101,6 +101,7 @@ public class StaticRecordReadProjectionService {
                 ActionExecutionContextHolder.current().orElse(null)
         );
         PageResult<Map<String, Object>> page = relationProjectionReadService.queryList(
+                staticModuleDefinitionCatalog.definitions(),
                 definition,
                 projection,
                 criteria,

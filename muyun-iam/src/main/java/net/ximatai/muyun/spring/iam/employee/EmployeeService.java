@@ -12,6 +12,8 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
@@ -39,7 +41,8 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         ReferenceAbility<Employee>,
         DataScopeAbility<Employee>,
         DataScopeFieldMappingAbility,
-        QueryAbility<Employee> {
+        QueryAbility<Employee>,
+        ModuleReadProjectionContributor {
     public static final String MODULE_ALIAS = "iam.employee";
     private static final DataScopeFieldMapping DATA_SCOPE_FIELD_MAPPING =
             DataScopeFieldMapping.of(null, "organizationId", "departmentId");
@@ -150,6 +153,13 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"))
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("employeeNo"))
                 .build();
+    }
+
+    @Override
+    public List<ModuleReadProjection> moduleReadProjections() {
+        return List.of(
+                ModuleReadProjection.of("organization.title", "organizationTitle")
+        );
     }
 
     private Criteria departmentScopeCriteria(Object value) {

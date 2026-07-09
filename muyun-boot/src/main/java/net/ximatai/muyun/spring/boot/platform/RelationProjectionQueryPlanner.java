@@ -20,6 +20,14 @@ public final class RelationProjectionQueryPlanner {
                                                  RecordReadProjection projection,
                                                  DBInfo.Type databaseType,
                                                  java.util.Set<String> requiredMainFields) {
+        return plan(List.of(definition), definition, projection, databaseType, requiredMainFields);
+    }
+
+    public static RelationProjectionSqlPlan plan(List<StaticModuleDefinition> definitions,
+                                                 StaticModuleDefinition definition,
+                                                 RecordReadProjection projection,
+                                                 DBInfo.Type databaseType,
+                                                 java.util.Set<String> requiredMainFields) {
         if (definition == null) {
             throw new IllegalArgumentException("static module definition must not be null");
         }
@@ -31,27 +39,49 @@ public final class RelationProjectionQueryPlanner {
                     + definition.moduleAlias() + " != " + projection.moduleAlias());
         }
         DBInfo.Type dbType = databaseType == null ? DBInfo.Type.POSTGRESQL : databaseType;
-        if (definition.entities().isEmpty() || definition.projectionJoins().isEmpty()) {
+        if (definition.entities().isEmpty()) {
             return emptyPlan(definition, dbType);
         }
         java.util.Set<String> requiredFields = requiredMainFields == null ? java.util.Set.of()
                 : java.util.Set.copyOf(requiredMainFields);
 
         EntityDefinition mainEntity = definition.entities().getFirst();
-        Map<String, EntityDefinition> entities = entitiesByAlias(definition.entities());
-        Map<String, RelationProjectionJoinDefinition> joins = joinsByRelation(definition.projectionJoins());
         LinkedHashSet<ViewFieldRef> relationFields = projection.outputFields().stream()
                 .filter(field -> field.relationCode() != null)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        if (relationFields.isEmpty()) {
+        LinkedHashSet<ViewFieldRef> readProjectionFields = projection.outputFields().stream()
+                .filter(field -> field.relationCode() == null)
+                .filter(field -> readProjection(definition, field.fieldName()) != null)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (relationFields.isEmpty() && readProjectionFields.isEmpty()) {
             return emptyPlan(definition, dbType);
         }
+        LinkedHashSet<ViewFieldRef> referenceFields = new LinkedHashSet<>(relationFields);
+        referenceFields.addAll(readProjectionFields);
+        RelationProjectionSqlPlan referencePlan = referencePlan(
+                definitions == null || definitions.isEmpty() ? List.of(definition) : definitions,
+                definition,
+                projection,
+                referenceFields,
+                dbType,
+                requiredFields
+        );
+        if (referencePlan != null) {
+            return referencePlan;
+        }
+        if (definition.projectionJoins().isEmpty()) {
+            return emptyPlan(definition, dbType);
+        }
+
+        Map<String, EntityDefinition> entities = entitiesByAlias(definition.entities());
+        Map<String, RelationProjectionJoinDefinition> joins = joinsByRelation(definition.projectionJoins());
 
         Map<String, FieldDefinition> mainFields = fieldsByName(mainEntity);
         LinkedHashMap<String, SelectField> selectFields = new LinkedHashMap<>();
         addMainProjectionFields(selectFields, mainFields, projection, requiredFields);
         addStandardMainFields(selectFields);
         LinkedHashSet<String> queryableFields = new LinkedHashSet<>(selectFields.keySet());
+        LinkedHashSet<String> sortableFields = new LinkedHashSet<>(queryableFields);
 
         LinkedHashSet<String> responseFields = new LinkedHashSet<>();
         responseFields.add(StandardEntitySchema.ID_FIELD);
@@ -101,6 +131,7 @@ public final class RelationProjectionQueryPlanner {
                 sql.toString(),
                 params,
                 queryableFields,
+                sortableFields,
                 responseFields,
                 List.copyOf(relationFields),
                 dbType
@@ -113,9 +144,120 @@ public final class RelationProjectionQueryPlanner {
         return plan(definition, projection, databaseType, java.util.Set.of());
     }
 
+    private static RelationProjectionSqlPlan referencePlan(List<StaticModuleDefinition> definitions,
+                                                           StaticModuleDefinition definition,
+                                                           RecordReadProjection projection,
+                                                           LinkedHashSet<ViewFieldRef> relationFields,
+                                                           DBInfo.Type dbType,
+                                                           java.util.Set<String> requiredFields) {
+        Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions);
+        if (!modules.containsKey(definition.moduleAlias())) {
+            LinkedHashMap<String, StaticModuleDefinition> merged = new LinkedHashMap<>(modules);
+            merged.put(definition.moduleAlias(), definition);
+            modules = java.util.Collections.unmodifiableMap(merged);
+        }
+        Map<String, FieldDefinition> mainFields = fieldsByName(definition.entities().getFirst());
+        LinkedHashMap<String, SelectField> selectFields = new LinkedHashMap<>();
+        addMainProjectionFields(selectFields, mainFields, projection, requiredFields);
+        addStandardMainFields(selectFields);
+        LinkedHashSet<String> queryableFields = new LinkedHashSet<>(selectFields.keySet());
+        LinkedHashSet<String> sortableFields = new LinkedHashSet<>(queryableFields);
+
+        LinkedHashSet<String> responseFields = new LinkedHashSet<>();
+        responseFields.add(StandardEntitySchema.ID_FIELD);
+        projection.outputFields().stream()
+                .map(ViewFieldRef::fieldName)
+                .forEach(responseFields::add);
+
+        LinkedHashMap<String, StaticModuleReferencePathResolver.JoinStep> joins = new LinkedHashMap<>();
+        for (ViewFieldRef field : relationFields) {
+            StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
+                    ? readProjection(definition, field.fieldName())
+                    : null;
+            String path = readProjection == null
+                    ? field.relationCode() + "." + field.fieldName()
+                    : readProjection.path();
+            int lastSeparator = path.lastIndexOf('.');
+            if (lastSeparator < 0) {
+                return null;
+            }
+            String relationPath = path.substring(0, lastSeparator);
+            String targetFieldName = path.substring(lastSeparator + 1);
+            StaticModuleReferencePathResolver.Traversal traversal =
+                    StaticModuleReferencePathResolver.resolve(modules, definition, relationPath);
+            if (traversal == null) {
+                return null;
+            }
+            for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+                joins.putIfAbsent(join.tableAlias(), join);
+            }
+            addSelectField(selectFields, new SelectField(
+                    traversal.tableAlias(),
+                    columnName(traversal.entity(), targetFieldName),
+                    field.fieldName()
+            ));
+            if (readProjection != null) {
+                if (readProjection.filterable()) {
+                    queryableFields.add(field.fieldName());
+                }
+                if (readProjection.sortable()) {
+                    sortableFields.add(field.fieldName());
+                }
+            }
+        }
+        if (joins.isEmpty()) {
+            return null;
+        }
+
+        LinkedHashMap<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder();
+        sql.append("select ");
+        sql.append(selectFields.values().stream()
+                .map(field -> qualified(field.tableAlias(), field.columnName(), dbType)
+                        + " as " + quote(field.outputName(), dbType))
+                .collect(java.util.stream.Collectors.joining(", ")));
+        sql.append(" from ")
+                .append(qualifiedTable(definition.entities().getFirst(), dbType))
+                .append(" ")
+                .append(quote(RelationProjectionSqlNames.MAIN_ALIAS, dbType));
+        for (StaticModuleReferencePathResolver.JoinStep join : joins.values()) {
+            appendReferenceJoin(sql, params, join, dbType);
+        }
+        return new RelationProjectionSqlPlan(
+                sql.toString(),
+                params,
+                queryableFields,
+                sortableFields,
+                responseFields,
+                List.copyOf(relationFields),
+                dbType
+        );
+    }
+
+    private static void appendReferenceJoin(StringBuilder sql,
+                                            Map<String, Object> params,
+                                            StaticModuleReferencePathResolver.JoinStep join,
+                                            DBInfo.Type databaseType) {
+        sql.append(" left join ")
+                .append(qualifiedTable(join.entity(), databaseType))
+                .append(" ")
+                .append(quote(join.tableAlias(), databaseType))
+                .append(" on ");
+        List<String> predicates = new ArrayList<>();
+        for (RelationProjectionJoinCondition condition : join.conditions()) {
+            predicates.add(qualified(condition.leftAlias(), condition.leftColumn(), databaseType)
+                    + " = "
+                    + qualified(condition.rightAlias(), condition.rightColumn(), databaseType));
+        }
+        String paramName = "__join_" + join.tableAlias() + "_deleted";
+        predicates.add(qualified(join.tableAlias(), StandardEntitySchema.DELETED_COLUMN, databaseType) + " = :" + paramName);
+        params.put(paramName, Boolean.FALSE);
+        sql.append(String.join(" and ", predicates));
+    }
+
     private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition, DBInfo.Type databaseType) {
         return new RelationProjectionSqlPlan("select * from " + qualifiedTable(definition.entities().getFirst(), databaseType),
-                Map.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType);
+                Map.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType);
     }
 
     private static void addMainProjectionFields(LinkedHashMap<String, SelectField> selectFields,
@@ -222,6 +364,55 @@ public final class RelationProjectionQueryPlanner {
             }
         }
         return java.util.Collections.unmodifiableMap(byRelation);
+    }
+
+    private static Map<String, StaticModuleDefinition> modulesByAlias(List<StaticModuleDefinition> definitions) {
+        LinkedHashMap<String, StaticModuleDefinition> byAlias = new LinkedHashMap<>();
+        for (StaticModuleDefinition definition : definitions) {
+            if (definition != null) {
+                byAlias.putIfAbsent(definition.moduleAlias(), definition);
+            }
+        }
+        return java.util.Collections.unmodifiableMap(byAlias);
+    }
+
+    private static StaticModuleReadProjectionDefinition readProjection(StaticModuleDefinition definition,
+                                                                       String outputField) {
+        if (definition == null || outputField == null || outputField.isBlank()) {
+            return null;
+        }
+        return definition.readProjections().stream()
+                .filter(projection -> projection.outputField().equals(outputField))
+                .findFirst()
+                .orElse(null);
+    }
+
+    static String columnName(EntityDefinition entity, String fieldName) {
+        return switch (fieldName) {
+            case StandardEntitySchema.ID_FIELD -> StandardEntitySchema.ID_COLUMN;
+            case StandardEntitySchema.TENANT_ID_FIELD -> StandardEntitySchema.TENANT_ID_COLUMN;
+            case StandardEntitySchema.VERSION_FIELD -> StandardEntitySchema.VERSION_COLUMN;
+            case StandardEntitySchema.DELETED_FIELD -> StandardEntitySchema.DELETED_COLUMN;
+            case StandardEntitySchema.DELETED_AT_FIELD -> StandardEntitySchema.DELETED_AT_COLUMN;
+            case StandardEntitySchema.CREATED_BY_FIELD -> StandardEntitySchema.CREATED_BY_COLUMN;
+            case StandardEntitySchema.CREATED_AT_FIELD -> StandardEntitySchema.CREATED_AT_COLUMN;
+            case StandardEntitySchema.UPDATED_BY_FIELD -> StandardEntitySchema.UPDATED_BY_COLUMN;
+            case StandardEntitySchema.UPDATED_AT_FIELD -> StandardEntitySchema.UPDATED_AT_COLUMN;
+            case net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.TITLE_FIELD ->
+                    net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.TITLE_COLUMN;
+            case net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.ENABLED_FIELD ->
+                    net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.ENABLED_COLUMN;
+            case net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.SORT_FIELD ->
+                    net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.SORT_COLUMN;
+            case net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.TREE_PARENT_FIELD ->
+                    net.ximatai.muyun.spring.common.schema.PlatformAbilityFields.TREE_PARENT_COLUMN;
+            default -> entity.fields().stream()
+                    .filter(field -> field.fieldName().equals(fieldName))
+                    .map(FieldDefinition::columnName)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("projection reference field is not declared: "
+                            + entity.alias() + "." + fieldName));
+        };
     }
 
     private static String qualifiedTable(EntityDefinition entity, DBInfo.Type databaseType) {

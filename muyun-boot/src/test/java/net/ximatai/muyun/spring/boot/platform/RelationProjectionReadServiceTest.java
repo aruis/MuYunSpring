@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -108,6 +109,65 @@ class RelationProjectionReadServiceTest {
         assertThat(service.supportsListQuery(userRelationDefinition(), projection)).isFalse();
     }
 
+    @Test
+    void shouldSortByServiceReadProjectionOutputWithoutAllowingCriteriaOnIt() {
+        NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
+        RelationProjectionReadService service = new RelationProjectionReadService(
+                new RelationProjectionQueryExecutor(jdbcOperations),
+                new RelationProjectionDatabaseTypeProvider()
+        );
+        StaticModuleDefinition user = userReferenceDefinition();
+        StaticModuleDefinition binding = employeeAccountReferenceDefinition();
+        StaticModuleDefinition employee = employeeReferenceDefinition();
+        RecordReadProjection projection = defaultListProjection(user);
+        when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
+                .thenReturn(List.of(Map.of(
+                        "id", "user-1",
+                        "username", "alice",
+                        "employeeNo", "E001",
+                        "employeeTitle", "Alice"
+                )));
+        when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
+                .thenReturn(1L);
+
+        PageResult<Map<String, Object>> page = service.queryList(
+                List.of(user, binding, employee),
+                user,
+                projection,
+                Criteria.of(),
+                PageRequest.of(1, 20),
+                Sort.asc("employeeTitle")
+        ).orElseThrow();
+
+        assertThat(page.getRecords()).singleElement()
+                .satisfies(record -> assertThat(record).containsEntry("employeeTitle", "Alice"));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.captor();
+        org.mockito.Mockito.verify(jdbcOperations).queryForList(sqlCaptor.capture(), any(Map.class));
+        assertThat(sqlCaptor.getValue()).contains("order by \"employeeTitle\" asc");
+
+        org.mockito.Mockito.clearInvocations(jdbcOperations);
+        PageResult<Map<String, Object>> filteredPage = service.queryList(
+                List.of(user, binding, employee),
+                user,
+                projection,
+                Criteria.of().eq("employeeNo", "E001"),
+                PageRequest.of(1, 20)
+        ).orElseThrow();
+        assertThat(filteredPage.getTotal()).isEqualTo(1);
+        org.mockito.Mockito.verify(jdbcOperations).queryForList(sqlCaptor.capture(), any(Map.class));
+        assertThat(sqlCaptor.getValue()).contains("where \"employeeNo\" = :");
+
+        assertThatThrownBy(() -> service.queryList(
+                List.of(user, binding, employee),
+                user,
+                projection,
+                Criteria.of().eq("employeeTitle", "Alice"),
+                PageRequest.of(1, 20)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection query field is not projected: employeeTitle");
+    }
+
     private static RecordReadProjection defaultListProjection(StaticModuleDefinition definition) {
         ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(definition);
         return RecordReadProjectionPlanner.defaultList(compilation.uiDescriptor(), compilation.readModel());
@@ -192,6 +252,98 @@ class RelationProjectionReadServiceTest {
                                 )
                         )
                 ))
+        );
+    }
+
+    private static StaticModuleDefinition userReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/users",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "user",
+                        "iam_user",
+                        "User",
+                        List.of(FieldDefinition.string("username", "账号").column("username"))
+                )),
+                ModuleUiDefinition.builder("iam.user")
+                        .listView(list -> list
+                                .field("username")
+                                .field("employeeNo")
+                                .field("employeeTitle"))
+                        .build(),
+                List.of(),
+                List.of(
+                        new StaticModuleReadProjectionDefinition(
+                                "employee_account.employee.employeeNo",
+                                "employeeNo",
+                                true,
+                                true
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                "employee_account.employee.title",
+                                "employeeTitle"
+                        )
+                )
+        );
+    }
+
+    private static StaticModuleDefinition employeeAccountReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.employee_account",
+                "职员账号绑定",
+                null,
+                ModuleEntryType.MODULE,
+                null,
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "employee_account",
+                        "iam_employee_account",
+                        "Employee Account",
+                        List.of(
+                                FieldDefinition.string("employeeId", "职员").column("employee_id"),
+                                FieldDefinition.string("userId", "用户").column("user_id")
+                        )
+                )),
+                null,
+                List.of(
+                        new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
+                        new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
+                ),
+                List.of()
+        );
+    }
+
+    private static StaticModuleDefinition employeeReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.employee",
+                "职员管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/employees",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "employee",
+                        "iam_employee",
+                        "Employee",
+                        List.of(
+                                FieldDefinition.string("employeeNo", "职员编号").column("employee_no"),
+                                FieldDefinition.string("title", "职员姓名").column("title")
+                        )
+                )),
+                null
         );
     }
 }

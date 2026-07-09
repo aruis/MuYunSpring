@@ -6,8 +6,10 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReference;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 
 @Getter
 @Setter
@@ -19,8 +21,10 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 )
 public class EmployeeAccount extends StandardEntity {
     @Column(name = "employee_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Employee id")
+    @ModuleReference(target = EmployeeService.class)
     private String employeeId;
 
     @Column(name = "user_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "User account id")
+    @ModuleReference(target = UserAccountService.class)
     private String userId;
 }
