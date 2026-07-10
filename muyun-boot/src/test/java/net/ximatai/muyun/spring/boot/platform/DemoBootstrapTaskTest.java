@@ -456,6 +456,81 @@ class DemoBootstrapTaskTest {
     }
 
     @Test
+    void shouldReuseExistingDemoEmployeeBindingCreatedOutsideBootstrap() {
+        MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
+        properties.setEnabled(true);
+        properties.setTenantTitle("演示租户");
+        properties.setOrganizationTitle("戏码台");
+        properties.setDepartmentTitle("综合管理部");
+        properties.setEmployeeTitle("演示租户管理员");
+        properties.setAdminUsername("demo_admin");
+        properties.setAdminInitialPassword("demo123");
+        when(grantableActionResolver.resolve(any())).thenReturn(List.of());
+        DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
+                departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias(DemoBootstrapTask.TENANT_ALIAS);
+            tenant.setTitle("演示租户");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
+            Organization organization = new Organization();
+            organization.setId(DemoBootstrapTask.ORGANIZATION_ID);
+            organization.setCode(DemoBootstrapTask.ORGANIZATION_CODE);
+            organization.setTitle("戏码台");
+            organization.setEnabled(Boolean.TRUE);
+            organizationService.insert(organization);
+
+            Department department = new Department();
+            department.setId(DemoBootstrapTask.DEPARTMENT_ID);
+            department.setOrganizationId(DemoBootstrapTask.ORGANIZATION_ID);
+            department.setCode(DemoBootstrapTask.DEPARTMENT_CODE);
+            department.setTitle("综合管理部");
+            department.setEnabled(Boolean.TRUE);
+            departmentService.insert(department);
+
+            Employee employee = new Employee();
+            employee.setId(DemoBootstrapTask.EMPLOYEE_ID);
+            employee.setOrganizationId(DemoBootstrapTask.ORGANIZATION_ID);
+            employee.setDepartmentId(DemoBootstrapTask.DEPARTMENT_ID);
+            employee.setEmployeeNo(DemoBootstrapTask.EMPLOYEE_NO);
+            employee.setTitle("演示租户管理员");
+            employee.setEnabled(Boolean.TRUE);
+            employeeService.insert(employee);
+
+            UserAccount manualUser = new UserAccount();
+            manualUser.setId("manual_user_admin");
+            manualUser.setUsername("DEMO-ADMIN");
+            manualUser.setPassword("demo123");
+            manualUser.setEnabled(Boolean.TRUE);
+            userAccountService.insert(manualUser);
+
+            EmployeeAccount manualBinding = new EmployeeAccount();
+            manualBinding.setId("manual_employee_account_admin");
+            manualBinding.setEmployeeId(DemoBootstrapTask.EMPLOYEE_ID);
+            manualBinding.setUserId("manual_user_admin");
+            employeeAccountService.insert(manualBinding);
+        }
+
+        task.run();
+
+        try (TenantContext.Scope ignored = TenantContext.use(DemoBootstrapTask.TENANT_ALIAS)) {
+            assertThat(userAccountService.select(DemoBootstrapTask.USER_ID)).isNotNull();
+            assertThat(employeeAccountService.select(DemoBootstrapTask.EMPLOYEE_ACCOUNT_ID)).isNull();
+            assertThat(employeeAccountService.accountOfEmployee(DemoBootstrapTask.EMPLOYEE_ID))
+                    .extracting(EmployeeAccount::getId, EmployeeAccount::getUserId)
+                    .containsExactly("manual_employee_account_admin", "manual_user_admin");
+            assertThat(employeeAccountDao.list(Criteria.of())).hasSize(1);
+            assertThat(accountRoleGrantDao.list(Criteria.of()))
+                    .singleElement()
+                    .satisfies(grant -> assertThat(grant.getUserId()).isEqualTo(DemoBootstrapTask.USER_ID));
+        }
+    }
+
+    @Test
     void shouldReplayTenantProvisioningWhenDemoTenantAlreadyExists() {
         MuYunSpringDemoBootstrapProperties properties = new MuYunSpringDemoBootstrapProperties();
         properties.setEnabled(true);

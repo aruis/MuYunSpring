@@ -104,7 +104,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                 if (!isActive(user)) {
                     return;
                 }
-                ensureEmployeeAccount();
+                ensureEmployeeAccount(user.getId());
                 Role role = ensureTenantAdminRoleGrant(user.getId());
                 if (!isActive(role)) {
                     return;
@@ -196,16 +196,21 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         return user;
     }
 
-    private EmployeeAccount ensureEmployeeAccount() {
+    private EmployeeAccount ensureEmployeeAccount(String userId) {
         EmployeeAccount existing = employeeAccountService.select(EMPLOYEE_ACCOUNT_ID);
         if (existing != null) {
-            validateExistingEmployeeAccount(existing);
+            validateExistingEmployeeAccount(existing, userId);
             return existing;
+        }
+        EmployeeAccount employeeBinding = employeeAccountService.accountOfEmployee(EMPLOYEE_ID);
+        if (employeeBinding != null) {
+            validateExistingDemoEmployeeBinding(employeeBinding);
+            return employeeBinding;
         }
         EmployeeAccount binding = new EmployeeAccount();
         binding.setId(EMPLOYEE_ACCOUNT_ID);
         binding.setEmployeeId(EMPLOYEE_ID);
-        binding.setUserId(USER_ID);
+        binding.setUserId(userId);
         employeeAccountService.insert(binding);
         return binding;
     }
@@ -247,10 +252,15 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
         requireEqual("demo admin username", properties.getAdminUsername(), user.getUsername());
     }
 
-    private void validateExistingEmployeeAccount(EmployeeAccount account) {
+    private void validateExistingEmployeeAccount(EmployeeAccount account, String userId) {
         requireEqual("demo employee account tenant", TENANT_ALIAS, account.getTenantId());
         requireEqual("demo employee account employee", EMPLOYEE_ID, account.getEmployeeId());
-        requireEqual("demo employee account user", USER_ID, account.getUserId());
+        requireEqual("demo employee account user", userId, account.getUserId());
+    }
+
+    private void validateExistingDemoEmployeeBinding(EmployeeAccount account) {
+        requireEqual("demo employee account tenant", TENANT_ALIAS, account.getTenantId());
+        requireEqual("demo employee account employee", EMPLOYEE_ID, account.getEmployeeId());
     }
 
     private void requireEqual(String fieldName, Object expected, Object actual) {
