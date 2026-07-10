@@ -724,7 +724,11 @@ async function provisionEmployeeAccount() {
     employeeAccountUser.value = response.user;
     showAccountProvisionForm.value = false;
     accountProvisionDraft.value = createAccountProvisionDraft(employee);
-    presentPlatformMessage('账号已创建并绑定职员', { source: 'employee-management', phase: 'action' });
+    presentPlatformMessage('账号已创建并绑定职员', {
+      source: 'employee-management',
+      phase: 'action',
+      tone: 'success',
+    });
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
   } finally {
@@ -753,7 +757,11 @@ async function removeEmployeeAccount() {
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/delete`,
     });
     await loadEmployeeAccounts(employee, employeeDetailRequestSeq.value);
-    presentPlatformMessage('账户已移除', { source: 'employee-management', phase: 'action' });
+    presentPlatformMessage('账户已移除', {
+      source: 'employee-management',
+      phase: 'action',
+      tone: 'success',
+    });
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
   } finally {
