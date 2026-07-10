@@ -6,6 +6,7 @@ import {
   createRecordEditorSessionState,
   presentPlatformError,
   presentPlatformMessage,
+  presentPlatformSuccess,
 } from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
@@ -473,18 +474,16 @@ export function createPositionManagementState(
   }
 
   function presentCategorySuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'position-category-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 
   function presentPositionSuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'position-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 

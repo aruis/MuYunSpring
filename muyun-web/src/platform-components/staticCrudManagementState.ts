@@ -5,6 +5,7 @@ import {
   matchesPlatformActionErrorHandler,
   presentPlatformError,
   presentPlatformMessage,
+  presentPlatformSuccess,
   type PlatformActionErrorHandler,
 } from './platformErrorFeedback';
 
@@ -289,10 +290,9 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
   }
 
   function presentActionSuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'static-crud-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 

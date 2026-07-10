@@ -72,7 +72,11 @@ export {
   createStaticTreeResourceModuleContext,
 } from './staticTreeResourceModuleContext';
 export { createScopedResourceTreeModuleContext } from './scopedResourceTreeModuleContext';
-export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+export {
+  presentPlatformError,
+  presentPlatformMessage,
+  presentPlatformSuccess,
+} from './platformErrorFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { createRecordEditorSessionState } from './recordEditorSessionState';
 export { useFlatCrudManagementState } from './staticCrudManagementState';

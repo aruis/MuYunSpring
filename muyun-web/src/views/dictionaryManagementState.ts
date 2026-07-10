@@ -12,6 +12,7 @@ import {
   createRecordEditorSessionState,
   presentPlatformError,
   presentPlatformMessage,
+  presentPlatformSuccess,
 } from '@muyun/platform-components';
 
 export type DictionaryCategoryMode = 'view' | 'edit' | 'create-root' | 'create-child';
@@ -530,18 +531,16 @@ export function createDictionaryManagementState(
   }
 
   function presentCategorySuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'dictionary-category-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 
   function presentItemSuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'dictionary-item-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 

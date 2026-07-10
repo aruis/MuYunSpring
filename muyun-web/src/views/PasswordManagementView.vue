@@ -9,6 +9,7 @@ import {
   StaticManagementLayout,
   presentPlatformError,
   presentPlatformMessage,
+  presentPlatformSuccess,
   type CrudRecordListBase,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
@@ -181,7 +182,7 @@ async function save() {
     draft.value = copyRule(result.record);
     mode.value = 'view';
     reloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', { source: 'password-management', tone: 'success' });
+    presentPlatformSuccess(result.message ?? '操作成功', { source: 'password-management' });
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {
@@ -208,7 +209,7 @@ async function toggleEnabled(enabled: boolean) {
     selected.value = refreshed;
     draft.value = copyRule(refreshed);
     reloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', { source: 'password-management', tone: 'success' });
+    presentPlatformSuccess(result.message ?? '操作成功', { source: 'password-management' });
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {
@@ -244,7 +245,7 @@ async function removeSelected() {
     draft.value = emptyRuleDraft();
     mode.value = canCreate.value ? 'create' : 'view';
     reloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', { source: 'password-management', tone: 'success' });
+    presentPlatformSuccess(result.message ?? '操作成功', { source: 'password-management' });
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {

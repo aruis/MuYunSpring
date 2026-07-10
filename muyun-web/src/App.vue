@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import { presentPlatformError, presentPlatformSuccess } from '@muyun/platform-components';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
 import {
@@ -146,7 +146,7 @@ async function submitChangeOwnPassword() {
     currentPassword.value = '';
     newPassword.value = '';
     confirmPassword.value = '';
-    presentPlatformMessage('密码已修改', { source: 'change-own-password', tone: 'success' });
+    presentPlatformSuccess('密码已修改', { source: 'change-own-password' });
   } catch (cause) {
     const error = presentPlatformError(cause, { source: 'change-own-password-dialog', phase: 'action' });
     changePasswordError.value = error.message;

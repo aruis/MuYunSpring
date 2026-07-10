@@ -2,7 +2,11 @@ import { computed, ref } from 'vue';
 import type { Organization } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import {
+  presentPlatformError,
+  presentPlatformMessage,
+  presentPlatformSuccess,
+} from '@muyun/platform-components';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
@@ -195,10 +199,9 @@ export function createOrganizationManagementState(
   }
 
   function presentActionSuccess(message: string) {
-    presentPlatformMessage(message, {
+    presentPlatformSuccess(message, {
       source: 'organization-management-action',
       phase: 'action',
-      tone: 'success',
     });
   }
 

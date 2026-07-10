@@ -1,6 +1,6 @@
 import type { Ref } from 'vue';
 import type { StaticRecordMutationResult } from '@muyun/web-core';
-import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+import { presentPlatformError, presentPlatformMessage, presentPlatformSuccess } from './platformErrorFeedback';
 
 export type StaticFormSaveMode = 'create' | 'edit';
 
@@ -55,10 +55,9 @@ export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOpti
   try {
     const result = await options.save(record, options.mode);
     options.onSaved(result);
-    presentPlatformMessage(result.message ?? options.successMessage ?? '操作成功', {
+    presentPlatformSuccess(result.message ?? options.successMessage ?? '操作成功', {
       source,
       phase: 'action',
-      tone: 'success',
     });
     return result;
   } catch (cause) {
@@ -93,10 +92,9 @@ export async function executeStaticRecordAction<TRecord, TResult = unknown>(
   try {
     const result = await options.execute(record);
     await options.onExecuted(result, record);
-    presentPlatformMessage(actionResultMessage(result) ?? options.successMessage ?? '操作成功', {
+    presentPlatformSuccess(actionResultMessage(result) ?? options.successMessage ?? '操作成功', {
       source,
       phase: 'action',
-      tone: 'success',
     });
     return result;
   } catch (cause) {

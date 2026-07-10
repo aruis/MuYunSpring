@@ -532,9 +532,12 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /解绑/);
   assert.match(
     employeeViewSource,
-    /账号已创建并绑定职员[\s\S]*source: 'employee-management'[\s\S]*tone: 'success'/,
+    /presentPlatformSuccess\('账号已创建并绑定职员'[\s\S]*source: 'employee-management'/,
   );
-  assert.match(employeeViewSource, /账户已移除[\s\S]*source: 'employee-management'[\s\S]*tone: 'success'/);
+  assert.match(
+    employeeViewSource,
+    /presentPlatformSuccess\('账户已移除'[\s\S]*source: 'employee-management'/,
+  );
   assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
   assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
@@ -965,16 +968,16 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(feedbackSource, /toErrorUiContext/);
   assert.match(feedbackSource, /presentation\.slot === 'silent'/);
   assert.match(feedbackSource, /presentation\.slot === 'redirect-login'/);
-  assert.match(feedbackSource, /tone\?: 'error' \| 'success'/);
+  assert.match(feedbackSource, /presentPlatformSuccess/);
   assert.match(feedbackSource, /showSuccessMessage\(message\)/);
   assert.match(uiFeedbackSource, /const id = `muyun-global-feedback-\$\{tone\}`/);
   assert.match(uiFeedbackSource, /className = `muyun-global-feedback \$\{tone\}`/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.success[\s\S]*right: 20px/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.error[\s\S]*left: 50%/);
-  assert.match(staticCrudStateSource, /tone: 'success'/);
-  assert.match(organizationStateSource, /tone: 'success'/);
-  assert.match(positionStateSource, /tone: 'success'/);
-  assert.match(dictionaryStateSource, /tone: 'success'/);
+  assert.match(staticCrudStateSource, /presentPlatformSuccess/);
+  assert.match(organizationStateSource, /presentPlatformSuccess/);
+  assert.match(positionStateSource, /presentPlatformSuccess/);
+  assert.match(dictionaryStateSource, /presentPlatformSuccess/);
 });
 
 function readSource(path: string) {
