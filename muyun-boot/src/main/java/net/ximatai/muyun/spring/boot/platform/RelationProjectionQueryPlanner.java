@@ -207,6 +207,11 @@ public final class RelationProjectionQueryPlanner {
                 return null;
             }
             for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+                if (!join.cardinality().safeForPageJoin()) {
+                    throw new IllegalArgumentException("projection reference path cardinality is not safe for page join: "
+                            + definition.moduleAlias() + "." + field.fieldName() + "."
+                            + join.tableAlias() + "." + join.cardinality());
+                }
                 joins.putIfAbsent(join.tableAlias(), join);
             }
             String targetColumn = columnName(traversal.entity(), targetFieldName);

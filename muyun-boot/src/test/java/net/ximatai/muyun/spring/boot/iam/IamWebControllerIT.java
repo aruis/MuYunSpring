@@ -938,7 +938,7 @@ class IamWebControllerIT {
                                 "organizationTitle"),
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                         .then(EmployeeAccount::getUserId)
                                         .select(UserAccount::getUsername),
                                 "username",
@@ -947,7 +947,7 @@ class IamWebControllerIT {
                                 false),
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                         .select(EmployeeAccount::getId),
                                 "accountBound",
                                 ModuleReadProjection.ProjectionType.EXISTS,

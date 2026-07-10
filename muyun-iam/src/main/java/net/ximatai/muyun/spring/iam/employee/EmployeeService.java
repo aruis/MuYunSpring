@@ -166,12 +166,12 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                                 .select(Organization::getTitle),
                         "organizationTitle"),
                 ModuleReadProjection.filterableOnly(
-                        ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                 .then(EmployeeAccount::getUserId)
                                 .select(UserAccount::getUsername),
                         "username"),
                 ModuleReadProjection.exists(
-                        ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                 .select(EmployeeAccount::getId),
                         "accountBound")
         );

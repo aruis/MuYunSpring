@@ -1,9 +1,14 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.organization.Organization;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 
@@ -79,15 +84,15 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.sortableFields()).contains("id", "username", "employeeNo", "employeeTitle");
         assertThat(plan.responseFields()).containsExactlyInAnyOrder("id", "username", "employeeNo", "employeeTitle");
         assertThat(plan.baseSql())
-                .contains("left join \"public\".\"iam_employee_account\" \"employee_account\"")
-                .contains("\"main\".\"id\" = \"employee_account\".\"user_id\"")
-                .contains("left join \"public\".\"iam_employee\" \"employee_account_employee\"")
-                .contains("\"employee_account\".\"employee_id\" = \"employee_account_employee\".\"id\"")
-                .contains("\"employee_account_employee\".\"employee_no\" as \"employeeNo\"")
-                .contains("\"employee_account_employee\".\"title\" as \"employeeTitle\"");
+                .contains("left join \"public\".\"iam_employee_account\" \"user_id\"")
+                .contains("\"main\".\"id\" = \"user_id\".\"user_id\"")
+                .contains("left join \"public\".\"iam_employee\" \"user_id_employee_id\"")
+                .contains("\"user_id\".\"employee_id\" = \"user_id_employee_id\".\"id\"")
+                .contains("\"user_id_employee_id\".\"employee_no\" as \"employeeNo\"")
+                .contains("\"user_id_employee_id\".\"title\" as \"employeeTitle\"");
         assertThat(plan.baseParams())
-                .containsEntry("__join_employee_account_deleted", Boolean.FALSE)
-                .containsEntry("__join_employee_account_employee_deleted", Boolean.FALSE);
+                .containsEntry("__join_user_id_deleted", Boolean.FALSE)
+                .containsEntry("__join_user_id_employee_id_deleted", Boolean.FALSE);
     }
 
     @Test
@@ -167,7 +172,32 @@ class RelationProjectionQueryPlannerTest {
 
     @Test
     void shouldRejectMissingReferenceTargetField() {
-        StaticModuleDefinition user = userReferenceDefinitionWithOutput("employee_account.employee.missingTitle",
+        StaticModuleDefinition employee = employeeWithReadProjectionDefinition("organization.missingTitle",
+                "organizationTitle");
+        StaticModuleDefinition organization = organizationReferenceDefinition();
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(employee);
+        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+                compilation.uiDescriptor(),
+                compilation.readModel()
+        );
+
+        assertThatThrownBy(() -> RelationProjectionQueryPlanner.plan(
+                List.of(employee, organization),
+                employee,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection reference field is not declared: organization.missingTitle");
+    }
+
+    @Test
+    void shouldRejectUnsafeInverseReferencePathProjection() {
+        StaticModuleDefinition user = userReferenceDefinitionWithOutput(
+                ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                        .then(EmployeeAccount::getEmployeeId)
+                        .select(Employee::getTitle),
                 "employeeTitle");
         StaticModuleDefinition binding = employeeAccountReferenceDefinition();
         StaticModuleDefinition employee = employeeReferenceDefinition();
@@ -185,7 +215,8 @@ class RelationProjectionQueryPlannerTest {
                 Set.of()
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("projection reference field is not declared: employee.missingTitle");
+                .hasMessageContaining("projection reference path cardinality is not safe for page join")
+                .hasMessageContaining("ONE_TO_MANY");
     }
 
     @Test
@@ -214,7 +245,11 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition userReferenceDefinition() {
-        return userReferenceDefinitionWithOutput("employee_account.employee.title", "employeeTitle");
+        return userReferenceDefinitionWithOutput(
+                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        .then(EmployeeAccount::getEmployeeId)
+                        .select(Employee::getTitle),
+                "employeeTitle");
     }
 
     private StaticModuleDefinition userReferenceDefinitionWithOutput(String readProjectionPath, String outputField) {
@@ -243,8 +278,12 @@ class RelationProjectionQueryPlannerTest {
                 List.of(),
                 List.of(
                         new StaticModuleReadProjectionDefinition(
-                                "employee_account.employee.employeeNo",
+                                null,
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getEmployeeNo),
                                 "employeeNo",
+                                net.ximatai.muyun.spring.ability.reference.ModuleReadProjection.ProjectionType.FIELD,
                                 true,
                                 true
                         ),
@@ -252,7 +291,55 @@ class RelationProjectionQueryPlannerTest {
                                 readProjectionPath,
                                 outputField
                         )
-                )
+                ),
+                UserAccount.class,
+                List.of()
+        );
+    }
+
+    private StaticModuleDefinition userReferenceDefinitionWithOutput(ModuleReferencePath readProjectionPath,
+                                                                     String outputField) {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/users",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "user",
+                        "iam_user",
+                        "User",
+                        List.of(FieldDefinition.string("username", "账号").column("username"))
+                )),
+                ModuleUiDefinition.builder("iam.user")
+                        .listView(list -> list
+                                .field("username")
+                                .field("employeeNo")
+                                .field(outputField))
+                        .build(),
+                List.of(),
+                List.of(
+                        new StaticModuleReadProjectionDefinition(
+                                null,
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getEmployeeNo),
+                                "employeeNo",
+                                net.ximatai.muyun.spring.ability.reference.ModuleReadProjection.ProjectionType.FIELD,
+                                true,
+                                true
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                readProjectionPath,
+                                outputField
+                        )
+                ),
+                UserAccount.class,
+                List.of()
         );
     }
 
@@ -281,6 +368,8 @@ class RelationProjectionQueryPlannerTest {
                         new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
                         new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
                 ),
+                List.of(),
+                EmployeeAccount.class,
                 List.of()
         );
     }
@@ -305,11 +394,19 @@ class RelationProjectionQueryPlannerTest {
                                 FieldDefinition.string("title", "职员姓名").column("title")
                         )
                 )),
-                null
+                null,
+                List.of(),
+                List.of(),
+                Employee.class,
+                List.of()
         );
     }
 
     private StaticModuleDefinition employeeWithOrganizationProjectionDefinition() {
+        return employeeWithReadProjectionDefinition("organization.title", "organizationTitle");
+    }
+
+    private StaticModuleDefinition employeeWithReadProjectionDefinition(String readProjectionPath, String outputField) {
         return new StaticModuleDefinition(
                 "iam",
                 "iam.employee",
@@ -333,11 +430,13 @@ class RelationProjectionQueryPlannerTest {
                 ModuleUiDefinition.builder("iam.employee")
                         .listView(list -> list
                                 .field("employeeNo")
-                                .field("organizationTitle")
+                                .field(outputField)
                                 .field("title"))
                         .build(),
                 List.of(new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id")),
-                List.of(new StaticModuleReadProjectionDefinition("organization.title", "organizationTitle"))
+                List.of(new StaticModuleReadProjectionDefinition(readProjectionPath, outputField)),
+                Employee.class,
+                List.of()
         );
     }
 
@@ -358,7 +457,11 @@ class RelationProjectionQueryPlannerTest {
                         "Organization",
                         List.of(FieldDefinition.string("title", "机构名称").column("title"))
                 )),
-                null
+                null,
+                List.of(),
+                List.of(),
+                Organization.class,
+                List.of()
         );
     }
 

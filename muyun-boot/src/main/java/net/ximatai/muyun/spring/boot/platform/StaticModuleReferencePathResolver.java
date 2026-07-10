@@ -58,7 +58,7 @@ final class StaticModuleReferencePathResolver {
                 case DIRECT -> resolveDirectReference(modules, current, currentAlias,
                         segment.referenceField(), pathAlias);
                 case INVERSE -> resolveInverseReference(modules, current, currentAlias,
-                        segment.referenceField(), pathAlias);
+                        segment, pathAlias);
             };
             if (step == null) {
                 return null;
@@ -96,6 +96,7 @@ final class StaticModuleReferencePathResolver {
             return new ResolvedStep(target, new JoinStep(
                     targetEntity,
                     tableAlias,
+                    RelationProjectionCardinality.MANY_TO_ONE,
                     List.of(
                             new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                     tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
@@ -131,6 +132,7 @@ final class StaticModuleReferencePathResolver {
             return new ResolvedStep(target, new JoinStep(
                     targetEntity,
                     tableAlias,
+                    RelationProjectionCardinality.MANY_TO_ONE,
                     List.of(
                             new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                     tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
@@ -166,6 +168,7 @@ final class StaticModuleReferencePathResolver {
                 return new ResolvedStep(candidate, new JoinStep(
                         candidateEntity,
                         tableAlias,
+                        RelationProjectionCardinality.ONE_TO_MANY,
                         List.of(
                                 new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                         tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
@@ -183,8 +186,9 @@ final class StaticModuleReferencePathResolver {
     private static ResolvedStep resolveInverseReference(Map<String, StaticModuleDefinition> modules,
                                                         StaticModuleDefinition current,
                                                         String currentAlias,
-                                                        ModuleFieldRef referenceField,
+                                                        ModuleReferencePath.Step segment,
                                                         String pathAlias) {
+        ModuleFieldRef referenceField = segment.referenceField();
         for (StaticModuleDefinition candidate : modules.values()) {
             if (candidate.entities().isEmpty() || !matchesModelClass(candidate, referenceField.ownerType())) {
                 continue;
@@ -200,6 +204,9 @@ final class StaticModuleReferencePathResolver {
                 return new ResolvedStep(candidate, new JoinStep(
                         candidateEntity,
                         tableAlias,
+                        segment.safeForPageJoin()
+                                ? RelationProjectionCardinality.ONE_TO_ONE
+                                : RelationProjectionCardinality.ONE_TO_MANY,
                         List.of(
                                 new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                         tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
@@ -247,6 +254,7 @@ final class StaticModuleReferencePathResolver {
 
     record JoinStep(EntityDefinition entity,
                     String tableAlias,
+                    RelationProjectionCardinality cardinality,
                     List<RelationProjectionJoinCondition> conditions) {
     }
 

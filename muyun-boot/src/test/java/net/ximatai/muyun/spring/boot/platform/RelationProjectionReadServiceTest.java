@@ -4,9 +4,14 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -281,16 +286,24 @@ class RelationProjectionReadServiceTest {
                 List.of(),
                 List.of(
                         new StaticModuleReadProjectionDefinition(
-                                "employee_account.employee.employeeNo",
+                                null,
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getEmployeeNo),
                                 "employeeNo",
+                                ModuleReadProjection.ProjectionType.FIELD,
                                 true,
                                 true
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                "employee_account.employee.title",
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getTitle),
                                 "employeeTitle"
                         )
-                )
+                ),
+                UserAccount.class,
+                List.of()
         );
     }
 
@@ -319,6 +332,8 @@ class RelationProjectionReadServiceTest {
                         new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
                         new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
                 ),
+                List.of(),
+                EmployeeAccount.class,
                 List.of()
         );
     }
@@ -343,7 +358,11 @@ class RelationProjectionReadServiceTest {
                                 FieldDefinition.string("title", "职员姓名").column("title")
                         )
                 )),
-                null
+                null,
+                List.of(),
+                List.of(),
+                Employee.class,
+                List.of()
         );
     }
 }

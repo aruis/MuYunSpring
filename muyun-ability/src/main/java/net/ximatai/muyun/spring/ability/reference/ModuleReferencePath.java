@@ -15,11 +15,15 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
     }
 
     public static <T, R> Builder from(ModuleProperty<T, R> referenceField) {
-        return new Builder(List.of(new Step(Direction.DIRECT, ModuleFieldRef.of(referenceField))));
+        return new Builder(List.of(new Step(Direction.DIRECT, ModuleFieldRef.of(referenceField), true)));
     }
 
     public static <T, R> Builder inverse(ModuleProperty<T, R> bridgeToCurrentField) {
-        return new Builder(List.of(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField))));
+        return new Builder(List.of(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField), false)));
+    }
+
+    public static <T, R> Builder inverseOne(ModuleProperty<T, R> bridgeToCurrentField) {
+        return new Builder(List.of(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField), true)));
     }
 
     public enum Direction {
@@ -27,7 +31,7 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
         INVERSE
     }
 
-    public record Step(Direction direction, ModuleFieldRef referenceField) {
+    public record Step(Direction direction, ModuleFieldRef referenceField, boolean safeForPageJoin) {
         public Step {
             if (direction == null) {
                 throw new IllegalArgumentException("module reference path step direction must not be null");
@@ -35,6 +39,7 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
             if (referenceField == null) {
                 throw new IllegalArgumentException("module reference path step field must not be null");
             }
+            safeForPageJoin = direction == Direction.DIRECT || safeForPageJoin;
         }
     }
 
@@ -46,12 +51,17 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
         }
 
         public <T, R> Builder then(ModuleProperty<T, R> referenceField) {
-            steps.add(new Step(Direction.DIRECT, ModuleFieldRef.of(referenceField)));
+            steps.add(new Step(Direction.DIRECT, ModuleFieldRef.of(referenceField), true));
             return this;
         }
 
         public <T, R> Builder thenInverse(ModuleProperty<T, R> bridgeToCurrentField) {
-            steps.add(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField)));
+            steps.add(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField), false));
+            return this;
+        }
+
+        public <T, R> Builder thenInverseOne(ModuleProperty<T, R> bridgeToCurrentField) {
+            steps.add(new Step(Direction.INVERSE, ModuleFieldRef.of(bridgeToCurrentField), true));
             return this;
         }
 

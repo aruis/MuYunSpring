@@ -50,12 +50,12 @@ class UserAccountService implements ModuleReadProjectionContributor {
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
                 ModuleReadProjection.filterable(
-                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getEmployeeNo),
                         "employeeNo"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle")
@@ -72,8 +72,10 @@ ModuleReferencePath.from(Employee::getOrganizationId)
 ```
 
 `from(...)` 表示从当前模块主模型的引用字段出发，`then(...)` 表示沿上一跳目标模型继续走一个引用字段，
-`inverse(...)` 表示通过一个候选桥接模型的字段反向命中当前模块。每一跳都必须落到真实 Java 字段，
-并且该字段必须声明 `@ModuleReference`。
+`inverseOne(...)` 表示通过一个候选桥接模型的字段反向唯一命中当前模块。每一跳都必须落到真实 Java 字段，
+并且该字段必须声明 `@ModuleReference`。列表读投影会生成分页 SQL join，反向桥接必须显式使用
+`inverseOne(...)` / `thenInverseOne(...)` 声明一对一唯一关系；未声明唯一性的 `inverse(...)` / `thenInverse(...)`
+视为不安全路径，不能进入分页 join。
 
 `outputField` 是当前模块对外暴露的稳定字段名。UI、查询接口和前端只消费 `outputField`，不直接消费跨模块路径。
 同一模块内 `outputField` 必须唯一，并且不能覆盖主实体字段或平台标准字段。

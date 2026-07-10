@@ -203,12 +203,12 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
                 ModuleReadProjection.filterable(
-                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getEmployeeNo),
                         "employeeNo"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle")
