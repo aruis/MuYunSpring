@@ -4,6 +4,8 @@
 
 菜单、路由和页签的专项治理见 [菜单、路由与页签专项治理](governance/MENU_ROUTING_AND_TAB_GOVERNANCE.md)。
 
+动作执行后的业务结果语义和前端反馈渲染见 [动作结果与反馈专项治理](governance/ACTION_RESULT_FEEDBACK_GOVERNANCE.md)。
+
 ## 第一草案目标
 
 第一阶段先定主 UI 框架和菜单承载闭环，再推进具体业务线。
