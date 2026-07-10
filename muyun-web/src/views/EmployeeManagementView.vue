@@ -803,7 +803,9 @@ function employeeAccountStatusTitle() {
 }
 
 function defaultAccountUsername(employee: Partial<Employee> | undefined) {
-  return String(employee?.employeeNo ?? employee?.mobile ?? '').trim().toLowerCase();
+  return String(employee?.employeeNo ?? employee?.mobile ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function startAccountProvision() {
