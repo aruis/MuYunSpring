@@ -15,9 +15,12 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -285,7 +288,9 @@ class IamWebControllerIT {
     void shouldExposeEmployeeQuerySchemaInTenantScope() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeService.querySchema()).thenReturn(QuerySchema.from(employeeQueryDescriptor()));
+        when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
+                .thenReturn(Optional.of(employeeStaticModuleDefinition()));
+        when(employeeService.queryDescriptor()).thenReturn(employeeQueryDescriptor());
 
         mvc.perform(get("/iam.employee/query/schema"))
                 .andExpect(status().isOk())
@@ -299,6 +304,10 @@ class IamWebControllerIT {
                         .value(org.hamcrest.Matchers.contains("职员编号")))
                 .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].valueType")
                         .value(org.hamcrest.Matchers.contains("BOOLEAN")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'organizationTitle')].sortable")
+                        .value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.fields[?(@.name == 'organizationTitle')].operators")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
                 .andExpect(jsonPath("$.externalCriteria[0].key").value("departmentScope"));
 
         verify(employeeService).verifyActiveTenant("tenant_a");
@@ -915,7 +924,14 @@ class IamWebControllerIT {
                 Set.of(EntityCapability.CRUD),
                 List.of(),
                 List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
-                controller.moduleUiDefinition()
+                controller.moduleUiDefinition(),
+                StaticModuleReferenceCompiler.compile(Employee.class),
+                List.of(new StaticModuleReadProjectionDefinition(
+                        ModuleReferencePath.from(Employee::getOrganizationId)
+                                .select(Organization::getTitle),
+                        "organizationTitle")),
+                Employee.class,
+                List.of()
         );
     }
 

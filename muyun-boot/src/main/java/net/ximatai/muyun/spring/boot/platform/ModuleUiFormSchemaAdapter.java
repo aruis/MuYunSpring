@@ -26,7 +26,7 @@ public final class ModuleUiFormSchemaAdapter {
         if (formView == null) {
             return null;
         }
-        validate(definition, modelClass);
+        validate(definition, formView, modelClass);
         FormDescriptor.Builder descriptor = FormDescriptor.builder(definition.moduleAlias())
                 .title(formView.title());
         formView.fields().stream()
@@ -71,7 +71,7 @@ public final class ModuleUiFormSchemaAdapter {
         return valueType == FormValueType.BOOLEAN ? FormControlType.SWITCH : FormControlType.TEXT;
     }
 
-    private static void validate(ModuleUiDefinition definition, Class<?> modelClass) {
+    private static void validate(ModuleUiDefinition definition, ViewDefinition formView, Class<?> modelClass) {
         if (modelClass == null || modelClass == Object.class) {
             return;
         }
@@ -80,7 +80,8 @@ public final class ModuleUiFormSchemaAdapter {
                 definition.moduleAlias(),
                 modelClass
         );
-        ModuleUiDescriptorCompiler.validate(definition, List.of(entity));
+        ModuleUiDescriptorCompiler.validate(new ModuleUiDefinition(definition.moduleAlias(), List.of(formView)),
+                List.of(entity));
     }
 
     private static String entityAlias(String moduleAlias) {

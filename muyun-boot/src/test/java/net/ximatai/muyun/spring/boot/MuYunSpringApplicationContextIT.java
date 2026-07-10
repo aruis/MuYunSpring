@@ -298,6 +298,19 @@ class MuYunSpringApplicationContextIT {
         assertThat(httpAlice.path("employeeNo").asText()).isEqualTo("E-PROJ-001");
         assertThat(httpAlice.path("employeeTitle").asText()).isEqualTo("Alice Employee");
 
+        ResponseEntity<JsonNode> querySchema = restTemplate.exchange(
+                "/iam.user/query/schema", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+        assertThat(querySchema.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(querySchema.getBody()).isNotNull();
+        JsonNode schemaFields = querySchema.getBody().path("fields");
+        JsonNode employeeNoSchema = fieldSchema(schemaFields, "employeeNo");
+        assertThat(employeeNoSchema.path("operators")).isNotEmpty();
+        assertThat(employeeNoSchema.path("sortable").asBoolean()).isTrue();
+        JsonNode employeeTitleSchema = fieldSchema(schemaFields, "employeeTitle");
+        assertThat(employeeTitleSchema.path("operators")).isEmpty();
+        assertThat(employeeTitleSchema.path("sortable").asBoolean()).isTrue();
+
         WebQueryRequest httpRejectRequest = new WebQueryRequest(
                 new WebPageRequest(1, 20),
                 List.of(
@@ -312,7 +325,16 @@ class MuYunSpringApplicationContextIT {
         assertThat(httpRejected.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(httpRejected.getBody()).isNotNull();
         assertThat(httpRejected.getBody().path("message").asText())
-                .contains("projection query field is not projected: employeeTitle");
+                .contains("query operator is not supported by iam.user: employeeTitle.EQ");
+    }
+
+    private JsonNode fieldSchema(JsonNode fields, String name) {
+        for (JsonNode field : fields) {
+            if (name.equals(field.path("name").asText())) {
+                return field;
+            }
+        }
+        throw new AssertionError("missing query schema field: " + name);
     }
 
     private String issueSuperAdminSessionToken() {

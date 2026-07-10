@@ -23,11 +23,13 @@ public record QueryField(String fieldName,
         }
         title = title == null || title.isBlank() ? fieldName : title.trim();
         valueType = valueType == null ? QueryValueType.STRING : valueType;
-        operators = operators == null || operators.isEmpty()
+        operators = operators == null
                 ? EnumSet.of(QueryOperator.EQ)
-                : EnumSet.copyOf(operators);
-        defaultOperator = defaultOperator == null ? fallbackDefaultOperator(valueType, operators) : defaultOperator;
-        if (!operators.contains(defaultOperator)) {
+                : operators.isEmpty() ? Set.of() : EnumSet.copyOf(operators);
+        defaultOperator = defaultOperator == null && !operators.isEmpty()
+                ? fallbackDefaultOperator(valueType, operators)
+                : defaultOperator;
+        if (defaultOperator != null && !operators.contains(defaultOperator)) {
             throw new IllegalArgumentException("default query operator must be allowed: "
                     + fieldName + "." + defaultOperator);
         }
