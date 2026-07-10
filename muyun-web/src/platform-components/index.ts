@@ -78,17 +78,23 @@ export {
   presentPlatformSuccess,
 } from './platformErrorFeedback';
 export {
+  createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  platformActionResultEffects,
+  platformActionResultEffectTypes,
   presentPlatformActionSuccess,
   resolvePlatformActionResult,
   resolvePlatformActionResultMessage,
+  withPlatformActionResultEffects,
 } from './platformActionResultFeedback';
 export type {
   PlatformActionResult,
   PlatformActionResultEffect,
   PlatformActionResultEffectHandler,
+  PlatformActionResultEffectType,
   PlatformActionResultFeedbackContext,
   PlatformActionResultHandlingContext,
+  PlatformActionResultStandardEffectHandlers,
 } from './platformActionResultFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { createRecordEditorSessionState } from './recordEditorSessionState';

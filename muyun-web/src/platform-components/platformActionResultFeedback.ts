@@ -8,6 +8,35 @@ export interface PlatformActionResultEffect {
   payload?: Record<string, unknown>;
 }
 
+export const platformActionResultEffectTypes = {
+  refreshList: 'refresh-list',
+  refreshDetail: 'refresh-detail',
+  closeEditor: 'close-editor',
+  clearSelection: 'clear-selection',
+  selectRecord: 'select-record',
+} as const;
+
+export type PlatformActionResultEffectType =
+  (typeof platformActionResultEffectTypes)[keyof typeof platformActionResultEffectTypes];
+
+export const platformActionResultEffects = {
+  refreshList(payload?: Record<string, unknown>): PlatformActionResultEffect {
+    return effectOf(platformActionResultEffectTypes.refreshList, payload);
+  },
+  refreshDetail(payload?: Record<string, unknown>): PlatformActionResultEffect {
+    return effectOf(platformActionResultEffectTypes.refreshDetail, payload);
+  },
+  closeEditor(payload?: Record<string, unknown>): PlatformActionResultEffect {
+    return effectOf(platformActionResultEffectTypes.closeEditor, payload);
+  },
+  clearSelection(payload?: Record<string, unknown>): PlatformActionResultEffect {
+    return effectOf(platformActionResultEffectTypes.clearSelection, payload);
+  },
+  selectRecord(payload?: Record<string, unknown>): PlatformActionResultEffect {
+    return effectOf(platformActionResultEffectTypes.selectRecord, payload);
+  },
+};
+
 export interface PlatformActionResult {
   message: string;
   resultType?: string;
@@ -26,6 +55,46 @@ export interface PlatformActionResultFeedbackContext extends PlatformErrorFeedba
 
 export interface PlatformActionResultHandlingContext extends PlatformActionResultFeedbackContext {
   effectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+}
+
+export interface PlatformActionResultStandardEffectHandlers {
+  refreshList?: PlatformActionResultEffectHandler;
+  refreshDetail?: PlatformActionResultEffectHandler;
+  closeEditor?: PlatformActionResultEffectHandler;
+  clearSelection?: PlatformActionResultEffectHandler;
+  selectRecord?: PlatformActionResultEffectHandler;
+}
+
+export function createPlatformActionResultEffectHandlers(
+  handlers: PlatformActionResultStandardEffectHandlers,
+) {
+  return {
+    [platformActionResultEffectTypes.refreshList]: handlers.refreshList,
+    [platformActionResultEffectTypes.refreshDetail]: handlers.refreshDetail,
+    [platformActionResultEffectTypes.closeEditor]: handlers.closeEditor,
+    [platformActionResultEffectTypes.clearSelection]: handlers.clearSelection,
+    [platformActionResultEffectTypes.selectRecord]: handlers.selectRecord,
+  };
+}
+
+export function withPlatformActionResultEffects<T>(
+  result: T,
+  effects: PlatformActionResultEffect[],
+): T & { effects: PlatformActionResultEffect[] } {
+  const existingEffects = actionResultEffects(result);
+  const existingTypes = new Set(existingEffects.map((effect) => effect.type));
+  const missingEffects = effects.filter((effect) => !existingTypes.has(effect.type));
+  if (result && typeof result === 'object') {
+    return {
+      ...result,
+      effects: [...existingEffects, ...missingEffects],
+    };
+  }
+  return ({
+    message: undefined,
+    raw: result,
+    effects: missingEffects,
+  } as unknown) as T & { effects: PlatformActionResultEffect[] };
 }
 
 export function resolvePlatformActionResultMessage(result: unknown, fallbackMessage = '操作成功') {
@@ -102,4 +171,8 @@ function isPlatformActionResultEffect(effect: unknown): effect is PlatformAction
   }
   const payload = (effect as { payload?: unknown }).payload;
   return payload === undefined || (typeof payload === 'object' && payload !== null && !Array.isArray(payload));
+}
+
+function effectOf(type: PlatformActionResultEffectType, payload?: Record<string, unknown>) {
+  return payload ? { type, payload } : { type };
 }

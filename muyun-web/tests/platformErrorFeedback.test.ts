@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  platformActionResultEffects,
+  platformActionResultEffectTypes,
   resolvePlatformActionResult,
   resolvePlatformActionResultMessage,
+  withPlatformActionResultEffects,
 } from '../src/platform-components/platformActionResultFeedback.ts';
 import { matchesPlatformActionErrorHandler } from '../src/platform-components/platformErrorFeedback.ts';
 import { AppError, platformErrorCodes } from '../src/web-core/index.ts';
@@ -100,4 +104,36 @@ test('platform action result resolves structured facts without UI coupling', asy
     },
   });
   assert.deepEqual(handled, ['refresh-list:updated']);
+});
+
+test('platform action result standard effects compose without duplicate local defaults', async () => {
+  const result = withPlatformActionResultEffects(
+    {
+      message: '已处理',
+      effects: [platformActionResultEffects.refreshList({ source: 'backend' })],
+    },
+    [
+      platformActionResultEffects.refreshList({ source: 'local' }),
+      platformActionResultEffects.closeEditor(),
+    ],
+  );
+
+  assert.deepEqual(resolvePlatformActionResult(result).effects, [
+    { type: platformActionResultEffectTypes.refreshList, payload: { source: 'backend' } },
+    { type: platformActionResultEffectTypes.closeEditor },
+  ]);
+
+  const handled: string[] = [];
+  await handlePlatformActionSuccess(result, {
+    effectHandlers: createPlatformActionResultEffectHandlers({
+      refreshList: (effect) => {
+        handled.push(`${effect.type}:${effect.payload?.source}`);
+      },
+      closeEditor: (effect) => {
+        handled.push(effect.type);
+      },
+    }),
+  });
+
+  assert.deepEqual(handled, ['refresh-list:backend', 'close-editor']);
 });

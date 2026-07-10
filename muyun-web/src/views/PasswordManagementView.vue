@@ -7,12 +7,16 @@ import {
   RecordMetaSection,
   RecordStatusSwitch,
   StaticManagementLayout,
+  createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  platformActionResultEffects,
   presentPlatformError,
   presentPlatformMessage,
   type CrudRecordListBase,
+  type PlatformActionResultEffect,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
+  withPlatformActionResultEffects,
 } from '@muyun/platform-components';
 import type { PasswordPolicyRule } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
@@ -53,6 +57,19 @@ const canEnable = computed(() => {
     return false;
   }
   return ruleContext.can(selected.value.enabled === false ? 'enable' : 'disable') === true;
+});
+const passwordActionEffectHandlers = createPlatformActionResultEffectHandlers({
+  refreshList: () => {
+    reloadKey.value += 1;
+  },
+  closeEditor: () => {
+    mode.value = 'view';
+  },
+  clearSelection: () => {
+    selected.value = undefined;
+    draft.value = emptyRuleDraft();
+    mode.value = canCreate.value ? 'create' : 'view';
+  },
 });
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -180,9 +197,10 @@ async function save() {
         : await ruleContext.abilities.crud().update(payload.id!, payload);
     selected.value = result.record;
     draft.value = copyRule(result.record);
-    mode.value = 'view';
-    reloadKey.value += 1;
-    await handlePlatformActionSuccess(result, { source: 'password-management' });
+    await handlePasswordActionSuccess(result, [
+      platformActionResultEffects.closeEditor(),
+      platformActionResultEffects.refreshList(),
+    ]);
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {
@@ -208,8 +226,7 @@ async function toggleEnabled(enabled: boolean) {
     const refreshed = await ruleContext.abilities.crud().view(selected.value.id);
     selected.value = refreshed;
     draft.value = copyRule(refreshed);
-    reloadKey.value += 1;
-    await handlePlatformActionSuccess(result, { source: 'password-management' });
+    await handlePasswordActionSuccess(result, [platformActionResultEffects.refreshList()]);
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {
@@ -241,11 +258,10 @@ async function removeSelected() {
   try {
     await ruleContext.runtime.ready;
     const result = await ruleContext.abilities.crud().delete(selected.value.id);
-    selected.value = undefined;
-    draft.value = emptyRuleDraft();
-    mode.value = canCreate.value ? 'create' : 'view';
-    reloadKey.value += 1;
-    await handlePlatformActionSuccess(result, { source: 'password-management' });
+    await handlePasswordActionSuccess(result, [
+      platformActionResultEffects.clearSelection(),
+      platformActionResultEffects.refreshList(),
+    ]);
   } catch (cause) {
     presentPlatformError(cause, { source: 'password-management', phase: 'action' });
   } finally {
@@ -269,6 +285,13 @@ function handleCardAction(action: RecordActionItem) {
   if (action.key === 'save') {
     void save();
   }
+}
+
+function handlePasswordActionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
+  return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+    source: 'password-management',
+    effectHandlers: passwordActionEffectHandlers,
+  });
 }
 
 function ruleItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor {
