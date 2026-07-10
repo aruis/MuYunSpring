@@ -18,6 +18,8 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -178,6 +180,51 @@ class UserAccountServiceContractTest {
         }
 
         verify(dao, never()).insert(any());
+    }
+
+    @Test
+    void shouldPhysicallyDeleteUserAccount() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        user.setVersion(1);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.deleteByIdAndVersion("user-1", 1)).thenReturn(1);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.of(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.delete("user-1")).isEqualTo(1);
+        }
+
+        verify(dao).deleteByIdAndVersion("user-1", 1);
+        verify(dao, never()).updateByIdAndVersion(any(UserAccount.class), any());
+    }
+
+    @Test
+    void shouldCleanupAccountRoleGrantsWhenPhysicallyDeletingUserAccount() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        UserAccount user = activeUser();
+        user.setVersion(1);
+        AccountRoleGrant grant = new AccountRoleGrant();
+        grant.setId("grant-1");
+        grant.setUserId("user-1");
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.deleteByIdAndVersion("user-1", 1)).thenReturn(1);
+        when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(grant));
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService,
+                Optional.of(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()),
+                null,
+                accountRoleGrantDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.delete("user-1")).isEqualTo(1);
+        }
+
+        verify(accountRoleGrantDao).deleteById("grant-1");
     }
 
     @Test

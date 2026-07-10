@@ -6,7 +6,12 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
@@ -31,11 +36,18 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest(
@@ -65,6 +77,9 @@ class MuYunSpringApplicationContextIT {
 
     @Autowired
     private UserAccountService userAccountService;
+
+    @Autowired
+    private EmployeeService employeeService;
 
     private TestRestTemplate restTemplate;
 
@@ -169,7 +184,7 @@ class MuYunSpringApplicationContextIT {
                 .get()
                 .satisfies(definition -> {
                     assertThat(definition.entities()).isNotEmpty();
-                    assertThat(definition.projectionJoins()).isNotEmpty();
+                    assertThat(definition.projectionJoins()).isEmpty();
                 });
         assertThat(staticRecordReadProjectionService.supportsDefaultListQuery(
                 UserAccountService.MODULE_ALIAS, userAccountService)).isTrue();
@@ -219,6 +234,196 @@ class MuYunSpringApplicationContextIT {
         Map<String, Object> dave = (Map<String, Object>) secondPage.records().get(1);
         assertThat(dave).containsEntry("username", "dave_projection");
         assertThat(dave.get("employeeNo")).isNull();
+
+        WebPageResponse<?> sortedByEmployeeTitle = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(1, 4),
+                userAccountService,
+                Sort.asc("employeeTitle")
+        ).orElseThrow();
+
+        assertThat(sortedByEmployeeTitle.records()).hasSize(4);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> firstByEmployeeTitle = (Map<String, Object>) sortedByEmployeeTitle.records().getFirst();
+        assertThat(firstByEmployeeTitle)
+                .containsEntry("username", "alice_projection")
+                .containsEntry("employeeTitle", "Alice Employee");
+
+        WebPageResponse<?> filteredByEmployeeNo = staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("employeeNo", "E-PROJ-001"),
+                PageRequest.of(1, 20),
+                userAccountService,
+                Sort.asc("username")
+        ).orElseThrow();
+
+        assertThat(filteredByEmployeeNo.records()).singleElement()
+                .satisfies(record -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> output = (Map<String, Object>) record;
+                    assertThat(output)
+                            .containsEntry("username", "alice_projection")
+                            .containsEntry("employeeNo", "E-PROJ-001");
+                });
+        assertThatThrownBy(() -> staticRecordReadProjectionService.queryDefaultList(
+                UserAccountService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("employeeTitle", "Alice Employee"),
+                PageRequest.of(1, 20),
+                userAccountService
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("projection query field is not projected: employeeTitle");
+
+        String token = issueSuperAdminSessionToken();
+        HttpHeaders headers = bearerHeaders(token);
+        WebQueryRequest httpFilterRequest = new WebQueryRequest(
+                new WebPageRequest(1, 20),
+                List.of(
+                        new WebQueryCondition("tenantId", "EQ", List.of(tenantId)),
+                        new WebQueryCondition("employeeNo", "EQ", List.of("E-PROJ-001"))
+                ),
+                List.of(new WebSort("employeeTitle", false))
+        );
+        ResponseEntity<JsonNode> httpFiltered = restTemplate.exchange(
+                "/iam.user/query", HttpMethod.POST, new HttpEntity<>(httpFilterRequest, headers), JsonNode.class);
+
+        assertThat(httpFiltered.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(httpFiltered.getBody()).isNotNull();
+        assertThat(httpFiltered.getBody().path("records")).hasSize(1);
+        JsonNode httpAlice = httpFiltered.getBody().path("records").get(0);
+        assertThat(httpAlice.path("username").asText()).isEqualTo("alice_projection");
+        assertThat(httpAlice.path("employeeNo").asText()).isEqualTo("E-PROJ-001");
+        assertThat(httpAlice.path("employeeTitle").asText()).isEqualTo("Alice Employee");
+
+        ResponseEntity<JsonNode> querySchema = restTemplate.exchange(
+                "/iam.user/query/schema", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+        assertThat(querySchema.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(querySchema.getBody()).isNotNull();
+        JsonNode schemaFields = querySchema.getBody().path("fields");
+        JsonNode employeeNoSchema = fieldSchema(schemaFields, "employeeNo");
+        assertThat(employeeNoSchema.path("operators")).isNotEmpty();
+        assertThat(employeeNoSchema.path("sortable").asBoolean()).isTrue();
+        JsonNode employeeTitleSchema = fieldSchema(schemaFields, "employeeTitle");
+        assertThat(employeeTitleSchema.path("operators")).isEmpty();
+        assertThat(employeeTitleSchema.path("sortable").asBoolean()).isTrue();
+
+        WebPageResponse<?> employeePage = staticRecordReadProjectionService.queryDefaultList(
+                EmployeeService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(1, 20),
+                employeeService,
+                Sort.asc("employeeNo")
+        ).orElseThrow();
+
+        assertThat(employeePage.records()).hasSize(2);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> employeeAlice = (Map<String, Object>) employeePage.records().get(0);
+        assertThat(employeeAlice)
+                .containsEntry("employeeNo", "E-PROJ-001")
+                .containsEntry("username", "alice_projection")
+                .containsEntry("accountBound", true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> employeeCharlie = (Map<String, Object>) employeePage.records().get(1);
+        assertThat(employeeCharlie)
+                .containsEntry("employeeNo", "E-PROJ-003")
+                .containsEntry("accountBound", false);
+        assertThat(employeeCharlie.get("username")).isNull();
+
+        WebPageResponse<?> unboundEmployees = staticRecordReadProjectionService.queryDefaultList(
+                EmployeeService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("accountBound", Boolean.FALSE),
+                PageRequest.of(1, 20),
+                employeeService,
+                Sort.asc("employeeNo")
+        ).orElseThrow();
+
+        assertThat(unboundEmployees.records()).singleElement()
+                .satisfies(record -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> output = (Map<String, Object>) record;
+                    assertThat(output)
+                            .containsEntry("employeeNo", "E-PROJ-003")
+                            .containsEntry("accountBound", false);
+                });
+
+        ResponseEntity<JsonNode> employeeQuerySchema = restTemplate.exchange(
+                "/iam.employee/query/schema", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+        assertThat(employeeQuerySchema.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(employeeQuerySchema.getBody()).isNotNull();
+        JsonNode employeeSchemaFields = employeeQuerySchema.getBody().path("fields");
+        JsonNode usernameSchema = fieldSchema(employeeSchemaFields, "username");
+        assertThat(usernameSchema.path("operators")).isNotEmpty();
+        JsonNode accountBoundSchema = fieldSchema(employeeSchemaFields, "accountBound");
+        assertThat(accountBoundSchema.path("valueType").asText()).isEqualTo("BOOLEAN");
+        assertThat(accountBoundSchema.path("operators")).isNotEmpty();
+
+        WebQueryRequest httpRejectRequest = new WebQueryRequest(
+                new WebPageRequest(1, 20),
+                List.of(
+                        new WebQueryCondition("tenantId", "EQ", List.of(tenantId)),
+                        new WebQueryCondition("employeeTitle", "EQ", List.of("Alice Employee"))
+                ),
+                List.of()
+        );
+        ResponseEntity<JsonNode> httpRejected = restTemplate.exchange(
+                "/iam.user/query", HttpMethod.POST, new HttpEntity<>(httpRejectRequest, headers), JsonNode.class);
+
+        assertThat(httpRejected.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(httpRejected.getBody()).isNotNull();
+        assertThat(httpRejected.getBody().path("message").asText())
+                .contains("query operator is not supported by iam.user: employeeTitle.EQ");
+    }
+
+    private JsonNode fieldSchema(JsonNode fields, String name) {
+        for (JsonNode field : fields) {
+            if (name.equals(field.path("name").asText())) {
+                return field;
+            }
+        }
+        throw new AssertionError("missing query schema field: " + name);
+    }
+
+    private String issueSuperAdminSessionToken() {
+        String token = "projection-http-token-" + System.nanoTime();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        jdbcTemplate.update("""
+                        insert into iam_user_session (
+                            id, user_id, username, token_hash, issued_at, expires_at,
+                            max_expires_at, last_seen_at, password_change_required, deleted
+                        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                "proj_http_" + Long.toUnsignedString(System.nanoTime(), 36),
+                UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
+                UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
+                tokenHash(token),
+                Timestamp.from(now),
+                Timestamp.from(now.plus(1, ChronoUnit.HOURS)),
+                Timestamp.from(now.plus(1, ChronoUnit.DAYS)),
+                Timestamp.from(now),
+                Boolean.FALSE,
+                Boolean.FALSE);
+        return token;
+    }
+
+    private String tokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
     }
 
     private HttpHeaders bearerHeaders(String token) {

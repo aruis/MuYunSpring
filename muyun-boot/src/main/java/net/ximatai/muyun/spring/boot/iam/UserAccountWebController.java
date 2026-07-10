@@ -18,13 +18,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionCardinality;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinCondition;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinContributor;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinDefinition;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinFilter;
-import net.ximatai.muyun.spring.boot.platform.RelationProjectionJoinStep;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -36,8 +30,6 @@ import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
@@ -66,8 +58,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         CrudWeb<UserAccount, UserAccountService>,
         EnableWeb<UserAccount, UserAccountService>,
         MutationTenantScopeResolver<UserAccount>,
-        StaticModuleUiContributor,
-        RelationProjectionJoinContributor {
+        StaticModuleUiContributor {
     private static final ActionExecutionPolicy USER_SELECTOR_POLICY = new ActionExecutionPolicy(
             "userSelector",
             PlatformActionLevel.LIST,
@@ -123,8 +114,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                         .field("enabled", field -> field.label("状态").uiType("enabledStatus")
                                 .width("90px").align("center"))
                         .field("passwordStatus", field -> field.label("密码状态").width("120px"))
-                        .field("bound_employee", "employeeNo", field -> field.label("职员工号").width("150px"))
-                        .field("bound_employee", "employeeTitle", field -> field.label("职员姓名").width("150px"))
+                        .field("employeeNo", field -> field.label("职员工号").width("150px"))
+                        .field("employeeTitle", field -> field.label("职员姓名").width("150px"))
                         .field("lastLoginAt", field -> field.label("最后登录时间").width("180px")))
                 .formView(form -> form
                         .title("用户账号")
@@ -133,54 +124,6 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                         .field("passwordStatus", field -> field.label("密码状态").readOnly())
                         .field("lastLoginAt", field -> field.label("最后登录时间").readOnly()))
                 .build();
-    }
-
-    @Override
-    public java.util.List<RelationProjectionJoinDefinition> projectionJoins() {
-        return java.util.List.of(new RelationProjectionJoinDefinition(
-                "bound_employee",
-                new EntityDefinition(
-                        "bound_employee",
-                        "iam_employee",
-                        "绑定职员",
-                        java.util.List.of(
-                                FieldDefinition.string("employeeId", "职员ID").column("id"),
-                                FieldDefinition.string("employeeNo", "职员工号").column("employee_no"),
-                                FieldDefinition.string("employeeTitle", "职员姓名").column("title"),
-                                FieldDefinition.string("employeeOrganizationId", "职员机构").column("organization_id"),
-                                FieldDefinition.string("employeeDepartmentId", "职员部门").column("department_id")
-                        )
-                ),
-                RelationProjectionCardinality.ONE_TO_ONE,
-                java.util.List.of(
-                        new RelationProjectionJoinStep(
-                                "public",
-                                "iam_employee_account",
-                                "bound_employee_account",
-                                java.util.List.of(
-                                        new RelationProjectionJoinCondition("main", "tenant_id",
-                                                "bound_employee_account", "tenant_id"),
-                                        new RelationProjectionJoinCondition("main", "id",
-                                                "bound_employee_account", "user_id")
-                                ),
-                                java.util.List.of(new RelationProjectionJoinFilter(
-                                        "bound_employee_account", "deleted", Boolean.FALSE))
-                        ),
-                        new RelationProjectionJoinStep(
-                                "public",
-                                "iam_employee",
-                                "bound_employee",
-                                java.util.List.of(
-                                        new RelationProjectionJoinCondition("bound_employee_account", "tenant_id",
-                                                "bound_employee", "tenant_id"),
-                                        new RelationProjectionJoinCondition("bound_employee_account", "employee_id",
-                                                "bound_employee", "id")
-                                ),
-                                java.util.List.of(new RelationProjectionJoinFilter(
-                                        "bound_employee", "deleted", Boolean.FALSE))
-                        )
-                )
-        ));
     }
 
     @Override

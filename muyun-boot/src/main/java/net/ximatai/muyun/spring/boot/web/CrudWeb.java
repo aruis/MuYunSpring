@@ -114,6 +114,12 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.QUERY)
     default QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
         return webScope(() -> {
+            StaticRecordReadProjectionService projectionService = staticRecordReadProjectionService();
+            if (projectionService != null && this instanceof StaticModuleUiContributor contributor
+                    && isCurrentModuleUiDefinition(contributor)
+                    && projectionService.hasModuleDefinition(contributor.moduleUiDefinition().moduleAlias())) {
+                return projectionService.querySchema(contributor.moduleUiDefinition().moduleAlias(), service());
+            }
             if (service() instanceof QueryAbility<?> queryAbility) {
                 return queryAbility.querySchema();
             }
@@ -187,8 +193,8 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         }
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
-        Criteria criteria = queryCriteria(request);
-        Sort[] sorts = querySorts(request);
+        Criteria criteria = projectionService.queryCriteria(moduleAlias, service(), WebQueryRequests.from(request));
+        Sort[] sorts = projectionService.querySorts(moduleAlias, service(), WebQueryRequests.from(request));
         if (service() instanceof DataScopeAbility<?>) {
             DataScopeAbility<T> dataScopeAbility = DataScopeAbility.cast(service());
             DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(actionPolicy(PlatformAction.QUERY), criteria);

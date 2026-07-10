@@ -86,11 +86,14 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                 .listView(list -> list
                         .title("职员列表")
                         .field("employeeNo", field -> field.label("职员编号").width("150px"))
+                        .field("organizationTitle", field -> field.label("所属机构").width("160px"))
                         .field("title", field -> field.label("职员姓名").width("150px"))
+                        .field("username", field -> field.label("账号").width("150px"))
                         .field("mobile", field -> field.label("手机号").width("150px"))
                         .field("email", field -> field.label("邮箱"))
                         .field("enabled", field -> field.label("状态").uiType("enabledStatus")
-                                .width("90px").align("center")))
+                                .width("90px").align("center"))
+                        .field("accountBound", field -> field.hidden()))
                 .formView(form -> form
                         .title("职员档案")
                         .field("organizationId", field -> field.label("所属机构").required().readOnly())
@@ -156,7 +159,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse deleteAccount(@PathVariable String employeeId) {
         return employeeRecordScope(employeeId,
-                () -> new WebCountResponse(employeeAccountService.unbindAccount(employeeId)));
+                () -> new WebCountResponse(employeeAccountService.removeAccount(employeeId)));
     }
 
     @GetMapping("/{employeeId}/positions")

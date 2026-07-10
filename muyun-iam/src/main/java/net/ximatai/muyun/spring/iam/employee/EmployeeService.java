@@ -12,6 +12,9 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
@@ -21,7 +24,9 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -39,7 +44,8 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         ReferenceAbility<Employee>,
         DataScopeAbility<Employee>,
         DataScopeFieldMappingAbility,
-        QueryAbility<Employee> {
+        QueryAbility<Employee>,
+        ModuleReadProjectionContributor {
     public static final String MODULE_ALIAS = "iam.employee";
     private static final DataScopeFieldMapping DATA_SCOPE_FIELD_MAPPING =
             DataScopeFieldMapping.of(null, "organizationId", "departmentId");
@@ -150,6 +156,25 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"))
                 .defaultSort(net.ximatai.muyun.database.core.orm.Sort.asc("employeeNo"))
                 .build();
+    }
+
+    @Override
+    public List<ModuleReadProjection> moduleReadProjections() {
+        return List.of(
+                ModuleReadProjection.of(
+                        ModuleReferencePath.from(Employee::getOrganizationId)
+                                .select(Organization::getTitle),
+                        "organizationTitle"),
+                ModuleReadProjection.filterableOnly(
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                .then(EmployeeAccount::getUserId)
+                                .select(UserAccount::getUsername),
+                        "username"),
+                ModuleReadProjection.exists(
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                .select(EmployeeAccount::getId),
+                        "accountBound")
+        );
     }
 
     private Criteria departmentScopeCriteria(Object value) {

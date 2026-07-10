@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -64,14 +65,59 @@ public class StaticModuleDefinitionScanner {
                 actions(beanClass, java.util.Set.of(module.capabilities())),
                 entities(bean, module, projectionJoins),
                 uiDefinition(bean, module),
+                references(bean),
+                readProjections(bean),
+                modelClass(bean),
                 projectionJoins
         );
     }
 
-    private List<RelationProjectionJoinDefinition> projectionJoins(Object bean) {
-        if (!(bean instanceof RelationProjectionJoinContributor contributor)) {
+    private Class<?> modelClass(Object bean) {
+        Object service = service(bean);
+        if (service instanceof CrudAbility<?> ability) {
+            return ability.modelClass();
+        }
+        return null;
+    }
+
+    private List<StaticModuleReferenceDefinition> references(Object bean) {
+        Object service = service(bean);
+        if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
         }
+        return StaticModuleReferenceCompiler.compile(ability.modelClass());
+    }
+
+    private List<StaticModuleReadProjectionDefinition> readProjections(Object bean) {
+        Object service = service(bean);
+        if (!(service instanceof ModuleReadProjectionContributor contributor)) {
+            return List.of();
+        }
+        List<net.ximatai.muyun.spring.ability.reference.ModuleReadProjection> projections =
+                contributor.moduleReadProjections();
+        if (projections == null || projections.isEmpty()) {
+            return List.of();
+        }
+        return projections.stream()
+                .map(projection -> new StaticModuleReadProjectionDefinition(
+                        projection.path(),
+                        projection.referencePath(),
+                        projection.outputField(),
+                        projection.projectionType(),
+                        projection.filterable(),
+                        projection.sortable()
+                ))
+                .toList();
+    }
+
+    private List<RelationProjectionJoinDefinition> projectionJoins(Object bean) {
+        @SuppressWarnings("deprecation")
+        boolean legacyProjectionJoinContributor = bean instanceof RelationProjectionJoinContributor;
+        if (!legacyProjectionJoinContributor) {
+            return List.of();
+        }
+        @SuppressWarnings("deprecation")
+        RelationProjectionJoinContributor contributor = (RelationProjectionJoinContributor) bean;
         List<RelationProjectionJoinDefinition> joins = contributor.projectionJoins();
         return joins == null ? List.of() : List.copyOf(joins);
     }
@@ -228,6 +274,9 @@ public class StaticModuleDefinitionScanner {
                     List.copyOf(merged.values()),
                     entities,
                     uiDefinition,
+                    target.references(),
+                    target.readProjections(),
+                    target.modelClass(),
                     target.projectionJoins()
             ));
         }

@@ -57,7 +57,7 @@ public class RelationProjectionQueryExecutor {
     private CompiledCriteria compileCriteria(RelationProjectionSqlPlan plan, Criteria criteria) {
         Criteria actual = criteria == null ? Criteria.of() : criteria;
         return criteriaSqlCompiler.compile(actual, fieldName -> {
-            if (!plan.projectedFields().contains(fieldName)) {
+            if (!plan.queryableFields().contains(fieldName)) {
                 throw new IllegalArgumentException("projection query field is not projected: " + fieldName);
             }
             return fieldName;
@@ -77,7 +77,7 @@ public class RelationProjectionQueryExecutor {
         }
         return " order by " + java.util.Arrays.stream(sorts)
                 .map(sort -> {
-                    if (!plan.projectedFields().contains(sort.getField())) {
+                    if (!plan.sortableFields().contains(sort.getField())) {
                         throw new IllegalArgumentException("projection sort field is not projected: " + sort.getField());
                     }
                     return RelationProjectionQueryPlanner.quote(sort.getField(), plan.databaseType())

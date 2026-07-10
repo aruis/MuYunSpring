@@ -15,9 +15,13 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -285,7 +289,9 @@ class IamWebControllerIT {
     void shouldExposeEmployeeQuerySchemaInTenantScope() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(employeeService.querySchema()).thenReturn(QuerySchema.from(employeeQueryDescriptor()));
+        when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
+                .thenReturn(Optional.of(employeeStaticModuleDefinition()));
+        when(employeeService.queryDescriptor()).thenReturn(employeeQueryDescriptor());
 
         mvc.perform(get("/iam.employee/query/schema"))
                 .andExpect(status().isOk())
@@ -298,6 +304,14 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.fields[?(@.name == 'employeeNo')].title")
                         .value(org.hamcrest.Matchers.contains("职员编号")))
                 .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].valueType")
+                        .value(org.hamcrest.Matchers.contains("BOOLEAN")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'organizationTitle')].sortable")
+                        .value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.fields[?(@.name == 'organizationTitle')].operators")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
+                .andExpect(jsonPath("$.fields[?(@.name == 'username')].operators")
+                        .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.empty())))
+                .andExpect(jsonPath("$.fields[?(@.name == 'accountBound')].valueType")
                         .value(org.hamcrest.Matchers.contains("BOOLEAN")))
                 .andExpect(jsonPath("$.externalCriteria[0].key").value("departmentScope"));
 
@@ -575,7 +589,7 @@ class IamWebControllerIT {
         when(employeeAccountService.accountOfEmployee("employee-1")).thenReturn(binding);
         when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
         when(employeeAccountService.select("binding-1")).thenReturn(binding);
-        when(employeeAccountService.unbindAccount("employee-1")).thenReturn(1);
+        when(employeeAccountService.removeAccount("employee-1")).thenReturn(1);
         UserAccount provisioned = new UserAccount();
         provisioned.setId("user-2");
         provisioned.setUsername("alice");
@@ -611,7 +625,7 @@ class IamWebControllerIT {
         verify(employeeAccountService).accountOfEmployee("employee-1");
         verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
         verify(employeeAccountService).provisionAccount(eq("employee-1"), any(UserAccount.class));
-        verify(employeeAccountService).unbindAccount("employee-1");
+        verify(employeeAccountService).removeAccount("employee-1");
     }
 
     @Test
@@ -915,7 +929,33 @@ class IamWebControllerIT {
                 Set.of(EntityCapability.CRUD),
                 List.of(),
                 List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
-                controller.moduleUiDefinition()
+                controller.moduleUiDefinition(),
+                StaticModuleReferenceCompiler.compile(Employee.class),
+                List.of(
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.from(Employee::getOrganizationId)
+                                        .select(Organization::getTitle),
+                                "organizationTitle"),
+                        new StaticModuleReadProjectionDefinition(
+                                null,
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                        .then(EmployeeAccount::getUserId)
+                                        .select(UserAccount::getUsername),
+                                "username",
+                                ModuleReadProjection.ProjectionType.FIELD,
+                                true,
+                                false),
+                        new StaticModuleReadProjectionDefinition(
+                                null,
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                        .select(EmployeeAccount::getId),
+                                "accountBound",
+                                ModuleReadProjection.ProjectionType.EXISTS,
+                                true,
+                                false)
+                ),
+                Employee.class,
+                List.of()
         );
     }
 

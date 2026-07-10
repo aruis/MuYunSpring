@@ -26,9 +26,13 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDao;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -77,9 +81,17 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(TenantWebController.class);
             context.registerBean(OrganizationWebController.class);
             context.registerBean(DepartmentWebController.class);
-            context.registerBean(EmployeeWebController.class,
-                    () -> new EmployeeWebController(mock(EmployeePositionService.class),
-                            mock(EmployeeAccountService.class), mock(EmployeeDelegationService.class)));
+            EmployeeService employeeService = new EmployeeService(mock(EmployeeDao.class),
+                    mock(net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier.class),
+                    mock(OrganizationService.class),
+                    mock(DepartmentService.class));
+            context.registerBean(EmployeeService.class, () -> employeeService);
+            context.registerBean(EmployeeWebController.class, () -> {
+                EmployeeWebController controller = new EmployeeWebController(mock(EmployeePositionService.class),
+                        mock(EmployeeAccountService.class), mock(EmployeeDelegationService.class));
+                ReflectionTestUtils.setField(controller, "service", employeeService);
+                return controller;
+            });
             context.registerBean(PositionWebController.class);
             context.registerBean(PositionCategoryWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
@@ -151,6 +163,20 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeDelegatedToMe"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
+                assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::code)
+                        .containsExactly("organization");
+                assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::targetModuleAlias)
+                        .containsExactly("iam.organization");
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
+                        .containsOnlyNulls();
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().steps().getFirst().referenceField().fieldName())
+                        .containsExactly("organizationId", "employeeId", "employeeId");
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().targetField().fieldName())
+                        .containsExactly("title", "username", "id");
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
+                        .containsExactly("organizationTitle", "username", "accountBound");
                 assertThat(definition.uiDefinition()).isNotNull();
                 assertThat(definition.uiDefinition().views()).hasSize(2);
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
@@ -158,7 +184,8 @@ class StaticModuleDefinitionScannerTest {
                         .satisfies(view -> {
                             assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                             assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                                    .containsExactly("employeeNo", "title", "mobile", "email", "enabled");
+                                    .containsExactly("employeeNo", "organizationTitle", "title", "username",
+                                            "mobile", "email", "enabled", "accountBound");
                         });
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_form"))
                         .singleElement()
@@ -291,19 +318,30 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.dataAuth()).isTrue();
                         });
                 assertThat(definition.entities()).extracting(EntityDefinition::alias)
-                        .contains("user", "bound_employee");
-                assertThat(definition.projectionJoins()).singleElement()
-                        .satisfies(join -> {
-                            assertThat(join.relationCode()).isEqualTo("bound_employee");
-                            assertThat(join.cardinality()).isEqualTo(RelationProjectionCardinality.ONE_TO_ONE);
-                            assertThat(join.steps()).hasSize(2);
-                        });
+                        .containsExactly("user");
+                assertThat(definition.projectionJoins()).isEmpty();
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
+                        .containsOnlyNulls();
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().steps().stream()
+                                .map(step -> step.referenceField().fieldName())
+                                .toList())
+                        .containsExactly(List.of("userId", "employeeId"), List.of("userId", "employeeId"));
+                assertThat(definition.readProjections()).extracting(projection ->
+                        projection.referencePath().targetField().fieldName())
+                        .containsExactly("employeeNo", "title");
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
+                        .containsExactly("employeeNo", "employeeTitle");
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::filterable)
+                        .containsExactly(true, false);
+                assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::sortable)
+                        .containsExactly(true, true);
                 assertThat(definition.uiDefinition()).isNotNull();
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
                         .singleElement()
                         .satisfies(view -> {
                             assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
-                                    .contains(null, "bound_employee");
+                                    .containsOnlyNulls();
                             assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                                     .contains("username", "employeeNo", "employeeTitle");
                         });

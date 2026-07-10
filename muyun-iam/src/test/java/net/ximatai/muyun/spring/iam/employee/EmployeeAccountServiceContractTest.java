@@ -14,9 +14,11 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -139,27 +141,56 @@ class EmployeeAccountServiceContractTest {
     }
 
     @Test
-    void shouldDeleteBindingPhysicallyWhenUnbindingAccount() {
-        EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
+    void shouldDeleteBindingAndUserWhenRemovingAccount() {
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        EmployeeAccountService service = spy(new EmployeeAccountService(
+                mock(EmployeeAccountDao.class), activeTenantVerifier(), mock(EmployeeService.class),
+                userAccountService));
         EmployeeAccount binding = binding("employee-1", "user-1");
         binding.setId("binding-1");
         binding.setVersion(1);
         doReturn(binding).when(service).accountOfEmployee("employee-1");
         doReturn(1).when(service).delete(binding);
+        when(userAccountService.select("user-1")).thenReturn(new UserAccount());
+        when(userAccountService.delete("user-1")).thenReturn(1);
 
-        assertThat(service.unbindAccount("employee-1")).isEqualTo(1);
+        assertThat(service.removeAccount("employee-1")).isEqualTo(1);
 
         verify(service).delete(binding);
+        verify(userAccountService).delete("user-1");
     }
 
     @Test
-    void shouldIgnoreUnbindingWhenEmployeeHasNoAccount() {
-        EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
+    void shouldRemoveDanglingBindingWhenRemovingAccountUserIsMissing() {
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        EmployeeAccountService service = spy(new EmployeeAccountService(
+                mock(EmployeeAccountDao.class), activeTenantVerifier(), mock(EmployeeService.class),
+                userAccountService));
+        EmployeeAccount binding = binding("employee-1", "user-1");
+        binding.setId("binding-1");
+        binding.setVersion(1);
+        doReturn(binding).when(service).accountOfEmployee("employee-1");
+        doReturn(1).when(service).delete(binding);
+        when(userAccountService.select("user-1")).thenReturn(null);
+
+        assertThat(service.removeAccount("employee-1")).isEqualTo(1);
+
+        verify(service).delete(binding);
+        verify(userAccountService, never()).delete(anyString());
+        verify(userAccountService).cleanupDeletedUserReferences("user-1");
+    }
+
+    @Test
+    void shouldIgnoreRemovingAccountWhenEmployeeHasNoAccount() {
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        EmployeeAccountService service = spy(new EmployeeAccountService(
+                mock(EmployeeAccountDao.class), activeTenantVerifier(), mock(EmployeeService.class),
+                userAccountService));
         doReturn(null).when(service).accountOfEmployee("employee-1");
 
-        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThat(service.unbindAccount("employee-1")).isZero();
-        }
+        assertThat(service.removeAccount("employee-1")).isZero();
+
+        verify(userAccountService, never()).delete(anyString());
     }
 
     @Test

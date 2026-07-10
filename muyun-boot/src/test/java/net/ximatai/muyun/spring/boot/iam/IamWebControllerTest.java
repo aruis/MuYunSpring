@@ -1099,6 +1099,8 @@ class IamWebControllerTest {
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
         when(projectionService.supportsDefaultListQuery(any(), any())).thenReturn(true);
+        when(projectionService.queryCriteria(any(), any(), any())).thenReturn(Criteria.of());
+        when(projectionService.querySorts(any(), any(), any())).thenReturn(new Sort[0]);
         when(projectionService.queryDefaultList(
                 any(),
                 any(Criteria.class),
@@ -1125,7 +1127,7 @@ class IamWebControllerTest {
         String sql = compiledCriteria(criteriaCaptor.getValue());
         assertThat(sql).contains("authUserId");
         assertThat(sql).contains("tenantId");
-        assertThat(sql).contains("deleted");
+        assertThat(sql).doesNotContain("deleted");
         verify(userAccountDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 

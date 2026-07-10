@@ -16,13 +16,17 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
@@ -41,6 +45,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -106,6 +111,31 @@ public class MuYunSpringIdentityConfiguration {
     public StaticModuleDefinitionCatalog staticModuleDefinitionCatalog(List<StaticModuleDefinition> definitions,
                                                                        StaticModuleDefinitionScanner scanner) {
         return new StaticModuleDefinitionCatalog(definitions, List.of(scanner));
+    }
+
+    @Bean
+    public StaticModuleDefinition employeeAccountStaticModuleDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                EmployeeAccountService.MODULE_ALIAS,
+                "职员账号绑定",
+                null,
+                ModuleEntryType.MODULE,
+                null,
+                null,
+                java.util.Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new StaticEntityDefinitionCompiler().compile(
+                        "employee_account",
+                        "职员账号绑定",
+                        EmployeeAccount.class
+                )),
+                null,
+                StaticModuleReferenceCompiler.compile(EmployeeAccount.class),
+                List.of(),
+                EmployeeAccount.class,
+                List.of()
+        );
     }
 
     @Bean

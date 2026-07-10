@@ -101,16 +101,18 @@ public final class ModuleUiDescriptorCompiler {
     }
 
     private static void validateFields(StaticModuleDefinition definition) {
-        validateFields(definition.uiDefinition(), definition.entities(), definition.moduleAlias());
+        validateFields(definition.uiDefinition(), definition.entities(), definition.moduleAlias(),
+                readProjectionOutputFields(definition));
     }
 
     private static void validateFields(ModuleUiDefinition definition, List<EntityDefinition> entityDefinitions) {
-        validateFields(definition, entityDefinitions, definition.moduleAlias());
+        validateFields(definition, entityDefinitions, definition.moduleAlias(), Set.of());
     }
 
     private static void validateFields(ModuleUiDefinition definition,
                                        List<EntityDefinition> entityDefinitions,
-                                       String moduleAlias) {
+                                       String moduleAlias,
+                                       Set<String> readProjectionOutputFields) {
         Map<String, EntityDefinition> entities = entitiesByAlias(entityDefinitions);
         if (entities.isEmpty()) {
             return;
@@ -118,7 +120,7 @@ public final class ModuleUiDescriptorCompiler {
         EntityDefinition mainEntity = entityDefinitions.getFirst();
         for (ViewDefinition view : definition.views()) {
             for (ViewFieldDefinition field : view.fields()) {
-                validateField(moduleAlias, view, field, entities, mainEntity);
+                validateField(moduleAlias, view, field, entities, mainEntity, readProjectionOutputFields);
             }
         }
     }
@@ -141,8 +143,12 @@ public final class ModuleUiDescriptorCompiler {
                                       ViewDefinition view,
                                       ViewFieldDefinition field,
                                       Map<String, EntityDefinition> entities,
-                                      EntityDefinition mainEntity) {
+                                      EntityDefinition mainEntity,
+                                      Set<String> readProjectionOutputFields) {
         ViewFieldRef fieldRef = field.fieldRef();
+        if (fieldRef.relationCode() == null && readProjectionOutputFields.contains(fieldRef.fieldName())) {
+            return;
+        }
         EntityDefinition entity = entity(moduleAlias, view, fieldRef, entities, mainEntity);
         if (entity == null) {
             return;
@@ -175,6 +181,9 @@ public final class ModuleUiDescriptorCompiler {
                                            EntityDefinition mainEntity) {
         if (fieldRef.relationCode() == null) {
             return mainEntity;
+        }
+        if (fieldRef.relationCode().contains(".")) {
+            return null;
         }
         EntityDefinition entity = entities.get(fieldRef.relationCode());
         if (entity == null) {
@@ -213,9 +222,26 @@ public final class ModuleUiDescriptorCompiler {
                 ));
             }
         }
+        for (StaticModuleReadProjectionDefinition projection : definition.readProjections()) {
+            putReadField(fields, new ResolvedModuleReadField(
+                    mainEntity.alias(),
+                    null,
+                    projection.outputField(),
+                    true
+            ));
+        }
         for (ViewDefinition view : definition.uiDefinition().views()) {
             for (ViewFieldDefinition field : view.fields()) {
                 ViewFieldRef fieldRef = field.fieldRef();
+                if (fieldRef.relationCode() != null) {
+                    putReadField(fields, new ResolvedModuleReadField(
+                            fieldRef.relationCode(),
+                            fieldRef.relationCode(),
+                            fieldRef.fieldName(),
+                            true
+                    ));
+                    continue;
+                }
                 if (!PLATFORM_FIELD_NAMES.contains(fieldRef.fieldName())) {
                     continue;
                 }
@@ -247,5 +273,14 @@ public final class ModuleUiDescriptorCompiler {
             return null;
         }
         return entity.alias();
+    }
+
+    private static Set<String> readProjectionOutputFields(StaticModuleDefinition definition) {
+        if (definition.readProjections().isEmpty()) {
+            return Set.of();
+        }
+        return definition.readProjections().stream()
+                .map(StaticModuleReadProjectionDefinition::outputField)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 }
