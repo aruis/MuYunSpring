@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -117,7 +118,7 @@ public final class RelationProjectionQueryPlanner {
         StringBuilder sql = new StringBuilder();
         sql.append("select ");
         sql.append(selectFields.values().stream()
-                .map(field -> qualified(field.tableAlias(), field.columnName(), dbType)
+                .map(field -> selectExpression(field, dbType)
                         + " as " + quote(field.outputName(), dbType))
                 .collect(java.util.stream.Collectors.joining(", ")));
         sql.append(" from ")
@@ -208,11 +209,19 @@ public final class RelationProjectionQueryPlanner {
             for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
                 joins.putIfAbsent(join.tableAlias(), join);
             }
-            addSelectField(selectFields, new SelectField(
-                    traversal.tableAlias(),
-                    columnName(traversal.entity(), targetFieldName),
-                    field.fieldName()
-            ));
+            String targetColumn = columnName(traversal.entity(), targetFieldName);
+            if (readProjection != null && readProjection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS) {
+                addSelectField(selectFields, SelectField.expression(
+                        qualified(traversal.tableAlias(), targetColumn, dbType) + " is not null",
+                        field.fieldName()
+                ));
+            } else {
+                addSelectField(selectFields, new SelectField(
+                        traversal.tableAlias(),
+                        targetColumn,
+                        field.fieldName()
+                ));
+            }
             if (readProjection != null) {
                 if (readProjection.filterable()) {
                     queryableFields.add(field.fieldName());
@@ -230,7 +239,7 @@ public final class RelationProjectionQueryPlanner {
         StringBuilder sql = new StringBuilder();
         sql.append("select ");
         sql.append(selectFields.values().stream()
-                .map(field -> qualified(field.tableAlias(), field.columnName(), dbType)
+                .map(field -> selectExpression(field, dbType)
                         + " as " + quote(field.outputName(), dbType))
                 .collect(java.util.stream.Collectors.joining(", ")));
         sql.append(" from ")
@@ -323,10 +332,11 @@ public final class RelationProjectionQueryPlanner {
 
     private static void addSelectField(LinkedHashMap<String, SelectField> selectFields, SelectField field) {
         PlatformNameRules.requireFieldName(field.outputName(), "projectionOutputField");
-        RelationProjectionSqlNames.requireColumn(field.columnName(), "columnName");
+        if (field.expression() == null) {
+            RelationProjectionSqlNames.requireColumn(field.columnName(), "columnName");
+        }
         SelectField existing = selectFields.putIfAbsent(field.outputName(), field);
-        if (existing != null && (!existing.tableAlias().equals(field.tableAlias())
-                || !existing.columnName().equals(field.columnName()))) {
+        if (existing != null && !existing.sameSource(field)) {
             throw new IllegalArgumentException("projection output field conflicts: " + field.outputName());
         }
     }
@@ -445,6 +455,13 @@ public final class RelationProjectionQueryPlanner {
         return quote(tableAlias, databaseType) + "." + quote(columnName, databaseType);
     }
 
+    private static String selectExpression(SelectField field, DBInfo.Type databaseType) {
+        if (field.expression() != null) {
+            return field.expression();
+        }
+        return qualified(field.tableAlias(), field.columnName(), databaseType);
+    }
+
     static String quote(String identifier, DBInfo.Type databaseType) {
         if (identifier == null || !identifier.matches("[A-Za-z_][A-Za-z0-9_]{0,62}")) {
             throw new IllegalArgumentException("invalid SQL identifier: " + identifier);
@@ -455,6 +472,22 @@ public final class RelationProjectionQueryPlanner {
         return "\"" + identifier + "\"";
     }
 
-    private record SelectField(String tableAlias, String columnName, String outputName) {
+    private record SelectField(String tableAlias, String columnName, String outputName, String expression) {
+        private SelectField(String tableAlias, String columnName, String outputName) {
+            this(tableAlias, columnName, outputName, null);
+        }
+
+        private static SelectField expression(String expression, String outputName) {
+            if (expression == null || expression.isBlank()) {
+                throw new IllegalArgumentException("projection select expression must not be blank");
+            }
+            return new SelectField(null, null, outputName, expression);
+        }
+
+        private boolean sameSource(SelectField other) {
+            return java.util.Objects.equals(tableAlias, other.tableAlias)
+                    && java.util.Objects.equals(columnName, other.columnName)
+                    && java.util.Objects.equals(expression, other.expression);
+        }
     }
 }

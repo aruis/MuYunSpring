@@ -26,6 +26,7 @@ import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -163,7 +164,16 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 ModuleReadProjection.of(
                         ModuleReferencePath.from(Employee::getOrganizationId)
                                 .select(Organization::getTitle),
-                        "organizationTitle")
+                        "organizationTitle"),
+                ModuleReadProjection.filterableOnly(
+                        ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                                .then(EmployeeAccount::getUserId)
+                                .select(UserAccount::getUsername),
+                        "username"),
+                ModuleReadProjection.exists(
+                        ModuleReferencePath.inverse(EmployeeAccount::getEmployeeId)
+                                .select(EmployeeAccount::getId),
+                        "accountBound")
         );
     }
 

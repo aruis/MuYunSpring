@@ -10,8 +10,11 @@ import net.ximatai.muyun.spring.ability.query.QueryCompiler;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
@@ -187,7 +190,9 @@ public class StaticRecordReadProjectionService {
     }
 
     private QueryField queryField(Object recordService, StaticModuleReadProjectionDefinition projection) {
-        QueryField field = QueryDescriptors.field(modelClass(recordService), projection.outputField());
+        QueryField field = projection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS
+                ? QueryField.of(projection.outputField(), QueryValueType.BOOLEAN, QueryOperator.EQ)
+                : QueryDescriptors.field(modelClass(recordService), projection.outputField());
         if (!projection.filterable()) {
             return new QueryField(
                     field.fieldName(),

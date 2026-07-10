@@ -93,8 +93,12 @@ ModuleReferencePath.from(Employee::getOrganizationId)
 | `ModuleReadProjection.of(referencePath, outputField)` | 是 | 是 | 否 |
 | `ModuleReadProjection.sortableOnly(referencePath, outputField)` | 是 | 是 | 否 |
 | `ModuleReadProjection.filterable(referencePath, outputField)` | 是 | 是 | 是 |
+| `ModuleReadProjection.filterableOnly(referencePath, outputField)` | 是 | 否 | 是 |
+| `ModuleReadProjection.exists(referencePath, outputField)` | 是 | 否 | 是 |
 
 过滤必须显式开启。展示字段不会因为已经被 select 出来就自动获得过滤能力。
+`exists(...)` 用于“引用链是否命中”的布尔派生字段，例如职员是否已经绑定账号；SQL planner 会按引用链
+生成 left join，并以目标记录主键是否非空作为输出值。
 
 当前用户模块的边界是：
 
@@ -102,6 +106,13 @@ ModuleReferencePath.from(Employee::getOrganizationId)
 | --- | --- | --- |
 | `employeeNo` | `EmployeeAccount.userId(inverse) -> EmployeeAccount.employeeId -> Employee.employeeNo` | 展示、排序、过滤 |
 | `employeeTitle` | `EmployeeAccount.userId(inverse) -> EmployeeAccount.employeeId -> Employee.title` | 展示、排序 |
+
+当前职员模块的账号边界是：
+
+| 输出字段 | 路径 | 能力 |
+| --- | --- | --- |
+| `username` | `EmployeeAccount.employeeId(inverse) -> EmployeeAccount.userId -> UserAccount.username` | 展示、过滤 |
+| `accountBound` | `EmployeeAccount.employeeId(inverse) -> EmployeeAccount.id` | 展示、过滤 |
 
 SQL plan 内部按语义拆分字段集合：
 

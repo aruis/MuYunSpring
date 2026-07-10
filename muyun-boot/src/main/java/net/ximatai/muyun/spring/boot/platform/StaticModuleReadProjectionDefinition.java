@@ -1,19 +1,21 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 public record StaticModuleReadProjectionDefinition(String path,
                                                    ModuleReferencePath referencePath,
                                                    String outputField,
+                                                   ModuleReadProjection.ProjectionType projectionType,
                                                    boolean filterable,
                                                    boolean sortable) {
     public StaticModuleReadProjectionDefinition(String path, String outputField) {
-        this(path, null, outputField, false, true);
+        this(path, null, outputField, ModuleReadProjection.ProjectionType.FIELD, false, true);
     }
 
     public StaticModuleReadProjectionDefinition(ModuleReferencePath referencePath, String outputField) {
-        this(null, referencePath, outputField, false, true);
+        this(null, referencePath, outputField, ModuleReadProjection.ProjectionType.FIELD, false, true);
     }
 
     public StaticModuleReadProjectionDefinition {
@@ -21,6 +23,7 @@ public record StaticModuleReadProjectionDefinition(String path,
             throw new IllegalArgumentException("static module read projection path must not be blank");
         }
         path = path == null || path.isBlank() ? null : path.trim();
+        projectionType = projectionType == null ? ModuleReadProjection.ProjectionType.FIELD : projectionType;
         if (referencePath == null && !path.contains(".")) {
             throw new IllegalArgumentException("static module read projection path requires reference field path: " + path);
         }
@@ -34,7 +37,7 @@ public record StaticModuleReadProjectionDefinition(String path,
                                                 String outputField,
                                                 boolean filterable,
                                                 boolean sortable) {
-        this(path, null, outputField, filterable, sortable);
+        this(path, null, outputField, ModuleReadProjection.ProjectionType.FIELD, filterable, sortable);
     }
 
     private static String defaultOutputField(String path, ModuleReferencePath referencePath) {

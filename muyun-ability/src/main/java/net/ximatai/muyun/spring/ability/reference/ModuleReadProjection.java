@@ -3,10 +3,11 @@ package net.ximatai.muyun.spring.ability.reference;
 public record ModuleReadProjection(String path,
                                    ModuleReferencePath referencePath,
                                    String outputField,
+                                   ProjectionType projectionType,
                                    boolean filterable,
                                    boolean sortable) {
     public ModuleReadProjection(String path, String outputField) {
-        this(path, null, outputField, false, true);
+        this(path, null, outputField, ProjectionType.FIELD, false, true);
     }
 
     public ModuleReadProjection {
@@ -14,6 +15,7 @@ public record ModuleReadProjection(String path,
             throw new IllegalArgumentException("module read projection path must not be blank");
         }
         path = path == null || path.isBlank() ? null : path.trim();
+        projectionType = projectionType == null ? ProjectionType.FIELD : projectionType;
         if (outputField == null || outputField.isBlank()) {
             outputField = referencePath == null ? defaultOutputField(path) : referencePath.targetField().fieldName();
         } else {
@@ -22,7 +24,7 @@ public record ModuleReadProjection(String path,
     }
 
     public ModuleReadProjection(String path, String outputField, boolean filterable, boolean sortable) {
-        this(path, null, outputField, filterable, sortable);
+        this(path, null, outputField, ProjectionType.FIELD, filterable, sortable);
     }
 
     public static ModuleReadProjection of(String path) {
@@ -34,11 +36,11 @@ public record ModuleReadProjection(String path,
     }
 
     public static ModuleReadProjection of(ModuleReferencePath referencePath) {
-        return new ModuleReadProjection(null, referencePath, null, false, true);
+        return new ModuleReadProjection(null, referencePath, null, ProjectionType.FIELD, false, true);
     }
 
     public static ModuleReadProjection of(ModuleReferencePath referencePath, String outputField) {
-        return new ModuleReadProjection(null, referencePath, outputField, false, true);
+        return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, false, true);
     }
 
     public static ModuleReadProjection filterable(String path, String outputField) {
@@ -46,7 +48,11 @@ public record ModuleReadProjection(String path,
     }
 
     public static ModuleReadProjection filterable(ModuleReferencePath referencePath, String outputField) {
-        return new ModuleReadProjection(null, referencePath, outputField, true, true);
+        return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, true, true);
+    }
+
+    public static ModuleReadProjection filterableOnly(ModuleReferencePath referencePath, String outputField) {
+        return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, true, false);
     }
 
     public static ModuleReadProjection sortableOnly(String path, String outputField) {
@@ -54,7 +60,16 @@ public record ModuleReadProjection(String path,
     }
 
     public static ModuleReadProjection sortableOnly(ModuleReferencePath referencePath, String outputField) {
-        return new ModuleReadProjection(null, referencePath, outputField, false, true);
+        return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, false, true);
+    }
+
+    public static ModuleReadProjection exists(ModuleReferencePath referencePath, String outputField) {
+        return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.EXISTS, true, false);
+    }
+
+    public enum ProjectionType {
+        FIELD,
+        EXISTS
     }
 
     private static String defaultOutputField(String path) {

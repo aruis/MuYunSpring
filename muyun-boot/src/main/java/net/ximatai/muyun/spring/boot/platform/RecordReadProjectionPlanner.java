@@ -74,7 +74,8 @@ public final class RecordReadProjectionPlanner {
         Set<String> readableFields = readableFields(readModel);
         FieldReadPolicy fieldReadPolicy = fieldReadPolicy(recordService, actionContext);
         for (ResolvedViewFieldDescriptor field : view.fields()) {
-            if (Boolean.FALSE.equals(field.visible().constant())) {
+            if (Boolean.FALSE.equals(field.visible().constant())
+                    && !isPlatformManagedReadField(readModel, field.fieldRef())) {
                 continue;
             }
             String fieldName = field.fieldRef().fieldName();
@@ -168,5 +169,12 @@ public final class RecordReadProjectionPlanner {
                 .map(ResolvedModuleReadField::fieldName)
                 .forEach(fields::add);
         return Set.copyOf(fields);
+    }
+
+    private static boolean isPlatformManagedReadField(ResolvedModuleReadModel readModel, ViewFieldRef fieldRef) {
+        return readModel.fields().stream()
+                .anyMatch(field -> field.platformManaged()
+                        && java.util.Objects.equals(field.relationCode(), fieldRef.relationCode())
+                        && field.fieldName().equals(fieldRef.fieldName()));
     }
 }

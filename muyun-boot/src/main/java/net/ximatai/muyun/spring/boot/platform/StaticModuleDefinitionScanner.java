@@ -103,6 +103,7 @@ public class StaticModuleDefinitionScanner {
                         projection.path(),
                         projection.referencePath(),
                         projection.outputField(),
+                        projection.projectionType(),
                         projection.filterable(),
                         projection.sortable()
                 ))

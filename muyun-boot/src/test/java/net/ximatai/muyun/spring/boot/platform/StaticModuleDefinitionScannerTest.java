@@ -171,12 +171,12 @@ class StaticModuleDefinitionScannerTest {
                         .containsOnlyNulls();
                 assertThat(definition.readProjections()).extracting(projection ->
                         projection.referencePath().steps().getFirst().referenceField().fieldName())
-                        .containsExactly("organizationId");
+                        .containsExactly("organizationId", "employeeId", "employeeId");
                 assertThat(definition.readProjections()).extracting(projection ->
                         projection.referencePath().targetField().fieldName())
-                        .containsExactly("title");
+                        .containsExactly("title", "username", "id");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
-                        .containsExactly("organizationTitle");
+                        .containsExactly("organizationTitle", "username", "accountBound");
                 assertThat(definition.uiDefinition()).isNotNull();
                 assertThat(definition.uiDefinition().views()).hasSize(2);
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
@@ -184,7 +184,8 @@ class StaticModuleDefinitionScannerTest {
                         .satisfies(view -> {
                             assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                             assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                                    .containsExactly("employeeNo", "organizationTitle", "title", "mobile", "email", "enabled");
+                                    .containsExactly("employeeNo", "organizationTitle", "title", "username",
+                                            "mobile", "email", "enabled", "accountBound");
                         });
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_form"))
                         .singleElement()

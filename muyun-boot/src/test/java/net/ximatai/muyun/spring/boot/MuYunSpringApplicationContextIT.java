@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
@@ -76,6 +77,9 @@ class MuYunSpringApplicationContextIT {
 
     @Autowired
     private UserAccountService userAccountService;
+
+    @Autowired
+    private EmployeeService employeeService;
 
     private TestRestTemplate restTemplate;
 
@@ -310,6 +314,60 @@ class MuYunSpringApplicationContextIT {
         JsonNode employeeTitleSchema = fieldSchema(schemaFields, "employeeTitle");
         assertThat(employeeTitleSchema.path("operators")).isEmpty();
         assertThat(employeeTitleSchema.path("sortable").asBoolean()).isTrue();
+
+        WebPageResponse<?> employeePage = staticRecordReadProjectionService.queryDefaultList(
+                EmployeeService.MODULE_ALIAS,
+                Criteria.of().eq("tenantId", tenantId).eq("deleted", Boolean.FALSE),
+                PageRequest.of(1, 20),
+                employeeService,
+                Sort.asc("employeeNo")
+        ).orElseThrow();
+
+        assertThat(employeePage.records()).hasSize(2);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> employeeAlice = (Map<String, Object>) employeePage.records().get(0);
+        assertThat(employeeAlice)
+                .containsEntry("employeeNo", "E-PROJ-001")
+                .containsEntry("username", "alice_projection")
+                .containsEntry("accountBound", true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> employeeCharlie = (Map<String, Object>) employeePage.records().get(1);
+        assertThat(employeeCharlie)
+                .containsEntry("employeeNo", "E-PROJ-003")
+                .containsEntry("accountBound", false);
+        assertThat(employeeCharlie.get("username")).isNull();
+
+        WebPageResponse<?> unboundEmployees = staticRecordReadProjectionService.queryDefaultList(
+                EmployeeService.MODULE_ALIAS,
+                Criteria.of()
+                        .eq("tenantId", tenantId)
+                        .eq("deleted", Boolean.FALSE)
+                        .eq("accountBound", Boolean.FALSE),
+                PageRequest.of(1, 20),
+                employeeService,
+                Sort.asc("employeeNo")
+        ).orElseThrow();
+
+        assertThat(unboundEmployees.records()).singleElement()
+                .satisfies(record -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> output = (Map<String, Object>) record;
+                    assertThat(output)
+                            .containsEntry("employeeNo", "E-PROJ-003")
+                            .containsEntry("accountBound", false);
+                });
+
+        ResponseEntity<JsonNode> employeeQuerySchema = restTemplate.exchange(
+                "/iam.employee/query/schema", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+        assertThat(employeeQuerySchema.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(employeeQuerySchema.getBody()).isNotNull();
+        JsonNode employeeSchemaFields = employeeQuerySchema.getBody().path("fields");
+        JsonNode usernameSchema = fieldSchema(employeeSchemaFields, "username");
+        assertThat(usernameSchema.path("operators")).isNotEmpty();
+        JsonNode accountBoundSchema = fieldSchema(employeeSchemaFields, "accountBound");
+        assertThat(accountBoundSchema.path("valueType").asText()).isEqualTo("BOOLEAN");
+        assertThat(accountBoundSchema.path("operators")).isNotEmpty();
 
         WebQueryRequest httpRejectRequest = new WebQueryRequest(
                 new WebPageRequest(1, 20),
