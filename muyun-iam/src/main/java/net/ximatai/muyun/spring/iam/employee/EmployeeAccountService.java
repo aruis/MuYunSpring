@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmployeeAccountService extends TenantStandardBusinessService<EmployeeAccount> {
     public static final String MODULE_ALIAS = "iam.employee_account";
+    private static final String ACCOUNT_REMOVAL_OPERATOR_ID = "employee-account-removal";
 
     private final EmployeeService employeeService;
     private final UserAccountService userAccountService;
@@ -83,8 +86,13 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         }
         String userId = binding.getUserId();
         int deleted = delete(binding);
-        if (deleted > 0) {
-            userAccountService.delete(userId);
+        if (deleted > 0 && userAccountService.select(userId) == null) {
+            userAccountService.cleanupDeletedUserReferences(userId);
+        } else if (deleted > 0) {
+            try (CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.systemUser(
+                    ACCOUNT_REMOVAL_OPERATOR_ID, "Employee Account Removal"))) {
+                userAccountService.delete(userId);
+            }
         }
         return deleted;
     }

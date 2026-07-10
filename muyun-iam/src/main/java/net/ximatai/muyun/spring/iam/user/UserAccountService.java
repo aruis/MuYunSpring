@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.user;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
@@ -31,6 +32,7 @@ import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -60,6 +62,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
 
     private final PasswordHashingService passwordHashingService;
     private final PasswordPolicyRuleService passwordPolicyRuleService;
+    private final AccountRoleGrantDao accountRoleGrantDao;
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
     private final SecureRandom secureRandom = new SecureRandom();
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
@@ -76,7 +79,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty(), null);
+        this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty(), null, null);
     }
 
     @Autowired
@@ -84,12 +87,14 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
-                              ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService) {
+                              ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
+                              ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
         this.passwordPolicyRuleService = passwordPolicyRuleService == null
                 ? null
                 : passwordPolicyRuleService.getIfAvailable();
+        this.accountRoleGrantDao = accountRoleGrantDao == null ? null : accountRoleGrantDao.getIfAvailable();
         this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
     }
 
@@ -105,9 +110,20 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                               PasswordHashingService passwordHashingService,
                               Optional<DataScopeCriteriaService> dataScopeCriteriaService,
                               PasswordPolicyRuleService passwordPolicyRuleService) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService, dataScopeCriteriaService,
+                passwordPolicyRuleService, null);
+    }
+
+    public UserAccountService(UserAccountDao userAccountDao,
+                              ActiveTenantVerifier activeTenantVerifier,
+                              PasswordHashingService passwordHashingService,
+                              Optional<DataScopeCriteriaService> dataScopeCriteriaService,
+                              PasswordPolicyRuleService passwordPolicyRuleService,
+                              AccountRoleGrantDao accountRoleGrantDao) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
         this.passwordPolicyRuleService = passwordPolicyRuleService;
+        this.accountRoleGrantDao = accountRoleGrantDao;
         Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
                 ? Optional.empty()
                 : dataScopeCriteriaService;
@@ -239,6 +255,21 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         }
         syncSelfAuthUser(user);
         rejectDuplicateUsername(user);
+    }
+
+    @Override
+    public void afterDelete(String id, UserAccount entity, int deleted) {
+        cleanupDeletedUserReferences(id);
+    }
+
+    public void cleanupDeletedUserReferences(String userId) {
+        if (accountRoleGrantDao == null) {
+            return;
+        }
+        String validUserId = Preconditions.requireText(userId, "userId");
+        accountRoleGrantDao.query(activeCriteria(Criteria.of().eq("userId", validUserId)),
+                        new PageRequest(0, Integer.MAX_VALUE))
+                .forEach(grant -> accountRoleGrantDao.deleteById(grant.getId()));
     }
 
     public String createUser(UserAccount user, String password) {

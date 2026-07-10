@@ -151,12 +151,33 @@ class EmployeeAccountServiceContractTest {
         binding.setVersion(1);
         doReturn(binding).when(service).accountOfEmployee("employee-1");
         doReturn(1).when(service).delete(binding);
+        when(userAccountService.select("user-1")).thenReturn(new UserAccount());
         when(userAccountService.delete("user-1")).thenReturn(1);
 
         assertThat(service.removeAccount("employee-1")).isEqualTo(1);
 
         verify(service).delete(binding);
         verify(userAccountService).delete("user-1");
+    }
+
+    @Test
+    void shouldRemoveDanglingBindingWhenRemovingAccountUserIsMissing() {
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        EmployeeAccountService service = spy(new EmployeeAccountService(
+                mock(EmployeeAccountDao.class), activeTenantVerifier(), mock(EmployeeService.class),
+                userAccountService));
+        EmployeeAccount binding = binding("employee-1", "user-1");
+        binding.setId("binding-1");
+        binding.setVersion(1);
+        doReturn(binding).when(service).accountOfEmployee("employee-1");
+        doReturn(1).when(service).delete(binding);
+        when(userAccountService.select("user-1")).thenReturn(null);
+
+        assertThat(service.removeAccount("employee-1")).isEqualTo(1);
+
+        verify(service).delete(binding);
+        verify(userAccountService, never()).delete(anyString());
+        verify(userAccountService).cleanupDeletedUserReferences("user-1");
     }
 
     @Test
