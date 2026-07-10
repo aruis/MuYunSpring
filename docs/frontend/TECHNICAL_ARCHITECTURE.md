@@ -4,7 +4,7 @@
 
 前端稳定设计共识见 [MuYun 前端设计原则](DESIGN_PRINCIPLES.md)。后续推进步骤和路线目标见 [MuYun 前端路线草案](DEVELOPMENT_APPROACH.md)。
 静态管理页组件拆分见 [静态管理页组件边界](STATIC_MANAGEMENT_PAGE_COMPONENTS.md)。
-菜单、路由和页签治理见 [菜单、路由与页签专项治理](governance/MENU_ROUTING_AND_TAB_GOVERNANCE.md)。错误抛出和前端展示治理见 [错误抛出与前端展示专项治理](governance/ERROR_HANDLING_GOVERNANCE.md)。
+菜单、路由和页签治理见 [菜单、路由与页签专项治理](governance/MENU_ROUTING_AND_TAB_GOVERNANCE.md)。错误抛出和前端展示治理见 [错误抛出与前端展示专项治理](governance/ERROR_HANDLING_GOVERNANCE.md)。动作结果和后效应治理见 [动作结果与后效应治理](governance/ACTION_RESULT_EFFECTS_GOVERNANCE.md)。
 
 ## 技术路线
 
