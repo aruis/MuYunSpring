@@ -3,9 +3,9 @@ import type { Organization } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
+  handlePlatformActionSuccess,
   presentPlatformError,
   presentPlatformMessage,
-  presentPlatformSuccess,
 } from '@muyun/platform-components';
 
 type CardMode = 'view' | 'edit' | 'create';
@@ -109,7 +109,7 @@ export function createOrganizationManagementState(
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -139,7 +139,7 @@ export function createOrganizationManagementState(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -174,7 +174,7 @@ export function createOrganizationManagementState(
       selected.value = undefined;
       draft.value = emptyDraft();
       mode.value = 'create';
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -198,8 +198,8 @@ export function createOrganizationManagementState(
     presentPlatformMessage(message, { source: 'organization-management-action', phase: 'action' });
   }
 
-  function presentActionSuccess(message: string) {
-    presentPlatformSuccess(message, {
+  function presentActionSuccess(result: unknown) {
+    return handlePlatformActionSuccess(result, {
       source: 'organization-management-action',
       phase: 'action',
     });

@@ -1,5 +1,6 @@
 import type {
   TreeSortRequest,
+  WebActionResultFacts,
   QuerySchema,
   WebCountResponse,
   WebListResponse,
@@ -10,9 +11,8 @@ import type {
 } from '@muyun/web-contracts';
 import type { HttpClient } from '../http';
 
-export interface StaticRecordMutationResult<TRecord> {
+export interface StaticRecordMutationResult<TRecord> extends WebActionResultFacts {
   record: TRecord;
-  message?: string;
 }
 
 export interface QuerySchemaRequestOptions {
@@ -159,6 +159,8 @@ function normalizeRecordMutationResponse<TRecord>(
     return {
       record: response.record,
       message: response.message,
+      resultType: response.resultType,
+      effects: response.effects,
     };
   }
   return { record: response };

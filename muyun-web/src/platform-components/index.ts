@@ -77,6 +77,19 @@ export {
   presentPlatformMessage,
   presentPlatformSuccess,
 } from './platformErrorFeedback';
+export {
+  handlePlatformActionSuccess,
+  presentPlatformActionSuccess,
+  resolvePlatformActionResult,
+  resolvePlatformActionResultMessage,
+} from './platformActionResultFeedback';
+export type {
+  PlatformActionResult,
+  PlatformActionResultEffect,
+  PlatformActionResultEffectHandler,
+  PlatformActionResultFeedbackContext,
+  PlatformActionResultHandlingContext,
+} from './platformActionResultFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { createRecordEditorSessionState } from './recordEditorSessionState';
 export { useFlatCrudManagementState } from './staticCrudManagementState';

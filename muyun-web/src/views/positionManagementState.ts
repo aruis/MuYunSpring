@@ -4,9 +4,9 @@ import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from 
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
   createRecordEditorSessionState,
+  handlePlatformActionSuccess,
   presentPlatformError,
   presentPlatformMessage,
-  presentPlatformSuccess,
 } from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
@@ -190,7 +190,7 @@ export function createPositionManagementState(
       const saved = result.record;
       categoryEditor.select(saved);
       categoryMode.value = 'view';
-      presentCategorySuccess(result.message ?? '操作成功');
+      await presentCategorySuccess(result);
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -217,7 +217,7 @@ export function createPositionManagementState(
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
       categoryEditor.select(await categoryContext.abilities.crud().view(selectedCategory.value.id));
-      presentCategorySuccess(result.message ?? '操作成功');
+      await presentCategorySuccess(result);
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -250,7 +250,7 @@ export function createPositionManagementState(
       const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
       categoryEditor.clearSelection();
       categoryMode.value = 'view';
-      presentCategorySuccess(result.message ?? '操作成功');
+      await presentCategorySuccess(result);
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -364,7 +364,7 @@ export function createPositionManagementState(
       const saved = result.record;
       positionEditor.select(saved);
       positionMode.value = 'view';
-      presentPositionSuccess(result.message ?? '操作成功');
+      await presentPositionSuccess(result);
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         const savedCategory = categories.value.find((category) => category.id === saved.categoryId);
         if (savedCategory) {
@@ -398,7 +398,7 @@ export function createPositionManagementState(
           ? await positionClient.enable(selectedPosition.value.id)
           : await positionClient.disable(selectedPosition.value.id);
       positionEditor.select(await positionClient.view(selectedPosition.value.id));
-      presentPositionSuccess(result.message ?? '操作成功');
+      await presentPositionSuccess(result);
       positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);
@@ -434,7 +434,7 @@ export function createPositionManagementState(
       } else {
         positionMode.value = 'view';
       }
-      presentPositionSuccess(result.message ?? '操作成功');
+      await presentPositionSuccess(result);
       positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);
@@ -473,15 +473,15 @@ export function createPositionManagementState(
     presentPlatformMessage(message, { source: 'position-action', phase: 'action' });
   }
 
-  function presentCategorySuccess(message: string) {
-    presentPlatformSuccess(message, {
+  function presentCategorySuccess(result: unknown) {
+    return handlePlatformActionSuccess(result, {
       source: 'position-category-action',
       phase: 'action',
     });
   }
 
-  function presentPositionSuccess(message: string) {
-    presentPlatformSuccess(message, {
+  function presentPositionSuccess(result: unknown) {
+    return handlePlatformActionSuccess(result, {
       source: 'position-action',
       phase: 'action',
     });

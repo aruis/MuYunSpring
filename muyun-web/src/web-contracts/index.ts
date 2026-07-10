@@ -26,14 +26,23 @@ export interface WebPageResponse<T> {
   navigation?: unknown;
 }
 
-export interface WebCountResponse {
-  count: number;
-  message?: string;
+export interface WebActionResultEffect {
+  type: string;
+  payload?: Record<string, unknown>;
 }
 
-export interface WebRecordResponse<T> {
-  record: T;
+export interface WebActionResultFacts {
   message?: string;
+  resultType?: string;
+  effects?: WebActionResultEffect[];
+}
+
+export interface WebCountResponse extends WebActionResultFacts {
+  count: number;
+}
+
+export interface WebRecordResponse<T> extends WebActionResultFacts {
+  record: T;
 }
 
 export interface WebTreeNode<T> {

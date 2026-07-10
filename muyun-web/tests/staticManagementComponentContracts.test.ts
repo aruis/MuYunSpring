@@ -958,6 +958,7 @@ test('record query list panel forwards dynamic ui config and query template ids'
 
 test('platform error feedback respects global error presentation slots', () => {
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
+  const actionResultFeedbackSource = readSource('src/platform-components/platformActionResultFeedback.ts');
   const uiFeedbackSource = readSource('src/vue-ui-antdv/feedback.ts');
   const staticCrudStateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const organizationStateSource = readSource('src/views/organizationManagementState.ts');
@@ -970,14 +971,17 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(feedbackSource, /presentation\.slot === 'redirect-login'/);
   assert.match(feedbackSource, /presentPlatformSuccess/);
   assert.match(feedbackSource, /showSuccessMessage\(message\)/);
+  assert.match(actionResultFeedbackSource, /resolvePlatformActionResultMessage/);
+  assert.match(actionResultFeedbackSource, /handlePlatformActionSuccess/);
+  assert.match(actionResultFeedbackSource, /presentPlatformActionSuccess/);
   assert.match(uiFeedbackSource, /const id = `muyun-global-feedback-\$\{tone\}`/);
   assert.match(uiFeedbackSource, /className = `muyun-global-feedback \$\{tone\}`/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.success[\s\S]*right: 20px/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.error[\s\S]*left: 50%/);
-  assert.match(staticCrudStateSource, /presentPlatformSuccess/);
-  assert.match(organizationStateSource, /presentPlatformSuccess/);
-  assert.match(positionStateSource, /presentPlatformSuccess/);
-  assert.match(dictionaryStateSource, /presentPlatformSuccess/);
+  assert.match(staticCrudStateSource, /handlePlatformActionSuccess/);
+  assert.match(organizationStateSource, /handlePlatformActionSuccess/);
+  assert.match(positionStateSource, /handlePlatformActionSuccess/);
+  assert.match(dictionaryStateSource, /handlePlatformActionSuccess/);
 });
 
 function readSource(path: string) {

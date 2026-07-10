@@ -36,6 +36,63 @@ test('static form save executes mutation once and calls saved callback', async (
   assert.equal(loading.value, false);
 });
 
+test('static form save dispatches structured result effects', async () => {
+  const loading = ref(false);
+  const effects: string[] = [];
+
+  await executeStaticFormSave<TestRecord>({
+    loading,
+    mode: 'create',
+    canSave: () => true,
+    deniedMessage: '无权保存',
+    createRecord: () => ({ title: '销售' }),
+    save: async (record) => ({
+      record: { ...record, id: 'sales' },
+      message: '已保存',
+      effects: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.employee' } }],
+    }),
+    onSaved: () => undefined,
+    effectHandlers: {
+      'refresh-list': (effect) => {
+        effects.push(`${effect.type}:${effect.payload?.moduleAlias}`);
+      },
+    },
+  });
+
+  assert.deepEqual(effects, ['refresh-list:iam.employee']);
+  assert.equal(loading.value, false);
+});
+
+test('static record action dispatches structured result effects after callback', async () => {
+  const loading = ref(false);
+  const calls: string[] = [];
+
+  await executeStaticRecordAction<
+    TestRecord,
+    { message: string; effects: { type: string; payload?: Record<string, unknown> }[] }
+  >({
+    loading,
+    record: () => ({ id: 'emp-1', title: '职员' }),
+    canExecute: () => true,
+    deniedMessage: '无权操作',
+    execute: async () => ({
+      message: '已启用',
+      effects: [{ type: 'refresh-detail', payload: { recordId: 'emp-1' } }],
+    }),
+    onExecuted: () => {
+      calls.push('executed');
+    },
+    effectHandlers: {
+      'refresh-detail': (effect) => {
+        calls.push(`${effect.type}:${effect.payload?.recordId}`);
+      },
+    },
+  });
+
+  assert.deepEqual(calls, ['executed', 'refresh-detail:emp-1']);
+  assert.equal(loading.value, false);
+});
+
 test('static form save ignores duplicate submit while loading', async () => {
   const loading = ref(false);
   const calls: TestRecord[] = [];

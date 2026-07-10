@@ -2,10 +2,13 @@ import { computed, ref } from 'vue';
 import { normalizeError, type AppError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
+  handlePlatformActionSuccess,
+  type PlatformActionResultEffectHandler,
+} from './platformActionResultFeedback';
+import {
   matchesPlatformActionErrorHandler,
   presentPlatformError,
   presentPlatformMessage,
-  presentPlatformSuccess,
   type PlatformActionErrorHandler,
 } from './platformErrorFeedback';
 
@@ -51,6 +54,7 @@ export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   canEnableRecord?: (record: TRecord, actionCode: 'enable' | 'disable') => boolean;
   validateBeforeSave?: (record: TRecord) => string | undefined;
   actionErrorHandlers?: StaticCrudActionErrorHandler<TRecord>[];
+  actionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
 }
 
 export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
@@ -173,7 +177,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, mode.value === 'create' ? 'create' : 'update');
@@ -206,7 +210,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, selected.value?.enabled === false ? 'enable' : 'disable');
@@ -244,7 +248,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       selected.value = undefined;
       draft.value = options.emptyDraft();
       mode.value = canCreate.value ? 'create' : 'view';
-      presentActionSuccess(result.message ?? '操作成功');
+      await presentActionSuccess(result);
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, 'delete');
@@ -289,10 +293,11 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     actionError.value = undefined;
   }
 
-  function presentActionSuccess(message: string) {
-    presentPlatformSuccess(message, {
+  function presentActionSuccess(result: unknown) {
+    return handlePlatformActionSuccess(result, {
       source: 'static-crud-action',
       phase: 'action',
+      effectHandlers: options.actionResultEffectHandlers,
     });
   }
 
