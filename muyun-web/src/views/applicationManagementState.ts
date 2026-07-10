@@ -6,12 +6,14 @@ import {
   type StaticCrudActionErrorHandler,
   useFlatCrudManagementState,
 } from '../platform-components/staticCrudManagementState';
+import type { PlatformActionResultEffectHandler } from '../platform-components/platformActionResultFeedback';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export interface ApplicationManagementStateOptions {
   actionErrorHandlers?: StaticCrudActionErrorHandler<Application>[];
+  actionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
 }
 
 export function createApplicationManagementState(
@@ -37,6 +39,7 @@ export function createApplicationManagementState(
     enableDeniedMessage: '当前用户无权变更应用启停状态',
     deleteDeniedMessage: () => '当前用户无权删除应用',
     actionErrorHandlers: options.actionErrorHandlers,
+    actionResultEffectHandlers: options.actionResultEffectHandlers,
   });
   const aliasReadonly = computed(() => state.mode.value !== 'create');
   return {

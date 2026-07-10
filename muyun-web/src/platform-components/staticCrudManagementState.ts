@@ -2,7 +2,11 @@ import { computed, ref } from 'vue';
 import { normalizeError, type AppError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
+  createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  platformActionResultEffects,
+  withPlatformActionResultEffects,
+  type PlatformActionResultEffect,
   type PlatformActionResultEffectHandler,
 } from './platformActionResultFeedback';
 import {
@@ -67,6 +71,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
   const saving = ref(false);
   const actionError = ref<string>();
   const copyRecord = options.copyRecord ?? ((record: TRecord) => ({ ...record }) as TRecord);
+  const actionResultEffectHandlers = createStaticCrudActionEffectHandlers();
 
   const cardTitle = computed(() => {
     if (mode.value === 'create') {
@@ -176,9 +181,10 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const saved = result.record;
       selected.value = saved;
       draft.value = copyRecord(saved);
-      mode.value = 'view';
-      await presentActionSuccess(result);
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [
+        platformActionResultEffects.closeEditor(),
+        platformActionResultEffects.refreshList(),
+      ]);
     } catch (cause) {
       handleActionError(cause, mode.value === 'create' ? 'create' : 'update');
     } finally {
@@ -210,8 +216,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      await presentActionSuccess(result);
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [platformActionResultEffects.refreshList()]);
     } catch (cause) {
       handleActionError(cause, selected.value?.enabled === false ? 'enable' : 'disable');
     } finally {
@@ -245,11 +250,10 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       await options.context.runtime.ready;
       const crud = options.context.abilities.crud();
       const result = await crud.delete(selected.value.id);
-      selected.value = undefined;
-      draft.value = options.emptyDraft();
-      mode.value = canCreate.value ? 'create' : 'view';
-      await presentActionSuccess(result);
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [
+        platformActionResultEffects.clearSelection(),
+        platformActionResultEffects.refreshList(),
+      ]);
     } catch (cause) {
       handleActionError(cause, 'delete');
     } finally {
@@ -293,12 +297,29 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     actionError.value = undefined;
   }
 
-  function presentActionSuccess(result: unknown) {
-    return handlePlatformActionSuccess(result, {
+  function presentActionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
       source: 'static-crud-action',
       phase: 'action',
-      effectHandlers: options.actionResultEffectHandlers,
+      effectHandlers: actionResultEffectHandlers,
     });
+  }
+
+  function createStaticCrudActionEffectHandlers() {
+    const defaultHandlers = createPlatformActionResultEffectHandlers({
+      refreshList: () => {
+        reloadKey.value += 1;
+      },
+      closeEditor: () => {
+        mode.value = 'view';
+      },
+      clearSelection: () => {
+        selected.value = undefined;
+        draft.value = options.emptyDraft();
+        mode.value = canCreate.value ? 'create' : 'view';
+      },
+    });
+    return mergeActionEffectHandlers(defaultHandlers, options.actionResultEffectHandlers);
   }
 
   return {
@@ -324,6 +345,26 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     toggleEnabled,
     removeSelected,
   };
+}
+
+function mergeActionEffectHandlers(
+  defaultHandlers: Record<string, PlatformActionResultEffectHandler | undefined>,
+  customHandlers: Record<string, PlatformActionResultEffectHandler | undefined> | undefined,
+) {
+  const effectTypes = new Set([
+    ...Object.keys(defaultHandlers),
+    ...Object.keys(customHandlers ?? {}),
+  ]);
+  const handlers: Record<string, PlatformActionResultEffectHandler | undefined> = {};
+  for (const effectType of effectTypes) {
+    const defaultHandler = defaultHandlers[effectType];
+    const customHandler = customHandlers?.[effectType];
+    handlers[effectType] = async (effect, result) => {
+      await defaultHandler?.(effect, result);
+      await customHandler?.(effect, result);
+    };
+  }
+  return handlers;
 }
 
 function requiredId(record: StaticCrudRecord, recordName: string) {
