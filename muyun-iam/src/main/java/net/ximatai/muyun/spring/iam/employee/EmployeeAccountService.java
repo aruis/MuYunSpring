@@ -74,13 +74,19 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         return new AccountProvisionResult(userAccountService.select(userId), select(bindingId));
     }
 
-    public int unbindAccount(String employeeId) {
+    @Transactional
+    public int removeAccount(String employeeId) {
         String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");
         EmployeeAccount binding = accountOfEmployee(validEmployeeId);
         if (binding == null) {
             return 0;
         }
-        return delete(binding);
+        String userId = binding.getUserId();
+        int deleted = delete(binding);
+        if (deleted > 0) {
+            userAccountService.delete(userId);
+        }
+        return deleted;
     }
 
     public String employeeIdOfUser(String userId) {

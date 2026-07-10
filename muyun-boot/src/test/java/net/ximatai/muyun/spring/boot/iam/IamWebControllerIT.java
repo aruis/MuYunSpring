@@ -589,7 +589,7 @@ class IamWebControllerIT {
         when(employeeAccountService.accountOfEmployee("employee-1")).thenReturn(binding);
         when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
         when(employeeAccountService.select("binding-1")).thenReturn(binding);
-        when(employeeAccountService.unbindAccount("employee-1")).thenReturn(1);
+        when(employeeAccountService.removeAccount("employee-1")).thenReturn(1);
         UserAccount provisioned = new UserAccount();
         provisioned.setId("user-2");
         provisioned.setUsername("alice");
@@ -625,7 +625,7 @@ class IamWebControllerIT {
         verify(employeeAccountService).accountOfEmployee("employee-1");
         verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
         verify(employeeAccountService).provisionAccount(eq("employee-1"), any(UserAccount.class));
-        verify(employeeAccountService).unbindAccount("employee-1");
+        verify(employeeAccountService).removeAccount("employee-1");
     }
 
     @Test

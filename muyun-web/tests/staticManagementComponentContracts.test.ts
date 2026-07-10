@@ -527,6 +527,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /function defaultAccountUsername/);
   assert.match(employeeViewSource, /employeeNo \?\? employee\?\.mobile/);
   assert.match(employeeViewSource, /\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(employeeViewSource, /移除账户/);
+  assert.match(employeeViewSource, /该用户账号会同步删除/);
+  assert.doesNotMatch(employeeViewSource, /解绑/);
   assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
   assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);

@@ -159,7 +159,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public WebCountResponse deleteAccount(@PathVariable String employeeId) {
         return employeeRecordScope(employeeId,
-                () -> new WebCountResponse(employeeAccountService.unbindAccount(employeeId)));
+                () -> new WebCountResponse(employeeAccountService.removeAccount(employeeId)));
     }
 
     @GetMapping("/{employeeId}/positions")

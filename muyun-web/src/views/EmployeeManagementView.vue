@@ -732,15 +732,15 @@ async function provisionEmployeeAccount() {
   }
 }
 
-async function deleteEmployeeAccount() {
+async function removeEmployeeAccount() {
   const employee = selectedEmployee.value;
   if (!employee?.id || !employeeAccount.value?.id || !canManageEmployeeAccounts.value) {
     return;
   }
   const confirmed = await confirmAction({
-    title: '解绑账号',
-    content: `确认解绑账号「${employeeAccountUserTitle()}」？`,
-    okText: '解绑',
+    title: '移除账户',
+    content: `确认移除账户「${employeeAccountUserTitle()}」？该用户账号会同步删除。`,
+    okText: '移除',
     danger: true,
   });
   if (!confirmed) {
@@ -753,7 +753,7 @@ async function deleteEmployeeAccount() {
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/delete`,
     });
     await loadEmployeeAccounts(employee, employeeDetailRequestSeq.value);
-    presentPlatformMessage('账号绑定已移除', { source: 'employee-management', phase: 'action' });
+    presentPlatformMessage('账户已移除', { source: 'employee-management', phase: 'action' });
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
   } finally {
@@ -1035,9 +1035,9 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
                 danger
                 icon-name="delete"
                 :disabled="savingEmployeeAccount || !canManageEmployeeAccounts"
-                @click="deleteEmployeeAccount"
+                @click="removeEmployeeAccount"
               >
-                解绑
+                移除账户
               </UiButton>
             </div>
           </section>
