@@ -1127,7 +1127,7 @@ class IamWebControllerTest {
         String sql = compiledCriteria(criteriaCaptor.getValue());
         assertThat(sql).contains("authUserId");
         assertThat(sql).contains("tenantId");
-        assertThat(sql).contains("deleted");
+        assertThat(sql).doesNotContain("deleted");
         verify(userAccountDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 

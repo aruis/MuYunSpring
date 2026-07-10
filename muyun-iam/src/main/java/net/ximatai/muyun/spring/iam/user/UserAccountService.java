@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
-import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
@@ -47,7 +46,6 @@ import java.util.function.Supplier;
 
 @Service
 public class UserAccountService extends TenantActiveScopedService<UserAccount> implements
-        SoftDeleteAbility<UserAccount>,
         EnableAbility<UserAccount>,
         ReferenceAbility<UserAccount>,
         ModuleReadProjectionContributor,

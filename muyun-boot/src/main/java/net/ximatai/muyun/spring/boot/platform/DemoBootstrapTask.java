@@ -182,7 +182,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
     }
 
     private UserAccount ensureTenantAdminUser() {
-        UserAccount existing = userAccountService.selectIgnoreSoftDelete(USER_ID);
+        UserAccount existing = userAccountService.select(USER_ID);
         if (existing != null) {
             validateExistingTenantAdminUser(existing);
             return existing;

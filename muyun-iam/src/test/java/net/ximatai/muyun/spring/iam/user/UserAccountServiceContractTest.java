@@ -181,6 +181,25 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldPhysicallyDeleteUserAccount() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        user.setVersion(1);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.deleteByIdAndVersion("user-1", 1)).thenReturn(1);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.of(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.delete("user-1")).isEqualTo(1);
+        }
+
+        verify(dao).deleteByIdAndVersion("user-1", 1);
+        verify(dao, never()).updateByIdAndVersion(any(UserAccount.class), any());
+    }
+
+    @Test
     void shouldApplyRecordDataScopeWhenChangingPassword() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccount user = activeUser();
