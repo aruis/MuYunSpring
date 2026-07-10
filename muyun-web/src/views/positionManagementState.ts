@@ -3,20 +3,32 @@ import type { Position, PositionCategory, WebQueryCondition } from '@muyun/web-c
 import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
+  createPlatformActionResultEffectHandlers,
   createRecordEditorSessionState,
   handlePlatformActionSuccess,
+  mergePlatformActionResultEffectHandlers,
+  platformActionResultEffects,
   presentPlatformError,
   presentPlatformMessage,
+  type PlatformActionResultEffect,
+  type PlatformActionResultEffectHandler,
+  withPlatformActionResultEffects,
 } from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
 export type CategoryCardMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
+export interface PositionManagementStateOptions {
+  categoryActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  positionActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+}
+
 export function createPositionManagementState(
   categoryContext: ModuleContext<PositionCategory>,
   positionClient: StaticModuleCrudClient<Position>,
   confirmAction: ConfirmAction,
+  options: PositionManagementStateOptions = {},
 ) {
   const categoryReloadKey = ref(0);
   const positionReloadKey = ref(0);
@@ -34,6 +46,7 @@ export function createPositionManagementState(
   const categorySaving = ref(false);
   const categoryError = ref<string>();
   const selectedCategoryId = computed(() => selectedCategory.value?.id);
+  const categoryActionResultEffectHandlers = createCategoryActionEffectHandlers();
 
   const positions = ref<Position[]>([]);
   const positionEditor = createRecordEditorSessionState<Position, PositionCardMode>({
@@ -49,6 +62,7 @@ export function createPositionManagementState(
   const positionLoading = ref(false);
   const positionSaving = ref(false);
   const positionError = ref<string>();
+  const positionActionResultEffectHandlers = createPositionActionEffectHandlers();
 
   const selectedCategoryTitle = computed(() => positionCategoryTitleOf(selectedCategory.value));
   const filteredPositions = computed(() =>
@@ -189,9 +203,10 @@ export function createPositionManagementState(
           : await crud.insert(validDraft);
       const saved = result.record;
       categoryEditor.select(saved);
-      categoryMode.value = 'view';
-      await presentCategorySuccess(result);
-      categoryReloadKey.value += 1;
+      await presentCategorySuccess(result, [
+        platformActionResultEffects.closeEditor(),
+        platformActionResultEffects.refreshList(),
+      ]);
     } catch (cause) {
       presentCategoryCause(cause);
     } finally {
@@ -217,8 +232,7 @@ export function createPositionManagementState(
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
       categoryEditor.select(await categoryContext.abilities.crud().view(selectedCategory.value.id));
-      await presentCategorySuccess(result);
-      categoryReloadKey.value += 1;
+      await presentCategorySuccess(result, [platformActionResultEffects.refreshList()]);
     } catch (cause) {
       presentCategoryCause(cause);
     } finally {
@@ -248,10 +262,10 @@ export function createPositionManagementState(
     try {
       await categoryContext.runtime.ready;
       const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
-      categoryEditor.clearSelection();
-      categoryMode.value = 'view';
-      await presentCategorySuccess(result);
-      categoryReloadKey.value += 1;
+      await presentCategorySuccess(result, [
+        platformActionResultEffects.clearSelection(),
+        platformActionResultEffects.refreshList(),
+      ]);
     } catch (cause) {
       presentCategoryCause(cause);
     } finally {
@@ -363,8 +377,10 @@ export function createPositionManagementState(
           : await positionClient.insert(validDraft);
       const saved = result.record;
       positionEditor.select(saved);
-      positionMode.value = 'view';
-      await presentPositionSuccess(result);
+      await presentPositionSuccess(result, [
+        platformActionResultEffects.closeEditor(),
+        platformActionResultEffects.refreshList(),
+      ]);
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         const savedCategory = categories.value.find((category) => category.id === saved.categoryId);
         if (savedCategory) {
@@ -374,7 +390,6 @@ export function createPositionManagementState(
         }
         positions.value = [saved];
       }
-      positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);
     } finally {
@@ -398,8 +413,7 @@ export function createPositionManagementState(
           ? await positionClient.enable(selectedPosition.value.id)
           : await positionClient.disable(selectedPosition.value.id);
       positionEditor.select(await positionClient.view(selectedPosition.value.id));
-      await presentPositionSuccess(result);
-      positionReloadKey.value += 1;
+      await presentPositionSuccess(result, [platformActionResultEffects.refreshList()]);
     } catch (cause) {
       presentPositionCause(cause);
     } finally {
@@ -434,8 +448,7 @@ export function createPositionManagementState(
       } else {
         positionMode.value = 'view';
       }
-      await presentPositionSuccess(result);
-      positionReloadKey.value += 1;
+      await presentPositionSuccess(result, [platformActionResultEffects.refreshList()]);
     } catch (cause) {
       presentPositionCause(cause);
     } finally {
@@ -473,18 +486,54 @@ export function createPositionManagementState(
     presentPlatformMessage(message, { source: 'position-action', phase: 'action' });
   }
 
-  function presentCategorySuccess(result: unknown) {
-    return handlePlatformActionSuccess(result, {
+  function presentCategorySuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
       source: 'position-category-action',
       phase: 'action',
+      effectHandlers: categoryActionResultEffectHandlers,
     });
   }
 
-  function presentPositionSuccess(result: unknown) {
-    return handlePlatformActionSuccess(result, {
+  function presentPositionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
       source: 'position-action',
       phase: 'action',
+      effectHandlers: positionActionResultEffectHandlers,
     });
+  }
+
+  function createCategoryActionEffectHandlers() {
+    const defaultHandlers = createPlatformActionResultEffectHandlers({
+      refreshList: () => {
+        categoryReloadKey.value += 1;
+      },
+      closeEditor: () => {
+        categoryMode.value = 'view';
+      },
+      clearSelection: () => {
+        categoryEditor.clearSelection();
+        categoryMode.value = 'view';
+      },
+    });
+    return mergePlatformActionResultEffectHandlers(
+      defaultHandlers,
+      options.categoryActionResultEffectHandlers,
+    );
+  }
+
+  function createPositionActionEffectHandlers() {
+    const defaultHandlers = createPlatformActionResultEffectHandlers({
+      refreshList: () => {
+        positionReloadKey.value += 1;
+      },
+      closeEditor: () => {
+        positionMode.value = 'view';
+      },
+    });
+    return mergePlatformActionResultEffectHandlers(
+      defaultHandlers,
+      options.positionActionResultEffectHandlers,
+    );
   }
 
   return {

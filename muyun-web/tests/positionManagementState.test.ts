@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Position, PositionCategory } from '../src/web-contracts/index.ts';
+import { platformActionResultEffectTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
 import {
   createPositionManagementState,
@@ -159,6 +160,64 @@ test('position management state saves normalized positions with required categor
   assert.equal(state.selectedPosition.value?.id, 'pos-dev');
   assert.equal(state.positionMode.value, 'view');
   assert.equal(state.positionReloadKey.value, 1);
+});
+
+test('position management state runs category action effects before custom handlers', async () => {
+  const handled: string[] = [];
+  const categoryContext = createContext<PositionCategory>('iam.position_category', {
+    insert: async (record) => ({
+      record: { ...record, id: 'category-child' },
+      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+    }),
+  });
+  const positionContext = createContext<Position>('iam.position');
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true, {
+    categoryActionResultEffectHandlers: {
+      [platformActionResultEffectTypes.refreshList]: () => {
+        handled.push(`categoryReload:${state.categoryReloadKey.value}`);
+      },
+    },
+  });
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+  state.startCreateChildCategory();
+  state.categoryDraft.value.code = 'DEV';
+  state.categoryDraft.value.title = '研发';
+
+  await state.saveCategory();
+
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryReloadKey.value, 1);
+  assert.deepEqual(handled, ['categoryReload:1']);
+});
+
+test('position management state runs position action effects before custom handlers', async () => {
+  const handled: string[] = [];
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position', {
+    insert: async (record) => ({
+      record: { ...record, id: 'pos-dev' },
+      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+    }),
+  });
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true, {
+    positionActionResultEffectHandlers: {
+      [platformActionResultEffectTypes.refreshList]: () => {
+        handled.push(`positionReload:${state.positionReloadKey.value}`);
+      },
+    },
+  });
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+  state.startCreatePosition();
+  state.positionDraft.value.code = 'DEV';
+  state.positionDraft.value.title = '开发工程师';
+
+  await state.savePosition();
+
+  assert.equal(state.positionMode.value, 'view');
+  assert.equal(state.positionReloadKey.value, 1);
+  assert.deepEqual(handled, ['positionReload:1']);
 });
 
 test('position management state moves selected category when saved position changes category', async () => {
