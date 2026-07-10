@@ -77,6 +77,26 @@ export function createPlatformActionResultEffectHandlers(
   };
 }
 
+export function mergePlatformActionResultEffectHandlers(
+  defaultHandlers: Record<string, PlatformActionResultEffectHandler | undefined>,
+  customHandlers: Record<string, PlatformActionResultEffectHandler | undefined> | undefined,
+) {
+  const effectTypes = new Set([
+    ...Object.keys(defaultHandlers),
+    ...Object.keys(customHandlers ?? {}),
+  ]);
+  const handlers: Record<string, PlatformActionResultEffectHandler | undefined> = {};
+  for (const effectType of effectTypes) {
+    const defaultHandler = defaultHandlers[effectType];
+    const customHandler = customHandlers?.[effectType];
+    handlers[effectType] = async (effect, result) => {
+      await defaultHandler?.(effect, result);
+      await customHandler?.(effect, result);
+    };
+  }
+  return handlers;
+}
+
 export function withPlatformActionResultEffects<T>(
   result: T,
   effects: PlatformActionResultEffect[],

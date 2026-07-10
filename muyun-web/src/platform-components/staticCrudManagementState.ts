@@ -4,6 +4,7 @@ import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
   createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  mergePlatformActionResultEffectHandlers,
   platformActionResultEffects,
   withPlatformActionResultEffects,
   type PlatformActionResultEffect,
@@ -319,7 +320,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
         mode.value = canCreate.value ? 'create' : 'view';
       },
     });
-    return mergeActionEffectHandlers(defaultHandlers, options.actionResultEffectHandlers);
+    return mergePlatformActionResultEffectHandlers(defaultHandlers, options.actionResultEffectHandlers);
   }
 
   return {
@@ -345,26 +346,6 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     toggleEnabled,
     removeSelected,
   };
-}
-
-function mergeActionEffectHandlers(
-  defaultHandlers: Record<string, PlatformActionResultEffectHandler | undefined>,
-  customHandlers: Record<string, PlatformActionResultEffectHandler | undefined> | undefined,
-) {
-  const effectTypes = new Set([
-    ...Object.keys(defaultHandlers),
-    ...Object.keys(customHandlers ?? {}),
-  ]);
-  const handlers: Record<string, PlatformActionResultEffectHandler | undefined> = {};
-  for (const effectType of effectTypes) {
-    const defaultHandler = defaultHandlers[effectType];
-    const customHandler = customHandlers?.[effectType];
-    handlers[effectType] = async (effect, result) => {
-      await defaultHandler?.(effect, result);
-      await customHandler?.(effect, result);
-    };
-  }
-  return handlers;
 }
 
 function requiredId(record: StaticCrudRecord, recordName: string) {

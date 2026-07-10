@@ -80,6 +80,7 @@ export {
 export {
   createPlatformActionResultEffectHandlers,
   handlePlatformActionSuccess,
+  mergePlatformActionResultEffectHandlers,
   platformActionResultEffects,
   platformActionResultEffectTypes,
   presentPlatformActionSuccess,
