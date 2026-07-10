@@ -524,6 +524,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /placeholder: '请输入性别'/);
   assert.match(employeeViewSource, /gender: draft\.gender\?\.trim\(\) \|\| undefined/);
   assert.match(employeeViewSource, /gender: \{ label: '性别'/);
+  assert.match(employeeViewSource, /function defaultAccountUsername/);
+  assert.match(employeeViewSource, /employeeNo \?\? employee\?\.mobile/);
+  assert.match(employeeViewSource, /\.trim\(\)\.toLowerCase\(\)/);
   assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
   assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
