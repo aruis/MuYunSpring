@@ -8,9 +8,9 @@ import type {
   PlatformRoutePageDescriptor,
   RemoteUrlPageDescriptor,
 } from '@muyun/web-contracts';
+import { DynamicModuleHost } from '@muyun/dynamic-page-runtime';
 import { UiEmpty } from '@muyun/vue-ui-antdv';
 import BusinessRouteHost from './hosts/BusinessRouteHost.vue';
-import DynamicModuleHost from './hosts/DynamicModuleHost.vue';
 import ExternalPageHost from './hosts/ExternalPageHost.vue';
 import PlatformRouteHost from './hosts/PlatformRouteHost.vue';
 import { resolvePageHostComponentName } from './pageHostRegistry';

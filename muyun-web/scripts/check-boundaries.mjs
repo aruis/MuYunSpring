@@ -6,7 +6,45 @@ const sourceRoots = ['src', 'examples/business-web/src'];
 const allowedAntdvPrefix = 'src/vue-ui-antdv/';
 const violations = [];
 const packageViolations = [];
+const layerViolations = [];
 const antdvTemplatePattern = /<\/?a-[a-z0-9-]+[\s>]/i;
+const packageLayerRules = [
+  {
+    prefix: 'src/web-contracts/',
+    forbidden: [
+      '@muyun/web-core',
+      '@muyun/vue-ui-antdv',
+      '@muyun/dynamic-page-runtime',
+      '@muyun/platform-components',
+      '@muyun/platform-workbench',
+    ],
+  },
+  {
+    prefix: 'src/web-core/',
+    forbidden: [
+      '@muyun/vue-ui-antdv',
+      '@muyun/dynamic-page-runtime',
+      '@muyun/platform-components',
+      '@muyun/platform-workbench',
+    ],
+  },
+  {
+    prefix: 'src/vue-ui-antdv/',
+    forbidden: ['@muyun/dynamic-page-runtime', '@muyun/platform-components', '@muyun/platform-workbench'],
+  },
+  {
+    prefix: 'src/dynamic-page-runtime/',
+    forbidden: ['@muyun/platform-workbench'],
+  },
+  {
+    prefix: 'src/platform-components/',
+    forbidden: ['@muyun/dynamic-page-runtime', '@muyun/platform-workbench'],
+  },
+  {
+    prefix: 'src/platform-workbench/',
+    forbidden: ['@muyun/platform-components'],
+  },
+];
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -33,6 +71,15 @@ for (const sourceRoot of sourceRoots) {
     if ((usesAntdvPackage || usesAntdvTemplate) && !projectPath.startsWith(allowedAntdvPrefix)) {
       violations.push(projectPath);
     }
+
+    const layerRule = packageLayerRules.find((rule) => projectPath.startsWith(rule.prefix));
+    if (layerRule) {
+      for (const dependencyName of layerRule.forbidden) {
+        if (source.includes(`'${dependencyName}'`) || source.includes(`"${dependencyName}"`)) {
+          layerViolations.push(`${projectPath}: ${dependencyName}`);
+        }
+      }
+    }
   }
 }
 
@@ -56,7 +103,7 @@ for (const packagePath of ['examples/business-web/package.json']) {
   }
 }
 
-if (violations.length > 0 || packageViolations.length > 0) {
+if (violations.length > 0 || packageViolations.length > 0 || layerViolations.length > 0) {
   if (violations.length > 0) {
     console.error('Ant Design Vue imports or template tags are only allowed under src/vue-ui-antdv:');
     for (const violation of violations) {
@@ -67,6 +114,13 @@ if (violations.length > 0 || packageViolations.length > 0) {
   if (packageViolations.length > 0) {
     console.error('Business examples must not declare direct Ant Design Vue dependencies:');
     for (const violation of packageViolations) {
+      console.error(`- ${violation}`);
+    }
+  }
+
+  if (layerViolations.length > 0) {
+    console.error('Package layer dependency violations:');
+    for (const violation of layerViolations) {
       console.error(`- ${violation}`);
     }
   }
