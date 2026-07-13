@@ -932,7 +932,7 @@ test('workbench exposes own password change through auth boundary', () => {
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
-  const hostSource = readSource('src/platform-workbench/hosts/DynamicModuleHost.vue');
+  const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
 
   assert.match(hostSource, /useModuleContext<QueryListRecord>/);
   assert.match(hostSource, /<RecordQueryListPanel/);
