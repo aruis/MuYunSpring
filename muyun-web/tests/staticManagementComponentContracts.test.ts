@@ -532,9 +532,12 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /解绑/);
   assert.match(
     employeeViewSource,
-    /账号已创建并绑定职员[\s\S]*source: 'employee-management'[\s\S]*tone: 'success'/,
+    /presentPlatformSuccess\('账号已创建并绑定职员'[\s\S]*source: 'employee-management'/,
   );
-  assert.match(employeeViewSource, /账户已移除[\s\S]*source: 'employee-management'[\s\S]*tone: 'success'/);
+  assert.match(
+    employeeViewSource,
+    /presentPlatformSuccess\('账户已移除'[\s\S]*source: 'employee-management'/,
+  );
   assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
   assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);
@@ -955,6 +958,8 @@ test('record query list panel forwards dynamic ui config and query template ids'
 
 test('platform error feedback respects global error presentation slots', () => {
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
+  const actionResultFeedbackSource = readSource('src/platform-components/platformActionResultFeedback.ts');
+  const actionResultReactionsSource = readSource('src/platform-components/platformActionResultReactions.ts');
   const uiFeedbackSource = readSource('src/vue-ui-antdv/feedback.ts');
   const staticCrudStateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const organizationStateSource = readSource('src/views/organizationManagementState.ts');
@@ -965,16 +970,21 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(feedbackSource, /toErrorUiContext/);
   assert.match(feedbackSource, /presentation\.slot === 'silent'/);
   assert.match(feedbackSource, /presentation\.slot === 'redirect-login'/);
-  assert.match(feedbackSource, /tone\?: 'error' \| 'success'/);
+  assert.match(feedbackSource, /presentPlatformSuccess/);
   assert.match(feedbackSource, /showSuccessMessage\(message\)/);
+  assert.match(actionResultFeedbackSource, /handlePlatformActionSuccess/);
+  assert.match(actionResultFeedbackSource, /presentPlatformActionSuccess/);
+  assert.match(actionResultReactionsSource, /resolvePlatformActionResultMessage/);
+  assert.match(actionResultReactionsSource, /withPlatformActionResultReactions/);
+  assert.match(actionResultReactionsSource, /platformActionResultReactionTypes/);
   assert.match(uiFeedbackSource, /const id = `muyun-global-feedback-\$\{tone\}`/);
   assert.match(uiFeedbackSource, /className = `muyun-global-feedback \$\{tone\}`/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.success[\s\S]*right: 20px/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.error[\s\S]*left: 50%/);
-  assert.match(staticCrudStateSource, /tone: 'success'/);
-  assert.match(organizationStateSource, /tone: 'success'/);
-  assert.match(positionStateSource, /tone: 'success'/);
-  assert.match(dictionaryStateSource, /tone: 'success'/);
+  assert.match(staticCrudStateSource, /handlePlatformActionSuccess/);
+  assert.match(organizationStateSource, /handlePlatformActionSuccess/);
+  assert.match(positionStateSource, /handlePlatformActionSuccess/);
+  assert.match(dictionaryStateSource, /handlePlatformActionSuccess/);
 });
 
 function readSource(path: string) {

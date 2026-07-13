@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Application } from '../src/web-contracts/index.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import {
   AppError,
   platformErrorCodes,
@@ -86,6 +87,33 @@ test('application management state toggles enable state and refreshes selected r
   assert.deepEqual(calls, ['disable:platform', 'view:platform']);
   assert.equal(state.selected.value?.enabled, false);
   assert.equal(state.reloadKey.value, 1);
+});
+
+test('application management state runs standard action reactions before custom handlers', async () => {
+  const handled: string[] = [];
+  const context = createContext({
+    insert: async (record) => ({
+      record: { ...record, sortOrder: 10 },
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
+    }),
+  });
+  const state = createApplicationManagementState(context, async () => true, {
+    actionResultReactionHandlers: {
+      [platformActionResultReactionTypes.refreshList]: () => {
+        handled.push(`reload:${state.reloadKey.value}`);
+      },
+    },
+  });
+
+  state.startCreate();
+  state.draft.value.alias = 'sales';
+  state.draft.value.title = '销售应用';
+
+  await state.save();
+
+  assert.equal(state.mode.value, 'view');
+  assert.equal(state.reloadKey.value, 1);
+  assert.deepEqual(handled, ['reload:1']);
 });
 
 test('application management state refreshes selected draft from loaded records in view mode', () => {

@@ -6,12 +6,14 @@ import {
   type StaticCrudActionErrorHandler,
   useFlatCrudManagementState,
 } from '../platform-components/staticCrudManagementState';
+import type { PlatformActionResultReactionHandler } from '../platform-components/platformActionResultFeedback';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export interface TenantManagementStateOptions {
   actionErrorHandlers?: StaticCrudActionErrorHandler<Tenant>[];
+  actionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export function createTenantManagementState(
@@ -37,6 +39,7 @@ export function createTenantManagementState(
     enableDeniedMessage: '当前用户无权变更租户启停状态',
     deleteDeniedMessage: () => '当前用户无权删除租户',
     actionErrorHandlers: options.actionErrorHandlers,
+    actionResultReactionHandlers: options.actionResultReactionHandlers,
   });
   const aliasReadonly = computed(() => state.mode.value !== 'create');
   return {

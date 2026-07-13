@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ref } from 'vue';
 import {
+  createPlatformActionResultReactionHandlers,
+  handlePlatformActionSuccess,
+} from '../src/platform-components/platformActionResultFeedback.ts';
+import {
   executeStaticFormSave,
   executeStaticRecordAction,
 } from '../src/platform-components/staticFormActionFlow.ts';
@@ -33,6 +37,85 @@ test('static form save executes mutation once and calls saved callback', async (
 
   assert.deepEqual(calls, [{ title: '销售' }]);
   assert.deepEqual(saved, { id: 'sales', title: '销售' });
+  assert.equal(loading.value, false);
+});
+
+test('static form save dispatches local result reactions', async () => {
+  const loading = ref(false);
+  const reactions: string[] = [];
+
+  await executeStaticFormSave<TestRecord>({
+    loading,
+    mode: 'create',
+    canSave: () => true,
+    deniedMessage: '无权保存',
+    createRecord: () => ({ title: '销售' }),
+    save: async (record) => ({
+      record: { ...record, id: 'sales' },
+      message: '已保存',
+      reactions: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.employee' } }],
+    }),
+    onSaved: () => undefined,
+    reactionHandlers: {
+      'refresh-list': (reaction) => {
+        reactions.push(`${reaction.type}:${reaction.payload?.moduleAlias}`);
+      },
+    },
+  });
+
+  assert.deepEqual(reactions, ['refresh-list:iam.employee']);
+  assert.equal(loading.value, false);
+});
+
+test('platform action result success dispatches standard reaction handlers', async () => {
+  const calls: string[] = [];
+  const reactionHandlers = createPlatformActionResultReactionHandlers({
+    refreshList: (reaction) => {
+      calls.push(`${reaction.type}:${reaction.payload?.resourceKey ?? ''}`);
+    },
+    closeEditor: (reaction) => {
+      calls.push(reaction.type);
+    },
+  });
+
+  await handlePlatformActionSuccess(
+    {
+      message: '已保存',
+      reactions: [{ type: 'refresh-list', payload: { resourceKey: 'employee' } }, { type: 'close-editor' }],
+    },
+    { reactionHandlers },
+  );
+
+  assert.deepEqual(calls, ['refresh-list:employee', 'close-editor']);
+});
+
+test('static record action dispatches local result reactions after callback', async () => {
+  const loading = ref(false);
+  const calls: string[] = [];
+
+  await executeStaticRecordAction<
+    TestRecord,
+    { message: string; reactions: { type: string; payload?: Record<string, unknown> }[] }
+  >({
+    loading,
+    record: () => ({ id: 'emp-1', title: '职员' }),
+    canExecute: () => true,
+    deniedMessage: '无权操作',
+    execute: async () => ({
+      message: '已启用',
+      reactions: [{ type: 'refresh-detail', payload: { recordId: 'emp-1' } }],
+    }),
+    onExecuted: () => {
+      calls.push('executed');
+    },
+    reactionHandlers: {
+      'refresh-detail': (reaction) => {
+        calls.push(`${reaction.type}:${reaction.payload?.recordId}`);
+      },
+    },
+  });
+
+  assert.deepEqual(calls, ['executed', 'refresh-detail:emp-1']);
   assert.equal(loading.value, false);
 });
 

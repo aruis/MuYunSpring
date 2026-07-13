@@ -1,4 +1,5 @@
 import type { DynamicPageDescriptor } from '@muyun/web-contracts';
+import type { DynamicLegacyRefreshActionContract } from './actionReactions';
 
 export const customerDescriptor: DynamicPageDescriptor = {
   moduleAlias: 'crm.customer',
@@ -46,7 +47,7 @@ export const customerDescriptor: DynamicPageDescriptor = {
     { actionCode: 'save', title: '保存', level: 'primary', refresh: 'record' },
     { actionCode: 'submit', title: '提交审批', refresh: 'all' },
     { actionCode: 'export', title: '导出', disabled: true, disabledReason: '当前用户缺少导出权限' },
-  ],
+  ] as DynamicLegacyRefreshActionContract[],
   initialRecord: {
     sourceCustomerId: null,
     customerId: null,

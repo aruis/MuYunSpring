@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { DictionaryCategory, DictionaryItem } from '../src/web-contracts/index.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import {
   AppError,
   platformErrorCodes,
@@ -144,6 +145,83 @@ test('dictionary management state saves category-bound dictionary items', async 
   assert.equal(state.selectedItem.value?.id, 'item-enabled');
   assert.equal(state.itemMode.value, 'view');
   assert.equal(state.itemReloadKey.value, 1);
+});
+
+test('dictionary management state runs category action reactions before custom handlers', async () => {
+  const handled: string[] = [];
+  const categoryContext = createContext();
+  const categoryClient = createCategoryClient({
+    insert: async (record) => ({
+      record: { ...record, id: 'category-status' },
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
+    }),
+  });
+  const state = createDictionaryManagementState(
+    categoryContext,
+    () => categoryClient,
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+    {
+      categoryActionResultReactionHandlers: {
+        [platformActionResultReactionTypes.refreshList]: () => {
+          handled.push(`categoryReload:${state.categoryReloadKey.value}`);
+        },
+      },
+    },
+  );
+
+  state.startCreateRootCategory();
+  state.categoryDraft.value.alias = 'status';
+  state.categoryDraft.value.title = '状态字典';
+  await state.saveCategory();
+
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryReloadKey.value, 1);
+  assert.deepEqual(handled, ['categoryReload:1']);
+});
+
+test('dictionary management state runs item action reactions before custom handlers', async () => {
+  const handled: string[] = [];
+  const categoryContext = createContext();
+  const itemClient = createItemClient({
+    insert: async (record) => ({
+      record: { ...record, id: 'item-enabled' },
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
+    }),
+  });
+  const state = createDictionaryManagementState(
+    categoryContext,
+    () => createCategoryClient(),
+    () => itemClient,
+    () => 'platform',
+    async () => true,
+    {
+      itemActionResultReactionHandlers: {
+        [platformActionResultReactionTypes.refreshList]: () => {
+          handled.push(`itemReload:${state.itemReloadKey.value}`);
+        },
+      },
+    },
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+    },
+  ]);
+  state.startCreateItem();
+  state.itemDraft.value.code = 'enabled';
+  state.itemDraft.value.title = '启用';
+  await state.saveItem();
+
+  assert.equal(state.itemMode.value, 'view');
+  assert.equal(state.itemReloadKey.value, 1);
+  assert.deepEqual(handled, ['itemReload:1']);
 });
 
 test('dictionary management state creates child dictionary items under selected parent', () => {

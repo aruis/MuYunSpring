@@ -1,5 +1,9 @@
 import type { Ref } from 'vue';
 import type { StaticRecordMutationResult } from '@muyun/web-core';
+import {
+  handlePlatformActionSuccess,
+  type PlatformActionResultReactionHandler,
+} from './platformActionResultFeedback';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 
 export type StaticFormSaveMode = 'create' | 'edit';
@@ -16,6 +20,7 @@ export interface StaticFormSaveOptions<TRecord> {
   save: (record: TRecord, mode: StaticFormSaveMode) => Promise<StaticRecordMutationResult<TRecord>>;
   onSaved: (result: StaticRecordMutationResult<TRecord>) => void;
   successMessage?: string;
+  reactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
@@ -28,6 +33,7 @@ export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
   execute: (record: TRecord) => Promise<TResult>;
   onExecuted: (result: TResult, record: TRecord) => void | Promise<void>;
   successMessage?: string;
+  reactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOptions<TRecord>) {
@@ -55,10 +61,11 @@ export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOpti
   try {
     const result = await options.save(record, options.mode);
     options.onSaved(result);
-    presentPlatformMessage(result.message ?? options.successMessage ?? '操作成功', {
+    await handlePlatformActionSuccess(result, {
       source,
       phase: 'action',
-      tone: 'success',
+      fallbackMessage: options.successMessage,
+      reactionHandlers: options.reactionHandlers,
     });
     return result;
   } catch (cause) {
@@ -93,10 +100,11 @@ export async function executeStaticRecordAction<TRecord, TResult = unknown>(
   try {
     const result = await options.execute(record);
     await options.onExecuted(result, record);
-    presentPlatformMessage(actionResultMessage(result) ?? options.successMessage ?? '操作成功', {
+    await handlePlatformActionSuccess(result, {
       source,
       phase: 'action',
-      tone: 'success',
+      fallbackMessage: options.successMessage,
+      reactionHandlers: options.reactionHandlers,
     });
     return result;
   } catch (cause) {
@@ -105,12 +113,4 @@ export async function executeStaticRecordAction<TRecord, TResult = unknown>(
   } finally {
     options.loading.value = false;
   }
-}
-
-function actionResultMessage(result: unknown): string | undefined {
-  if (!result || typeof result !== 'object' || !('message' in result)) {
-    return undefined;
-  }
-  const message = (result as { message?: unknown }).message;
-  return typeof message === 'string' && message.trim() ? message : undefined;
 }

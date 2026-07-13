@@ -1,5 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  createPlatformActionResultReactionHandlers,
+  handlePlatformActionSuccess,
+  platformActionResultReactions,
+  platformActionResultReactionTypes,
+  resolvePlatformActionResult,
+  resolvePlatformActionResultMessage,
+  withPlatformActionResultReactions,
+} from '../src/platform-components/platformActionResultFeedback.ts';
 import { matchesPlatformActionErrorHandler } from '../src/platform-components/platformErrorFeedback.ts';
 import { AppError, platformErrorCodes } from '../src/web-core/index.ts';
 
@@ -59,4 +68,96 @@ test('platform action error handler matches by code or marker facts', () => {
     }),
     false,
   );
+});
+
+test('platform action result message prefers business message and falls back safely', () => {
+  assert.equal(resolvePlatformActionResultMessage({ message: '已保存' }), '已保存');
+  assert.equal(resolvePlatformActionResultMessage({ message: '   ' }, '默认成功'), '默认成功');
+  assert.equal(resolvePlatformActionResultMessage({ count: 1 }, '已删除'), '已删除');
+  assert.equal(resolvePlatformActionResultMessage(undefined), '操作成功');
+});
+
+test('platform action result resolves data changes without dispatching UI reactions', async () => {
+  const actionResult = resolvePlatformActionResult({
+    message: '已刷新',
+    resultType: 'updated',
+    changes: [
+      { type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' },
+      { type: '' },
+      'refresh-detail',
+      { type: 'record-updated' },
+    ],
+  });
+
+  assert.equal(actionResult.message, '已刷新');
+  assert.equal(actionResult.resultType, 'updated');
+  assert.deepEqual(actionResult.changes, [
+    { type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' },
+  ]);
+  assert.deepEqual(actionResult.reactions, []);
+
+  const handled: string[] = [];
+  await handlePlatformActionSuccess(actionResult.raw, {
+    reactionHandlers: {
+      'refresh-list': (reaction, result) => {
+        handled.push(`${reaction.type}:${result.resultType}`);
+      },
+    },
+  });
+  assert.deepEqual(handled, []);
+});
+
+test('platform action result local reactions compose without duplicate local defaults', async () => {
+  const result = withPlatformActionResultReactions(
+    {
+      message: '已处理',
+      reactions: [platformActionResultReactions.refreshList({ source: 'local-page' })],
+    },
+    [
+      platformActionResultReactions.refreshList({ source: 'local' }),
+      platformActionResultReactions.closeEditor(),
+    ],
+  );
+
+  assert.deepEqual(resolvePlatformActionResult(result).reactions, [
+    { type: platformActionResultReactionTypes.refreshList, payload: { source: 'local-page' } },
+    { type: platformActionResultReactionTypes.closeEditor },
+  ]);
+
+  const handled: string[] = [];
+  await handlePlatformActionSuccess(result, {
+    reactionHandlers: createPlatformActionResultReactionHandlers({
+      refreshList: (reaction) => {
+        handled.push(`${reaction.type}:${reaction.payload?.source}`);
+      },
+      closeEditor: (reaction) => {
+        handled.push(reaction.type);
+      },
+    }),
+  });
+
+  assert.deepEqual(handled, ['refresh-list:local-page', 'close-editor']);
+});
+
+test('platform action result reactions keep same type for different records', () => {
+  const result = withPlatformActionResultReactions(
+    {
+      message: '已处理',
+      reactions: [
+        platformActionResultReactions.refreshDetail({ moduleAlias: 'iam.employee', recordId: 'emp-1' }),
+      ],
+    },
+    [platformActionResultReactions.refreshDetail({ moduleAlias: 'iam.employee', recordId: 'emp-2' })],
+  );
+
+  assert.deepEqual(resolvePlatformActionResult(result).reactions, [
+    {
+      type: platformActionResultReactionTypes.refreshDetail,
+      payload: { moduleAlias: 'iam.employee', recordId: 'emp-1' },
+    },
+    {
+      type: platformActionResultReactionTypes.refreshDetail,
+      payload: { moduleAlias: 'iam.employee', recordId: 'emp-2' },
+    },
+  ]);
 });

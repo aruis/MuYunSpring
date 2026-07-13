@@ -22,10 +22,15 @@ export function presentPlatformError(cause: unknown, context: PlatformErrorFeedb
 
 export function presentPlatformMessage(message: string, context: PlatformErrorFeedbackContext = {}) {
   if (context.tone === 'success') {
-    showSuccessMessage(message);
+    presentPlatformSuccess(message);
     return;
   }
   showErrorMessage(message);
+}
+
+export function presentPlatformSuccess(message: string, context: PlatformErrorFeedbackContext = {}) {
+  void context;
+  showSuccessMessage(message);
 }
 
 export type PlatformActionErrorHandler<TContext> = {

@@ -72,7 +72,33 @@ export {
   createStaticTreeResourceModuleContext,
 } from './staticTreeResourceModuleContext';
 export { createScopedResourceTreeModuleContext } from './scopedResourceTreeModuleContext';
-export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+export {
+  presentPlatformError,
+  presentPlatformMessage,
+  presentPlatformSuccess,
+} from './platformErrorFeedback';
+export { handlePlatformActionSuccess, presentPlatformActionSuccess } from './platformActionResultFeedback';
+export {
+  createPlatformActionResultReactionHandlers,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
+  platformActionResultReactionTypes,
+  resolvePlatformActionResult,
+  resolvePlatformActionResultMessage,
+  withPlatformActionResultReactions,
+} from './platformActionResultReactions';
+export type {
+  PlatformActionResult,
+  PlatformActionResultReaction,
+  PlatformActionResultReactionHandler,
+  PlatformActionResultReactionPayload,
+  PlatformActionResultReactionType,
+  PlatformActionResultStandardReactionHandlers,
+} from './platformActionResultReactions';
+export type {
+  PlatformActionResultFeedbackContext,
+  PlatformActionResultHandlingContext,
+} from './platformActionResultFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { createRecordEditorSessionState } from './recordEditorSessionState';
 export { useFlatCrudManagementState } from './staticCrudManagementState';

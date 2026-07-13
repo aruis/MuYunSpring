@@ -23,6 +23,7 @@ import {
   executeStaticRecordAction,
   presentPlatformError,
   presentPlatformMessage,
+  presentPlatformSuccess,
   resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
@@ -724,10 +725,9 @@ async function provisionEmployeeAccount() {
     employeeAccountUser.value = response.user;
     showAccountProvisionForm.value = false;
     accountProvisionDraft.value = createAccountProvisionDraft(employee);
-    presentPlatformMessage('账号已创建并绑定职员', {
+    presentPlatformSuccess('账号已创建并绑定职员', {
       source: 'employee-management',
       phase: 'action',
-      tone: 'success',
     });
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
@@ -757,10 +757,9 @@ async function removeEmployeeAccount() {
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/delete`,
     });
     await loadEmployeeAccounts(employee, employeeDetailRequestSeq.value);
-    presentPlatformMessage('账户已移除', {
+    presentPlatformSuccess('账户已移除', {
       source: 'employee-management',
       phase: 'action',
-      tone: 'success',
     });
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'action' });

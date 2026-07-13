@@ -2,14 +2,29 @@ import { computed, ref } from 'vue';
 import type { Organization } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
+import {
+  createPlatformActionResultReactionHandlers,
+  handlePlatformActionSuccess,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
+  presentPlatformError,
+  presentPlatformMessage,
+  type PlatformActionResultReaction,
+  type PlatformActionResultReactionHandler,
+  withPlatformActionResultReactions,
+} from '@muyun/platform-components';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
+export interface OrganizationManagementStateOptions {
+  actionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
+}
+
 export function createOrganizationManagementState(
   organizationContext: ModuleContext<Organization>,
   confirmAction: ConfirmAction,
+  options: OrganizationManagementStateOptions = {},
 ) {
   const selected = ref<Organization>();
   const draft = ref<Organization>(emptyDraft());
@@ -17,6 +32,7 @@ export function createOrganizationManagementState(
   const reloadKey = ref(0);
   const saving = ref(false);
   const actionError = ref<string>();
+  const actionResultReactionHandlers = createOrganizationActionReactionHandlers();
 
   const cardTitle = computed(() => {
     if (mode.value === 'create') {
@@ -104,9 +120,10 @@ export function createOrganizationManagementState(
       const saved = result.record;
       selected.value = saved;
       draft.value = copyRecord(saved);
-      mode.value = 'view';
-      presentActionSuccess(result.message ?? '操作成功');
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
+      ]);
     } catch (cause) {
       presentActionCause(cause);
     } finally {
@@ -135,8 +152,7 @@ export function createOrganizationManagementState(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      presentActionSuccess(result.message ?? '操作成功');
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       presentActionCause(cause);
     } finally {
@@ -167,11 +183,10 @@ export function createOrganizationManagementState(
       await organizationContext.runtime.ready;
       const crud = organizationContext.abilities.crud();
       const result = await crud.delete(selected.value.id);
-      selected.value = undefined;
-      draft.value = emptyDraft();
-      mode.value = 'create';
-      presentActionSuccess(result.message ?? '操作成功');
-      reloadKey.value += 1;
+      await presentActionSuccess(result, [
+        platformActionResultReactions.clearSelection(),
+        platformActionResultReactions.refreshList(),
+      ]);
     } catch (cause) {
       presentActionCause(cause);
     } finally {
@@ -194,12 +209,29 @@ export function createOrganizationManagementState(
     presentPlatformMessage(message, { source: 'organization-management-action', phase: 'action' });
   }
 
-  function presentActionSuccess(message: string) {
-    presentPlatformMessage(message, {
+  function presentActionSuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'organization-management-action',
       phase: 'action',
-      tone: 'success',
+      reactionHandlers: actionResultReactionHandlers,
     });
+  }
+
+  function createOrganizationActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
+      refreshList: () => {
+        reloadKey.value += 1;
+      },
+      closeEditor: () => {
+        mode.value = 'view';
+      },
+      clearSelection: () => {
+        selected.value = undefined;
+        draft.value = emptyDraft();
+        mode.value = 'create';
+      },
+    });
+    return mergePlatformActionResultReactionHandlers(defaultHandlers, options.actionResultReactionHandlers);
   }
 
   return {

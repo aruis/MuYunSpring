@@ -26,14 +26,39 @@ export interface WebPageResponse<T> {
   navigation?: unknown;
 }
 
-export interface WebCountResponse {
-  count: number;
-  message?: string;
+export const webDataChangeTypes = {
+  recordCreated: 'record-created',
+  recordUpdated: 'record-updated',
+  recordDeleted: 'record-deleted',
+  collectionChanged: 'collection-changed',
+} as const;
+
+export type WebDataChangeType = (typeof webDataChangeTypes)[keyof typeof webDataChangeTypes];
+
+export interface WebDataChange {
+  type: string;
+  moduleAlias: string;
+  recordId?: string;
+  resourceKey?: string;
+  scope?: string;
+  [key: string]: unknown;
 }
 
-export interface WebRecordResponse<T> {
-  record: T;
+export interface WebActionResultFacts {
   message?: string;
+  resultType?: string;
+  changes?: WebDataChange[];
+}
+
+export type WebActionResult<TFacts extends Record<string, unknown> = Record<string, unknown>> = TFacts &
+  WebActionResultFacts;
+
+export interface WebCountResponse extends WebActionResultFacts {
+  count: number;
+}
+
+export interface WebRecordResponse<T> extends WebActionResultFacts {
+  record: T;
 }
 
 export interface WebTreeNode<T> {
@@ -665,7 +690,6 @@ export interface ActionContract {
   level?: 'primary' | 'default' | 'danger';
   disabled?: boolean;
   disabledReason?: string;
-  refresh?: 'none' | 'record' | 'list' | 'all';
 }
 
 export type RecordData = Record<string, Primitive>;

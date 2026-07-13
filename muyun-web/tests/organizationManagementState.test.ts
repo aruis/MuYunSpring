@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Organization } from '../src/web-contracts/index.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
 import { createOrganizationManagementState } from '../src/views/organizationManagementState.ts';
 
@@ -59,6 +60,55 @@ test('organization management state updates existing records and refreshes enabl
   assert.deepEqual(calls, ['update:org-root:总部修订', 'disable:org-root', 'view:org-root']);
   assert.equal(state.selected.value?.enabled, false);
   assert.equal(state.reloadKey.value, 2);
+});
+
+test('organization management state runs standard action reactions before custom handlers', async () => {
+  const handled: string[] = [];
+  const context = createContext({
+    insert: async (record) => ({
+      record: { ...record, id: 'org-child' },
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
+    }),
+  });
+  const state = createOrganizationManagementState(context, async () => true, {
+    actionResultReactionHandlers: {
+      [platformActionResultReactionTypes.refreshList]: () => {
+        handled.push(`reload:${state.reloadKey.value}`);
+      },
+    },
+  });
+
+  state.handleTreeLoaded([{ id: 'org-root', code: 'ROOT', title: '总部', enabled: true }]);
+  state.startCreateChild();
+  state.draft.value.title = '华东区';
+  state.draft.value.code = 'EAST';
+
+  await state.save();
+
+  assert.equal(state.mode.value, 'view');
+  assert.equal(state.reloadKey.value, 1);
+  assert.deepEqual(handled, ['reload:1']);
+});
+
+test('organization management state clears selection through standard delete reactions', async () => {
+  const context = createContext({
+    delete: async () => ({
+      count: 1,
+      reactions: [
+        { type: platformActionResultReactionTypes.clearSelection },
+        { type: platformActionResultReactionTypes.refreshList },
+      ],
+    }),
+  });
+  const state = createOrganizationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'org-root', code: 'ROOT', title: '总部', enabled: true });
+  await state.removeSelected();
+
+  assert.equal(state.selected.value, undefined);
+  assert.equal(state.draft.value.title, '');
+  assert.equal(state.mode.value, 'create');
+  assert.equal(state.reloadKey.value, 1);
 });
 
 test('organization management state trims parent id and clears blank parent id', async () => {
