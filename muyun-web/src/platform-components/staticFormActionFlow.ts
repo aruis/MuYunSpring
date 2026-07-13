@@ -2,7 +2,7 @@ import type { Ref } from 'vue';
 import type { StaticRecordMutationResult } from '@muyun/web-core';
 import {
   handlePlatformActionSuccess,
-  type PlatformActionResultEffectHandler,
+  type PlatformActionResultReactionHandler,
 } from './platformActionResultFeedback';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 
@@ -20,7 +20,7 @@ export interface StaticFormSaveOptions<TRecord> {
   save: (record: TRecord, mode: StaticFormSaveMode) => Promise<StaticRecordMutationResult<TRecord>>;
   onSaved: (result: StaticRecordMutationResult<TRecord>) => void;
   successMessage?: string;
-  effectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  reactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
@@ -33,7 +33,7 @@ export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
   execute: (record: TRecord) => Promise<TResult>;
   onExecuted: (result: TResult, record: TRecord) => void | Promise<void>;
   successMessage?: string;
-  effectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  reactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOptions<TRecord>) {
@@ -65,7 +65,7 @@ export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOpti
       source,
       phase: 'action',
       fallbackMessage: options.successMessage,
-      effectHandlers: options.effectHandlers,
+      reactionHandlers: options.reactionHandlers,
     });
     return result;
   } catch (cause) {
@@ -104,7 +104,7 @@ export async function executeStaticRecordAction<TRecord, TResult = unknown>(
       source,
       phase: 'action',
       fallbackMessage: options.successMessage,
-      effectHandlers: options.effectHandlers,
+      reactionHandlers: options.reactionHandlers,
     });
     return result;
   } catch (cause) {

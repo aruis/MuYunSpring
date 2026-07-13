@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { ActionBar, UiForm, UiTable } from '@muyun/vue-ui-antdv';
 import type { ActionContract, DynamicPageDescriptor, RecordData } from '@muyun/web-contracts';
+import { resolveDynamicActionReactions } from './actionReactions';
 
 defineOptions({ name: 'DynamicModulePage' });
 
@@ -22,7 +23,11 @@ const saveEnvelope = computed(() => ({
 }));
 
 function executeAction(action: ActionContract) {
-  lastAction.value = `${action.actionCode}:${action.refresh ?? 'none'}`;
+  const reactions = resolveDynamicActionReactions(action, {
+    moduleAlias: props.descriptor.moduleAlias,
+    recordId: typeof record.value.id === 'string' ? record.value.id : undefined,
+  });
+  lastAction.value = `${action.actionCode}:${reactions.map((reaction) => reaction.type).join(',') || 'none'}`;
 }
 </script>
 

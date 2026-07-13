@@ -2,13 +2,13 @@ import { computed, ref } from 'vue';
 import { normalizeError, type AppError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
-  createPlatformActionResultEffectHandlers,
+  createPlatformActionResultReactionHandlers,
   handlePlatformActionSuccess,
-  mergePlatformActionResultEffectHandlers,
-  platformActionResultEffects,
-  withPlatformActionResultEffects,
-  type PlatformActionResultEffect,
-  type PlatformActionResultEffectHandler,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
+  withPlatformActionResultReactions,
+  type PlatformActionResultReaction,
+  type PlatformActionResultReactionHandler,
 } from './platformActionResultFeedback';
 import {
   matchesPlatformActionErrorHandler,
@@ -59,7 +59,7 @@ export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   canEnableRecord?: (record: TRecord, actionCode: 'enable' | 'disable') => boolean;
   validateBeforeSave?: (record: TRecord) => string | undefined;
   actionErrorHandlers?: StaticCrudActionErrorHandler<TRecord>[];
-  actionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  actionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
@@ -72,7 +72,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
   const saving = ref(false);
   const actionError = ref<string>();
   const copyRecord = options.copyRecord ?? ((record: TRecord) => ({ ...record }) as TRecord);
-  const actionResultEffectHandlers = createStaticCrudActionEffectHandlers();
+  const actionResultReactionHandlers = createStaticCrudActionReactionHandlers();
 
   const cardTitle = computed(() => {
     if (mode.value === 'create') {
@@ -183,8 +183,8 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       selected.value = saved;
       draft.value = copyRecord(saved);
       await presentActionSuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       handleActionError(cause, mode.value === 'create' ? 'create' : 'update');
@@ -217,7 +217,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      await presentActionSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentActionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       handleActionError(cause, selected.value?.enabled === false ? 'enable' : 'disable');
     } finally {
@@ -252,8 +252,8 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const crud = options.context.abilities.crud();
       const result = await crud.delete(selected.value.id);
       await presentActionSuccess(result, [
-        platformActionResultEffects.clearSelection(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.clearSelection(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       handleActionError(cause, 'delete');
@@ -298,16 +298,16 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     actionError.value = undefined;
   }
 
-  function presentActionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentActionSuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'static-crud-action',
       phase: 'action',
-      effectHandlers: actionResultEffectHandlers,
+      reactionHandlers: actionResultReactionHandlers,
     });
   }
 
-  function createStaticCrudActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createStaticCrudActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         reloadKey.value += 1;
       },
@@ -320,7 +320,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
         mode.value = canCreate.value ? 'create' : 'view';
       },
     });
-    return mergePlatformActionResultEffectHandlers(defaultHandlers, options.actionResultEffectHandlers);
+    return mergePlatformActionResultReactionHandlers(defaultHandlers, options.actionResultReactionHandlers);
   }
 
   return {

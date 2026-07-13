@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ref } from 'vue';
 import {
+  createPlatformActionResultReactionHandlers,
+  handlePlatformActionSuccess,
+} from '../src/platform-components/platformActionResultFeedback.ts';
+import {
   executeStaticFormSave,
   executeStaticRecordAction,
 } from '../src/platform-components/staticFormActionFlow.ts';
@@ -36,9 +40,9 @@ test('static form save executes mutation once and calls saved callback', async (
   assert.equal(loading.value, false);
 });
 
-test('static form save dispatches structured result effects', async () => {
+test('static form save dispatches local result reactions', async () => {
   const loading = ref(false);
-  const effects: string[] = [];
+  const reactions: string[] = [];
 
   await executeStaticFormSave<TestRecord>({
     loading,
@@ -49,27 +53,49 @@ test('static form save dispatches structured result effects', async () => {
     save: async (record) => ({
       record: { ...record, id: 'sales' },
       message: '已保存',
-      effects: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.employee' } }],
+      reactions: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.employee' } }],
     }),
     onSaved: () => undefined,
-    effectHandlers: {
-      'refresh-list': (effect) => {
-        effects.push(`${effect.type}:${effect.payload?.moduleAlias}`);
+    reactionHandlers: {
+      'refresh-list': (reaction) => {
+        reactions.push(`${reaction.type}:${reaction.payload?.moduleAlias}`);
       },
     },
   });
 
-  assert.deepEqual(effects, ['refresh-list:iam.employee']);
+  assert.deepEqual(reactions, ['refresh-list:iam.employee']);
   assert.equal(loading.value, false);
 });
 
-test('static record action dispatches structured result effects after callback', async () => {
+test('platform action result success dispatches standard reaction handlers', async () => {
+  const calls: string[] = [];
+  const reactionHandlers = createPlatformActionResultReactionHandlers({
+    refreshList: (reaction) => {
+      calls.push(`${reaction.type}:${reaction.payload?.resourceKey ?? ''}`);
+    },
+    closeEditor: (reaction) => {
+      calls.push(reaction.type);
+    },
+  });
+
+  await handlePlatformActionSuccess(
+    {
+      message: '已保存',
+      reactions: [{ type: 'refresh-list', payload: { resourceKey: 'employee' } }, { type: 'close-editor' }],
+    },
+    { reactionHandlers },
+  );
+
+  assert.deepEqual(calls, ['refresh-list:employee', 'close-editor']);
+});
+
+test('static record action dispatches local result reactions after callback', async () => {
   const loading = ref(false);
   const calls: string[] = [];
 
   await executeStaticRecordAction<
     TestRecord,
-    { message: string; effects: { type: string; payload?: Record<string, unknown> }[] }
+    { message: string; reactions: { type: string; payload?: Record<string, unknown> }[] }
   >({
     loading,
     record: () => ({ id: 'emp-1', title: '职员' }),
@@ -77,14 +103,14 @@ test('static record action dispatches structured result effects after callback',
     deniedMessage: '无权操作',
     execute: async () => ({
       message: '已启用',
-      effects: [{ type: 'refresh-detail', payload: { recordId: 'emp-1' } }],
+      reactions: [{ type: 'refresh-detail', payload: { recordId: 'emp-1' } }],
     }),
     onExecuted: () => {
       calls.push('executed');
     },
-    effectHandlers: {
-      'refresh-detail': (effect) => {
-        calls.push(`${effect.type}:${effect.payload?.recordId}`);
+    reactionHandlers: {
+      'refresh-detail': (reaction) => {
+        calls.push(`${reaction.type}:${reaction.payload?.recordId}`);
       },
     },
   });

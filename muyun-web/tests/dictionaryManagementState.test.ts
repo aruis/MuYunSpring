@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { DictionaryCategory, DictionaryItem } from '../src/web-contracts/index.ts';
-import { platformActionResultEffectTypes } from '../src/platform-components/platformActionResultFeedback.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import {
   AppError,
   platformErrorCodes,
@@ -147,13 +147,13 @@ test('dictionary management state saves category-bound dictionary items', async 
   assert.equal(state.itemReloadKey.value, 1);
 });
 
-test('dictionary management state runs category action effects before custom handlers', async () => {
+test('dictionary management state runs category action reactions before custom handlers', async () => {
   const handled: string[] = [];
   const categoryContext = createContext();
   const categoryClient = createCategoryClient({
     insert: async (record) => ({
       record: { ...record, id: 'category-status' },
-      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
     }),
   });
   const state = createDictionaryManagementState(
@@ -163,8 +163,8 @@ test('dictionary management state runs category action effects before custom han
     () => 'platform',
     async () => true,
     {
-      categoryActionResultEffectHandlers: {
-        [platformActionResultEffectTypes.refreshList]: () => {
+      categoryActionResultReactionHandlers: {
+        [platformActionResultReactionTypes.refreshList]: () => {
           handled.push(`categoryReload:${state.categoryReloadKey.value}`);
         },
       },
@@ -181,13 +181,13 @@ test('dictionary management state runs category action effects before custom han
   assert.deepEqual(handled, ['categoryReload:1']);
 });
 
-test('dictionary management state runs item action effects before custom handlers', async () => {
+test('dictionary management state runs item action reactions before custom handlers', async () => {
   const handled: string[] = [];
   const categoryContext = createContext();
   const itemClient = createItemClient({
     insert: async (record) => ({
       record: { ...record, id: 'item-enabled' },
-      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
     }),
   });
   const state = createDictionaryManagementState(
@@ -197,8 +197,8 @@ test('dictionary management state runs item action effects before custom handler
     () => 'platform',
     async () => true,
     {
-      itemActionResultEffectHandlers: {
-        [platformActionResultEffectTypes.refreshList]: () => {
+      itemActionResultReactionHandlers: {
+        [platformActionResultReactionTypes.refreshList]: () => {
           handled.push(`itemReload:${state.itemReloadKey.value}`);
         },
       },

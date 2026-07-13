@@ -12,6 +12,8 @@ import {
   normalizeError,
   platformErrorCodes,
   resolveGlobalErrorPresentation,
+  webDataChanges,
+  withWebActionResultChanges,
 } from '../src/web-core/index.ts';
 
 test('auth logout posts bearer token to backend logout endpoint', async () => {
@@ -84,6 +86,68 @@ test('http client sends platform trace header', async () => {
   }
 });
 
+test('web action result changes keep backend change when local fact duplicates it', () => {
+  const result = withWebActionResultChanges(
+    {
+      message: '已保存',
+      changes: [webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'category' })],
+    },
+    [webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'category' })],
+  );
+
+  assert.deepEqual(result.changes, [
+    webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'category' }),
+  ]);
+});
+
+test('web action result changes preserve same type with different resource key', () => {
+  const result = withWebActionResultChanges(
+    {
+      message: '已保存',
+      changes: [webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'category' })],
+    },
+    [webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'item' })],
+  );
+
+  assert.deepEqual(result.changes, [
+    webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'category' }),
+    webDataChanges.collectionChanged('platform.dictionary', { resourceKey: 'item' }),
+  ]);
+});
+
+test('web action result changes include scope in dedupe key', () => {
+  const result = withWebActionResultChanges(
+    {
+      message: '已保存',
+      changes: [webDataChanges.collectionChanged('iam.employee', { scope: 'left-pane' })],
+    },
+    [
+      webDataChanges.collectionChanged('iam.employee', { scope: 'right-pane' }),
+      webDataChanges.collectionChanged('iam.employee', { scope: 'left-pane' }),
+    ],
+  );
+
+  assert.deepEqual(result.changes, [
+    webDataChanges.collectionChanged('iam.employee', { scope: 'left-pane' }),
+    webDataChanges.collectionChanged('iam.employee', { scope: 'right-pane' }),
+  ]);
+});
+
+test('web action result changes separate records inside the same module', () => {
+  const result = withWebActionResultChanges(
+    {
+      message: '已保存',
+      changes: [webDataChanges.recordUpdated('iam.employee', 'emp-1')],
+    },
+    [webDataChanges.recordUpdated('iam.employee', 'emp-2')],
+  );
+
+  assert.deepEqual(result.changes, [
+    webDataChanges.recordUpdated('iam.employee', 'emp-1'),
+    webDataChanges.recordUpdated('iam.employee', 'emp-2'),
+  ]);
+});
+
 test('static module tree client maps standard CRUD and tree endpoints by module alias', async () => {
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;
@@ -108,7 +172,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
         record: { id: 'org-1', title: '总部' },
         message: '已创建',
         resultType: 'created',
-        effects: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.organization' } }],
+        changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
       });
     }
     return Response.json({ count: 1 });
@@ -138,7 +202,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
       record: { id: 'org-1', title: '总部' },
       message: '已创建',
       resultType: 'created',
-      effects: [{ type: 'refresh-list', payload: { moduleAlias: 'iam.organization' } }],
+      changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
     assert.equal(requests[4].url, 'http://api.local/iam.organization/sort/org-1');
     assert.deepEqual(await requests[4].json(), { parentId: 'root' });

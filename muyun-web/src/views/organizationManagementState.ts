@@ -3,22 +3,22 @@ import type { Organization } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
-  createPlatformActionResultEffectHandlers,
+  createPlatformActionResultReactionHandlers,
   handlePlatformActionSuccess,
-  mergePlatformActionResultEffectHandlers,
-  platformActionResultEffects,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
   presentPlatformError,
   presentPlatformMessage,
-  type PlatformActionResultEffect,
-  type PlatformActionResultEffectHandler,
-  withPlatformActionResultEffects,
+  type PlatformActionResultReaction,
+  type PlatformActionResultReactionHandler,
+  withPlatformActionResultReactions,
 } from '@muyun/platform-components';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export interface OrganizationManagementStateOptions {
-  actionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  actionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export function createOrganizationManagementState(
@@ -32,7 +32,7 @@ export function createOrganizationManagementState(
   const reloadKey = ref(0);
   const saving = ref(false);
   const actionError = ref<string>();
-  const actionResultEffectHandlers = createOrganizationActionEffectHandlers();
+  const actionResultReactionHandlers = createOrganizationActionReactionHandlers();
 
   const cardTitle = computed(() => {
     if (mode.value === 'create') {
@@ -121,8 +121,8 @@ export function createOrganizationManagementState(
       selected.value = saved;
       draft.value = copyRecord(saved);
       await presentActionSuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       presentActionCause(cause);
@@ -152,7 +152,7 @@ export function createOrganizationManagementState(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      await presentActionSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentActionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       presentActionCause(cause);
     } finally {
@@ -184,8 +184,8 @@ export function createOrganizationManagementState(
       const crud = organizationContext.abilities.crud();
       const result = await crud.delete(selected.value.id);
       await presentActionSuccess(result, [
-        platformActionResultEffects.clearSelection(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.clearSelection(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       presentActionCause(cause);
@@ -209,16 +209,16 @@ export function createOrganizationManagementState(
     presentPlatformMessage(message, { source: 'organization-management-action', phase: 'action' });
   }
 
-  function presentActionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentActionSuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'organization-management-action',
       phase: 'action',
-      effectHandlers: actionResultEffectHandlers,
+      reactionHandlers: actionResultReactionHandlers,
     });
   }
 
-  function createOrganizationActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createOrganizationActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         reloadKey.value += 1;
       },
@@ -231,7 +231,7 @@ export function createOrganizationManagementState(
         mode.value = 'create';
       },
     });
-    return mergePlatformActionResultEffectHandlers(defaultHandlers, options.actionResultEffectHandlers);
+    return mergePlatformActionResultReactionHandlers(defaultHandlers, options.actionResultReactionHandlers);
   }
 
   return {

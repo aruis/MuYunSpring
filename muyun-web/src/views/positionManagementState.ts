@@ -3,16 +3,16 @@ import type { Position, PositionCategory, WebQueryCondition } from '@muyun/web-c
 import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
-  createPlatformActionResultEffectHandlers,
+  createPlatformActionResultReactionHandlers,
   createRecordEditorSessionState,
   handlePlatformActionSuccess,
-  mergePlatformActionResultEffectHandlers,
-  platformActionResultEffects,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
   presentPlatformError,
   presentPlatformMessage,
-  type PlatformActionResultEffect,
-  type PlatformActionResultEffectHandler,
-  withPlatformActionResultEffects,
+  type PlatformActionResultReaction,
+  type PlatformActionResultReactionHandler,
+  withPlatformActionResultReactions,
 } from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
@@ -20,8 +20,8 @@ export type CategoryCardMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export interface PositionManagementStateOptions {
-  categoryActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
-  positionActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  categoryActionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
+  positionActionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export function createPositionManagementState(
@@ -46,7 +46,7 @@ export function createPositionManagementState(
   const categorySaving = ref(false);
   const categoryError = ref<string>();
   const selectedCategoryId = computed(() => selectedCategory.value?.id);
-  const categoryActionResultEffectHandlers = createCategoryActionEffectHandlers();
+  const categoryActionResultReactionHandlers = createCategoryActionReactionHandlers();
 
   const positions = ref<Position[]>([]);
   const positionEditor = createRecordEditorSessionState<Position, PositionCardMode>({
@@ -62,7 +62,7 @@ export function createPositionManagementState(
   const positionLoading = ref(false);
   const positionSaving = ref(false);
   const positionError = ref<string>();
-  const positionActionResultEffectHandlers = createPositionActionEffectHandlers();
+  const positionActionResultReactionHandlers = createPositionActionReactionHandlers();
 
   const selectedCategoryTitle = computed(() => positionCategoryTitleOf(selectedCategory.value));
   const filteredPositions = computed(() =>
@@ -204,8 +204,8 @@ export function createPositionManagementState(
       const saved = result.record;
       categoryEditor.select(saved);
       await presentCategorySuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       presentCategoryCause(cause);
@@ -232,7 +232,7 @@ export function createPositionManagementState(
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
       categoryEditor.select(await categoryContext.abilities.crud().view(selectedCategory.value.id));
-      await presentCategorySuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentCategorySuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       presentCategoryCause(cause);
     } finally {
@@ -263,8 +263,8 @@ export function createPositionManagementState(
       await categoryContext.runtime.ready;
       const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
       await presentCategorySuccess(result, [
-        platformActionResultEffects.clearSelection(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.clearSelection(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       presentCategoryCause(cause);
@@ -378,8 +378,8 @@ export function createPositionManagementState(
       const saved = result.record;
       positionEditor.select(saved);
       await presentPositionSuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         const savedCategory = categories.value.find((category) => category.id === saved.categoryId);
@@ -413,7 +413,7 @@ export function createPositionManagementState(
           ? await positionClient.enable(selectedPosition.value.id)
           : await positionClient.disable(selectedPosition.value.id);
       positionEditor.select(await positionClient.view(selectedPosition.value.id));
-      await presentPositionSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentPositionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       presentPositionCause(cause);
     } finally {
@@ -448,7 +448,7 @@ export function createPositionManagementState(
       } else {
         positionMode.value = 'view';
       }
-      await presentPositionSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentPositionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       presentPositionCause(cause);
     } finally {
@@ -486,24 +486,24 @@ export function createPositionManagementState(
     presentPlatformMessage(message, { source: 'position-action', phase: 'action' });
   }
 
-  function presentCategorySuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentCategorySuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'position-category-action',
       phase: 'action',
-      effectHandlers: categoryActionResultEffectHandlers,
+      reactionHandlers: categoryActionResultReactionHandlers,
     });
   }
 
-  function presentPositionSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentPositionSuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'position-action',
       phase: 'action',
-      effectHandlers: positionActionResultEffectHandlers,
+      reactionHandlers: positionActionResultReactionHandlers,
     });
   }
 
-  function createCategoryActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createCategoryActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         categoryReloadKey.value += 1;
       },
@@ -515,14 +515,14 @@ export function createPositionManagementState(
         categoryMode.value = 'view';
       },
     });
-    return mergePlatformActionResultEffectHandlers(
+    return mergePlatformActionResultReactionHandlers(
       defaultHandlers,
-      options.categoryActionResultEffectHandlers,
+      options.categoryActionResultReactionHandlers,
     );
   }
 
-  function createPositionActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createPositionActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         positionReloadKey.value += 1;
       },
@@ -530,9 +530,9 @@ export function createPositionManagementState(
         positionMode.value = 'view';
       },
     });
-    return mergePlatformActionResultEffectHandlers(
+    return mergePlatformActionResultReactionHandlers(
       defaultHandlers,
-      options.positionActionResultEffectHandlers,
+      options.positionActionResultReactionHandlers,
     );
   }
 

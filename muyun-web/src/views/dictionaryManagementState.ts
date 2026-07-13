@@ -9,16 +9,16 @@ import {
 } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 import {
-  createPlatformActionResultEffectHandlers,
+  createPlatformActionResultReactionHandlers,
   createRecordEditorSessionState,
   handlePlatformActionSuccess,
-  mergePlatformActionResultEffectHandlers,
-  platformActionResultEffects,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
   presentPlatformError,
   presentPlatformMessage,
-  type PlatformActionResultEffect,
-  type PlatformActionResultEffectHandler,
-  withPlatformActionResultEffects,
+  type PlatformActionResultReaction,
+  type PlatformActionResultReactionHandler,
+  withPlatformActionResultReactions,
 } from '@muyun/platform-components';
 
 export type DictionaryCategoryMode = 'view' | 'edit' | 'create-root' | 'create-child';
@@ -26,8 +26,8 @@ export type DictionaryItemMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export interface DictionaryManagementStateOptions {
-  categoryActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
-  itemActionResultEffectHandlers?: Record<string, PlatformActionResultEffectHandler | undefined>;
+  categoryActionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
+  itemActionResultReactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
 }
 
 export function createDictionaryManagementState(
@@ -53,7 +53,7 @@ export function createDictionaryManagementState(
   const categoryMode = categoryEditor.mode;
   const categorySaving = ref(false);
   const categoryError = ref<string>();
-  const categoryActionResultEffectHandlers = createCategoryActionEffectHandlers();
+  const categoryActionResultReactionHandlers = createCategoryActionReactionHandlers();
 
   const items = ref<DictionaryItem[]>([]);
   const itemEditor = createRecordEditorSessionState<DictionaryItem, DictionaryItemMode>({
@@ -69,7 +69,7 @@ export function createDictionaryManagementState(
   const itemLoading = ref(false);
   const itemSaving = ref(false);
   const itemError = ref<string>();
-  const itemActionResultEffectHandlers = createItemActionEffectHandlers();
+  const itemActionResultReactionHandlers = createItemActionReactionHandlers();
 
   const selectedCategoryId = computed(() => selectedCategory.value?.id);
   const selectedCategoryTitle = computed(() => dictionaryCategoryTitleOf(selectedCategory.value));
@@ -209,8 +209,8 @@ export function createDictionaryManagementState(
       const saved = result.record;
       categoryEditor.select(saved);
       await presentCategorySuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
       resetItemsForCategory();
     } catch (cause) {
@@ -238,7 +238,7 @@ export function createDictionaryManagementState(
           ? await enable.enable(selectedCategory.value.id)
           : await enable.disable(selectedCategory.value.id);
       categoryEditor.select(await categoryClientOf().view(selectedCategory.value.id));
-      await presentCategorySuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentCategorySuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       handleCategoryError(cause);
     } finally {
@@ -269,8 +269,8 @@ export function createDictionaryManagementState(
       await categoryContext.runtime.ready;
       const result = await categoryClientOf().delete(selectedCategory.value.id);
       await presentCategorySuccess(result, [
-        platformActionResultEffects.clearSelection(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.clearSelection(),
+        platformActionResultReactions.refreshList(),
       ]);
       resetItemsForCategory();
     } catch (cause) {
@@ -390,8 +390,8 @@ export function createDictionaryManagementState(
       const saved = result.record;
       itemEditor.select(saved);
       await presentItemSuccess(result, [
-        platformActionResultEffects.closeEditor(),
-        platformActionResultEffects.refreshList(),
+        platformActionResultReactions.closeEditor(),
+        platformActionResultReactions.refreshList(),
       ]);
     } catch (cause) {
       handleItemError(cause);
@@ -416,7 +416,7 @@ export function createDictionaryManagementState(
           ? await itemClient().enable(selectedItem.value.id)
           : await itemClient().disable(selectedItem.value.id);
       itemEditor.select(await itemClient().view(selectedItem.value.id));
-      await presentItemSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentItemSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       handleItemError(cause);
     } finally {
@@ -451,7 +451,7 @@ export function createDictionaryManagementState(
       } else {
         itemMode.value = 'view';
       }
-      await presentItemSuccess(result, [platformActionResultEffects.refreshList()]);
+      await presentItemSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
       handleItemError(cause);
     } finally {
@@ -543,24 +543,24 @@ export function createDictionaryManagementState(
     presentPlatformMessage(message, { source: 'dictionary-item-action', phase: 'action' });
   }
 
-  function presentCategorySuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentCategorySuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'dictionary-category-action',
       phase: 'action',
-      effectHandlers: categoryActionResultEffectHandlers,
+      reactionHandlers: categoryActionResultReactionHandlers,
     });
   }
 
-  function presentItemSuccess(result: unknown, defaultEffects: PlatformActionResultEffect[]) {
-    return handlePlatformActionSuccess(withPlatformActionResultEffects(result, defaultEffects), {
+  function presentItemSuccess(result: unknown, defaultReactions: PlatformActionResultReaction[]) {
+    return handlePlatformActionSuccess(withPlatformActionResultReactions(result, defaultReactions), {
       source: 'dictionary-item-action',
       phase: 'action',
-      effectHandlers: itemActionResultEffectHandlers,
+      reactionHandlers: itemActionResultReactionHandlers,
     });
   }
 
-  function createCategoryActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createCategoryActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         categoryReloadKey.value += 1;
       },
@@ -572,14 +572,14 @@ export function createDictionaryManagementState(
         categoryMode.value = 'view';
       },
     });
-    return mergePlatformActionResultEffectHandlers(
+    return mergePlatformActionResultReactionHandlers(
       defaultHandlers,
-      options.categoryActionResultEffectHandlers,
+      options.categoryActionResultReactionHandlers,
     );
   }
 
-  function createItemActionEffectHandlers() {
-    const defaultHandlers = createPlatformActionResultEffectHandlers({
+  function createItemActionReactionHandlers() {
+    const defaultHandlers = createPlatformActionResultReactionHandlers({
       refreshList: () => {
         itemReloadKey.value += 1;
       },
@@ -587,7 +587,10 @@ export function createDictionaryManagementState(
         itemMode.value = 'view';
       },
     });
-    return mergePlatformActionResultEffectHandlers(defaultHandlers, options.itemActionResultEffectHandlers);
+    return mergePlatformActionResultReactionHandlers(
+      defaultHandlers,
+      options.itemActionResultReactionHandlers,
+    );
   }
 
   return {

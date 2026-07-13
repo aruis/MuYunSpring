@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Organization } from '../src/web-contracts/index.ts';
-import { platformActionResultEffectTypes } from '../src/platform-components/platformActionResultFeedback.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
 import { createOrganizationManagementState } from '../src/views/organizationManagementState.ts';
 
@@ -62,17 +62,17 @@ test('organization management state updates existing records and refreshes enabl
   assert.equal(state.reloadKey.value, 2);
 });
 
-test('organization management state runs standard action effects before custom handlers', async () => {
+test('organization management state runs standard action reactions before custom handlers', async () => {
   const handled: string[] = [];
   const context = createContext({
     insert: async (record) => ({
       record: { ...record, id: 'org-child' },
-      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
     }),
   });
   const state = createOrganizationManagementState(context, async () => true, {
-    actionResultEffectHandlers: {
-      [platformActionResultEffectTypes.refreshList]: () => {
+    actionResultReactionHandlers: {
+      [platformActionResultReactionTypes.refreshList]: () => {
         handled.push(`reload:${state.reloadKey.value}`);
       },
     },
@@ -90,13 +90,13 @@ test('organization management state runs standard action effects before custom h
   assert.deepEqual(handled, ['reload:1']);
 });
 
-test('organization management state clears selection through standard delete effects', async () => {
+test('organization management state clears selection through standard delete reactions', async () => {
   const context = createContext({
     delete: async () => ({
       count: 1,
-      effects: [
-        { type: platformActionResultEffectTypes.clearSelection },
-        { type: platformActionResultEffectTypes.refreshList },
+      reactions: [
+        { type: platformActionResultReactionTypes.clearSelection },
+        { type: platformActionResultReactionTypes.refreshList },
       ],
     }),
   });

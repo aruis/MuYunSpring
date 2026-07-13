@@ -160,7 +160,7 @@ function normalizeRecordMutationResponse<TRecord>(
       record: response.record,
       message: response.message,
       resultType: response.resultType,
-      effects: response.effects,
+      changes: response.changes,
     };
   }
   return { record: response };

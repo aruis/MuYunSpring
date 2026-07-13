@@ -28,7 +28,8 @@ export function presentPlatformMessage(message: string, context: PlatformErrorFe
   showErrorMessage(message);
 }
 
-export function presentPlatformSuccess(message: string, _context: PlatformErrorFeedbackContext = {}) {
+export function presentPlatformSuccess(message: string, context: PlatformErrorFeedbackContext = {}) {
+  void context;
   showSuccessMessage(message);
 }
 

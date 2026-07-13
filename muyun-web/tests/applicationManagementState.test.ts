@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Application } from '../src/web-contracts/index.ts';
-import { platformActionResultEffectTypes } from '../src/platform-components/platformActionResultFeedback.ts';
+import { platformActionResultReactionTypes } from '../src/platform-components/platformActionResultFeedback.ts';
 import {
   AppError,
   platformErrorCodes,
@@ -89,17 +89,17 @@ test('application management state toggles enable state and refreshes selected r
   assert.equal(state.reloadKey.value, 1);
 });
 
-test('application management state runs standard action effects before custom handlers', async () => {
+test('application management state runs standard action reactions before custom handlers', async () => {
   const handled: string[] = [];
   const context = createContext({
     insert: async (record) => ({
       record: { ...record, sortOrder: 10 },
-      effects: [{ type: platformActionResultEffectTypes.refreshList }],
+      reactions: [{ type: platformActionResultReactionTypes.refreshList }],
     }),
   });
   const state = createApplicationManagementState(context, async () => true, {
-    actionResultEffectHandlers: {
-      [platformActionResultEffectTypes.refreshList]: () => {
+    actionResultReactionHandlers: {
+      [platformActionResultReactionTypes.refreshList]: () => {
         handled.push(`reload:${state.reloadKey.value}`);
       },
     },

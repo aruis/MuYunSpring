@@ -77,25 +77,27 @@ export {
   presentPlatformMessage,
   presentPlatformSuccess,
 } from './platformErrorFeedback';
+export { handlePlatformActionSuccess, presentPlatformActionSuccess } from './platformActionResultFeedback';
 export {
-  createPlatformActionResultEffectHandlers,
-  handlePlatformActionSuccess,
-  mergePlatformActionResultEffectHandlers,
-  platformActionResultEffects,
-  platformActionResultEffectTypes,
-  presentPlatformActionSuccess,
+  createPlatformActionResultReactionHandlers,
+  mergePlatformActionResultReactionHandlers,
+  platformActionResultReactions,
+  platformActionResultReactionTypes,
   resolvePlatformActionResult,
   resolvePlatformActionResultMessage,
-  withPlatformActionResultEffects,
-} from './platformActionResultFeedback';
+  withPlatformActionResultReactions,
+} from './platformActionResultReactions';
 export type {
   PlatformActionResult,
-  PlatformActionResultEffect,
-  PlatformActionResultEffectHandler,
-  PlatformActionResultEffectType,
+  PlatformActionResultReaction,
+  PlatformActionResultReactionHandler,
+  PlatformActionResultReactionPayload,
+  PlatformActionResultReactionType,
+  PlatformActionResultStandardReactionHandlers,
+} from './platformActionResultReactions';
+export type {
   PlatformActionResultFeedbackContext,
   PlatformActionResultHandlingContext,
-  PlatformActionResultStandardEffectHandlers,
 } from './platformActionResultFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { createRecordEditorSessionState } from './recordEditorSessionState';
