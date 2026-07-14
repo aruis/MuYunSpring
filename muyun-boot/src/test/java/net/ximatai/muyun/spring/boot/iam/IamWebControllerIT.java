@@ -867,9 +867,13 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"employeePositionId":"position-1"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-2"));
+                .andExpect(jsonPath("$.data").value("grant-2"))
+                .andExpect(jsonPath("$.message.code").value("iam.employment-role-grant.granted"))
+                .andExpect(jsonPath("$.message.text").value("任职角色已授权"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
 
         mvc.perform(get("/iam.role/{roleId}/employment-grants", "role-2"))
                 .andExpect(status().isOk())
@@ -878,7 +882,11 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("iam.employment-role-grant.revoked"))
+                .andExpect(jsonPath("$.message.text").value("任职角色授权已撤销"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
 
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")

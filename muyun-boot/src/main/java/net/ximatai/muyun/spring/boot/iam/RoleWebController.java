@@ -165,6 +165,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/employment-grants")
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutationResult(code = "iam.employment-role-grant.granted", message = "任职角色已授权",
+            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
     public String grantEmploymentRole(@PathVariable String roleId,
                                       @RequestBody EmploymentRoleGrantRequest request) {
         return roleRecordScope(roleId, () -> service().grantEmploymentRole(roleId, request.employeePositionId()));
@@ -173,6 +175,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/employment-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutationResult(code = "iam.employment-role-grant.revoked", message = "任职角色授权已撤销",
+            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
     public int deleteEmploymentRoleGrant(@PathVariable String roleId,
                                                       @PathVariable String grantId) {
         return roleRecordScope(roleId,
