@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
-import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -454,15 +453,14 @@ public class DynamicRecordWebController implements
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
-    public WebRecordResponse<DynamicRecord> insert(@RequestBody DynamicRecord record) {
+    public DynamicRecord insert(@RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             String id = service().insert(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
-            DynamicRecord saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
         });
     }
 
@@ -470,7 +468,7 @@ public class DynamicRecordWebController implements
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
     @Transactional
-    public WebRecordResponse<DynamicRecord> update(@PathVariable String id, @RequestBody DynamicRecord record) {
+    public DynamicRecord update(@PathVariable String id, @RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             normalized.setId(id);
@@ -479,9 +477,8 @@ public class DynamicRecordWebController implements
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
-            DynamicRecord saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
+            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
                     FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 

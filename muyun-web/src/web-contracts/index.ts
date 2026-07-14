@@ -70,10 +70,6 @@ export interface WebCountResponse extends WebActionResultFacts {
   count: number;
 }
 
-export interface WebRecordResponse<T> extends WebActionResultFacts {
-  record: T;
-}
-
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];

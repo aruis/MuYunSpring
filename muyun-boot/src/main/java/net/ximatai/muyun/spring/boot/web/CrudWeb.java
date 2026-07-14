@@ -237,24 +237,22 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.CREATE)
     @StandardMutation(StandardMutationKind.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    default WebRecordResponse<T> insert(@RequestBody T record) {
+    default T insert(@RequestBody T record) {
         return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
-            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
         }));
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
     @StandardMutation(StandardMutationKind.UPDATE)
-    default WebRecordResponse<T> update(@PathVariable String id, @RequestBody T record) {
+    default T update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return MutationTenantScopeExecutor.forUpdate(this, id, record, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
-            T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
         }));
     }
 

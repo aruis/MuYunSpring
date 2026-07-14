@@ -7,7 +7,6 @@ import type {
   WebListResponse,
   WebPageResponse,
   WebQueryRequest,
-  WebRecordResponse,
   WebTreeNode,
 } from '@muyun/web-contracts';
 import type { HttpClient } from '../http';
@@ -72,7 +71,7 @@ export function createStaticResourceCrudClient<TRecord>(
     view: (id) => http.request<TRecord>({ path: `${modulePath}/view/${encodeURIComponent(id)}` }),
     insert: async (record) =>
       normalizeRecordMutationResponse(
-        await http.request<TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>>({
+        await http.request<TRecord | WebActionResultEnvelope<TRecord>>({
           method: 'POST',
           path: `${modulePath}/insert`,
           body: record,
@@ -80,7 +79,7 @@ export function createStaticResourceCrudClient<TRecord>(
       ),
     update: async (id, record) =>
       normalizeRecordMutationResponse(
-        await http.request<TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>>({
+        await http.request<TRecord | WebActionResultEnvelope<TRecord>>({
           method: 'POST',
           path: `${modulePath}/update/${encodeURIComponent(id)}`,
           body: record,
@@ -162,7 +161,7 @@ function modulePathOf(moduleAlias: string) {
 }
 
 function normalizeRecordMutationResponse<TRecord>(
-  response: TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>,
+  response: TRecord | WebActionResultEnvelope<TRecord>,
 ): StaticRecordMutationResult<TRecord> {
   if (isWebActionResultEnvelope<TRecord>(response)) {
     return {
@@ -171,14 +170,6 @@ function normalizeRecordMutationResponse<TRecord>(
       resultType: response.resultType,
       changes: response.changes,
       changeSetId: response.changeSetId,
-    };
-  }
-  if (isWebRecordResponse(response)) {
-    return {
-      record: response.record,
-      message: response.message,
-      resultType: response.resultType,
-      changes: response.changes,
     };
   }
   return { record: response };
@@ -209,10 +200,4 @@ function webCount(data: unknown) {
 
 function isWebActionResultEnvelope<TData>(response: unknown): response is WebActionResultEnvelope<TData> {
   return typeof response === 'object' && response !== null && 'data' in response && 'changeSetId' in response;
-}
-
-function isWebRecordResponse<TRecord>(
-  response: TRecord | WebRecordResponse<TRecord>,
-): response is WebRecordResponse<TRecord> {
-  return typeof response === 'object' && response !== null && 'record' in response;
 }

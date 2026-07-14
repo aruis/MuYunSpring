@@ -66,9 +66,6 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     private Object actionData(Object body) {
-        if (body instanceof WebRecordResponse<?> recordResponse) {
-            return recordResponse.record();
-        }
         if (body instanceof WebCountResponse countResponse) {
             return new CountData(countResponse.count());
         }

@@ -172,7 +172,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(tenant("tenant_b", "Tenant B"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.alias").value("tenant_b"));
+                .andExpect(jsonPath("$.alias").value("tenant_b"));
     }
 
     @Test
@@ -405,7 +405,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(organization(null, "HQ", "Headquarters"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("org-1"));
+                .andExpect(jsonPath("$.id").value("org-1"));
     }
 
     @Test
@@ -434,10 +434,10 @@ class IamWebControllerTest {
 	                                }
                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("user-1"))
-                .andExpect(jsonPath("$.record.username").value("alice"))
-                .andExpect(jsonPath("$.record.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.record.password").doesNotExist());
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.username").value("alice"))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test
@@ -465,8 +465,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("user-1"))
-                .andExpect(jsonPath("$.record.username").value("alice"));
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.username").value("alice"));
     }
 
     @Test
@@ -492,8 +492,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.roleKind").value("dataGrant"));
+                .andExpect(jsonPath("$.id").value("role-1"))
+                .andExpect(jsonPath("$.roleKind").value("dataGrant"));
     }
 
     @Test
@@ -525,8 +525,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("demo"));
+                .andExpect(jsonPath("$.id").value("role-1"))
+                .andExpect(jsonPath("$.tenantId").value("demo"));
     }
 
     @Test
@@ -971,9 +971,9 @@ class IamWebControllerTest {
                                 {"organizationId":"org-1","code":"FIN","title":"Finance","enabled":true}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("dept-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.record.organizationId").value("org-1"));
+                .andExpect(jsonPath("$.id").value("dept-1"))
+                .andExpect(jsonPath("$.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.organizationId").value("org-1"));
     }
 
     @Test
@@ -1014,9 +1014,9 @@ class IamWebControllerTest {
                                 {"organizationId":"org-1","departmentId":"dept-1","employeeNo":"E001","title":"Alice","enabled":true}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("employee-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.record.organizationId").value("org-1"));
+                .andExpect(jsonPath("$.id").value("employee-1"))
+                .andExpect(jsonPath("$.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.organizationId").value("org-1"));
     }
 
     @Test

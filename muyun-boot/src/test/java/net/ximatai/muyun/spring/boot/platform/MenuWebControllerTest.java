@@ -153,7 +153,7 @@ class MenuWebControllerTest {
                                 {"alias":"default","scopeType":"tenant","title":"Default"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("scheme-1"));
+                .andExpect(jsonPath("$.id").value("scheme-1"));
 
         ArgumentCaptor<MenuScheme> captor = ArgumentCaptor.forClass(MenuScheme.class);
         verify(schemeService).insert(captor.capture());
@@ -188,7 +188,7 @@ class MenuWebControllerTest {
                                 {"schemeId":"other-scheme","parentId":"root-1","title":"订单","moduleAlias":"crm.order"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.schemeId").value("scheme-1"));
+                .andExpect(jsonPath("$.schemeId").value("scheme-1"));
 
         ArgumentCaptor<Menu> captor = ArgumentCaptor.forClass(Menu.class);
         verify(menuService).insert(captor.capture());
