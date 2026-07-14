@@ -17,7 +17,7 @@ import java.util.Set;
 public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    @BusinessMutation
+    @StandardMutation(StandardMutationKind.SORT)
     default WebCountResponse sort(@PathVariable String id,
                                   @RequestBody(required = false) SortWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
@@ -25,13 +25,11 @@ public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extend
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 requireSortScope(id, normalized.previousId());
                 service().moveAfter(id, normalized.previousId());
-                StaticCrudActionResultSupport.sorted(webScopeName(), id);
                 return new WebCountResponse(1);
             }
             if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
                 requireSortScope(id, normalized.nextId());
                 service().moveBefore(id, normalized.nextId());
-                StaticCrudActionResultSupport.sorted(webScopeName(), id);
                 return new WebCountResponse(1);
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");

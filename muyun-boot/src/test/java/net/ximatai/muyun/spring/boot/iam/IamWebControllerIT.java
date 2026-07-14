@@ -62,6 +62,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -262,6 +263,29 @@ class IamWebControllerIT {
                         .exists());
 
         verify(tenantService).moveAfter("tenant-1", "tenant-0");
+    }
+
+    @Test
+    void shouldDeriveStandardCreateMutationFromReturnedRecordInRealMvcContext() throws Exception {
+        Tenant tenant = new Tenant();
+        tenant.setId("tenant-2");
+        tenant.setTitle("Tenant 2");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.systemUser("admin", "Admin")));
+        when(tenantService.insert(any(Tenant.class))).thenReturn("tenant-2");
+        when(tenantService.select("tenant-2")).thenReturn(tenant);
+
+        mvc.perform(post("/iam.tenant/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {"id":"tenant-2","title":"Tenant 2"}
+                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value("tenant-2"))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
+                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.tenant' && @.recordId == 'tenant-2')]")
+                        .exists());
     }
 
     @Test

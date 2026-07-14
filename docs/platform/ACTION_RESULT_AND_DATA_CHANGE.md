@@ -169,7 +169,7 @@ throw new BusinessException(
 `BusinessMutation` 是 Web 动作边界标记：
 
 ```java
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface BusinessMutation {
@@ -208,6 +208,39 @@ public EmployeeAccountView provisionAccount(...) {
 标准静态 CRUD 应在平台基类统一接入，普通业务 Controller 不重复标记。
 
 查询、文件下载、流式响应、第三方回调等不进入该机制。
+
+### 5.1 StandardMutation
+
+标准静态写动作使用 `StandardMutation` 声明默认结果策略：
+
+```java
+@BusinessMutation
+public @interface StandardMutation {
+    StandardMutationKind value();
+}
+```
+
+第一阶段仅表达有限标准动作：
+
+```java
+CREATE, UPDATE, DELETE, ENABLE, DISABLE, SORT
+```
+
+它负责让平台根据标准动作、当前静态模块身份、返回记录或路径变量自动派生：
+
+- 标准成功消息；
+- 标准数据变化事实；
+- HTTP `ActionResult` 包装。
+
+它不负责表达：
+
+- 自定义业务消息；
+- 跨模块影响；
+- 复杂记录 ID 提取规则；
+- 字符串属性解析表达式；
+- UI 行为。
+
+标准动作注解不能演进为配置语言。复杂业务事实仍由应用 Service 通过 reporter 显式报告。
 
 ## 6. 数据变更声明
 
@@ -429,8 +462,8 @@ Web Adapter
 
 | 存量对象或链路 | 当前处理 | 目标 |
 | --- | --- | --- |
-| `CrudWeb` 标准 `insert` / `update` / `delete` | Web 输出层包装为 `ActionResult`；Java 签名可阶段性保留 `WebRecordResponse` 以兼容动态覆盖 | 外部 HTTP 契约统一，后续再压缩 Java 内部旧包装 |
-| `EnableWeb` / `SortWeb` | Web 输出层包装为 `ActionResult`，按记录更新类变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
+| `CrudWeb` 标准 `insert` / `update` / `delete` | 使用 `StandardMutation` 声明标准动作，Web 输出层派生标准消息和变化事实；Java 签名可阶段性保留 `WebRecordResponse` 以兼容动态覆盖 | 外部 HTTP 契约统一，后续再压缩 Java 内部旧包装 |
+| `EnableWeb` / `SortWeb` | 使用 `StandardMutation` 声明标准动作，按记录更新类变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
 | 嵌套静态 CRUD / Tree CRUD | 第一阶段暂保持旧响应 | 明确 `resourceKey`、父子 `scope` 和子资源变化语义后，再接入统一动作结果 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 报告消息和变化 | Controller 返回贴近原始业务数据 |
 | `WebRecordResponse` / `WebCountResponse` | 作为阶段兼容对象；进入 `BusinessMutation` 时由输出层转换为 `data` | 新业务不继续扩散旧顶层 `record` / `count` |
