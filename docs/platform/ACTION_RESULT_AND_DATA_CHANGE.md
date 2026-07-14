@@ -472,6 +472,7 @@ Web Adapter
 | `BusinessMutationResult` | 作为简单非标准静态动作的声明式结果契约，使用 service class 强引用目标模块；记录 ID 通过 `recordIdSource = PATH_VARIABLE` 和显式 `recordId` 声明 | 不支持对象路径、返回值路径等字符串表达式 |
 | `BusinessMutationResultSupport` | 作为 boot web 层业务动作门面，供复杂非标准静态动作登记业务消息和显式变化事实 | 不复用标准 CRUD 文案，不表达 UI 行为 |
 | 业务专用静态动作 | 简单单结果动作使用 `@BusinessMutationResult`；复杂多影响动作使用 `@BusinessMutation` 加代码式 reporter；底层业务 Service 不因 HTTP 输出契约反向依赖 boot web | Controller 返回贴近原始业务数据 |
+| 授权集合动作 | 第一阶段用 `COLLECTION_CHANGED` 表达授权集合变化；账号角色授权当前归入 `RoleService` 聚合模块 | 授权关系独立成静态模块后，再切换为独立模块身份 |
 | 计数型动作 | Controller 直接返回 `int` / `Integer`；进入 `BusinessMutation` 时统一放入 `data` | 计数语义保留为原始数字，不再引入计数包装模型 |
 | 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
 | `DynamicActionResultBody` | 暂保持旧形态，禁止作为新静态动作结果参考 | 拆分为业务数据、业务消息、数据变化事实和明确交互动作 |

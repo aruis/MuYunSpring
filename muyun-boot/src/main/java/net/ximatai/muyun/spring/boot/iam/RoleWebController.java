@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.spring.boot.web.BusinessMutationChange;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationResult;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
@@ -131,6 +133,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/account-grants")
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutationResult(code = "iam.account-role-grant.granted", message = "账号角色已授权",
+            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
     public String grantAccountRole(@PathVariable String roleId,
                                    @RequestBody AccountRoleGrantRequest request) {
         return roleRecordScope(roleId, () -> service().grantAccountRole(
@@ -143,6 +147,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/account-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutationResult(code = "iam.account-role-grant.revoked", message = "账号角色授权已撤销",
+            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
     public int deleteAccountRoleGrant(@PathVariable String roleId,
                                                    @PathVariable String grantId) {
         return roleRecordScope(roleId,
