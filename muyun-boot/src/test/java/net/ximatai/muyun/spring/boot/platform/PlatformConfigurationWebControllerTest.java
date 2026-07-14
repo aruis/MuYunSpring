@@ -984,7 +984,7 @@ class PlatformConfigurationWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addInterceptors(new BusinessMutationInterceptor())
-                .setControllerAdvice(new ActionResultResponseAdvice(Class::getSimpleName))
+                .setControllerAdvice(new ActionResultResponseAdvice(PlatformConfigurationWebControllerTest::moduleAlias))
                 .build();
 
         assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/publish",
@@ -1024,6 +1024,18 @@ class PlatformConfigurationWebControllerTest {
                 new ModuleDefinition("crm.contract", "Contract", List.of()),
                 Map.of(),
                 dryRun);
+    }
+
+    private static String moduleAlias(Class<?> moduleType) {
+        try {
+            Object value = moduleType.getField("MODULE_ALIAS").get(null);
+            if (value instanceof String alias) {
+                return alias;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fall through to a clear test failure.
+        }
+        throw new IllegalArgumentException("missing MODULE_ALIAS: " + moduleType.getName());
     }
 
     private PlatformModule module(String id, String applicationAlias, String parentId) {

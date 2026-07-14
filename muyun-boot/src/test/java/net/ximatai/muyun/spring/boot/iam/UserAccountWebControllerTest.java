@@ -77,7 +77,7 @@ class UserAccountWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addInterceptors(new BusinessMutationInterceptor())
-                .setControllerAdvice(new ActionResultResponseAdvice(Class::getSimpleName))
+                .setControllerAdvice(new ActionResultResponseAdvice(UserAccountWebControllerTest::moduleAlias))
                 .build();
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             mvc.perform(post("/iam.user/changePassword/user-1")
@@ -110,5 +110,17 @@ class UserAccountWebControllerTest {
         ObjectProvider<UserSessionService> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(userSessionService);
         return provider;
+    }
+
+    private static String moduleAlias(Class<?> moduleType) {
+        try {
+            Object value = moduleType.getField("MODULE_ALIAS").get(null);
+            if (value instanceof String alias) {
+                return alias;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fall through to a clear test failure.
+        }
+        throw new IllegalArgumentException("missing MODULE_ALIAS: " + moduleType.getName());
     }
 }

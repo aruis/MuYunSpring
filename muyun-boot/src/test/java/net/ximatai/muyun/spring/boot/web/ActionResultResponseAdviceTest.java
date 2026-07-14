@@ -69,9 +69,46 @@ class ActionResultResponseAdviceTest {
         }
     }
 
+    @Test
+    void shouldReportAnnotatedBusinessMutationResultBeforeWrapping() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS);
+        Method method = TestController.class.getDeclaredMethod("publish");
+        MethodParameter returnType = new MethodParameter(method, -1);
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        servletRequest.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
+                Map.of("id", "record-1"));
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            Object response = advice.beforeBodyWrite(
+                    1,
+                    returnType,
+                    MediaType.APPLICATION_JSON,
+                    null,
+                    new ServletServerHttpRequest(servletRequest),
+                    null
+            );
+
+            assertThat(response).isInstanceOf(ActionResultResponse.class);
+            ActionResultResponse actionResult = (ActionResultResponse) response;
+            assertThat(actionResult.message().code()).isEqualTo("demo.published");
+            assertThat(actionResult.message().text()).isEqualTo("已发布");
+            assertThat(actionResult.changes()).singleElement().satisfies(change -> {
+                assertThat(change.type()).isEqualTo("record-updated");
+                assertThat(change.moduleAlias()).isEqualTo("demo.module");
+                assertThat(change.recordId()).isEqualTo("record-1");
+            });
+        }
+    }
+
     private static final class TestController {
         @StandardMutation(StandardMutationKind.SORT)
         int sort() {
+            return 1;
+        }
+
+        @BusinessMutationResult(code = "demo.published", message = "已发布",
+                change = BusinessMutationChange.UPDATED, module = DemoModule.class)
+        int publish() {
             return 1;
         }
     }
@@ -84,5 +121,9 @@ class ActionResultResponseAdviceTest {
     }
 
     private static final class ChildController extends BaseController {
+    }
+
+    public static final class DemoModule {
+        public static final String MODULE_ALIAS = "demo.module";
     }
 }
