@@ -433,11 +433,12 @@ Web Adapter
 试点完成后依次接入：
 
 1. 顶层静态 CRUD；
-2. 其他静态业务动作；
-3. 动态动作；
-4. 工作流动作。
+2. 嵌套静态标准写动作；
+3. 其他静态业务动作；
+4. 动态动作；
+5. 工作流动作。
 
-嵌套静态资源写动作不纳入第一阶段。嵌套资源需要先明确外部资源身份、父子作用域和变化事实表达，再接入统一动作结果，避免仅按父模块记录变化而丢失子资源语义。
+嵌套静态标准写动作已接入第一阶段，但只覆盖标准 CRUD、启停和排序。当前变化事实仍按所属静态模块表达。更细的父子资源身份、`resourceKey` 和 `scope` 语义暂不在第一阶段扩展，避免把嵌套路由结构误当成稳定外部资源模型。
 
 ## 13. 契约测试
 
@@ -464,7 +465,10 @@ Web Adapter
 | --- | --- | --- |
 | `CrudWeb` 标准 `insert` / `update` / `delete` | 使用 `StandardMutation` 进入动作管线，标准 Web 方法在写成功后登记标准消息和变化事实 | 外部 HTTP 契约统一，业务代码不再使用旧顶层 `record` 包装 |
 | `EnableWeb` / `SortWeb` | 使用 `StandardMutation` 进入动作管线；启停按记录更新处理，排序按集合变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
-| 嵌套静态 CRUD / Tree CRUD | 第一阶段暂保持旧响应 | 明确 `resourceKey`、父子 `scope` 和子资源变化语义后，再接入统一动作结果 |
+| `TreeWeb` | 使用 `StandardMutation(SORT)` 接入树排序；排序按集合变化处理 | 树排序与普通排序使用相同外部动作结果契约 |
+| 嵌套静态 CRUD / Tree CRUD | 标准增改删、启停、普通排序和树排序已接入 `StandardMutation`；查询和树查询保持原查询响应 | 保持 controller 返回原始记录或计数，HTTP 输出层统一包装 |
+| `StandardMutationResultSupport` | 作为 boot web 层公开门面，供标准静态动作登记标准消息和变化事实 | `platform` 包等自定义 Web support 不依赖包内 helper |
+| `StaticStandardMutationSupport` | 作为标准 Web 基类内部执行 helper，负责 data scope、selectForAction、动作策略等上下文细节 | 不作为跨包业务接入门面 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 报告消息和变化 | Controller 返回贴近原始业务数据 |
 | 计数型动作 | Controller 直接返回 `int` / `Integer`；进入 `BusinessMutation` 时统一放入 `data` | 计数语义保留为原始数字，不再引入计数包装模型 |
 | 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
