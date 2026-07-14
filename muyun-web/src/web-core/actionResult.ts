@@ -1,8 +1,17 @@
-import { webDataChangeTypes, type WebDataChange, type WebDataChangeType } from '@muyun/web-contracts';
+import {
+  webDataChangeTypes,
+  type WebActionMessage,
+  type WebActionResultEnvelope,
+  type WebDataChange,
+  type WebDataChangeType,
+} from '@muyun/web-contracts';
 
 export interface ResolvedWebActionResult {
   message: string;
+  messageCode?: string;
+  messageType?: string;
   resultType?: string;
+  changeSetId?: string;
   changes: WebDataChange[];
   raw: unknown;
 }
@@ -55,12 +64,23 @@ export function resolveWebActionResult(
   result: unknown,
   options: { fallbackMessage?: string } = {},
 ): ResolvedWebActionResult {
+  const message = actionResultMessage(result);
   return {
-    message: actionResultMessage(result) ?? options.fallbackMessage ?? '操作成功',
+    message: message?.text ?? options.fallbackMessage ?? '操作成功',
+    messageCode: message?.code,
+    messageType: message?.type,
     resultType: actionResultType(result),
+    changeSetId: actionResultChangeSetId(result),
     changes: actionResultChanges(result),
     raw: result,
   };
+}
+
+export function actionResultData<TData>(result: TData | WebActionResultEnvelope<TData>): TData {
+  if (!result || typeof result !== 'object' || !('data' in result)) {
+    return result as TData;
+  }
+  return (result as WebActionResultEnvelope<TData>).data;
 }
 
 export function webDataChangeKey(change: WebDataChange) {
@@ -73,12 +93,28 @@ export function webDataChangeKey(change: WebDataChange) {
   ].join('|');
 }
 
-function actionResultMessage(result: unknown): string | undefined {
+function actionResultMessage(result: unknown): WebActionMessage | undefined {
   if (!result || typeof result !== 'object' || !('message' in result)) {
     return undefined;
   }
   const message = (result as { message?: unknown }).message;
-  return typeof message === 'string' && message.trim() ? message : undefined;
+  if (typeof message === 'string' && message.trim()) {
+    return { text: message.trim() };
+  }
+  if (!message || typeof message !== 'object') {
+    return undefined;
+  }
+  const text = (message as { text?: unknown }).text;
+  if (typeof text !== 'string' || !text.trim()) {
+    return undefined;
+  }
+  const code = (message as { code?: unknown }).code;
+  const type = (message as { type?: unknown }).type;
+  return {
+    text: text.trim(),
+    code: typeof code === 'string' && code.trim() ? code.trim() : undefined,
+    type: typeof type === 'string' && type.trim() ? type.trim() : undefined,
+  };
 }
 
 function actionResultType(result: unknown): string | undefined {
@@ -98,6 +134,14 @@ function actionResultChanges(result: unknown): WebDataChange[] {
     return [];
   }
   return changes.filter(isWebDataChange);
+}
+
+function actionResultChangeSetId(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object' || !('changeSetId' in result)) {
+    return undefined;
+  }
+  const changeSetId = (result as { changeSetId?: unknown }).changeSetId;
+  return typeof changeSetId === 'string' && changeSetId.trim() ? changeSetId.trim() : undefined;
 }
 
 function isWebDataChange(change: unknown): change is WebDataChange {

@@ -8,6 +8,11 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointContextResolver;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
+import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -202,7 +207,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleAlias":"other.module","actionCode":"submit","title":"Submit"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.moduleAlias").value("platform.sales.order"));
+                .andExpect(jsonPath("$.moduleAlias").value("platform.sales.order"));
 
         ArgumentCaptor<PlatformModuleAction> captor = ArgumentCaptor.forClass(PlatformModuleAction.class);
         verify(service).insert(captor.capture());
@@ -285,7 +290,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"metadataFieldId":"other-field","targetMetadataId":"target-metadata"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.metadataFieldId").value("field-1"));
+                .andExpect(jsonPath("$.metadataFieldId").value("field-1"));
 
         ArgumentCaptor<MetadataFieldReferenceConfig> captor =
                 ArgumentCaptor.forClass(MetadataFieldReferenceConfig.class);
@@ -382,7 +387,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleMetadataFieldId":"other-field","referenceFieldId":"ref","targetFieldId":"target"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.moduleMetadataFieldId").value("field-1"));
+                .andExpect(jsonPath("$.moduleMetadataFieldId").value("field-1"));
 
         ArgumentCaptor<ModuleMetadataFieldAffect> captor = ArgumentCaptor.forClass(ModuleMetadataFieldAffect.class);
         verify(service).insert(captor.capture());
@@ -411,7 +416,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"relationId":"other-rel","alias":"checkAmount","expression":"amount > 0"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.relationId").value("rel-1"));
+                .andExpect(jsonPath("$.relationId").value("rel-1"));
 
         ArgumentCaptor<ModuleMetadataFormulaRule> captor = ArgumentCaptor.forClass(ModuleMetadataFormulaRule.class);
         verify(service).insert(captor.capture());
@@ -483,7 +488,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"relationId":"other-rel","viewType":"FORM","title":"Form"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.relationId").value("rel-1"));
+                .andExpect(jsonPath("$.relationId").value("rel-1"));
 
         ArgumentCaptor<MetadataView> captor = ArgumentCaptor.forClass(MetadataView.class);
         verify(service).insert(captor.capture());
@@ -543,7 +548,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"viewId":"other-view","metadataFieldId":"field-1","title":"Code"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.viewId").value("view-1"));
+                .andExpect(jsonPath("$.viewId").value("view-1"));
 
         ArgumentCaptor<MetadataViewField> captor = ArgumentCaptor.forClass(MetadataViewField.class);
         verify(service).insert(captor.capture());
@@ -634,7 +639,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"applicationAlias":"other","alias":"common","title":"Common"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("platform"));
+                .andExpect(jsonPath("$.applicationAlias").value("platform"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
@@ -673,7 +678,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"parentId":"root"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).moveInTree(criteria.capture(), eq("category-1"), eq(null), eq(null), eq("root"));
@@ -719,8 +724,8 @@ class PlatformConfigurationWebControllerTest {
                                 {"applicationAlias":"other","categoryAlias":"other","code":"enabled","title":"Enabled"}
                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.categoryId").value("category-1"))
-                .andExpect(jsonPath("$.record.categoryAlias").value("status"));
+                .andExpect(jsonPath("$.categoryId").value("category-1"))
+                .andExpect(jsonPath("$.categoryAlias").value("status"));
         mvc.perform(get("/platform.dictionary_category/categories/category-1/items/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("item-1"));
@@ -771,7 +776,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"previousId":"item-0","parentId":"parent-1"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).moveInTree(criteria.capture(), eq("item-1"), eq("item-0"), eq(null), eq("parent-1"));
@@ -821,7 +826,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleAlias":"other.module","alias":"list","setType":"LIST","title":"List"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.moduleAlias").value("platform.sales.order"));
+                .andExpect(jsonPath("$.moduleAlias").value("platform.sales.order"));
 
         ArgumentCaptor<PlatformUiSet> captor = ArgumentCaptor.forClass(PlatformUiSet.class);
         verify(service).insert(captor.capture());
@@ -881,7 +886,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"fieldUiTypeAlias":"other","attributeAlias":"placeholder","title":"Placeholder"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.fieldUiTypeAlias").value("text"));
+                .andExpect(jsonPath("$.fieldUiTypeAlias").value("text"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
@@ -934,7 +939,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"fieldUiTypeAlias":"other","sourceKey":"options","title":"Options"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.fieldUiTypeAlias").value("select"));
+                .andExpect(jsonPath("$.fieldUiTypeAlias").value("select"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
@@ -969,9 +974,55 @@ class PlatformConfigurationWebControllerTest {
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(service).publishUiConfig("ui-config-1");
+    }
+
+    @Test
+    void shouldWrapPagePublishBusinessMutationResults() throws Exception {
+        PlatformPageConfigPublishService service = mock(PlatformPageConfigPublishService.class);
+        PlatformPageConfigPublishWebController controller = new PlatformPageConfigPublishWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
+                        new ActionEndpointContextResolver()))
+                .addInterceptors(new BusinessMutationInterceptor())
+                .setControllerAdvice(new ActionResultResponseAdvice(PlatformConfigurationWebControllerTest::moduleAlias,
+                        new com.fasterxml.jackson.databind.ObjectMapper()))
+                .build();
+
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/publish",
+                "platform.ui-config.published", "UI 配置已发布", "platform.ui_config", "ui-config-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/unpublish",
+                "platform.ui-config.unpublished", "UI 配置已取消发布", "platform.ui_config", "ui-config-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/query-templates/query-template-1/publish",
+                "platform.query-template.published", "查询模板已发布",
+                "platform.query_template", "query-template-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/query-templates/query-template-1/unpublish",
+                "platform.query-template.unpublished", "查询模板已取消发布",
+                "platform.query_template", "query-template-1");
+
+        verify(service).publishUiConfig("ui-config-1");
+        verify(service).unpublishUiConfig("ui-config-1");
+        verify(service).publishQueryTemplate("query-template-1");
+        verify(service).unpublishQueryTemplate("query-template-1");
+    }
+
+    private void assertPagePublishActionResult(MockMvc mvc,
+                                               String path,
+                                               String messageCode,
+                                               String messageText,
+                                               String moduleAlias,
+                                               String recordId) throws Exception {
+        mvc.perform(post(path))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value(messageCode))
+                .andExpect(jsonPath("$.message.text").value(messageText))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == '%s' && @.recordId == '%s')]"
+                        .formatted(moduleAlias, recordId)).exists());
     }
 
     private DynamicModuleRefreshResult runtimeRefreshResult(boolean dryRun) {
@@ -979,6 +1030,18 @@ class PlatformConfigurationWebControllerTest {
                 new ModuleDefinition("crm.contract", "Contract", List.of()),
                 Map.of(),
                 dryRun);
+    }
+
+    private static String moduleAlias(Class<?> moduleType) {
+        try {
+            Object value = moduleType.getField("MODULE_ALIAS").get(null);
+            if (value instanceof String alias) {
+                return alias;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fall through to a clear test failure.
+        }
+        throw new IllegalArgumentException("missing MODULE_ALIAS: " + moduleType.getName());
     }
 
     private PlatformModule module(String id, String applicationAlias, String parentId) {

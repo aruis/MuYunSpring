@@ -8,10 +8,12 @@ import {
   createHttpClient,
   createModuleContext,
   createModuleTreeContext,
+  createStaticModuleCrudClient,
   createStaticModuleTreeClient,
   normalizeError,
   platformErrorCodes,
   resolveGlobalErrorPresentation,
+  actionResultData,
   webDataChanges,
   withWebActionResultChanges,
 } from '../src/web-core/index.ts';
@@ -148,6 +150,66 @@ test('web action result changes separate records inside the same module', () => 
   ]);
 });
 
+test('web action result data unwraps backend action envelope', () => {
+  assert.deepEqual(
+    actionResultData({
+      data: { id: 'user-1', username: 'alice' },
+      message: { code: 'iam.user.created', text: '账号已创建', type: 'SUCCESS' },
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-created', moduleAlias: 'iam.user', recordId: 'user-1' }],
+    }),
+    { id: 'user-1', username: 'alice' },
+  );
+  assert.deepEqual(actionResultData({ id: 'user-1', username: 'alice' }), {
+    id: 'user-1',
+    username: 'alice',
+  });
+});
+
+test('static module client normalizes backend action envelopes', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/insert')) {
+      return Response.json({
+        data: { id: 'org-1', title: '总部' },
+        message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+        changeSetId: 'change-set-1',
+        changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
+      });
+    }
+    return Response.json({
+      data: 1,
+      message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
+      changeSetId: 'change-set-2',
+      changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
+    });
+  };
+
+  try {
+    const client = createStaticModuleCrudClient(createHttpClient({ baseUrl: 'http://api.local' }), {
+      moduleAlias: 'iam.organization',
+    });
+
+    assert.deepEqual(await client.insert({ title: '总部' }), {
+      record: { id: 'org-1', title: '总部' },
+      message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
+    });
+    assert.deepEqual(await client.delete('org-1'), {
+      data: 1,
+      message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
+      changeSetId: 'change-set-2',
+      changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('static module tree client maps standard CRUD and tree endpoints by module alias', async () => {
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;
@@ -169,13 +231,13 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     }
     if (request.url.endsWith('/insert')) {
       return Response.json({
-        record: { id: 'org-1', title: '总部' },
-        message: '已创建',
-        resultType: 'created',
+        data: { id: 'org-1', title: '总部' },
+        message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+        changeSetId: 'change-set-1',
         changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
       });
     }
-    return Response.json({ count: 1 });
+    return Response.json(1);
   };
 
   try {
@@ -200,8 +262,8 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     assert.deepEqual(await requests[3].json(), { title: '总部' });
     assert.deepEqual(insertResult, {
       record: { id: 'org-1', title: '总部' },
-      message: '已创建',
-      resultType: 'created',
+      message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+      changeSetId: 'change-set-1',
       changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
     assert.equal(requests[4].url, 'http://api.local/iam.organization/sort/org-1');

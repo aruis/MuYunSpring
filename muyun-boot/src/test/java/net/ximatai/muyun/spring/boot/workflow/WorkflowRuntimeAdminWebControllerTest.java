@@ -344,7 +344,7 @@ class WorkflowRuntimeAdminWebControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(adminFacade).queryHistory(eq("sales.contract"), eq("record-1"), eq("starter-1"), any());
         verify(adminFacade).deleteHistory("history-1");

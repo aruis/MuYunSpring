@@ -18,12 +18,10 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
-import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -454,15 +452,14 @@ public class DynamicRecordWebController implements
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
-    public WebRecordResponse<DynamicRecord> insert(@RequestBody DynamicRecord record) {
+    public DynamicRecord insert(@RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             String id = service().insert(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
-            DynamicRecord saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
         });
     }
 
@@ -470,7 +467,7 @@ public class DynamicRecordWebController implements
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
     @Transactional
-    public WebRecordResponse<DynamicRecord> update(@PathVariable String id, @RequestBody DynamicRecord record) {
+    public DynamicRecord update(@PathVariable String id, @RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             normalized.setId(id);
@@ -479,9 +476,8 @@ public class DynamicRecordWebController implements
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
-            DynamicRecord saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
+            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
                     FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 
@@ -1137,7 +1133,7 @@ public class DynamicRecordWebController implements
     @Override
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(HttpServletRequest httpRequest,
+    public int sort(HttpServletRequest httpRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -1147,7 +1143,7 @@ public class DynamicRecordWebController implements
             if (capabilities.contains(EntityCapability.TREE.name())) {
                 requireSortInput(normalized);
                 operations.moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-                return new WebCountResponse(1);
+                return 1;
             }
             if (!capabilities.contains(EntityCapability.SORT.name())) {
                 throw new PlatformException("dynamic entity does not support capability: SORT");
@@ -1157,11 +1153,11 @@ public class DynamicRecordWebController implements
             }
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 operations.moveAfter(id, normalized.previousId());
-                return new WebCountResponse(1);
+                return 1;
             }
             if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
                 operations.moveBefore(id, normalized.nextId());
-                return new WebCountResponse(1);
+                return 1;
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");
         });

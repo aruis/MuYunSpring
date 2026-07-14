@@ -382,8 +382,8 @@ class DynamicRecordWebControllerTest {
                                 "children", Map.of("lines", List.of(Map.of(
                                         "values", Map.of("lineNo", "L-001", "lineAmount", 7))))))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("contract-1"))
-                .andExpect(jsonPath("$.record.values.code").value("C-001"));
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.values.code").value("C-001"));
 
         ArgumentCaptor<DynamicRecord> createRecord = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(mainEntity).insert(createRecord.capture());
@@ -401,8 +401,8 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("version", 3, "values", Map.of("amount", BigDecimal.TEN)))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.record.id").value("contract-1"))
-                .andExpect(jsonPath("$.record.version").value(4));
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.version").value(4));
 
         ArgumentCaptor<DynamicRecord> updateRecord = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(mainEntity).update(updateRecord.capture());
@@ -531,7 +531,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("contract-1"));
+                .andExpect(jsonPath("$.id").value("contract-1"));
 
         ArgumentCaptor<DynamicRecord> inserted = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(mainEntity).insert(inserted.capture());
@@ -552,8 +552,8 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.record.id").value("contract-1"))
-                .andExpect(jsonPath("$.record.version").value(5));
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.version").value(5));
 
         ArgumentCaptor<DynamicRecord> updated = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(mainEntity).update(updated.capture());
@@ -696,7 +696,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("contract-1"));
+                .andExpect(jsonPath("$.id").value("contract-1"));
 
         ArgumentCaptor<DynamicRecord> inserted = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(mainEntity).insert(inserted.capture());
@@ -2096,7 +2096,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/delete/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         mvc.perform(get("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
@@ -2110,7 +2110,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
-        verify(mainEntity, times(2)).select("contract-1");
+        verify(mainEntity).select("contract-1");
         verify(mainEntity).delete("contract-1");
         verify(service).actions(MODULE);
     }
@@ -2246,7 +2246,7 @@ class DynamicRecordWebControllerTest {
                                 "parentId", "P"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).moveInTree("A", "B", null, "P");
     }
@@ -2270,7 +2270,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("previousId", "B"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).moveAfter("A", "B");
     }
@@ -2304,10 +2304,10 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).enable("contract-1");
         verify(mainEntity).disable("contract-1");

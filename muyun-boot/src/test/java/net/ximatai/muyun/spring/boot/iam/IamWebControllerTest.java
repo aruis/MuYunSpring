@@ -172,7 +172,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(tenant("tenant_b", "Tenant B"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.alias").value("tenant_b"));
+                .andExpect(jsonPath("$.alias").value("tenant_b"));
     }
 
     @Test
@@ -405,7 +405,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(organization(null, "HQ", "Headquarters"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("org-1"));
+                .andExpect(jsonPath("$.id").value("org-1"));
     }
 
     @Test
@@ -434,10 +434,10 @@ class IamWebControllerTest {
 	                                }
                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("user-1"))
-                .andExpect(jsonPath("$.record.username").value("alice"))
-                .andExpect(jsonPath("$.record.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.record.password").doesNotExist());
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.username").value("alice"))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test
@@ -465,8 +465,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("user-1"))
-                .andExpect(jsonPath("$.record.username").value("alice"));
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.username").value("alice"));
     }
 
     @Test
@@ -492,8 +492,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.roleKind").value("dataGrant"));
+                .andExpect(jsonPath("$.id").value("role-1"))
+                .andExpect(jsonPath("$.roleKind").value("dataGrant"));
     }
 
     @Test
@@ -525,8 +525,8 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("role-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("demo"));
+                .andExpect(jsonPath("$.id").value("role-1"))
+                .andExpect(jsonPath("$.tenantId").value("demo"));
     }
 
     @Test
@@ -546,8 +546,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.role/delete/{id}", "role-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.message").value("「Organization Role」已删除"));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -566,7 +565,7 @@ class IamWebControllerTest {
                                 {"previousId":"role-0"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -592,7 +591,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -652,7 +651,7 @@ class IamWebControllerTest {
                                 {"password":"new-secret"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -734,7 +733,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.tenant/disable/{tenantAlias}", "tenant_a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(tenantDao).updateByIdAndVersion(any(Tenant.class), any());
     }
@@ -745,11 +744,12 @@ class IamWebControllerTest {
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
                 ManagementScopeType.TENANT, "tenant_a");
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
-                .thenReturn("grant-1");
+        when(roleService.grantAccountRoleResult("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-1", true));
         when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
         when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
-        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
+        when(roleService.grantEmploymentRoleResult("role-2", "position-1"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-2", true));
         when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
         when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
@@ -771,7 +771,7 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$[0].managementScopeType").value("tenant"));
         mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
                         .contentType("application/json")
                         .content("""
@@ -785,7 +785,7 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$[0].employeePositionId").value("position-1"));
         mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")
                         .content("""
@@ -797,14 +797,14 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
                         .contentType("application/json")
                         .content("""
                                 {"moduleAlias":"sales.contract","actionCode":"query"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -824,7 +824,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(2));
+                .andExpect(jsonPath("$").value(2));
 
         mvc.perform(post("/iam.role/revoke/{roleId}/batch", "role-1")
                         .contentType("application/json")
@@ -836,7 +836,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(roleService).grantActions(any(), any());
         verify(roleService).revokeActions(any(), any());
@@ -971,9 +971,9 @@ class IamWebControllerTest {
                                 {"organizationId":"org-1","code":"FIN","title":"Finance","enabled":true}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("dept-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.record.organizationId").value("org-1"));
+                .andExpect(jsonPath("$.id").value("dept-1"))
+                .andExpect(jsonPath("$.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.organizationId").value("org-1"));
     }
 
     @Test
@@ -1014,9 +1014,9 @@ class IamWebControllerTest {
                                 {"organizationId":"org-1","departmentId":"dept-1","employeeNo":"E001","title":"Alice","enabled":true}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.id").value("employee-1"))
-                .andExpect(jsonPath("$.record.tenantId").value("tenant_a"))
-                .andExpect(jsonPath("$.record.organizationId").value("org-1"));
+                .andExpect(jsonPath("$.id").value("employee-1"))
+                .andExpect(jsonPath("$.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.organizationId").value("org-1"));
     }
 
     @Test

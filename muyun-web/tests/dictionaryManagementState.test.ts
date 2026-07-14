@@ -315,7 +315,7 @@ test('dictionary management state keeps delete fallback creation without selecti
   const state = createDictionaryManagementState(
     createContext(),
     () => createCategoryClient(),
-    () => createItemClient({ delete: async () => ({ count: 1 }) }),
+    () => createItemClient({ delete: async () => 1 }),
     () => 'platform',
     async () => true,
   );
@@ -469,7 +469,7 @@ test('dictionary management state rejects item actions without contributed permi
     },
     delete: async (id) => {
       calls.push(`delete:${id}`);
-      return { count: 1 };
+      return 1;
     },
   });
   const state = createDictionaryManagementState(
@@ -683,7 +683,7 @@ test('dictionary management state keeps category create draft when categories re
 test('dictionary management state keeps category editor closed after deleting category', async () => {
   const state = createDictionaryManagementState(
     createContext(),
-    () => createCategoryClient({ delete: async () => ({ count: 1 }) }),
+    () => createCategoryClient({ delete: async () => 1 }),
     () => createItemClient(),
     () => 'platform',
     async () => true,
@@ -720,9 +720,9 @@ function createContext(can: (actionCode: string) => boolean = () => true): Modul
     view: async (id) => ({ id }),
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
   };
   return {
     moduleAlias: 'platform.dictionary_category',
@@ -736,7 +736,7 @@ function createContext(can: (actionCode: string) => boolean = () => true): Modul
         tree: async () => ({ records: [] }),
         treeFlat: async () => ({ records: [] }),
         subtree: async () => ({ records: [] }),
-        sort: async () => ({ count: 1 }),
+        sort: async () => 1,
       }),
       enable: () => crud,
       tryCrud: () => crud,
@@ -767,13 +767,13 @@ function createItemClient(
     view: async (id) => ({ id }),
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     tree: async () => ({ records: [] }),
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
     ...overrides,
   };
 }
@@ -793,13 +793,13 @@ function createCategoryClient(
     view: async (id) => ({ id }),
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     tree: async () => ({ records: [] }),
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
     ...overrides,
   };
 }

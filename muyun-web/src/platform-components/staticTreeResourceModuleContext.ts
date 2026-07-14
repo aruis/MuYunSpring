@@ -35,13 +35,13 @@ export function createEmptyStaticTreeClient<TRecord>(
     view: async () => ({}) as TRecord,
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 0 }),
-    enable: async () => ({ count: 0 }),
-    disable: async () => ({ count: 0 }),
+    delete: async () => 0,
+    enable: async () => 0,
+    disable: async () => 0,
     tree: async () => emptyTree<TRecord>(),
     treeFlat: async () => emptyList<TRecord>(),
     subtree: async () => emptyTree<TRecord>(),
-    sort: async () => ({ count: 0 }),
+    sort: async () => 0,
   };
 }
 

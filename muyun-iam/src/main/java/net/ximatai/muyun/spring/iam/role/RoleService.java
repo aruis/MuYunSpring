@@ -314,7 +314,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                    String userId,
                                    ManagementScopeType managementScopeType,
                                    String managementScopeId) {
-        return grantAccountRoleIfAbsent(roleId, userId, managementScopeType, managementScopeId).grantId();
+        return grantAccountRoleResult(roleId, userId, managementScopeType, managementScopeId).grantId();
+    }
+
+    public RoleGrantMutationResult grantAccountRoleResult(String roleId,
+                                                          String userId,
+                                                          ManagementScopeType managementScopeType,
+                                                          String managementScopeId) {
+        return grantAccountRoleIfAbsent(roleId, userId, managementScopeType, managementScopeId);
     }
 
     public int revokeAccountRole(String roleId,
@@ -356,7 +363,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public String grantEmploymentRole(String roleId, String employeePositionId) {
-        return grantEmploymentRoleIfAbsent(roleId, employeePositionId).grantId();
+        return grantEmploymentRoleResult(roleId, employeePositionId).grantId();
+    }
+
+    public RoleGrantMutationResult grantEmploymentRoleResult(String roleId, String employeePositionId) {
+        return grantEmploymentRoleIfAbsent(roleId, employeePositionId);
     }
 
     public int revokeEmploymentRole(String roleId, String employeePositionId) {
@@ -1080,10 +1091,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return expanded;
     }
 
-    private GrantResult grantAccountRoleIfAbsent(String roleId,
-                                                 String userId,
-                                                 ManagementScopeType managementScopeType,
-                                                 String managementScopeId) {
+    private RoleGrantMutationResult grantAccountRoleIfAbsent(String roleId,
+                                                             String userId,
+                                                             ManagementScopeType managementScopeType,
+                                                             String managementScopeId) {
         Role role = requireBindableRole(roleId);
         requireAccountRole(role);
         requireSystemManagedMutationAllowed(role, "grant account role");
@@ -1099,8 +1110,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 existing.setEnabled(true);
                 prepareChildUpdate(existing);
                 accountRoleGrantDao.updateById(existing);
+                return new RoleGrantMutationResult(existing.getId(), true);
             }
-            return new GrantResult(existing.getId(), false);
+            return new RoleGrantMutationResult(existing.getId(), false);
         }
         AccountRoleGrant grant = new AccountRoleGrant();
         grant.setRoleId(role.getId());
@@ -1109,10 +1121,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         grant.setManagementScopeId(validScopeId);
         grant.setEnabled(true);
         prepareChildInsert(grant);
-        return new GrantResult(accountRoleGrantDao.insert(grant), true);
+        return new RoleGrantMutationResult(accountRoleGrantDao.insert(grant), true);
     }
 
-    private GrantResult grantEmploymentRoleIfAbsent(String roleId, String employeePositionId) {
+    private RoleGrantMutationResult grantEmploymentRoleIfAbsent(String roleId, String employeePositionId) {
         Role role = requireBindableRole(roleId);
         requireEmploymentAssignableRole(role);
         requireSystemManagedMutationAllowed(role, "grant employment role");
@@ -1128,15 +1140,16 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 existing.setEnabled(true);
                 prepareChildUpdate(existing);
                 employmentRoleGrantDao.updateById(existing);
+                return new RoleGrantMutationResult(existing.getId(), true);
             }
-            return new GrantResult(existing.getId(), false);
+            return new RoleGrantMutationResult(existing.getId(), false);
         }
         EmploymentRoleGrant grant = new EmploymentRoleGrant();
         grant.setRoleId(role.getId());
         grant.setEmployeePositionId(validEmployeePositionId);
         grant.setEnabled(true);
         prepareChildInsert(grant);
-        return new GrantResult(employmentRoleGrantDao.insert(grant), true);
+        return new RoleGrantMutationResult(employmentRoleGrantDao.insert(grant), true);
     }
 
     private void ensureDataGrantUnique(String employeePositionId, Role newRole) {
@@ -1450,6 +1463,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     public record ActionRevokeCommand(String moduleAlias, String actionCode) {
     }
 
-    private record GrantResult(String grantId, boolean created) {
+    public record RoleGrantMutationResult(String grantId, boolean changed) {
     }
 }

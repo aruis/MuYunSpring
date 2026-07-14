@@ -72,7 +72,7 @@ test('application management state toggles enable state and refreshes selected r
   const context = createContext({
     disable: async (id) => {
       calls.push(`disable:${id}`);
-      return { count: 1 };
+      return 1;
     },
     view: async (id) => {
       calls.push(`view:${id}`);
@@ -192,7 +192,7 @@ test('application management state respects delete confirmation result', async (
   const context = createContext({
     delete: async (id) => {
       calls.push(`delete:${id}`);
-      return { count: 1 };
+      return 1;
     },
   });
   let confirmed = false;
@@ -280,7 +280,7 @@ test('application management state stays readonly after deleting last applicatio
     {
       delete: async (id) => {
         calls.push(`delete:${id}`);
-        return { count: 1 };
+        return 1;
       },
     },
     (actionCode) => actionCode !== 'create',
@@ -324,9 +324,9 @@ function createContext(
     view: async (id) => ({ id, alias: id, title: '平台', enabled: true }),
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     ...overrides,
   };
   const enable = {
@@ -338,7 +338,7 @@ function createContext(
     tree: async () => ({ records: [] }),
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
   };
   return {
     moduleAlias: 'platform.application',

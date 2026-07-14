@@ -78,36 +78,41 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
 
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
+    @StandardMutation(StandardMutationKind.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    public WebRecordResponse<T> insert(HttpServletRequest servletRequest, @RequestBody T record) {
+    public T insert(HttpServletRequest servletRequest, @RequestBody T record) {
         return webScope(() -> {
             bindScope(record, servletRequest);
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            StaticStandardMutationSupport.created(this, id);
+            return saved;
         });
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<T> update(HttpServletRequest servletRequest, @PathVariable String id,
-                                       @RequestBody T record) {
+    @StandardMutation(StandardMutationKind.UPDATE)
+    public T update(HttpServletRequest servletRequest, @PathVariable String id,
+                    @RequestBody T record) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             record.setId(id);
             bindScope(record, servletRequest);
             service().update(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
+            StaticStandardMutationSupport.updated(this, id);
+            return saved;
         });
     }
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    @StandardMutation(StandardMutationKind.DELETE)
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
-            T record = requireScopedRecord(servletRequest, id);
-            return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
+            requireScopedRecord(servletRequest, id);
+            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id));
         });
     }
 

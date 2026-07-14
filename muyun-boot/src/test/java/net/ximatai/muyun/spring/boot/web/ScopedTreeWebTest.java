@@ -48,10 +48,10 @@ class ScopedTreeWebTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
         try (TenantContext.Scope ignored = TenantContext.system("scoped tree maintenance")) {
-            WebCountResponse response = controller.sort(request,
+            int response = controller.sort(request,
                     "moving", new TreeSortWebRequest("previous", null, TreeAbility.ROOT_ID));
 
-            assertThat(response.count()).isEqualTo(1);
+            assertThat(response).isEqualTo(1);
             assertThat(service.moveTenantId).isEqualTo("tenant_b");
             assertThat(service.moveScope).isNotNull();
             assertThat(TenantContext.isSystem()).isTrue();

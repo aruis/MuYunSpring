@@ -22,12 +22,7 @@ import {
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
 import { UiButton, UiError, UiInput, UiSpin } from '@muyun/vue-ui-antdv';
-import type {
-  ResetPasswordResponse,
-  UserAccount,
-  WebCountResponse,
-  WebQueryRequest,
-} from '@muyun/web-contracts';
+import type { ResetPasswordResponse, UserAccount, WebQueryRequest } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'SystemUserManagementView' });
@@ -311,14 +306,14 @@ async function resetUserPassword() {
     presentPlatformMessage('请填写新密码', { source: 'system-user-management', phase: 'validation' });
     return;
   }
-  await executeStaticRecordAction<UserAccount, WebCountResponse>({
+  await executeStaticRecordAction<UserAccount, number>({
     loading: savingUser,
     source: 'system-user-management',
     record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
     canExecute: () => canSaveUser.value,
     deniedMessage: '当前用户无权重置系统账号密码',
     execute: (user) =>
-      userContext.http.request<WebCountResponse>({
+      userContext.http.request<number>({
         method: 'POST',
         path: `/iam.user/changePassword/${encodeURIComponent(user.id!)}`,
         body: { password: passwordDraft.value },

@@ -1,5 +1,5 @@
-import type { WebCountResponse, WebListResponse, WebQueryRequest, WebTreeNode } from '@muyun/web-contracts';
-import type { ModuleContext, StaticModuleTreeClient } from '@muyun/web-core';
+import type { WebListResponse, WebQueryRequest, WebTreeNode } from '@muyun/web-contracts';
+import type { ModuleContext, StaticCountMutationResult, StaticModuleTreeClient } from '@muyun/web-core';
 
 export interface ScopedTreeModuleContextOptions {
   scopeFieldName: string;
@@ -62,7 +62,7 @@ export function createScopedTreeClient<TRecord>(
         },
       }),
     sort: (id, request) =>
-      context.http.request<WebCountResponse>({
+      context.http.request<StaticCountMutationResult>({
         method: 'POST',
         path: `${(options.sortPath ?? `${options.treePath.replace(/\/tree\/?$/, '')}/sort`).replace(
           /\/$/,

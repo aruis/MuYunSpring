@@ -4,8 +4,6 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
-import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -71,8 +69,8 @@ public class WorkflowDefinitionWebController
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    public WebRecordResponse<WorkflowDefinition> insert(HttpServletRequest servletRequest,
-                                                        @RequestBody WorkflowDefinition record) {
+    public WorkflowDefinition insert(HttpServletRequest servletRequest,
+                                     @RequestBody WorkflowDefinition record) {
         normalizeDraft(record);
         return super.insert(servletRequest, record);
     }
@@ -80,9 +78,9 @@ public class WorkflowDefinitionWebController
     @Override
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WebRecordResponse<WorkflowDefinition> update(HttpServletRequest servletRequest,
-                                                        @PathVariable String id,
-                                                        @RequestBody WorkflowDefinition record) {
+    public WorkflowDefinition update(HttpServletRequest servletRequest,
+                                     @PathVariable String id,
+                                     @RequestBody WorkflowDefinition record) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow definition can only edit draft definitions");
         normalizeDraft(record);
         return super.update(servletRequest, id, record);
@@ -91,7 +89,7 @@ public class WorkflowDefinitionWebController
     @Override
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow definition can only delete draft definitions");
         return super.delete(servletRequest, id);
     }

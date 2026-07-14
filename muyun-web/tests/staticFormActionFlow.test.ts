@@ -199,14 +199,14 @@ test('static record action executes action and waits for executed callback', asy
   const calls: string[] = [];
   let refreshed = false;
 
-  await executeStaticRecordAction<TestRecord, { count: number; message?: string }>({
+  await executeStaticRecordAction<TestRecord, { data: number; message: string; changeSetId: string }>({
     loading,
     record: () => ({ id: 'emp-1', title: '职员' }),
     canExecute: () => true,
     deniedMessage: '无权操作',
     execute: async (record) => {
       calls.push(`execute:${record.id}`);
-      return { count: 1, message: '已启用' };
+      return { data: 1, message: '已启用', changeSetId: 'change-1' };
     },
     onExecuted: async (_, record) => {
       await Promise.resolve();
@@ -231,8 +231,8 @@ test('static record action ignores duplicate submit while loading', async () => 
     deniedMessage: '无权操作',
     execute: async (record: TestRecord) => {
       calls.push(record.id ?? '');
-      return new Promise<{ count: number }>((resolve) => {
-        releaseAction = () => resolve({ count: 1 });
+      return new Promise<number>((resolve) => {
+        releaseAction = () => resolve(1);
       });
     },
     onExecuted: () => undefined,
@@ -292,7 +292,7 @@ test('static record action confirms before execute', async () => {
     },
     execute: async (record: TestRecord) => {
       calls.push(`execute:${record.id}`);
-      return { count: 1 };
+      return 1;
     },
     onExecuted: () => {
       calls.push('executed');

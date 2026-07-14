@@ -21,9 +21,9 @@ import {
   type ResolvedRecordActionItem,
   executeStaticFormSave,
   executeStaticRecordAction,
+  handlePlatformActionSuccess,
   presentPlatformError,
   presentPlatformMessage,
-  presentPlatformSuccess,
   resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
@@ -35,9 +35,9 @@ import type {
   EmployeeAccountProvisionResponse,
   Organization,
   UserAccount,
-  WebCountResponse,
+  WebActionResultEnvelope,
 } from '@muyun/web-contracts';
-import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { actionResultData, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
@@ -716,16 +716,19 @@ async function provisionEmployeeAccount() {
   }
   savingEmployeeAccount.value = true;
   try {
-    const response = await employeeContext.http.request<EmployeeAccountProvisionResponse>({
+    const result = await employeeContext.http.request<
+      WebActionResultEnvelope<EmployeeAccountProvisionResponse>
+    >({
       method: 'POST',
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/provision`,
       body: draft,
     });
+    const response = actionResultData(result);
     employeeAccount.value = response.binding;
     employeeAccountUser.value = response.user;
     showAccountProvisionForm.value = false;
     accountProvisionDraft.value = createAccountProvisionDraft(employee);
-    presentPlatformSuccess('账号已创建并绑定职员', {
+    await handlePlatformActionSuccess(result, {
       source: 'employee-management',
       phase: 'action',
     });
@@ -752,12 +755,12 @@ async function removeEmployeeAccount() {
   }
   savingEmployeeAccount.value = true;
   try {
-    await employeeContext.http.request<WebCountResponse>({
+    const result = await employeeContext.http.request<WebActionResultEnvelope<number>>({
       method: 'POST',
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/delete`,
     });
     await loadEmployeeAccounts(employee, employeeDetailRequestSeq.value);
-    presentPlatformSuccess('账户已移除', {
+    await handlePlatformActionSuccess(result, {
       source: 'employee-management',
       phase: 'action',
     });

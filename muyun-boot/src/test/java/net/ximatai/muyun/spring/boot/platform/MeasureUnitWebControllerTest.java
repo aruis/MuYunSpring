@@ -45,8 +45,8 @@ class MeasureUnitWebControllerTest {
                                 {"applicationAlias":"other","alias":"weight","title":"Weight","dimension":"MASS"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("crm"))
-                .andExpect(jsonPath("$.record.alias").value("weight"));
+                .andExpect(jsonPath("$.applicationAlias").value("crm"))
+                .andExpect(jsonPath("$.alias").value("weight"));
 
         ArgumentCaptor<MeasureUnitCategory> captor = ArgumentCaptor.forClass(MeasureUnitCategory.class);
         verify(service).insert(captor.capture());
@@ -87,9 +87,9 @@ class MeasureUnitWebControllerTest {
                                 {"applicationAlias":"other","categoryAlias":"other_category","code":"kg","title":"Kilogram"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("crm"))
-                .andExpect(jsonPath("$.record.categoryAlias").value("weight"))
-                .andExpect(jsonPath("$.record.code").value("kg"));
+                .andExpect(jsonPath("$.applicationAlias").value("crm"))
+                .andExpect(jsonPath("$.categoryAlias").value("weight"))
+                .andExpect(jsonPath("$.code").value("kg"));
 
         ArgumentCaptor<MeasureUnit> captor = ArgumentCaptor.forClass(MeasureUnit.class);
         verify(service).insert(captor.capture());
@@ -130,8 +130,8 @@ class MeasureUnitWebControllerTest {
                                 {"applicationAlias":"crm","alias":"quantity","title":"Quantity","dimension":"COUNT"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("platform"))
-                .andExpect(jsonPath("$.record.alias").value("quantity"));
+                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.alias").value("quantity"));
 
         ArgumentCaptor<MeasureUnitCategory> captor = ArgumentCaptor.forClass(MeasureUnitCategory.class);
         verify(service).insert(captor.capture());
@@ -156,9 +156,9 @@ class MeasureUnitWebControllerTest {
                                 {"applicationAlias":"crm","categoryAlias":"other","code":"box","title":"Box"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.record.applicationAlias").value("platform"))
-                .andExpect(jsonPath("$.record.categoryAlias").value("quantity"))
-                .andExpect(jsonPath("$.record.code").value("box"));
+                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.categoryAlias").value("quantity"))
+                .andExpect(jsonPath("$.code").value("box"));
 
         ArgumentCaptor<MeasureUnit> captor = ArgumentCaptor.forClass(MeasureUnit.class);
         verify(service).insert(captor.capture());

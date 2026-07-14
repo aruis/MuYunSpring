@@ -17,12 +17,18 @@ import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.action.ActionMessage;
+import net.ximatai.muyun.spring.ability.action.DataChangeIntent;
+import net.ximatai.muyun.spring.ability.action.DataChangeOperation;
+import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointWebConfiguration;
+import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -56,8 +62,10 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -100,6 +108,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         CurrentUserWebFilter.class,
         MuYunSpringJacksonConfiguration.class,
+        ActionEndpointWebConfiguration.class,
+        ActionResultResponseAdvice.class,
         PlatformWebExceptionHandler.class,
         StaticRecordReadProjectionService.class
 })
@@ -176,9 +186,13 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"previousId":"org-0","parentId":"root"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.organization')]")
+                        .exists());
 
         verify(organizationService).moveInTree(any(Criteria.class), eq("org-1"), eq("org-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }
@@ -228,9 +242,13 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"previousId":"dept-0","parentId":"root"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.department')]")
+                        .exists());
 
         verify(departmentService).moveInTree(any(Criteria.class), eq("dept-1"), eq("dept-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }
@@ -244,11 +262,38 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"previousId":"tenant-0"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.tenant')]")
+                        .exists());
 
         verify(tenantService).moveAfter("tenant-1", "tenant-0");
+    }
+
+    @Test
+    void shouldDeriveStandardCreateMutationFromReturnedRecordInRealMvcContext() throws Exception {
+        Tenant tenant = new Tenant();
+        tenant.setId("tenant-2");
+        tenant.setTitle("Tenant 2");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.systemUser("admin", "Admin")));
+        when(tenantService.insert(any(Tenant.class))).thenReturn("tenant-2");
+        when(tenantService.select("tenant-2")).thenReturn(tenant);
+
+        mvc.perform(post("/iam.tenant/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {"id":"tenant-2","title":"Tenant 2"}
+                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value("tenant-2"))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
+                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.tenant' && @.recordId == 'tenant-2')]")
+                        .exists());
     }
 
     @Test
@@ -260,9 +305,13 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"previousId":"employee-0"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.employee')]")
+                        .exists());
 
         verify(employeeService).moveAfter("employee-1", "employee-0");
     }
@@ -558,11 +607,11 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.employee/employee-1/positions/relation-1/delete"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         mvc.perform(post("/iam.employee/employee-1/positions/relation-1/primary"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -576,7 +625,7 @@ class IamWebControllerIT {
                                 {"previousId":"relation-0"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(employeePositionService).moveEmployeePosition("employee-1", "relation-1", "relation-0", null);
     }
@@ -589,12 +638,42 @@ class IamWebControllerIT {
         when(employeeAccountService.accountOfEmployee("employee-1")).thenReturn(binding);
         when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
         when(employeeAccountService.select("binding-1")).thenReturn(binding);
-        when(employeeAccountService.removeAccount("employee-1")).thenReturn(1);
+        when(employeeAccountService.removeAccount("employee-1")).thenAnswer(invocation -> {
+            MutationContextHolder.current().ifPresent(context -> {
+                context.message(ActionMessage.success("iam.employee-account.removed", "账户已移除"));
+                context.record(new DataChangeIntent(DataChangeOperation.DELETED,
+                        EmployeeAccountService.class, "binding-1"));
+                context.record(new DataChangeIntent(DataChangeOperation.DELETED,
+                        UserAccountService.class, "user-2"));
+                context.record(new DataChangeIntent(DataChangeOperation.UPDATED,
+                        EmployeeService.class, "employee-1"));
+            });
+            return 1;
+        });
         UserAccount provisioned = new UserAccount();
         provisioned.setId("user-2");
         provisioned.setUsername("alice");
         when(employeeAccountService.provisionAccount(eq("employee-1"), any(UserAccount.class)))
-                .thenReturn(new EmployeeAccountService.AccountProvisionResult(provisioned, binding));
+                .thenAnswer(invocation -> {
+                    MutationContextHolder.current().ifPresent(context -> {
+                        context.message(ActionMessage.success("iam.employee-account.provisioned",
+                                "账号已创建并绑定职员"));
+                        context.record(new DataChangeIntent(DataChangeOperation.CREATED,
+                                UserAccountService.class, "user-2"));
+                        context.record(new DataChangeIntent(DataChangeOperation.CREATED,
+                                EmployeeAccountService.class, "binding-1"));
+                        context.record(new DataChangeIntent(DataChangeOperation.UPDATED,
+                                EmployeeService.class, "employee-1"));
+                    });
+                    return new EmployeeAccountService.AccountProvisionResult(provisioned, binding);
+                });
+        when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
+                .thenReturn(Optional.of(moduleDefinition(EmployeeService.MODULE_ALIAS, "职员管理", Employee.class)));
+        when(staticModuleDefinitionCatalog.find(EmployeeAccountService.MODULE_ALIAS))
+                .thenReturn(Optional.of(moduleDefinition(EmployeeAccountService.MODULE_ALIAS,
+                        "职员账号绑定", EmployeeAccount.class)));
+        when(staticModuleDefinitionCatalog.find(UserAccountService.MODULE_ALIAS))
+                .thenReturn(Optional.of(moduleDefinition(UserAccountService.MODULE_ALIAS, "用户账号", UserAccount.class)));
 
         mvc.perform(get("/iam.employee/employee-1/account"))
                 .andExpect(status().isOk())
@@ -615,12 +694,32 @@ class IamWebControllerIT {
                                 {"username":"alice","password":"secret1"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.id").value("user-2"))
-                .andExpect(jsonPath("$.binding.id").value("binding-1"));
+                .andExpect(jsonPath("$.data.user.id").value("user-2"))
+                .andExpect(jsonPath("$.data.binding.id").value("binding-1"))
+                .andExpect(jsonPath("$.message.code").value("iam.employee-account.provisioned"))
+                .andExpect(jsonPath("$.message.text").value("账号已创建并绑定职员"))
+                .andExpect(jsonPath("$.message.type").value("SUCCESS"))
+                .andExpect(jsonPath("$.changeSetId").isString())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.user' && @.recordId == 'user-2')]")
+                        .exists())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.employee_account' && @.recordId == 'binding-1')]")
+                        .exists())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.employee' && @.recordId == 'employee-1')]")
+                        .exists());
 
         mvc.perform(post("/iam.employee/employee-1/account/delete"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("iam.employee-account.removed"))
+                .andExpect(jsonPath("$.message.text").value("账户已移除"))
+                .andExpect(jsonPath("$.message.type").value("SUCCESS"))
+                .andExpect(jsonPath("$.changeSetId").isString())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-deleted' && @.moduleAlias == 'iam.user' && @.recordId == 'user-2')]")
+                        .exists())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-deleted' && @.moduleAlias == 'iam.employee_account' && @.recordId == 'binding-1')]")
+                        .exists())
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.employee' && @.recordId == 'employee-1')]")
+                        .exists());
 
         verify(employeeAccountService).accountOfEmployee("employee-1");
         verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
@@ -671,13 +770,13 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/delete"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/enable"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/disable"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(employeeDelegationService).delegationsByPrincipal("employee-1");
         verify(employeeDelegationService).delegationsByDelegate("employee-2");
@@ -692,12 +791,25 @@ class IamWebControllerIT {
         position.setTitle("Sales Manager");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(positionService.insert(any(Position.class))).thenReturn("position-1");
         when(positionService.select("position-1")).thenReturn(position);
 
         mvc.perform(get("/iam.position/view/position-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("position-1"))
                 .andExpect(jsonPath("$.code").value("SALES_MANAGER"));
+
+        mvc.perform(post("/iam.position/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {"categoryId":"position-category-1","code":"SALES_MANAGER","title":"Sales Manager"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value("position-1"))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
+                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.position' && @.recordId == 'position-1')]")
+                        .exists());
     }
 
     @Test
@@ -723,11 +835,14 @@ class IamWebControllerIT {
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
                 ManagementScopeType.TENANT, "tenant_a");
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
-                .thenReturn("grant-1");
+        when(roleService.grantAccountRoleResult("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-1", true));
+        when(roleService.grantAccountRoleResult("role-1", "user-3", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-existing", false));
         when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
         when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
-        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
+        when(roleService.grantEmploymentRoleResult("role-2", "position-1"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-2", true));
         when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
         when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
@@ -742,9 +857,23 @@ class IamWebControllerIT {
                         .contentType("application/json")
                         .content("""
                                 {"userId":"user-2","managementScopeType":"tenant","managementScopeId":"tenant_a"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-1"));
+                .andExpect(jsonPath("$.data").value("grant-1"))
+                .andExpect(jsonPath("$.message.code").value("iam.account-role-grant.granted"))
+                .andExpect(jsonPath("$.message.text").value("账号角色已授权"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
+
+        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"userId":"user-3","managementScopeType":"tenant","managementScopeId":"tenant_a"}
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("grant-existing"))
+                .andExpect(jsonPath("$.message.code").value("iam.account-role-grant.granted"))
+                .andExpect(jsonPath("$.changes").isEmpty());
 
         mvc.perform(get("/iam.role/{roleId}/account-grants", "role-1"))
                 .andExpect(status().isOk())
@@ -754,15 +883,23 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("iam.account-role-grant.revoked"))
+                .andExpect(jsonPath("$.message.text").value("账号角色授权已撤销"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
 
         mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
                         .contentType("application/json")
                         .content("""
                                 {"employeePositionId":"position-1"}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("grant-2"));
+                .andExpect(jsonPath("$.data").value("grant-2"))
+                .andExpect(jsonPath("$.message.code").value("iam.employment-role-grant.granted"))
+                .andExpect(jsonPath("$.message.text").value("任职角色已授权"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
 
         mvc.perform(get("/iam.role/{roleId}/employment-grants", "role-2"))
                 .andExpect(status().isOk())
@@ -771,7 +908,11 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("iam.employment-role-grant.revoked"))
+                .andExpect(jsonPath("$.message.text").value("任职角色授权已撤销"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
+                        .exists());
 
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")
@@ -784,7 +925,7 @@ class IamWebControllerIT {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")
@@ -797,7 +938,7 @@ class IamWebControllerIT {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
                         .contentType("application/json")
@@ -805,7 +946,7 @@ class IamWebControllerIT {
                                 {"moduleAlias":"sales.contract","actionCode":"query"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -973,6 +1114,30 @@ class IamWebControllerIT {
                 List.of(),
                 List.of(new StaticEntityDefinitionCompiler().compile("department", "部门管理", Department.class)),
                 controller.moduleUiDefinition()
+        );
+    }
+
+    private StaticModuleDefinition moduleDefinition(String moduleAlias, String title, Class<?> modelClass) {
+        return new StaticModuleDefinition(
+                moduleAlias.substring(0, moduleAlias.indexOf('.')),
+                moduleAlias,
+                title,
+                null,
+                ModuleEntryType.MODULE,
+                null,
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new StaticEntityDefinitionCompiler().compile(
+                        moduleAlias.substring(moduleAlias.indexOf('.') + 1),
+                        title,
+                        modelClass
+                )),
+                null,
+                List.of(),
+                List.of(),
+                modelClass,
+                List.of()
         );
     }
 
