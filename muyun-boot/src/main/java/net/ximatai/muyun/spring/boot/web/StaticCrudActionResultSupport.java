@@ -28,21 +28,8 @@ final class StaticCrudActionResultSupport {
         report("platform.crud.disabled", "停用成功", DataChange.recordUpdated(moduleAlias, recordId));
     }
 
-    static void sorted(String moduleAlias, String recordId) {
-        report("platform.crud.sorted", "排序成功", DataChange.recordUpdated(moduleAlias, recordId));
-    }
-
-    static void report(StandardMutationKind kind,
-                       String moduleAlias,
-                       String recordId) {
-        switch (kind) {
-            case CREATE -> created(moduleAlias, recordId);
-            case UPDATE -> updated(moduleAlias, recordId);
-            case DELETE -> deleted(moduleAlias, recordId);
-            case ENABLE -> enabled(moduleAlias, recordId);
-            case DISABLE -> disabled(moduleAlias, recordId);
-            case SORT -> sorted(moduleAlias, recordId);
-        }
+    static void sorted(String moduleAlias) {
+        report("platform.crud.sorted", "排序成功", DataChange.collectionChanged(moduleAlias));
     }
 
     private static void report(String code,

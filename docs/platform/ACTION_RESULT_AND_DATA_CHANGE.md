@@ -462,8 +462,8 @@ Web Adapter
 
 | 存量对象或链路 | 当前处理 | 目标 |
 | --- | --- | --- |
-| `CrudWeb` 标准 `insert` / `update` / `delete` | 使用 `StandardMutation` 声明标准动作，Controller 返回记录或计数数据，Web 输出层派生标准消息和变化事实 | 外部 HTTP 契约统一，业务代码不再使用旧顶层 `record` 包装 |
-| `EnableWeb` / `SortWeb` | 使用 `StandardMutation` 声明标准动作，按记录更新类变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
+| `CrudWeb` 标准 `insert` / `update` / `delete` | 使用 `StandardMutation` 进入动作管线，标准 Web 方法在写成功后登记标准消息和变化事实 | 外部 HTTP 契约统一，业务代码不再使用旧顶层 `record` 包装 |
+| `EnableWeb` / `SortWeb` | 使用 `StandardMutation` 进入动作管线；启停按记录更新处理，排序按集合变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
 | 嵌套静态 CRUD / Tree CRUD | 第一阶段暂保持旧响应 | 明确 `resourceKey`、父子 `scope` 和子资源变化语义后，再接入统一动作结果 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 报告消息和变化 | Controller 返回贴近原始业务数据 |
 | 计数型动作 | Controller 直接返回 `int` / `Integer`；进入 `BusinessMutation` 时统一放入 `data` | 计数语义保留为原始数字，不再引入计数包装模型 |

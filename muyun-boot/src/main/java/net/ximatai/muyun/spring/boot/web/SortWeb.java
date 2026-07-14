@@ -25,11 +25,13 @@ public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extend
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 requireSortScope(id, normalized.previousId());
                 service().moveAfter(id, normalized.previousId());
+                StaticCrudActionResultSupport.sorted(webScopeName());
                 return 1;
             }
             if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
                 requireSortScope(id, normalized.nextId());
                 service().moveBefore(id, normalized.nextId());
+                StaticCrudActionResultSupport.sorted(webScopeName());
                 return 1;
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");

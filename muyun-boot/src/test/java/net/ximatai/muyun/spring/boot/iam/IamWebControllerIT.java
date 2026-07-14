@@ -259,7 +259,7 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.data").value(1))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
                 .andExpect(jsonPath("$.message.text").value("排序成功"))
-                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.tenant' && @.recordId == 'tenant-1')]")
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.tenant')]")
                         .exists());
 
         verify(tenantService).moveAfter("tenant-1", "tenant-0");
@@ -302,7 +302,7 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.data").value(1))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
                 .andExpect(jsonPath("$.message.text").value("排序成功"))
-                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.employee' && @.recordId == 'employee-1')]")
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.employee')]")
                         .exists());
 
         verify(employeeService).moveAfter("employee-1", "employee-0");

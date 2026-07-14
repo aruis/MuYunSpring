@@ -240,7 +240,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     default T insert(@RequestBody T record) {
         return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            StaticCrudActionResultSupport.created(webScopeName(), id);
+            return saved;
         }));
     }
 
@@ -252,7 +254,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return MutationTenantScopeExecutor.forUpdate(this, id, record, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
-            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
+                    FieldOutputContext.VIEW);
+            StaticCrudActionResultSupport.updated(webScopeName(), id);
+            return saved;
         }));
     }
 
@@ -263,6 +268,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
             int count = service().delete(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.deleted(webScopeName(), id);
+            }
             return count;
         }));
     }

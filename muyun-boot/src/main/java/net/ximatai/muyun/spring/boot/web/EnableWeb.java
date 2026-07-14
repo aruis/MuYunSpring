@@ -20,7 +20,11 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     default int enable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.ENABLE, id);
-            return service().enable(id);
+            int count = service().enable(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.enabled(webScopeName(), id);
+            }
+            return count;
         }));
     }
 
@@ -30,7 +34,11 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     default int disable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DISABLE, id);
-            return service().disable(id);
+            int count = service().disable(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.disabled(webScopeName(), id);
+            }
+            return count;
         }));
     }
 
