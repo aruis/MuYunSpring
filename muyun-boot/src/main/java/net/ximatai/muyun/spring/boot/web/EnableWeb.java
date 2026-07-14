@@ -1,13 +1,9 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.ability.EnableAbility;
-import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,12 +15,8 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     @StandardMutation(StandardMutationKind.ENABLE)
     default int enable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
-            requireDataScopeRecord(PlatformAction.ENABLE, id);
-            int count = service().enable(id);
-            if (count > 0) {
-                StaticCrudActionResultSupport.enabled(webScopeName(), id);
-            }
-            return count;
+            StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.ENABLE, id);
+            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id));
         }));
     }
 
@@ -33,26 +25,8 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     @StandardMutation(StandardMutationKind.DISABLE)
     default int disable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
-            requireDataScopeRecord(PlatformAction.DISABLE, id);
-            int count = service().disable(id);
-            if (count > 0) {
-                StaticCrudActionResultSupport.disabled(webScopeName(), id);
-            }
-            return count;
+            StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DISABLE, id);
+            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id));
         }));
-    }
-
-    private void requireDataScopeRecord(PlatformAction action, String id) {
-        if (service() instanceof DataScopeAbility<?>) {
-            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
-            dataScopeAbility.requireRecordScope(actionPolicy(action), java.util.List.of(id));
-        }
-    }
-
-    private ActionExecutionPolicy actionPolicy(PlatformAction fallback) {
-        return ActionExecutionContextHolder.current()
-                .filter(context -> context.moduleAlias().equals(webScopeName()))
-                .map(ActionExecutionContext::actionPolicy)
-                .orElseGet(fallback::executionPolicy);
     }
 }

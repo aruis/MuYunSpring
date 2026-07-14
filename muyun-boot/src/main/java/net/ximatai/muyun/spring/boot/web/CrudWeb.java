@@ -17,9 +17,6 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -197,7 +194,8 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         Sort[] sorts = projectionService.querySorts(moduleAlias, service(), WebQueryRequests.from(request));
         if (service() instanceof DataScopeAbility<?>) {
             DataScopeAbility<T> dataScopeAbility = DataScopeAbility.cast(service());
-            DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(actionPolicy(PlatformAction.QUERY), criteria);
+            DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(
+                    StaticStandardMutationSupport.actionPolicy(this, PlatformAction.QUERY), criteria);
             Criteria activeCriteria = service().activeCriteria(scope.criteria());
             return dataScopeAbility.withDataScopeTenant(scope,
                     () -> projectionService.queryDefaultList(
@@ -230,7 +228,8 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.VIEW)
     default T view(@PathVariable String id) {
         return webScope(() -> WebOutputSupport.record(service(),
-                selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW));
+                StaticStandardMutationSupport.selectForAction(this, PlatformAction.VIEW, id),
+                FieldOutputContext.VIEW));
     }
 
     @PostMapping("/insert")
@@ -241,7 +240,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            StaticCrudActionResultSupport.created(webScopeName(), id);
+            StaticStandardMutationSupport.created(this, id);
             return saved;
         }));
     }
@@ -252,11 +251,12 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     default T update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return MutationTenantScopeExecutor.forUpdate(this, id, record, () -> webScope(() -> {
-            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.UPDATE, id);
             service().update(record);
-            T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id),
+            T saved = WebOutputSupport.record(service(),
+                    StaticStandardMutationSupport.selectForAction(this, PlatformAction.VIEW, id),
                     FieldOutputContext.VIEW);
-            StaticCrudActionResultSupport.updated(webScopeName(), id);
+            StaticStandardMutationSupport.updated(this, id);
             return saved;
         }));
     }
@@ -266,36 +266,8 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @StandardMutation(StandardMutationKind.DELETE)
     default int delete(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
-            requireDataScopeRecord(PlatformAction.DELETE, id);
-            int count = service().delete(id);
-            if (count > 0) {
-                StaticCrudActionResultSupport.deleted(webScopeName(), id);
-            }
-            return count;
+            StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DELETE, id);
+            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id));
         }));
-    }
-
-    private T selectForAction(PlatformAction action, String id) {
-        if (service() instanceof DataScopeAbility<?>) {
-            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
-            @SuppressWarnings("unchecked")
-            T record = (T) dataScopeAbility.selectForAction(action, id);
-            return record;
-        }
-        return service().select(id);
-    }
-
-    private void requireDataScopeRecord(PlatformAction action, String id) {
-        if (service() instanceof DataScopeAbility<?>) {
-            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
-            dataScopeAbility.requireRecordScope(actionPolicy(action), java.util.List.of(id));
-        }
-    }
-
-    private ActionExecutionPolicy actionPolicy(PlatformAction fallback) {
-        return ActionExecutionContextHolder.current()
-                .filter(context -> context.moduleAlias().equals(webScopeName()))
-                .map(ActionExecutionContext::actionPolicy)
-                .orElseGet(fallback::executionPolicy);
     }
 }
