@@ -19,27 +19,30 @@ public abstract class NestedEnabledSortableCrudWebSupport<
         extends NestedCrudWebSupport<T, S> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
+    @StandardMutation(StandardMutationKind.ENABLE)
     public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().enable(id);
+            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
+    @StandardMutation(StandardMutationKind.DISABLE)
     public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().disable(id);
+            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id));
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
+    @StandardMutation(StandardMutationKind.SORT)
     public int sort(HttpServletRequest servletRequest,
-                                 @PathVariable String id,
-                                 @RequestBody(required = false) SortWebRequest request) {
+                    @PathVariable String id,
+                    @RequestBody(required = false) SortWebRequest request) {
         return webScope(() -> moveWithinScope(servletRequest, id, request, "sort requires previousId or nextId"));
     }
 
@@ -51,13 +54,17 @@ public abstract class NestedEnabledSortableCrudWebSupport<
         requireScopedRecord(servletRequest, id);
         if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.previousId());
-            service().moveAfter(id, normalized.previousId());
-            return 1;
+            return StaticStandardMutationSupport.sorted(this, () -> {
+                service().moveAfter(id, normalized.previousId());
+                return 1;
+            });
         }
         if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.nextId());
-            service().moveBefore(id, normalized.nextId());
-            return 1;
+            return StaticStandardMutationSupport.sorted(this, () -> {
+                service().moveBefore(id, normalized.nextId());
+                return 1;
+            });
         }
         throw new IllegalArgumentException(errorMessage);
     }

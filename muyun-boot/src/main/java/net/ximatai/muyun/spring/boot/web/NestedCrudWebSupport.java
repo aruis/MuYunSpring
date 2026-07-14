@@ -78,17 +78,21 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
 
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
+    @StandardMutation(StandardMutationKind.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     public T insert(HttpServletRequest servletRequest, @RequestBody T record) {
         return webScope(() -> {
             bindScope(record, servletRequest);
             String id = service().insert(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            StaticStandardMutationSupport.created(this, id);
+            return saved;
         });
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
+    @StandardMutation(StandardMutationKind.UPDATE)
     public T update(HttpServletRequest servletRequest, @PathVariable String id,
                     @RequestBody T record) {
         return webScope(() -> {
@@ -96,16 +100,19 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
             record.setId(id);
             bindScope(record, servletRequest);
             service().update(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            StaticStandardMutationSupport.updated(this, id);
+            return saved;
         });
     }
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
+    @StandardMutation(StandardMutationKind.DELETE)
     public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().delete(id);
+            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id));
         });
     }
 

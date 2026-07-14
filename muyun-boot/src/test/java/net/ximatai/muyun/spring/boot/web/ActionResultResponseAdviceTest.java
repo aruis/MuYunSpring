@@ -58,10 +58,31 @@ class ActionResultResponseAdviceTest {
         }
     }
 
+    @Test
+    void shouldSupportInheritedStandardMutationHandler() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName);
+        Method method = ChildController.class.getMethod("insert");
+        MethodParameter returnType = new MethodParameter(method, -1);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            assertThat(advice.supports(returnType, null)).isTrue();
+        }
+    }
+
     private static final class TestController {
         @StandardMutation(StandardMutationKind.SORT)
         int sort() {
             return 1;
         }
+    }
+
+    private abstract static class BaseController {
+        @StandardMutation(StandardMutationKind.CREATE)
+        public int insert() {
+            return 1;
+        }
+    }
+
+    private static final class ChildController extends BaseController {
     }
 }

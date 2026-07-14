@@ -20,27 +20,30 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         extends NestedCrudWebSupport<T, S> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
+    @StandardMutation(StandardMutationKind.ENABLE)
     public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().enable(id);
+            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
+    @StandardMutation(StandardMutationKind.DISABLE)
     public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().disable(id);
+            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id));
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
+    @StandardMutation(StandardMutationKind.SORT)
     public int sort(HttpServletRequest servletRequest,
-                                 @PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+                    @PathVariable String id,
+                    @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             requireSortInput(normalized);
@@ -49,13 +52,15 @@ public abstract class NestedEnabledTreeCrudWebSupport<
             requireScopedNeighbor(servletRequest, normalized.nextId());
             requireScopedParent(servletRequest, normalized.parentId());
             Criteria scopeCriteria = treeScopeCriteria(servletRequest);
-            if (scopeCriteria == null || scopeCriteria.isEmpty()) {
-                service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-            } else {
-                service().moveInTree(scopeCriteria, id, normalized.previousId(), normalized.nextId(),
-                        normalized.parentId());
-            }
-            return 1;
+            return StaticStandardMutationSupport.sorted(this, () -> {
+                if (scopeCriteria == null || scopeCriteria.isEmpty()) {
+                    service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
+                } else {
+                    service().moveInTree(scopeCriteria, id, normalized.previousId(), normalized.nextId(),
+                            normalized.parentId());
+                }
+                return 1;
+            });
         });
     }
 
