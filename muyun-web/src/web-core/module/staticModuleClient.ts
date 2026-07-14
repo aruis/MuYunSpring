@@ -165,13 +165,16 @@ function normalizeRecordMutationResponse<TRecord>(
   response: TRecord | WebActionResultEnvelope<TRecord>,
 ): StaticRecordMutationResult<TRecord> {
   if (isWebActionResultEnvelope<TRecord>(response)) {
-    return {
+    const result: StaticRecordMutationResult<TRecord> = {
       record: response.data,
       message: response.message,
-      resultType: response.resultType,
       changes: response.changes,
       changeSetId: response.changeSetId,
     };
+    if (response.resultType) {
+      result.resultType = response.resultType;
+    }
+    return result;
   }
   return { record: response };
 }

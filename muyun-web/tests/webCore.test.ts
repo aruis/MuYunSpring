@@ -8,6 +8,7 @@ import {
   createHttpClient,
   createModuleContext,
   createModuleTreeContext,
+  createStaticModuleCrudClient,
   createStaticModuleTreeClient,
   normalizeError,
   platformErrorCodes,
@@ -199,7 +200,7 @@ test('static module client normalizes backend action envelopes', async () => {
       changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
     assert.deepEqual(await client.delete('org-1'), {
-      count: 1,
+      data: 1,
       message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
       changeSetId: 'change-set-2',
       changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
@@ -230,13 +231,13 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     }
     if (request.url.endsWith('/insert')) {
       return Response.json({
-        record: { id: 'org-1', title: '总部' },
-        message: '已创建',
-        resultType: 'created',
+        data: { id: 'org-1', title: '总部' },
+        message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+        changeSetId: 'change-set-1',
         changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
       });
     }
-    return Response.json1;
+    return Response.json(1);
   };
 
   try {
@@ -261,8 +262,8 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     assert.deepEqual(await requests[3].json(), { title: '总部' });
     assert.deepEqual(insertResult, {
       record: { id: 'org-1', title: '总部' },
-      message: '已创建',
-      resultType: 'created',
+      message: { code: 'platform.crud.created', text: '新增成功', type: 'SUCCESS' },
+      changeSetId: 'change-set-1',
       changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
     assert.equal(requests[4].url, 'http://api.local/iam.organization/sort/org-1');
