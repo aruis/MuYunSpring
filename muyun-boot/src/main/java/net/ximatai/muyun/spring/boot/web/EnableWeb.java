@@ -17,22 +17,20 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
     @StandardMutation(StandardMutationKind.ENABLE)
-    default WebCountResponse enable(@PathVariable String id) {
+    default CountResult enable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.ENABLE, id);
-            int count = service().enable(id);
-            return new WebCountResponse(count, successMessage(service().select(id), "已启用"));
+            return new CountResult(service().enable(id));
         }));
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
     @StandardMutation(StandardMutationKind.DISABLE)
-    default WebCountResponse disable(@PathVariable String id) {
+    default CountResult disable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DISABLE, id);
-            int count = service().disable(id);
-            return new WebCountResponse(count, successMessage(service().select(id), "已停用"));
+            return new CountResult(service().disable(id));
         }));
     }
 

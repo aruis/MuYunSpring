@@ -66,7 +66,7 @@ export interface WebActionResultEnvelope<TData = unknown> extends WebActionResul
   data: TData;
 }
 
-export interface WebCountResponse extends WebActionResultFacts {
+export interface CountResult extends WebActionResultFacts {
   count: number;
 }
 

@@ -2110,7 +2110,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
-        verify(mainEntity, times(2)).select("contract-1");
+        verify(mainEntity).select("contract-1");
         verify(mainEntity).delete("contract-1");
         verify(service).actions(MODULE);
     }

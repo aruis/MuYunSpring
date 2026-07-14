@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
@@ -53,7 +53,7 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(@PathVariable String id,
+    public CountResult sort(@PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
@@ -61,7 +61,7 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
                 throw new IllegalArgumentException("module tree sort requires previousId, nextId, or parentId");
             }
             service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-            return new WebCountResponse(1);
+            return new CountResult(1);
         });
     }
 

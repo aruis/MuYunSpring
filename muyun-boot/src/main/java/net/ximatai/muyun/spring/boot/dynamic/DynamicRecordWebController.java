@@ -18,7 +18,7 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
@@ -1134,7 +1134,7 @@ public class DynamicRecordWebController implements
     @Override
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(HttpServletRequest httpRequest,
+    public CountResult sort(HttpServletRequest httpRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -1144,7 +1144,7 @@ public class DynamicRecordWebController implements
             if (capabilities.contains(EntityCapability.TREE.name())) {
                 requireSortInput(normalized);
                 operations.moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-                return new WebCountResponse(1);
+                return new CountResult(1);
             }
             if (!capabilities.contains(EntityCapability.SORT.name())) {
                 throw new PlatformException("dynamic entity does not support capability: SORT");
@@ -1154,11 +1154,11 @@ public class DynamicRecordWebController implements
             }
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 operations.moveAfter(id, normalized.previousId());
-                return new WebCountResponse(1);
+                return new CountResult(1);
             }
             if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
                 operations.moveBefore(id, normalized.nextId());
-                return new WebCountResponse(1);
+                return new CountResult(1);
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");
         });

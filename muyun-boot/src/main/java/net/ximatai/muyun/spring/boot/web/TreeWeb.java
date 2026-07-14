@@ -24,7 +24,7 @@ import java.util.Set;
 public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeAbility<T>> extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    default WebCountResponse sort(HttpServletRequest httpRequest,
+    default CountResult sort(HttpServletRequest httpRequest,
                                   @PathVariable String id,
                                   @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -32,7 +32,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
             requireSortInput(normalized);
             requireTreeSortScope(httpRequest, id, normalized);
             moveTree(httpRequest, id, normalized);
-            return new WebCountResponse(1);
+            return new CountResult(1);
         });
     }
 

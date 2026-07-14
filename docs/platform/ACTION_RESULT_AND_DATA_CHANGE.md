@@ -466,7 +466,7 @@ Web Adapter
 | `EnableWeb` / `SortWeb` | 使用 `StandardMutation` 声明标准动作，按记录更新类变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
 | 嵌套静态 CRUD / Tree CRUD | 第一阶段暂保持旧响应 | 明确 `resourceKey`、父子 `scope` 和子资源变化语义后，再接入统一动作结果 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 报告消息和变化 | Controller 返回贴近原始业务数据 |
-| `WebCountResponse` | 仅作为计数型动作的数据模型；进入 `BusinessMutation` 时由输出层转换为 `data.count` | 计数语义保留，但不再作为顶层 HTTP 包装 |
+| `CountResult` | 仅作为计数型动作的数据模型；进入 `BusinessMutation` 时由输出层转换为 `data.count` | 计数语义保留，但不再作为顶层 HTTP 包装 |
 | 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
 | `DynamicActionResultBody` | 暂保持旧形态，禁止作为新静态动作结果参考 | 拆分为业务数据、业务消息、数据变化事实和明确交互动作 |
 | `WorkflowTaskActionResult` / `WorkflowInstanceActionResult` | 暂保持工作流专用结果 | 后续由工作流 Adapter 映射到统一外部动作结果 |

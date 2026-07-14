@@ -19,33 +19,31 @@ public abstract class NestedEnabledSortableCrudWebSupport<
         extends NestedCrudWebSupport<T, S> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public WebCountResponse enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public CountResult enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            int count = service().enable(id);
-            return new WebCountResponse(count, successMessage(service().select(id), "已启用"));
+            return new CountResult(service().enable(id));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public WebCountResponse disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public CountResult disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            int count = service().disable(id);
-            return new WebCountResponse(count, successMessage(service().select(id), "已停用"));
+            return new CountResult(service().disable(id));
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public WebCountResponse sort(HttpServletRequest servletRequest,
+    public CountResult sort(HttpServletRequest servletRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) SortWebRequest request) {
         return webScope(() -> moveWithinScope(servletRequest, id, request, "sort requires previousId or nextId"));
     }
 
-    protected WebCountResponse moveWithinScope(HttpServletRequest servletRequest,
+    protected CountResult moveWithinScope(HttpServletRequest servletRequest,
                                                String id,
                                                SortWebRequest request,
                                                String errorMessage) {
@@ -54,12 +52,12 @@ public abstract class NestedEnabledSortableCrudWebSupport<
         if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.previousId());
             service().moveAfter(id, normalized.previousId());
-            return new WebCountResponse(1);
+            return new CountResult(1);
         }
         if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.nextId());
             service().moveBefore(id, normalized.nextId());
-            return new WebCountResponse(1);
+            return new CountResult(1);
         }
         throw new IllegalArgumentException(errorMessage);
     }

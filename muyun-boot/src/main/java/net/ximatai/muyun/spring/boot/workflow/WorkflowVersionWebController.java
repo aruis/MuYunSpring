@@ -4,7 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -82,7 +82,7 @@ public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowV
     @Override
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public CountResult delete(HttpServletRequest servletRequest, @PathVariable String id) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow version can only delete draft versions");
         return super.delete(servletRequest, id);
     }

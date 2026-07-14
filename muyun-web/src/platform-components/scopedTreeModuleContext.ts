@@ -1,4 +1,4 @@
-import type { WebCountResponse, WebListResponse, WebQueryRequest, WebTreeNode } from '@muyun/web-contracts';
+import type { CountResult, WebListResponse, WebQueryRequest, WebTreeNode } from '@muyun/web-contracts';
 import type { ModuleContext, StaticModuleTreeClient } from '@muyun/web-core';
 
 export interface ScopedTreeModuleContextOptions {
@@ -62,7 +62,7 @@ export function createScopedTreeClient<TRecord>(
         },
       }),
     sort: (id, request) =>
-      context.http.request<WebCountResponse>({
+      context.http.request<CountResult>({
         method: 'POST',
         path: `${(options.sortPath ?? `${options.treePath.replace(/\/tree\/?$/, '')}/sort`).replace(
           /\/$/,

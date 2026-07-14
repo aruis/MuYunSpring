@@ -333,7 +333,7 @@ class DynamicOpenApiGeneratorTest {
                 .get()
                 .satisfies(operation -> {
                     assertThat(operation.requestSchema()).isEqualTo("SortWebRequest");
-                    assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
+                    assertThat(operation.responseSchema()).isEqualTo("CountResult");
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.SORT.code());
                 });
         assertThat(sortable.schemas().get("SortWebRequest").properties())
@@ -385,7 +385,7 @@ class DynamicOpenApiGeneratorTest {
                 .findFirst())
                 .get()
                 .satisfies(operation -> {
-                    assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
+                    assertThat(operation.responseSchema()).isEqualTo("CountResult");
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.ENABLE.code());
                 });
         assertThat(enabled.operations().stream()
@@ -516,7 +516,7 @@ class DynamicOpenApiGeneratorTest {
     void shouldExposeWebResponseSchemasForActionAndCrudContracts() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
 
-        assertThat(document.schemas().get("WebCountResponse").properties().get("count"))
+        assertThat(document.schemas().get("CountResult").properties().get("count"))
                 .satisfies(property -> {
                     assertThat(property.type()).isEqualTo("integer");
                     assertThat(property.format()).isEqualTo("int32");

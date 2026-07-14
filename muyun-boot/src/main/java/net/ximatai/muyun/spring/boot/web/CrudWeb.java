@@ -259,12 +259,11 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     @StandardMutation(StandardMutationKind.DELETE)
-    default WebCountResponse delete(@PathVariable String id) {
+    default CountResult delete(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
-            T record = service().select(id);
             int count = service().delete(id);
-            return new WebCountResponse(count, successMessage(record, "已删除"));
+            return new CountResult(count);
         }));
     }
 

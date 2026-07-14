@@ -82,7 +82,7 @@
 | 字典管理                    | 类目和字典项两套资源分别接入本地 reactions。           |
 | 动态运行器                  | 兼容读取旧 `refresh` 字段，并编译为本地 reactions。    |
 
-`web-contracts` 已允许 `WebActionResult` 和 `WebCountResponse` 承载 `message`、`resultType`、`changes`。`staticModuleClient` 会保留后端已经返回的这些事实，不在 normalize 时丢弃。后端统一 `ActionResult` / `DataChange` 输出需要在后续后端契约治理中补齐。
+`web-contracts` 已允许统一 `WebActionResult` 承载 `message`、`resultType`、`changes`；前端对旧顶层 `CountResult` 仍兼容保留这些事实。`staticModuleClient` 会保留后端已经返回的动作事实，不在 normalize 时丢弃。后端统一 `ActionResult` / `DataChange` 输出需要在后续后端契约治理中补齐。
 
 ## 保留在页面内的联动
 

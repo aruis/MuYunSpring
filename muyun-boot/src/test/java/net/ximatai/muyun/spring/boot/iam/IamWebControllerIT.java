@@ -701,7 +701,7 @@ class IamWebControllerIT {
 
         mvc.perform(post("/iam.employee/employee-1/account/delete"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.count").value(1))
                 .andExpect(jsonPath("$.message.code").value("iam.employee-account.removed"))
                 .andExpect(jsonPath("$.message.text").value("账户已移除"))
                 .andExpect(jsonPath("$.message.type").value("SUCCESS"))

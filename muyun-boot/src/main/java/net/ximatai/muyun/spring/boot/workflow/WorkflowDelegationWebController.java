@@ -5,7 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
-import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -72,8 +72,8 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @PostMapping("/delete/{id}")
     @CustomActionEndpoint(value = "delete", title = "Delegation Delete", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WebCountResponse delete(@PathVariable String id) {
-        return new WebCountResponse(service.deleteForPrincipal(id, currentUserId()));
+    public CountResult delete(@PathVariable String id) {
+        return new CountResult(service.deleteForPrincipal(id, currentUserId()));
     }
 
     @PostMapping("/enable/{id}")
@@ -130,8 +130,8 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @PostMapping("/manage/delete/{id}")
     @CustomActionEndpoint(value = "manageDelete", title = "Delegation Manage Delete",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WebCountResponse manageDelete(@PathVariable String id) {
-        return new WebCountResponse(service.delete(id));
+    public CountResult manageDelete(@PathVariable String id) {
+        return new CountResult(service.delete(id));
     }
 
     @PostMapping("/manage/enable/{id}")

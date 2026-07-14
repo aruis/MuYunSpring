@@ -66,8 +66,8 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     private Object actionData(Object body) {
-        if (body instanceof WebCountResponse countResponse) {
-            return new CountData(countResponse.count());
+        if (body instanceof CountResult countResult) {
+            return new CountData(countResult.count());
         }
         return body;
     }
@@ -103,7 +103,7 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     private boolean mutationAffectedRecord(Object body) {
-        return !(body instanceof WebCountResponse countResponse) || countResponse.count() > 0;
+        return !(body instanceof CountResult countResult) || countResult.count() > 0;
     }
 
     private String recordId(Object data, ServerHttpRequest request) {

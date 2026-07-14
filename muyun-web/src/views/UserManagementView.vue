@@ -29,7 +29,7 @@ import type {
   ResetPasswordResponse,
   Tenant,
   UserAccount,
-  WebCountResponse,
+  CountResult,
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
@@ -421,14 +421,14 @@ async function saveUser() {
 }
 
 async function resetUserPassword() {
-  await executeStaticRecordAction<UserAccount, WebCountResponse>({
+  await executeStaticRecordAction<UserAccount, CountResult>({
     loading: savingUser,
     source: 'user-management',
     record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
     canExecute: () => canSaveUser.value,
     deniedMessage: '当前用户无权重置用户密码',
     execute: (user) =>
-      userContext.http.request<WebCountResponse>({
+      userContext.http.request<CountResult>({
         method: 'POST',
         path: `/iam.user/changePassword/${encodeURIComponent(user.id!)}`,
         body: { password: passwordDraft.value },

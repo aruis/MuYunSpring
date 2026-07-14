@@ -3,7 +3,7 @@ import type {
   WebActionResultFacts,
   WebActionResultEnvelope,
   QuerySchema,
-  WebCountResponse,
+  CountResult,
   WebListResponse,
   WebPageResponse,
   WebQueryRequest,
@@ -25,21 +25,21 @@ export interface StaticModuleCrudClient<TRecord> {
   view(id: string): Promise<TRecord>;
   insert(record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
   update(id: string, record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
-  delete(id: string): Promise<WebCountResponse>;
-  enable(id: string): Promise<WebCountResponse>;
-  disable(id: string): Promise<WebCountResponse>;
+  delete(id: string): Promise<CountResult>;
+  enable(id: string): Promise<CountResult>;
+  disable(id: string): Promise<CountResult>;
 }
 
 export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
   tree(): Promise<WebListResponse<WebTreeNode<TRecord>>>;
   treeFlat(options?: { rootId?: string; includeSelf?: boolean }): Promise<WebListResponse<TRecord>>;
   subtree(id: string, options?: { includeSelf?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
-  sort(id: string, request: TreeSortRequest): Promise<WebCountResponse>;
+  sort(id: string, request: TreeSortRequest): Promise<CountResult>;
 }
 
 export interface ModuleEnableClient {
-  enable(id: string): Promise<WebCountResponse>;
-  disable(id: string): Promise<WebCountResponse>;
+  enable(id: string): Promise<CountResult>;
+  disable(id: string): Promise<CountResult>;
 }
 
 export function createStaticModuleCrudClient<TRecord>(
@@ -87,21 +87,21 @@ export function createStaticResourceCrudClient<TRecord>(
       ),
     delete: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
+        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
           method: 'POST',
           path: `${modulePath}/delete/${encodeURIComponent(id)}`,
         }),
       ),
     enable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
+        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
           method: 'POST',
           path: `${modulePath}/enable/${encodeURIComponent(id)}`,
         }),
       ),
     disable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
+        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
           method: 'POST',
           path: `${modulePath}/disable/${encodeURIComponent(id)}`,
         }),
@@ -146,7 +146,7 @@ export function createStaticResourceTreeClient<TRecord>(
       }),
     sort: async (id, request) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
+        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
           method: 'POST',
           path: `${modulePath}/sort/${encodeURIComponent(id)}`,
           body: request,
@@ -176,8 +176,8 @@ function normalizeRecordMutationResponse<TRecord>(
 }
 
 function normalizeCountMutationResponse(
-  response: WebCountResponse | WebActionResultEnvelope<WebCountResponse>,
-): WebCountResponse {
+  response: CountResult | WebActionResultEnvelope<CountResult>,
+): CountResult {
   if (isWebActionResultEnvelope(response)) {
     return {
       count: webCount(response.data),

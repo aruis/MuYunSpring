@@ -102,10 +102,10 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public CountResult delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
-            T record = requireScopedRecord(servletRequest, id);
-            return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
+            requireScopedRecord(servletRequest, id);
+            return new CountResult(service().delete(id));
         });
     }
 

@@ -546,8 +546,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.role/delete/{id}", "role-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.message").value("「Organization Role」已删除"));
+                .andExpect(jsonPath("$.count").value(1));
     }
 
     @Test
