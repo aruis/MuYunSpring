@@ -8,6 +8,8 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -970,6 +972,27 @@ class PlatformConfigurationWebControllerTest {
         mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
+
+        verify(service).publishUiConfig("ui-config-1");
+    }
+
+    @Test
+    void shouldWrapPagePublishBusinessMutationResult() throws Exception {
+        PlatformPageConfigPublishService service = mock(PlatformPageConfigPublishService.class);
+        PlatformPageConfigPublishWebController controller = new PlatformPageConfigPublishWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addInterceptors(new BusinessMutationInterceptor())
+                .setControllerAdvice(new ActionResultResponseAdvice(Class::getSimpleName))
+                .build();
+        mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.ui-config.published"))
+                .andExpect(jsonPath("$.message.text").value("UI 配置已发布"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'platform.ui_config' && @.recordId == 'ui-config-1')]")
+                        .exists());
 
         verify(service).publishUiConfig("ui-config-1");
     }
