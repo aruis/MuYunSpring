@@ -255,7 +255,7 @@ class IamWebControllerIT {
                                 {"previousId":"tenant-0"}
                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.count").value(1))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
                 .andExpect(jsonPath("$.message.text").value("排序成功"))
                 .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.tenant' && @.recordId == 'tenant-1')]")
@@ -275,7 +275,7 @@ class IamWebControllerIT {
                                 {"previousId":"employee-0"}
                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.count").value(1))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
                 .andExpect(jsonPath("$.message.text").value("排序成功"))
                 .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.employee' && @.recordId == 'employee-1')]")

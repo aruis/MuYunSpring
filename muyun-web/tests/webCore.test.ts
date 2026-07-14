@@ -180,7 +180,7 @@ test('static module client normalizes backend action envelopes', async () => {
       });
     }
     return Response.json({
-      data: null,
+      data: { count: 1 },
       message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
       changeSetId: 'change-set-2',
       changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
@@ -199,7 +199,7 @@ test('static module client normalizes backend action envelopes', async () => {
       changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
     assert.deepEqual(await client.delete('org-1'), {
-      count: 0,
+      count: 1,
       message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
       changeSetId: 'change-set-2',
       changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],

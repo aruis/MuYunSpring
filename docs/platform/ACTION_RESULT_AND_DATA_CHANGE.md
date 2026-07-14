@@ -399,10 +399,12 @@ Web Adapter
 
 试点完成后依次接入：
 
-1. 静态 CRUD；
+1. 顶层静态 CRUD；
 2. 其他静态业务动作；
 3. 动态动作；
 4. 工作流动作。
+
+嵌套静态资源写动作不纳入第一阶段。嵌套资源需要先明确外部资源身份、父子作用域和变化事实表达，再接入统一动作结果，避免仅按父模块记录变化而丢失子资源语义。
 
 ## 13. 契约测试
 
@@ -429,6 +431,7 @@ Web Adapter
 | --- | --- | --- |
 | `CrudWeb` 标准 `insert` / `update` / `delete` | Web 输出层包装为 `ActionResult`；Java 签名可阶段性保留 `WebRecordResponse` 以兼容动态覆盖 | 外部 HTTP 契约统一，后续再压缩 Java 内部旧包装 |
 | `EnableWeb` / `SortWeb` | Web 输出层包装为 `ActionResult`，按记录更新类变化处理 | 标准静态写动作默认携带标准消息和变化事实 |
+| 嵌套静态 CRUD / Tree CRUD | 第一阶段暂保持旧响应 | 明确 `resourceKey`、父子 `scope` 和子资源变化语义后，再接入统一动作结果 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 报告消息和变化 | Controller 返回贴近原始业务数据 |
 | `WebRecordResponse` / `WebCountResponse` | 作为阶段兼容对象；进入 `BusinessMutation` 时由输出层转换为 `data` | 新业务不继续扩散旧顶层 `record` / `count` |
 | 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |

@@ -88,21 +88,21 @@ export function createStaticResourceCrudClient<TRecord>(
       ),
     delete: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
           method: 'POST',
           path: `${modulePath}/delete/${encodeURIComponent(id)}`,
         }),
       ),
     enable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
           method: 'POST',
           path: `${modulePath}/enable/${encodeURIComponent(id)}`,
         }),
       ),
     disable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
           method: 'POST',
           path: `${modulePath}/disable/${encodeURIComponent(id)}`,
         }),
@@ -147,7 +147,7 @@ export function createStaticResourceTreeClient<TRecord>(
       }),
     sort: async (id, request) =>
       normalizeCountMutationResponse(
-        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+        await http.request<WebCountResponse | WebActionResultEnvelope<WebCountResponse>>({
           method: 'POST',
           path: `${modulePath}/sort/${encodeURIComponent(id)}`,
           body: request,
@@ -185,11 +185,11 @@ function normalizeRecordMutationResponse<TRecord>(
 }
 
 function normalizeCountMutationResponse(
-  response: WebCountResponse | WebActionResultEnvelope<null>,
+  response: WebCountResponse | WebActionResultEnvelope<WebCountResponse>,
 ): WebCountResponse {
   if (isWebActionResultEnvelope(response)) {
     return {
-      count: 0,
+      count: webCount(response.data),
       message: response.message,
       resultType: response.resultType,
       changes: response.changes,
@@ -197,6 +197,14 @@ function normalizeCountMutationResponse(
     };
   }
   return response;
+}
+
+function webCount(data: unknown) {
+  if (!data || typeof data !== 'object' || !('count' in data)) {
+    return 0;
+  }
+  const count = (data as { count?: unknown }).count;
+  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
 }
 
 function isWebActionResultEnvelope<TData>(response: unknown): response is WebActionResultEnvelope<TData> {
