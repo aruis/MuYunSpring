@@ -13,6 +13,16 @@ public final class BusinessMutationResultSupport {
                 .ifPresent(context -> context.message(ActionMessage.success(code, text)));
     }
 
+    public static void successUpdated(String code, String text, String moduleAlias, String recordId) {
+        success(code, text);
+        updated(moduleAlias, recordId);
+    }
+
+    public static void successCollectionChanged(String code, String text, String moduleAlias) {
+        success(code, text);
+        collectionChanged(moduleAlias);
+    }
+
     public static void updated(String moduleAlias, String recordId) {
         MutationContextHolder.current()
                 .ifPresent(context -> context.record(DataChange.recordUpdated(moduleAlias, recordId)));

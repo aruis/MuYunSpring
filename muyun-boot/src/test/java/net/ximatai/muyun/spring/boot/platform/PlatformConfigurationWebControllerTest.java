@@ -977,7 +977,7 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldWrapPagePublishBusinessMutationResult() throws Exception {
+    void shouldWrapPagePublishBusinessMutationResults() throws Exception {
         PlatformPageConfigPublishService service = mock(PlatformPageConfigPublishService.class);
         PlatformPageConfigPublishWebController controller = new PlatformPageConfigPublishWebController();
         ReflectionTestUtils.setField(controller, "service", service);
@@ -986,15 +986,37 @@ class PlatformConfigurationWebControllerTest {
                 .addInterceptors(new BusinessMutationInterceptor())
                 .setControllerAdvice(new ActionResultResponseAdvice(Class::getSimpleName))
                 .build();
-        mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(1))
-                .andExpect(jsonPath("$.message.code").value("platform.ui-config.published"))
-                .andExpect(jsonPath("$.message.text").value("UI 配置已发布"))
-                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'platform.ui_config' && @.recordId == 'ui-config-1')]")
-                        .exists());
+
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/publish",
+                "platform.ui-config.published", "UI 配置已发布", "platform.ui_config", "ui-config-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/unpublish",
+                "platform.ui-config.unpublished", "UI 配置已取消发布", "platform.ui_config", "ui-config-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/query-templates/query-template-1/publish",
+                "platform.query-template.published", "查询模板已发布",
+                "platform.query_template", "query-template-1");
+        assertPagePublishActionResult(mvc, "/platform.page_config_publish/query-templates/query-template-1/unpublish",
+                "platform.query-template.unpublished", "查询模板已取消发布",
+                "platform.query_template", "query-template-1");
 
         verify(service).publishUiConfig("ui-config-1");
+        verify(service).unpublishUiConfig("ui-config-1");
+        verify(service).publishQueryTemplate("query-template-1");
+        verify(service).unpublishQueryTemplate("query-template-1");
+    }
+
+    private void assertPagePublishActionResult(MockMvc mvc,
+                                               String path,
+                                               String messageCode,
+                                               String messageText,
+                                               String moduleAlias,
+                                               String recordId) throws Exception {
+        mvc.perform(post(path))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value(messageCode))
+                .andExpect(jsonPath("$.message.text").value(messageText))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == '%s' && @.recordId == '%s')]"
+                        .formatted(moduleAlias, recordId)).exists());
     }
 
     private DynamicModuleRefreshResult runtimeRefreshResult(boolean dryRun) {

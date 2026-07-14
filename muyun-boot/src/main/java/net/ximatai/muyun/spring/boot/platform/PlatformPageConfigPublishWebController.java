@@ -25,8 +25,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     public int publishUiConfig(@PathVariable String id) {
         return webScope(() -> {
             service().publishUiConfig(id);
-            BusinessMutationResultSupport.success("platform.ui-config.published", "UI 配置已发布");
-            BusinessMutationResultSupport.updated(PlatformUiConfigService.MODULE_ALIAS, id);
+            BusinessMutationResultSupport.successUpdated("platform.ui-config.published",
+                    "UI 配置已发布", PlatformUiConfigService.MODULE_ALIAS, id);
             return 1;
         });
     }
@@ -37,8 +37,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     public int unpublishUiConfig(@PathVariable String id) {
         return webScope(() -> {
             service().unpublishUiConfig(id);
-            BusinessMutationResultSupport.success("platform.ui-config.unpublished", "UI 配置已取消发布");
-            BusinessMutationResultSupport.updated(PlatformUiConfigService.MODULE_ALIAS, id);
+            BusinessMutationResultSupport.successUpdated("platform.ui-config.unpublished",
+                    "UI 配置已取消发布", PlatformUiConfigService.MODULE_ALIAS, id);
             return 1;
         });
     }
@@ -49,8 +49,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     public int publishQueryTemplate(@PathVariable String id) {
         return webScope(() -> {
             service().publishQueryTemplate(id);
-            BusinessMutationResultSupport.success("platform.query-template.published", "查询模板已发布");
-            BusinessMutationResultSupport.updated(PlatformQueryTemplateService.MODULE_ALIAS, id);
+            BusinessMutationResultSupport.successUpdated("platform.query-template.published",
+                    "查询模板已发布", PlatformQueryTemplateService.MODULE_ALIAS, id);
             return 1;
         });
     }
@@ -62,8 +62,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     public int unpublishQueryTemplate(@PathVariable String id) {
         return webScope(() -> {
             service().unpublishQueryTemplate(id);
-            BusinessMutationResultSupport.success("platform.query-template.unpublished", "查询模板已取消发布");
-            BusinessMutationResultSupport.updated(PlatformQueryTemplateService.MODULE_ALIAS, id);
+            BusinessMutationResultSupport.successUpdated("platform.query-template.unpublished",
+                    "查询模板已取消发布", PlatformQueryTemplateService.MODULE_ALIAS, id);
             return 1;
         });
     }

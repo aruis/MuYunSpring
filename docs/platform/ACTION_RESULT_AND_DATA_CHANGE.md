@@ -469,7 +469,7 @@ Web Adapter
 | 嵌套静态 CRUD / Tree CRUD | 标准增改删、启停、普通排序和树排序已接入 `StandardMutation`；查询和树查询保持原查询响应 | 保持 controller 返回原始记录或计数，HTTP 输出层统一包装 |
 | `StandardMutationResultSupport` | 作为 boot web 层公开门面，供标准静态动作登记标准消息和变化事实 | `platform` 包等自定义 Web support 不依赖包内 helper |
 | `StaticStandardMutationSupport` | 作为标准 Web 基类内部执行 helper，负责 data scope、selectForAction、动作策略等上下文细节 | 不作为跨包业务接入门面 |
-| `BusinessMutationResultSupport` | 作为 boot web 层业务动作门面，供非标准静态动作登记业务消息和显式变化事实 | 不复用标准 CRUD 文案，不表达 UI 行为 |
+| `BusinessMutationResultSupport` | 作为 boot web 层业务动作门面，供非标准静态动作登记业务消息和显式变化事实；单记录更新和集合变化优先使用 `successUpdated`、`successCollectionChanged` 组合方法 | 不复用标准 CRUD 文案，不表达 UI 行为 |
 | 业务专用静态动作 | 使用 `@BusinessMutation` 标记，由 Service 或 Web Adapter 边界报告消息和变化；底层业务 Service 不因 HTTP 输出契约反向依赖 boot web | Controller 返回贴近原始业务数据 |
 | 计数型动作 | Controller 直接返回 `int` / `Integer`；进入 `BusinessMutation` 时统一放入 `data` | 计数语义保留为原始数字，不再引入计数包装模型 |
 | 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
