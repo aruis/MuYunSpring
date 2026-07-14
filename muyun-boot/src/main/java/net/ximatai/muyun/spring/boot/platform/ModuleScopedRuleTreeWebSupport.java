@@ -11,7 +11,6 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
-import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -86,34 +85,34 @@ abstract class ModuleScopedRuleTreeWebSupport<
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public CountResult delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new CountResult(service().delete(id));
+            return service().delete(id);
         });
     }
 
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public CountResult enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new CountResult(service().enable(id));
+            return service().enable(id);
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public CountResult disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new CountResult(service().disable(id));
+            return service().disable(id);
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public CountResult sort(HttpServletRequest servletRequest,
+    public int sort(HttpServletRequest servletRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) SortWebRequest request) {
         return webScope(() -> {
@@ -122,12 +121,12 @@ abstract class ModuleScopedRuleTreeWebSupport<
             if (hasText(normalized.previousId())) {
                 requireScopedRecord(servletRequest, normalized.previousId());
                 service().moveAfter(id, normalized.previousId());
-                return new CountResult(1);
+                return 1;
             }
             if (hasText(normalized.nextId())) {
                 requireScopedRecord(servletRequest, normalized.nextId());
                 service().moveBefore(id, normalized.nextId());
-                return new CountResult(1);
+                return 1;
             }
             throw new IllegalArgumentException("rule sort requires previousId or nextId");
         });

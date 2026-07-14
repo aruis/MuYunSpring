@@ -31,7 +31,7 @@ class UserAccountWebControllerTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(controller.changePassword("user-1",
-                    new UserAccountWebController.ChangePasswordRequest("secret2")).count()).isEqualTo(1);
+                    new UserAccountWebController.ChangePasswordRequest("secret2"))).isEqualTo(1);
         }
 
         verify(userSessionService).revokeUserSessions("user-1");

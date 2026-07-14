@@ -332,15 +332,15 @@ function createFakeContext<TRecord extends { id?: string }>(moduleAlias: string)
     delete: async (id: string) => {
       calls.push(['delete', id]);
       records.delete(id);
-      return { count: 1 };
+      return 1;
     },
     enable: async (id: string) => {
       calls.push(['enable', id]);
-      return { count: 1 };
+      return 1;
     },
     disable: async (id: string) => {
       calls.push(['disable', id]);
-      return { count: 1 };
+      return 1;
     },
   };
   const context = {

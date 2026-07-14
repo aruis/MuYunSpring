@@ -79,7 +79,7 @@ test('platform action result message prefers business message and falls back saf
     '账号已创建并绑定职员',
   );
   assert.equal(resolvePlatformActionResultMessage({ message: '   ' }, '默认成功'), '默认成功');
-  assert.equal(resolvePlatformActionResultMessage({ count: 1 }, '已删除'), '已删除');
+  assert.equal(resolvePlatformActionResultMessage(1, '已删除'), '已删除');
   assert.equal(resolvePlatformActionResultMessage(undefined), '操作成功');
 });
 

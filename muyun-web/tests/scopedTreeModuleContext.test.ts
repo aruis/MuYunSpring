@@ -101,9 +101,9 @@ function createFakeModuleContext(options: { hasTree?: boolean } = {}) {
     view: async (id: string) => ({ id, title: id }),
     insert: async (record: DepartmentRecord) => ({ record }),
     update: async (_id: string, record: DepartmentRecord) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
   };
   const context = {
     moduleAlias: 'iam.department',

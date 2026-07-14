@@ -33,7 +33,6 @@ import type {
   Employee,
   EmployeeAccount,
   EmployeeAccountProvisionResponse,
-  CountResult,
   Organization,
   UserAccount,
   WebActionResultEnvelope,
@@ -756,7 +755,7 @@ async function removeEmployeeAccount() {
   }
   savingEmployeeAccount.value = true;
   try {
-    const result = await employeeContext.http.request<WebActionResultEnvelope<CountResult>>({
+    const result = await employeeContext.http.request<WebActionResultEnvelope<number>>({
       method: 'POST',
       path: `/iam.employee/${encodeURIComponent(employee.id)}/account/delete`,
     });

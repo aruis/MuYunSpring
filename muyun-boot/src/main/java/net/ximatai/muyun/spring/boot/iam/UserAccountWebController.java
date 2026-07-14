@@ -9,7 +9,6 @@ import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -137,14 +136,14 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     @PostMapping("/changePassword/{id}")
     @CustomActionEndpoint(value = "changePassword", title = "修改密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public CountResult changePassword(@PathVariable String id,
+    public int changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             int changed = service().changePassword(id, request.password());
             if (changed > 0 && userSessionService != null) {
                 userSessionService.revokeUserSessions(id);
             }
-            return new CountResult(changed);
+            return changed;
         }));
     }
 

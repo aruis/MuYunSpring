@@ -136,7 +136,7 @@ public class DynamicOpenApiGenerator {
         }
         if (standardActionVisible.test(PlatformAction.DELETE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
-                    "Delete " + mainEntity.title(), null, "CountResult", PlatformAction.DELETE.code()));
+                    "Delete " + mainEntity.title(), null, "integer", PlatformAction.DELETE.code()));
         }
         boolean exchangeSupported = mainEntity.capabilities().contains(EntityCapability.EXCHANGE.name());
         if (exchangeSupported && standardActionVisible.test(PlatformAction.IMPORT)) {
@@ -167,12 +167,12 @@ public class DynamicOpenApiGenerator {
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
                 && standardActionVisible.test(PlatformAction.ENABLE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/enable/{id}", operationId(descriptor, "enable"),
-                    "Enable " + mainEntity.title(), null, "CountResult", PlatformAction.ENABLE.code()));
+                    "Enable " + mainEntity.title(), null, "integer", PlatformAction.ENABLE.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
                 && standardActionVisible.test(PlatformAction.DISABLE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/disable/{id}", operationId(descriptor, "disable"),
-                    "Disable " + mainEntity.title(), null, "CountResult", PlatformAction.DISABLE.code()));
+                    "Disable " + mainEntity.title(), null, "integer", PlatformAction.DISABLE.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.SORT.name())
                 && standardActionVisible.test(PlatformAction.SORT)) {
@@ -180,7 +180,7 @@ public class DynamicOpenApiGenerator {
                     ? "TreeSortWebRequest"
                     : "SortWebRequest";
             operations.add(operation(descriptor.moduleAlias(), basePath + "/sort/{id}", operationId(descriptor, "sort"),
-                    "Sort " + mainEntity.title(), sortRequestSchema, "CountResult", PlatformAction.SORT.code()));
+                    "Sort " + mainEntity.title(), sortRequestSchema, "integer", PlatformAction.SORT.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())
                 && standardActionVisible.test(PlatformAction.TREE)) {

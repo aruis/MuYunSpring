@@ -56,8 +56,8 @@ test('static tree resource context keeps runtime tree availability for optional 
 test('empty static tree client is mutation-safe for unavailable scopes', async () => {
   const client = createEmptyStaticTreeClient<DictionaryCategory>('platform.dictionary_item');
 
-  assert.deepEqual(await client.delete('missing'), { count: 0 });
-  assert.deepEqual(await client.sort('missing', { beforeId: 'other' }), { count: 0 });
+  assert.equal(await client.delete('missing'), 0);
+  assert.equal(await client.sort('missing', { beforeId: 'other' }), 0);
 });
 
 function createContext(options: { hasTree?: boolean } = {}): ModuleContext<DictionaryCategory> {
@@ -118,12 +118,12 @@ function createTreeClient(
     view: async (id) => ({ id }),
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     tree: async () => ({ records: [] }),
     treeFlat: async () => treeFlatResponse,
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
   };
 }

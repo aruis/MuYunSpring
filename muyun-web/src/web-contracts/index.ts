@@ -66,10 +66,6 @@ export interface WebActionResultEnvelope<TData = unknown> extends WebActionResul
   data: TData;
 }
 
-export interface CountResult extends WebActionResultFacts {
-  count: number;
-}
-
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];

@@ -336,7 +336,7 @@ test('position management state keeps category create draft when categories relo
 
 test('position management state keeps category editor closed after deleting category', async () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category', {
-    delete: async () => ({ count: 1 }),
+    delete: async () => 1,
   });
   const positionContext = createContext<Position>('iam.position');
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
@@ -398,7 +398,7 @@ test('position management state exposes category toggle authorization', async ()
     {
       disable: async (id) => {
         calls.push(`disable:${id}`);
-        return { count: 1 };
+        return 1;
       },
     },
     (actionCode) => actionCode !== 'disable',
@@ -421,7 +421,7 @@ test('position management state respects delete confirmation result', async () =
   const positionContext = createContext<Position>('iam.position', {
     delete: async (id) => {
       calls.push(`delete:${id}`);
-      return { count: 1 };
+      return 1;
     },
   });
   let confirmed = false;
@@ -445,7 +445,7 @@ test('position management state respects delete confirmation result', async () =
 test('position management state keeps delete fallback creation without selecting reload rows', async () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category');
   const positionContext = createContext<Position>('iam.position', {
-    delete: async () => ({ count: 1 }),
+    delete: async () => 1,
   });
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
 
@@ -523,12 +523,12 @@ test('position management state stays readonly without create permissions after 
   const categoryContext = createContext<PositionCategory>(
     'iam.position_category',
     {
-      delete: async () => ({ count: 1 }),
+      delete: async () => 1,
     },
     (actionCode) => actionCode !== 'create' && actionCode !== 'position_create',
   );
   const positionContext = createContext<Position>('iam.position', {
-    delete: async () => ({ count: 1 }),
+    delete: async () => 1,
   });
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
 
@@ -568,11 +568,11 @@ test('position management state rejects position actions without contributed per
     },
     delete: async (id) => {
       calls.push(`delete:${id}`);
-      return { count: 1 };
+      return 1;
     },
     enable: async (id) => {
       calls.push(`enable:${id}`);
-      return { count: 1 };
+      return 1;
     },
   });
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
@@ -649,9 +649,9 @@ function createContext<TRecord>(
     view: async (id) => ({ id }) as TRecord,
     insert: async (record) => ({ record }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     ...overrides,
   };
   const enable = {
@@ -663,7 +663,7 @@ function createContext<TRecord>(
     tree: async () => ({ records: [] }),
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
   };
   return {
     moduleAlias,

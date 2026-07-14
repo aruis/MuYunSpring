@@ -5,7 +5,6 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
-import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
@@ -144,10 +143,10 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/account-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult deleteAccountRoleGrant(@PathVariable String roleId,
+    public int deleteAccountRoleGrant(@PathVariable String roleId,
                                                    @PathVariable String grantId) {
         return roleRecordScope(roleId,
-                () -> new CountResult(service().deleteAccountRoleGrant(roleId, grantId)));
+                () -> service().deleteAccountRoleGrant(roleId, grantId));
     }
 
     @GetMapping("/{roleId}/employment-grants")
@@ -168,18 +167,18 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/employment-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult deleteEmploymentRoleGrant(@PathVariable String roleId,
+    public int deleteEmploymentRoleGrant(@PathVariable String roleId,
                                                       @PathVariable String grantId) {
         return roleRecordScope(roleId,
-                () -> new CountResult(service().deleteEmploymentRoleGrant(roleId, grantId)));
+                () -> service().deleteEmploymentRoleGrant(roleId, grantId));
     }
 
     @PostMapping("/grant/{roleId}")
     @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult grantAction(@PathVariable String roleId,
+    public int grantAction(@PathVariable String roleId,
                                         @RequestBody GrantActionRequest request) {
-        return roleRecordScope(roleId, () -> new CountResult(service().grantAction(
+        return roleRecordScope(roleId, () -> service().grantAction(
                 roleId,
                 request.moduleAlias(),
                 request.actionCode(),
@@ -188,42 +187,42 @@ public class RoleWebController extends WebSupport<RoleService> implements
                 request.scopeCondition(),
                 request.referenceFieldId(),
                 request.referenceActionCode()
-        )));
+        ));
     }
 
     @PostMapping("/grant/{roleId}/batch")
     @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult grantActions(@PathVariable String roleId,
+    public int grantActions(@PathVariable String roleId,
                                          @RequestBody GrantActionsRequest request) {
-        return roleRecordScope(roleId, () -> new CountResult(service().grantActions(
+        return roleRecordScope(roleId, () -> service().grantActions(
                 roleId,
                 request.actions().stream()
                         .map(GrantActionRequest::toCommand)
                         .toList()
-        )));
+        ));
     }
 
     @PostMapping("/revoke/{roleId}")
     @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult revokeAction(@PathVariable String roleId,
+    public int revokeAction(@PathVariable String roleId,
                                          @RequestBody RevokeActionRequest request) {
-        return roleRecordScope(roleId, () -> new CountResult(service().revokeAction(
-                roleId, request.moduleAlias(), request.actionCode())));
+        return roleRecordScope(roleId, () -> service().revokeAction(
+                roleId, request.moduleAlias(), request.actionCode()));
     }
 
     @PostMapping("/revoke/{roleId}/batch")
     @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public CountResult revokeActions(@PathVariable String roleId,
+    public int revokeActions(@PathVariable String roleId,
                                           @RequestBody RevokeActionsRequest request) {
-        return roleRecordScope(roleId, () -> new CountResult(service().revokeActions(
+        return roleRecordScope(roleId, () -> service().revokeActions(
                 roleId,
                 request.actions().stream()
                         .map(RevokeActionRequest::toCommand)
                         .toList()
-        )));
+        ));
     }
 
     @PostMapping("/permissionMatrix/{roleId}")

@@ -673,7 +673,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"parentId":"root"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).moveInTree(criteria.capture(), eq("category-1"), eq(null), eq(null), eq("root"));
@@ -771,7 +771,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"previousId":"item-0","parentId":"parent-1"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).moveInTree(criteria.capture(), eq("item-1"), eq("item-0"), eq(null), eq("parent-1"));
@@ -969,7 +969,7 @@ class PlatformConfigurationWebControllerTest {
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(service).publishUiConfig("ui-config-1");
     }

@@ -54,7 +54,7 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         if (context == null) {
             return body;
         }
-        Object data = actionData(body);
+        Object data = body;
         applyStandardMutation(returnType, request, body, data);
         CommittedChangeSet changeSet = context.committedChangeSet(moduleAliasResolver);
         return new ActionResultResponse(
@@ -63,16 +63,6 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
                 changeSet.changeSetId(),
                 changeSet.changes()
         );
-    }
-
-    private Object actionData(Object body) {
-        if (body instanceof CountResult countResult) {
-            return new CountData(countResult.count());
-        }
-        return body;
-    }
-
-    private record CountData(int count) {
     }
 
     private void applyStandardMutation(MethodParameter returnType,
@@ -103,7 +93,7 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     private boolean mutationAffectedRecord(Object body) {
-        return !(body instanceof CountResult countResult) || countResult.count() > 0;
+        return !(body instanceof Number count) || count.intValue() > 0;
     }
 
     private String recordId(Object data, ServerHttpRequest request) {

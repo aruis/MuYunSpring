@@ -17,13 +17,13 @@ public abstract class NestedSortableCrudWebSupport<
         extends NestedCrudWebSupport<T, S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public CountResult sort(HttpServletRequest servletRequest,
+    public int sort(HttpServletRequest servletRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) SortWebRequest request) {
         return webScope(() -> moveWithinScope(servletRequest, id, request, "sort requires previousId or nextId"));
     }
 
-    protected CountResult moveWithinScope(HttpServletRequest servletRequest,
+    protected int moveWithinScope(HttpServletRequest servletRequest,
                                                String id,
                                                SortWebRequest request,
                                                String errorMessage) {
@@ -32,12 +32,12 @@ public abstract class NestedSortableCrudWebSupport<
         if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.previousId());
             service().moveAfter(id, normalized.previousId());
-            return new CountResult(1);
+            return 1;
         }
         if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
             requireScopedRecord(servletRequest, normalized.nextId());
             service().moveBefore(id, normalized.nextId());
-            return new CountResult(1);
+            return 1;
         }
         throw new IllegalArgumentException(errorMessage);
     }

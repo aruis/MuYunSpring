@@ -48,9 +48,9 @@ function createFakeModuleContext() {
     view: async (id: string) => ({ id, schemeId: 'scheme-1', title: id }),
     insert: async (record: MenuRecord) => ({ record }),
     update: async (_id: string, record: MenuRecord) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
   };
   const context = {
     moduleAlias: 'platform.menu',

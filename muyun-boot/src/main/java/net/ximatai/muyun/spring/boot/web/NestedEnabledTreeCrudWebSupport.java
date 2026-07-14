@@ -20,25 +20,25 @@ public abstract class NestedEnabledTreeCrudWebSupport<
         extends NestedCrudWebSupport<T, S> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
-    public CountResult enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new CountResult(service().enable(id));
+            return service().enable(id);
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
-    public CountResult disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new CountResult(service().disable(id));
+            return service().disable(id);
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
-    public CountResult sort(HttpServletRequest servletRequest,
+    public int sort(HttpServletRequest servletRequest,
                                  @PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -55,7 +55,7 @@ public abstract class NestedEnabledTreeCrudWebSupport<
                 service().moveInTree(scopeCriteria, id, normalized.previousId(), normalized.nextId(),
                         normalized.parentId());
             }
-            return new CountResult(1);
+            return 1;
         });
     }
 

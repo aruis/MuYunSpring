@@ -195,9 +195,9 @@ function createContext(
     view: async (id) => ({ id, organizationId: 'org-root', code: 'FIN', title: '财务部', enabled: true }),
     insert: async (record) => ({ record: { ...record, id: 'dept-new' } }),
     update: async (_id, record) => ({ record }),
-    delete: async () => ({ count: 1 }),
-    enable: async () => ({ count: 1 }),
-    disable: async () => ({ count: 1 }),
+    delete: async () => 1,
+    enable: async () => 1,
+    disable: async () => 1,
     ...overrides,
   };
   const enable = {
@@ -209,7 +209,7 @@ function createContext(
     tree: async () => ({ records: [] }),
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
-    sort: async () => ({ count: 1 }),
+    sort: async () => 1,
   };
   return {
     moduleAlias: 'iam.department',

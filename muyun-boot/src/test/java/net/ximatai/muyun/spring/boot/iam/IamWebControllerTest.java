@@ -546,7 +546,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.role/delete/{id}", "role-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -565,7 +565,7 @@ class IamWebControllerTest {
                                 {"previousId":"role-0"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -591,7 +591,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -651,7 +651,7 @@ class IamWebControllerTest {
                                 {"password":"new-secret"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -733,7 +733,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.tenant/disable/{tenantAlias}", "tenant_a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(tenantDao).updateByIdAndVersion(any(Tenant.class), any());
     }
@@ -770,7 +770,7 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$[0].managementScopeType").value("tenant"));
         mvc.perform(post("/iam.role/{roleId}/account-grants/{grantId}/delete", "role-1", "grant-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/{roleId}/employment-grants", "role-2")
                         .contentType("application/json")
                         .content("""
@@ -784,7 +784,7 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$[0].employeePositionId").value("position-1"));
         mvc.perform(post("/iam.role/{roleId}/employment-grants/{grantId}/delete", "role-2", "grant-2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")
                         .content("""
@@ -796,14 +796,14 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
                         .contentType("application/json")
                         .content("""
                                 {"moduleAlias":"sales.contract","actionCode":"query"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
     }
 
     @Test
@@ -823,7 +823,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(2));
+                .andExpect(jsonPath("$").value(2));
 
         mvc.perform(post("/iam.role/revoke/{roleId}/batch", "role-1")
                         .contentType("application/json")
@@ -835,7 +835,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(roleService).grantActions(any(), any());
         verify(roleService).revokeActions(any(), any());

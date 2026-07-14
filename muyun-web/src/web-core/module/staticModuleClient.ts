@@ -3,7 +3,6 @@ import type {
   WebActionResultFacts,
   WebActionResultEnvelope,
   QuerySchema,
-  CountResult,
   WebListResponse,
   WebPageResponse,
   WebQueryRequest,
@@ -15,6 +14,8 @@ export interface StaticRecordMutationResult<TRecord> extends WebActionResultFact
   record: TRecord;
 }
 
+export type StaticCountMutationResult = number | WebActionResultEnvelope<number>;
+
 export interface QuerySchemaRequestOptions {
   uiConfigId?: string;
 }
@@ -25,21 +26,21 @@ export interface StaticModuleCrudClient<TRecord> {
   view(id: string): Promise<TRecord>;
   insert(record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
   update(id: string, record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
-  delete(id: string): Promise<CountResult>;
-  enable(id: string): Promise<CountResult>;
-  disable(id: string): Promise<CountResult>;
+  delete(id: string): Promise<StaticCountMutationResult>;
+  enable(id: string): Promise<StaticCountMutationResult>;
+  disable(id: string): Promise<StaticCountMutationResult>;
 }
 
 export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
   tree(): Promise<WebListResponse<WebTreeNode<TRecord>>>;
   treeFlat(options?: { rootId?: string; includeSelf?: boolean }): Promise<WebListResponse<TRecord>>;
   subtree(id: string, options?: { includeSelf?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
-  sort(id: string, request: TreeSortRequest): Promise<CountResult>;
+  sort(id: string, request: TreeSortRequest): Promise<StaticCountMutationResult>;
 }
 
 export interface ModuleEnableClient {
-  enable(id: string): Promise<CountResult>;
-  disable(id: string): Promise<CountResult>;
+  enable(id: string): Promise<StaticCountMutationResult>;
+  disable(id: string): Promise<StaticCountMutationResult>;
 }
 
 export function createStaticModuleCrudClient<TRecord>(
@@ -87,21 +88,21 @@ export function createStaticResourceCrudClient<TRecord>(
       ),
     delete: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
+        await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/delete/${encodeURIComponent(id)}`,
         }),
       ),
     enable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
+        await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/enable/${encodeURIComponent(id)}`,
         }),
       ),
     disable: async (id) =>
       normalizeCountMutationResponse(
-        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
+        await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/disable/${encodeURIComponent(id)}`,
         }),
@@ -146,7 +147,7 @@ export function createStaticResourceTreeClient<TRecord>(
       }),
     sort: async (id, request) =>
       normalizeCountMutationResponse(
-        await http.request<CountResult | WebActionResultEnvelope<CountResult>>({
+        await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/sort/${encodeURIComponent(id)}`,
           body: request,
@@ -175,27 +176,14 @@ function normalizeRecordMutationResponse<TRecord>(
   return { record: response };
 }
 
-function normalizeCountMutationResponse(
-  response: CountResult | WebActionResultEnvelope<CountResult>,
-): CountResult {
-  if (isWebActionResultEnvelope(response)) {
-    return {
-      count: webCount(response.data),
-      message: response.message,
-      resultType: response.resultType,
-      changes: response.changes,
-      changeSetId: response.changeSetId,
-    };
+function normalizeCountMutationResponse(response: StaticCountMutationResult): StaticCountMutationResult {
+  if (isWebActionResultEnvelope<number>(response)) {
+    return response;
   }
-  return response;
-}
-
-function webCount(data: unknown) {
-  if (!data || typeof data !== 'object' || !('count' in data)) {
-    return 0;
+  if (typeof response === 'number' && Number.isFinite(response)) {
+    return response;
   }
-  const count = (data as { count?: unknown }).count;
-  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
+  return 0;
 }
 
 function isWebActionResultEnvelope<TData>(response: unknown): response is WebActionResultEnvelope<TData> {

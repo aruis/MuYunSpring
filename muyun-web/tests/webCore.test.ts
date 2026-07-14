@@ -180,7 +180,7 @@ test('static module client normalizes backend action envelopes', async () => {
       });
     }
     return Response.json({
-      data: { count: 1 },
+      data: 1,
       message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
       changeSetId: 'change-set-2',
       changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
@@ -236,7 +236,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
         changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
       });
     }
-    return Response.json({ count: 1 });
+    return Response.json1;
   };
 
   try {

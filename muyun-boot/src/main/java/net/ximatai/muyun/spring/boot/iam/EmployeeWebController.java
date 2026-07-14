@@ -13,7 +13,6 @@ import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
-import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -160,9 +159,9 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @BusinessMutation
     @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult deleteAccount(@PathVariable String employeeId) {
+    public int deleteAccount(@PathVariable String employeeId) {
         return employeeRecordScope(employeeId,
-                () -> new CountResult(employeeAccountService.removeAccount(employeeId)));
+                () -> employeeAccountService.removeAccount(employeeId));
     }
 
     @GetMapping("/{employeeId}/positions")
@@ -197,50 +196,50 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @PostMapping("/{employeeId}/positions/{relationId}/delete")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult deletePosition(@PathVariable String employeeId,
+    public int deletePosition(@PathVariable String employeeId,
                                            @PathVariable String relationId) {
         return employeeRecordScope(employeeId,
-                () -> new CountResult(employeePositionService.deletePosition(employeeId, relationId)));
+                () -> employeePositionService.deletePosition(employeeId, relationId));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/enable")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult enablePosition(@PathVariable String employeeId,
+    public int enablePosition(@PathVariable String employeeId,
                                            @PathVariable String relationId) {
         return employeeRecordScope(employeeId,
-                () -> new CountResult(employeePositionService.enablePosition(employeeId, relationId)));
+                () -> employeePositionService.enablePosition(employeeId, relationId));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/disable")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult disablePosition(@PathVariable String employeeId,
+    public int disablePosition(@PathVariable String employeeId,
                                             @PathVariable String relationId) {
         return employeeRecordScope(employeeId,
-                () -> new CountResult(employeePositionService.disablePosition(employeeId, relationId)));
+                () -> employeePositionService.disablePosition(employeeId, relationId));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/primary")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult makePrimaryPosition(@PathVariable String employeeId,
+    public int makePrimaryPosition(@PathVariable String employeeId,
                                                 @PathVariable String relationId) {
         return employeeRecordScope(employeeId,
-                () -> new CountResult(employeePositionService.makePrimaryPosition(employeeId, relationId)));
+                () -> employeePositionService.makePrimaryPosition(employeeId, relationId));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/sort")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult sortPosition(@PathVariable String employeeId,
+    public int sortPosition(@PathVariable String employeeId,
                                          @PathVariable String relationId,
                                          @RequestBody(required = false) SortWebRequest request) {
         return employeeRecordScope(employeeId, () -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             employeePositionService.moveEmployeePosition(employeeId, relationId,
                     normalized.previousId(), normalized.nextId());
-            return new CountResult(1);
+            return 1;
         });
     }
 
@@ -284,28 +283,28 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @PostMapping("/{employeeId}/delegations/{delegationId}/delete")
     @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult deleteDelegation(@PathVariable String employeeId,
+    public int deleteDelegation(@PathVariable String employeeId,
                                              @PathVariable String delegationId) {
-        return employeeRecordScope(employeeId, () -> new CountResult(
-                employeeDelegationService.deleteDelegation(employeeId, delegationId)));
+        return employeeRecordScope(employeeId, () ->
+                employeeDelegationService.deleteDelegation(employeeId, delegationId));
     }
 
     @PostMapping("/{employeeId}/delegations/{delegationId}/enable")
     @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult enableDelegation(@PathVariable String employeeId,
+    public int enableDelegation(@PathVariable String employeeId,
                                              @PathVariable String delegationId) {
-        return employeeRecordScope(employeeId, () -> new CountResult(
-                employeeDelegationService.enableDelegation(employeeId, delegationId)));
+        return employeeRecordScope(employeeId, () ->
+                employeeDelegationService.enableDelegation(employeeId, delegationId));
     }
 
     @PostMapping("/{employeeId}/delegations/{delegationId}/disable")
     @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public CountResult disableDelegation(@PathVariable String employeeId,
+    public int disableDelegation(@PathVariable String employeeId,
                                               @PathVariable String delegationId) {
-        return employeeRecordScope(employeeId, () -> new CountResult(
-                employeeDelegationService.disableDelegation(employeeId, delegationId)));
+        return employeeRecordScope(employeeId, () ->
+                employeeDelegationService.disableDelegation(employeeId, delegationId));
     }
 
     private <R> R employeeRecordScope(String employeeId, Supplier<R> action) {

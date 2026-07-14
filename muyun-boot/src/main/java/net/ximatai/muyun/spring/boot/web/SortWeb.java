@@ -18,19 +18,19 @@ public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extend
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
     @StandardMutation(StandardMutationKind.SORT)
-    default CountResult sort(@PathVariable String id,
+    default int sort(@PathVariable String id,
                                   @RequestBody(required = false) SortWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
                 requireSortScope(id, normalized.previousId());
                 service().moveAfter(id, normalized.previousId());
-                return new CountResult(1);
+                return 1;
             }
             if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
                 requireSortScope(id, normalized.nextId());
                 service().moveBefore(id, normalized.nextId());
-                return new CountResult(1);
+                return 1;
             }
             throw new IllegalArgumentException("sort requires previousId or nextId");
         }));

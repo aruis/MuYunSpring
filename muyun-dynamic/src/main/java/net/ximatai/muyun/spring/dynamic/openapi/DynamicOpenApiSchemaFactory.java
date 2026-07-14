@@ -98,7 +98,6 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicActionRefreshStrategy", actionRefreshStrategySchema());
         schemas.put("DynamicReferenceResolveItem", referenceResolveItemSchema());
         schemas.put("DynamicReferenceResolveResult", referenceResolveResultSchema());
-        schemas.put("CountResult", countResultSchema("CountResult"));
         return Map.copyOf(schemas);
     }
 
@@ -1012,14 +1011,6 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("candidates", arrayProperty("DynamicReferenceResolveItem"));
         return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveResult", "object", null,
                 List.of("status"), properties, null);
-    }
-
-    private DynamicOpenApiDocument.Schema countResultSchema(String name) {
-        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
-        properties.put("count", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
-                false, null, null, null, null, null, List.of()));
-        return new DynamicOpenApiDocument.Schema(name, "object", null,
-                List.of("count"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema arraySchema(String name, String itemName) {

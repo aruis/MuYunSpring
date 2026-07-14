@@ -2096,7 +2096,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/delete/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         mvc.perform(get("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
@@ -2246,7 +2246,7 @@ class DynamicRecordWebControllerTest {
                                 "parentId", "P"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).moveInTree("A", "B", null, "P");
     }
@@ -2270,7 +2270,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("previousId", "B"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).moveAfter("A", "B");
     }
@@ -2304,10 +2304,10 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
         mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$").value(1));
 
         verify(mainEntity).enable("contract-1");
         verify(mainEntity).disable("contract-1");

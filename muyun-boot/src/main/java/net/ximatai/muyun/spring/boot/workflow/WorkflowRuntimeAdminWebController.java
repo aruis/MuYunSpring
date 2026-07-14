@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.spring.boot.web.CountResult;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
@@ -184,9 +183,9 @@ public class WorkflowRuntimeAdminWebController {
     @PostMapping("/history/{historyInstanceId}/delete")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION,
             title = "Delete Workflow History", level = PlatformActionLevel.LIST)
-    public CountResult deleteHistory(@PathVariable String historyInstanceId,
+    public int deleteHistory(@PathVariable String historyInstanceId,
                                           @RequestBody(required = false) Object ignored) {
-        return new CountResult(adminFacade.deleteHistory(historyInstanceId));
+        return adminFacade.deleteHistory(historyInstanceId);
     }
 
     private String operatorId(String operatorId) {
