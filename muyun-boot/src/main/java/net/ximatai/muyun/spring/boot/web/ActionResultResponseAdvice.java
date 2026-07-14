@@ -1,14 +1,18 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.DataChangeModuleAliasResolver;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -19,11 +23,15 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import java.util.Map;
 
 @RestControllerAdvice
+@ConditionalOnBean(DataChangeModuleAliasResolver.class)
 public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     private final DataChangeModuleAliasResolver moduleAliasResolver;
+    private final ObjectMapper objectMapper;
 
-    public ActionResultResponseAdvice(DataChangeModuleAliasResolver moduleAliasResolver) {
+    public ActionResultResponseAdvice(DataChangeModuleAliasResolver moduleAliasResolver,
+                                      ObjectMapper objectMapper) {
         this.moduleAliasResolver = moduleAliasResolver;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -55,12 +63,26 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         }
         reportAnnotatedMutationResult(returnType, request);
         CommittedChangeSet changeSet = context.committedChangeSet(moduleAliasResolver);
-        return new ActionResultResponse(
+        ActionResultResponse actionResult = new ActionResultResponse(
                 body,
                 context.message(),
                 changeSet.changeSetId(),
                 changeSet.changes()
         );
+        if (selectedConverterType != null
+                && StringHttpMessageConverter.class.isAssignableFrom(selectedConverterType)) {
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            return json(actionResult);
+        }
+        return actionResult;
+    }
+
+    private String json(ActionResultResponse actionResult) {
+        try {
+            return objectMapper.writeValueAsString(actionResult);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("failed to serialize action result", ex);
+        }
     }
 
     private void reportAnnotatedMutationResult(MethodParameter returnType, ServerHttpRequest request) {

@@ -82,7 +82,8 @@ class UserAccountWebControllerTest {
                 .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
                         new ActionEndpointContextResolver()))
                 .addInterceptors(new BusinessMutationInterceptor())
-                .setControllerAdvice(new ActionResultResponseAdvice(UserAccountWebControllerTest::moduleAlias))
+                .setControllerAdvice(new ActionResultResponseAdvice(UserAccountWebControllerTest::moduleAlias,
+                        new com.fasterxml.jackson.databind.ObjectMapper()))
                 .build();
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             mvc.perform(post("/iam.user/changePassword/user-1")

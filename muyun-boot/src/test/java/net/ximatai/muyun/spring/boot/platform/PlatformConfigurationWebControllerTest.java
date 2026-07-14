@@ -989,7 +989,8 @@ class PlatformConfigurationWebControllerTest {
                 .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
                         new ActionEndpointContextResolver()))
                 .addInterceptors(new BusinessMutationInterceptor())
-                .setControllerAdvice(new ActionResultResponseAdvice(PlatformConfigurationWebControllerTest::moduleAlias))
+                .setControllerAdvice(new ActionResultResponseAdvice(PlatformConfigurationWebControllerTest::moduleAlias,
+                        new com.fasterxml.jackson.databind.ObjectMapper()))
                 .build();
 
         assertPagePublishActionResult(mvc, "/platform.page_config_publish/ui-configs/ui-config-1/publish",

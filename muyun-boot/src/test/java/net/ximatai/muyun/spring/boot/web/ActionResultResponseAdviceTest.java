@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -9,7 +10,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.server.ServletServerHttpRequest;
+import org.springframework.http.server.ServletServerHttpResponse;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.HandlerMapping;
 
@@ -21,6 +25,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ActionResultResponseAdviceTest {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @AfterEach
     void tearDown() {
         ActionExecutionContextHolder.clear();
@@ -28,7 +34,7 @@ class ActionResultResponseAdviceTest {
 
     @Test
     void shouldNotDeriveStandardMutationFactsDuringResponseWrapping() throws Exception {
-        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName);
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName, objectMapper);
         Method method = TestController.class.getDeclaredMethod("sort");
         MethodParameter returnType = new MethodParameter(method, -1);
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
@@ -60,7 +66,7 @@ class ActionResultResponseAdviceTest {
 
     @Test
     void shouldSupportInheritedStandardMutationHandler() throws Exception {
-        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName);
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName, objectMapper);
         Method method = ChildController.class.getMethod("insert");
         MethodParameter returnType = new MethodParameter(method, -1);
 
@@ -71,7 +77,7 @@ class ActionResultResponseAdviceTest {
 
     @Test
     void shouldReportAnnotatedBusinessMutationResultBeforeWrapping() throws Exception {
-        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS);
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS, objectMapper);
         Method method = TestController.class.getDeclaredMethod("publish");
         MethodParameter returnType = new MethodParameter(method, -1);
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
@@ -102,7 +108,7 @@ class ActionResultResponseAdviceTest {
 
     @Test
     void shouldReportAnnotatedCollectionChangedResultBeforeWrapping() throws Exception {
-        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS);
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS, objectMapper);
         Method method = TestController.class.getDeclaredMethod("grant");
         MethodParameter returnType = new MethodParameter(method, -1);
 
@@ -127,6 +133,33 @@ class ActionResultResponseAdviceTest {
         }
     }
 
+    @Test
+    void shouldSerializeActionResultWhenStringConverterIsSelected() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS, objectMapper);
+        Method method = TestController.class.getDeclaredMethod("grantString");
+        MethodParameter returnType = new MethodParameter(method, -1);
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+        ServletServerHttpResponse response = new ServletServerHttpResponse(servletResponse);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            Object body = advice.beforeBodyWrite(
+                    "grant-1",
+                    returnType,
+                    MediaType.TEXT_PLAIN,
+                    StringHttpMessageConverter.class,
+                    new ServletServerHttpRequest(new MockHttpServletRequest()),
+                    response
+            );
+
+            assertThat(servletResponse.getContentType()).isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+            assertThat(body).isInstanceOf(String.class);
+            assertThat((String) body)
+                    .contains("\"data\":\"grant-1\"")
+                    .contains("\"code\":\"demo.granted\"")
+                    .contains("\"type\":\"collection-changed\"");
+        }
+    }
+
     private static final class TestController {
         @StandardMutation(StandardMutationKind.SORT)
         int sort() {
@@ -144,6 +177,12 @@ class ActionResultResponseAdviceTest {
                 change = BusinessMutationChange.COLLECTION_CHANGED, module = DemoModule.class)
         int grant() {
             return 1;
+        }
+
+        @BusinessMutationResult(code = "demo.granted", message = "已授权",
+                change = BusinessMutationChange.COLLECTION_CHANGED, module = DemoModule.class)
+        String grantString() {
+            return "grant-1";
         }
     }
 
