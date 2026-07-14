@@ -469,12 +469,12 @@ Web Adapter
 | 嵌套静态 CRUD / Tree CRUD | 标准增改删、启停、普通排序和树排序已接入 `StandardMutation`；查询和树查询保持原查询响应 | 保持 controller 返回原始记录或计数，HTTP 输出层统一包装 |
 | `StandardMutationResultSupport` | 作为 boot web 层公开门面，供标准静态动作登记标准消息和变化事实 | `platform` 包等自定义 Web support 不依赖包内 helper |
 | `StaticStandardMutationSupport` | 作为标准 Web 基类内部执行 helper，负责 data scope、selectForAction、动作策略等上下文细节 | 不作为跨包业务接入门面 |
-| `BusinessMutationResult` | 作为简单非标准静态动作的声明式结果契约，使用 service class 强引用目标模块；记录 ID 通过 `recordIdSource = PATH_VARIABLE` 和显式 `recordId` 声明 | 不支持对象路径、返回值路径等字符串表达式 |
+| `BusinessMutationResult` | 作为简单非标准静态动作的声明式结果契约，使用 service class 强引用目标模块；记录 ID 通过 `recordIdSource = PATH_VARIABLE` 和显式 `recordId` 声明 | 仅适合成功即必然发生目标变化的动作；不支持对象路径、返回值路径等字符串表达式 |
 | `BusinessMutationResultSupport` | 作为 boot web 层业务动作门面，供复杂非标准静态动作登记业务消息和显式变化事实 | 不复用标准 CRUD 文案，不表达 UI 行为 |
 | 业务专用静态动作 | 简单单结果动作使用 `@BusinessMutationResult`；复杂多影响动作使用 `@BusinessMutation` 加代码式 reporter；底层业务 Service 不因 HTTP 输出契约反向依赖 boot web | Controller 返回贴近原始业务数据 |
-| 授权集合动作 | 第一阶段用 `COLLECTION_CHANGED` 表达授权集合变化；账号角色授权当前归入 `RoleService` 聚合模块 | 授权关系独立成静态模块后，再切换为独立模块身份 |
+| 授权集合动作 | 第一阶段用 `COLLECTION_CHANGED` 表达授权集合变化；账号角色授权当前归入 `RoleService` 聚合模块；可能幂等的授权动作由代码式 reporter 根据业务结果决定是否报告变化 | 授权关系独立成静态模块后，再切换为独立模块身份 |
 | 计数型动作 | Controller 直接返回 `int` / `Integer`；进入 `BusinessMutation` 时统一放入 `data` | 计数语义保留为原始数字，不再引入计数包装模型 |
-| 动态记录保存 | 暂保持现有动态 Web 契约 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
+| 动态记录 CRUD | 第一阶段不进入 `ActionResult` 管线；Controller 返回原始动态记录或原始计数，不再沿用旧顶层 `record` / `count` 包装 | 后续映射到相同 `ActionResult`，动态元数据提供模块身份 |
 | `DynamicActionResultBody` | 暂保持旧形态，禁止作为新静态动作结果参考 | 拆分为业务数据、业务消息、数据变化事实和明确交互动作 |
 | `WorkflowTaskActionResult` / `WorkflowInstanceActionResult` | 暂保持工作流专用结果 | 后续由工作流 Adapter 映射到统一外部动作结果 |
 | `PlatformWebError` | 继续由异常处理链路返回，保留 HTTP 失败状态 | 可复用 `ActionMessage` 结构表达业务错误性质 |

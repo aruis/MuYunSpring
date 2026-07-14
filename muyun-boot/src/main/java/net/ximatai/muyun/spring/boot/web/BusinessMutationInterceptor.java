@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.lang.NonNull;
 import org.springframework.web.method.HandlerMethod;
@@ -42,11 +42,9 @@ public class BusinessMutationInterceptor implements AsyncHandlerInterceptor {
     }
 
     private boolean isBusinessMutation(HandlerMethod handlerMethod) {
-        if (!AnnotatedElementUtils.hasAnnotation(handlerMethod.getBeanType(), PlatformStaticModule.class)) {
-            return false;
-        }
-        return AnnotatedElementUtils.hasAnnotation(handlerMethod.getMethod(), BusinessMutation.class)
-                || AnnotatedElementUtils.hasAnnotation(handlerMethod.getBeanType(), BusinessMutation.class);
+        return (AnnotatedElementUtils.hasAnnotation(handlerMethod.getMethod(), BusinessMutation.class)
+                || AnnotatedElementUtils.hasAnnotation(handlerMethod.getBeanType(), BusinessMutation.class))
+                && ActionExecutionContextHolder.current().isPresent();
     }
 
     private void closeMutationContext(HttpServletRequest request) {

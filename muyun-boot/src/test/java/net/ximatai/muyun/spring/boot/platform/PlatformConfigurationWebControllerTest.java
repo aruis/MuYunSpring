@@ -8,8 +8,11 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointContextResolver;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
 import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -983,6 +986,8 @@ class PlatformConfigurationWebControllerTest {
         ReflectionTestUtils.setField(controller, "service", service);
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
+                        new ActionEndpointContextResolver()))
                 .addInterceptors(new BusinessMutationInterceptor())
                 .setControllerAdvice(new ActionResultResponseAdvice(PlatformConfigurationWebControllerTest::moduleAlias))
                 .build();

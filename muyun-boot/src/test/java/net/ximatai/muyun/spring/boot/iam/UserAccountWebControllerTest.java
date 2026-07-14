@@ -1,7 +1,10 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointContextResolver;
+import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -76,6 +79,8 @@ class UserAccountWebControllerTest {
                 new UserAccountService.PasswordResetResult(1, "temp-secret", null));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
+                        new ActionEndpointContextResolver()))
                 .addInterceptors(new BusinessMutationInterceptor())
                 .setControllerAdvice(new ActionResultResponseAdvice(UserAccountWebControllerTest::moduleAlias))
                 .build();

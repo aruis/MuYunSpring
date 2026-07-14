@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import net.ximatai.muyun.spring.boot.web.BusinessMutationChange;
-import net.ximatai.muyun.spring.boot.web.BusinessMutationResult;
+import net.ximatai.muyun.spring.boot.web.BusinessMutation;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
@@ -133,26 +133,31 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/account-grants")
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    @BusinessMutationResult(code = "iam.account-role-grant.granted", message = "账号角色已授权",
-            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
+    @BusinessMutation
     public String grantAccountRole(@PathVariable String roleId,
                                    @RequestBody AccountRoleGrantRequest request) {
-        return roleRecordScope(roleId, () -> service().grantAccountRole(
-                roleId,
-                request.userId(),
-                request.managementScopeType(),
-                request.managementScopeId()));
+        return roleRecordScope(roleId, () -> {
+            RoleService.RoleGrantMutationResult result = service().grantAccountRoleResult(
+                    roleId,
+                    request.userId(),
+                    request.managementScopeType(),
+                    request.managementScopeId());
+            reportAccountRoleGranted(result.changed());
+            return result.grantId();
+        });
     }
 
     @PostMapping("/{roleId}/account-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    @BusinessMutationResult(code = "iam.account-role-grant.revoked", message = "账号角色授权已撤销",
-            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
+    @BusinessMutation
     public int deleteAccountRoleGrant(@PathVariable String roleId,
                                                    @PathVariable String grantId) {
-        return roleRecordScope(roleId,
-                () -> service().deleteAccountRoleGrant(roleId, grantId));
+        return roleRecordScope(roleId, () -> {
+            int count = service().deleteAccountRoleGrant(roleId, grantId);
+            reportAccountRoleRevoked(count > 0);
+            return count;
+        });
     }
 
     @GetMapping("/{roleId}/employment-grants")
@@ -165,22 +170,52 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @PostMapping("/{roleId}/employment-grants")
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    @BusinessMutationResult(code = "iam.employment-role-grant.granted", message = "任职角色已授权",
-            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
+    @BusinessMutation
     public String grantEmploymentRole(@PathVariable String roleId,
                                       @RequestBody EmploymentRoleGrantRequest request) {
-        return roleRecordScope(roleId, () -> service().grantEmploymentRole(roleId, request.employeePositionId()));
+        return roleRecordScope(roleId, () -> {
+            RoleService.RoleGrantMutationResult result =
+                    service().grantEmploymentRoleResult(roleId, request.employeePositionId());
+            reportEmploymentRoleGranted(result.changed());
+            return result.grantId();
+        });
     }
 
     @PostMapping("/{roleId}/employment-grants/{grantId}/delete")
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    @BusinessMutationResult(code = "iam.employment-role-grant.revoked", message = "任职角色授权已撤销",
-            change = BusinessMutationChange.COLLECTION_CHANGED, module = RoleService.class)
+    @BusinessMutation
     public int deleteEmploymentRoleGrant(@PathVariable String roleId,
                                                       @PathVariable String grantId) {
-        return roleRecordScope(roleId,
-                () -> service().deleteEmploymentRoleGrant(roleId, grantId));
+        return roleRecordScope(roleId, () -> {
+            int count = service().deleteEmploymentRoleGrant(roleId, grantId);
+            reportEmploymentRoleRevoked(count > 0);
+            return count;
+        });
+    }
+
+    private void reportAccountRoleGranted(boolean changed) {
+        reportGrantMutation("iam.account-role-grant.granted", "账号角色已授权", changed);
+    }
+
+    private void reportAccountRoleRevoked(boolean changed) {
+        reportGrantMutation("iam.account-role-grant.revoked", "账号角色授权已撤销", changed);
+    }
+
+    private void reportEmploymentRoleGranted(boolean changed) {
+        reportGrantMutation("iam.employment-role-grant.granted", "任职角色已授权", changed);
+    }
+
+    private void reportEmploymentRoleRevoked(boolean changed) {
+        reportGrantMutation("iam.employment-role-grant.revoked", "任职角色授权已撤销", changed);
+    }
+
+    private void reportGrantMutation(String code, String text, boolean changed) {
+        if (changed) {
+            BusinessMutationResultSupport.successCollectionChanged(code, text, RoleService.MODULE_ALIAS);
+            return;
+        }
+        BusinessMutationResultSupport.success(code, text);
     }
 
     @PostMapping("/grant/{roleId}")

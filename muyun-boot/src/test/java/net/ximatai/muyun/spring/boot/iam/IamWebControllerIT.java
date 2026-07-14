@@ -791,12 +791,25 @@ class IamWebControllerIT {
         position.setTitle("Sales Manager");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(positionService.insert(any(Position.class))).thenReturn("position-1");
         when(positionService.select("position-1")).thenReturn(position);
 
         mvc.perform(get("/iam.position/view/position-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("position-1"))
                 .andExpect(jsonPath("$.code").value("SALES_MANAGER"));
+
+        mvc.perform(post("/iam.position/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {"categoryId":"position-category-1","code":"SALES_MANAGER","title":"Sales Manager"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value("position-1"))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
+                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.position' && @.recordId == 'position-1')]")
+                        .exists());
     }
 
     @Test
@@ -822,11 +835,14 @@ class IamWebControllerIT {
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
                 ManagementScopeType.TENANT, "tenant_a");
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
-                .thenReturn("grant-1");
+        when(roleService.grantAccountRoleResult("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-1", true));
+        when(roleService.grantAccountRoleResult("role-1", "user-3", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-existing", false));
         when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
         when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
-        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
+        when(roleService.grantEmploymentRoleResult("role-2", "position-1"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-2", true));
         when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
         when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
@@ -848,6 +864,16 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.message.text").value("账号角色已授权"))
                 .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.role' && @.recordId == null)]")
                         .exists());
+
+        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"userId":"user-3","managementScopeType":"tenant","managementScopeId":"tenant_a"}
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("grant-existing"))
+                .andExpect(jsonPath("$.message.code").value("iam.account-role-grant.granted"))
+                .andExpect(jsonPath("$.changes").isEmpty());
 
         mvc.perform(get("/iam.role/{roleId}/account-grants", "role-1"))
                 .andExpect(status().isOk())

@@ -744,11 +744,12 @@ class IamWebControllerTest {
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
                 ManagementScopeType.TENANT, "tenant_a");
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
-        when(roleService.grantAccountRole("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
-                .thenReturn("grant-1");
+        when(roleService.grantAccountRoleResult("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-1", true));
         when(roleService.accountRoleGrants("role-1")).thenReturn(List.of(accountGrant));
         when(roleService.deleteAccountRoleGrant("role-1", "grant-1")).thenReturn(1);
-        when(roleService.grantEmploymentRole("role-2", "position-1")).thenReturn("grant-2");
+        when(roleService.grantEmploymentRoleResult("role-2", "position-1"))
+                .thenReturn(new RoleService.RoleGrantMutationResult("grant-2", true));
         when(roleService.employmentRoleGrants("role-2")).thenReturn(List.of(employmentGrant));
         when(roleService.deleteEmploymentRoleGrant("role-2", "grant-2")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
