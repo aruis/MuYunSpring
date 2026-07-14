@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
@@ -166,7 +167,7 @@ class UserAccountServiceContractTest {
     void shouldRejectPasswordWhenPolicyRuleFails() {
         UserAccountDao dao = mock(UserAccountDao.class);
         PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
-        org.mockito.Mockito.doThrow(new net.ximatai.muyun.spring.common.exception.PlatformException("密码必须包含数字"))
+        org.mockito.Mockito.doThrow(new BusinessException("iam.user.password-policy-violated", "密码必须包含数字"))
                 .when(passwordPolicyRuleService).validatePassword("secret");
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
@@ -175,8 +176,10 @@ class UserAccountServiceContractTest {
             UserAccount user = new UserAccount();
             user.setUsername("alice");
             assertThatThrownBy(() -> service.createUser(user, "secret"))
-                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
-                    .hasMessageContaining("密码必须包含数字");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("密码必须包含数字")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.user.password-policy-violated"));
         }
 
         verify(dao, never()).insert(any());
@@ -362,11 +365,15 @@ class UserAccountServiceContractTest {
              CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
                      CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
             assertThatThrownBy(() -> service.changePassword("user-1", "secret2"))
-                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
-                    .hasMessageContaining("cannot administrate current user's password");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("cannot administrate current user's password")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.user.password-admin-current-user"));
             assertThatThrownBy(() -> service.resetPassword("user-1"))
-                    .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
-                    .hasMessageContaining("cannot administrate current user's password");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("cannot administrate current user's password")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.user.password-admin-current-user"));
         }
 
         verify(dao, never()).updateById(any(UserAccount.class));

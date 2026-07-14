@@ -3,9 +3,9 @@ package net.ximatai.muyun.spring.iam.employee;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.action.ActionMessageReporter;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.ability.action.DataChangeRecorder;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -81,7 +81,8 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
     public AccountProvisionResult provisionAccount(String employeeId, UserAccount account) {
         String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");
         if (accountOfEmployee(validEmployeeId) != null) {
-            throw new PlatformException("employee already has user account: " + validEmployeeId);
+            throw BusinessExceptions.warning("iam.employee-account.already-bound",
+                    "employee already has user account: " + validEmployeeId);
         }
         employeeService.requireEnabled(validEmployeeId, "employee is not active: " + validEmployeeId);
         UserAccount user = normalizeProvisionUser(account);

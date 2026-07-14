@@ -153,16 +153,21 @@ Controller 不参与消息组装。
 特殊业务失败由业务异常携带：
 
 ```java
-throw new BusinessException(
+throw BusinessExceptions.warning(
         "iam.employee-account.username-occupied",
-        "登录账号已被占用",
-        ActionMessageType.WARNING
-);
+        "登录账号已被占用");
 ```
 
 统一异常处理器负责形成错误响应，并保留正确的 HTTP 状态。
 
 成功与失败可以复用 `ActionMessage` 结构，但不能混淆 HTTP 成功和失败语义。
+
+失败响应的迁移边界：
+
+- 用户可修正的业务失败或配置失败使用 `BusinessException` / `BusinessExceptions`，并提供稳定 `code`；
+- 参数校验、权限、认证和乐观锁等通用失败由 Web 异常处理器映射为统一 `ActionMessage`；
+- 平台运行时不变量、调用上下文缺失、数据结构循环和系统故障继续使用平台异常或系统异常；
+- 后端失败消息只表达业务语义，不表达 Toast、弹窗、刷新、关闭页面等前端 UI 行为。
 
 ## 5. BusinessMutation
 

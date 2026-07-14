@@ -1,9 +1,10 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.ability.form.FormAbility;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -103,7 +104,9 @@ class EmployeeServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.insert(employee("org-1", "dept-2", "E001", "Alice")))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee.department-organization-mismatch"))
                     .hasMessageContaining("same organization");
         }
     }

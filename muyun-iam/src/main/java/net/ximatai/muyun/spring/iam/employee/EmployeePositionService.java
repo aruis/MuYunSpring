@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
@@ -161,7 +161,8 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         String validRelationId = Preconditions.requireText(relationId, "relationId");
         EmployeePosition relation = select(validRelationId);
         if (relation == null || !SortAbility.sameValue(validEmployeeId, relation.getEmployeeId())) {
-            throw new PlatformException("employee position does not belong to employee: " + validRelationId);
+            throw BusinessExceptions.warning("iam.employee-position.not-belong-to-employee",
+                    "employee position does not belong to employee: " + validRelationId);
         }
         return relation;
     }
@@ -186,7 +187,8 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         positionService.requireEnabled(relation.getPositionId(),
                 "position is not active: " + relation.getPositionId());
         if (!SortAbility.sameValue(relation.getOrganizationId(), department.getOrganizationId())) {
-            throw new PlatformException("Employee position department must belong to the same organization");
+            throw BusinessExceptions.warning("iam.employee-position.department-organization-mismatch",
+                    "Employee position department must belong to the same organization");
         }
         return employee;
     }
@@ -194,7 +196,8 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
     private void validatePrimaryPositionOwner(EmployeePosition relation, Employee employee) {
         if (!SortAbility.sameValue(relation.getOrganizationId(), employee.getOrganizationId())
                 || !SortAbility.sameValue(relation.getDepartmentId(), employee.getDepartmentId())) {
-            throw new PlatformException("Primary employee position must match employee main organization and department");
+            throw BusinessExceptions.warning("iam.employee-position.primary-owner-mismatch",
+                    "Primary employee position must match employee main organization and department");
         }
     }
 }

@@ -1,8 +1,9 @@
 package net.ximatai.muyun.spring.platform.menu;
 
-import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
+import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
@@ -90,7 +91,9 @@ class MenuServiceContractTest {
     void shouldRequireSystemContextForSystemScheme() {
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThatThrownBy(() -> schemeService.insert(scheme("admin_default", MenuScopeType.SYSTEM, null)))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("platform.menu-scheme.system-context-required"))
                     .hasMessageContaining("system context");
         }
     }
@@ -104,7 +107,9 @@ class MenuServiceContractTest {
             changedAlias.setId(schemeId);
             changedAlias.setVersion(0);
             assertThatThrownBy(() -> schemeService.update(changedAlias))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("platform.menu-scheme.identity-immutable"))
                     .hasMessageContaining("identity");
 
             MenuScheme changedScope = scheme("default", MenuScopeType.ORGANIZATION, "org-a");
@@ -112,7 +117,9 @@ class MenuServiceContractTest {
             changedScope.setTenantId("tenant-a");
             changedScope.setVersion(0);
             assertThatThrownBy(() -> schemeService.update(changedScope))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("platform.menu-scheme.identity-immutable"))
                     .hasMessageContaining("identity");
         }
     }
@@ -193,7 +200,8 @@ class MenuServiceContractTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("moduleAlias");
             assertThatThrownBy(() -> menuService.insert(moduleMenu(firstSchemeId, "不存在模块", TreeAbility.ROOT_ID, "crm.unknown")))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code()).isEqualTo("platform.menu.module-not-found"))
                     .hasMessageContaining("existing module");
             Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithRoute.setRoute("/customer");
@@ -202,12 +210,15 @@ class MenuServiceContractTest {
             Menu groupWithOpenMode = groupMenu(firstSchemeId, "错误分组打开方式", TreeAbility.ROOT_ID);
             groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
             assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("platform.menu.container-open-mode-denied"))
                     .hasMessageContaining("Container menu cannot have openMode");
             Menu moduleWithoutOpenMode = moduleMenu(firstSchemeId, "错误模块打开方式", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithoutOpenMode.setOpenMode(null);
             assertThatThrownBy(() -> menuService.insert(moduleWithoutOpenMode))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code()).isEqualTo("platform.menu.open-mode-required"))
                     .hasMessageContaining("Module entry menu requires openMode");
         }
     }
@@ -251,7 +262,9 @@ class MenuServiceContractTest {
             emptySchemeId = guardedSchemeService.insert(scheme("empty", MenuScopeType.TENANT, null));
 
             assertThatThrownBy(() -> guardedSchemeService.delete(schemeId))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("platform.menu-scheme.delete-with-menus-denied"))
                     .hasMessageContaining("menus exist");
 
             assertThat(guardedSchemeService.delete(emptySchemeId)).isEqualTo(1);

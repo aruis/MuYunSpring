@@ -96,8 +96,10 @@ function headersOf(context: RequestContext, options: HttpRequestOptions) {
 
 async function appErrorFromResponse(response: Response) {
   const details = await responseBody(response);
-  const message = messageOf(details) ?? `Request failed with status ${response.status}`;
-  const code = codeOf(details) ?? platformErrorCodes.httpError;
+  const actionMessage = actionMessageOf(details);
+  const message =
+    actionMessage?.text ?? messageOf(details) ?? `Request failed with status ${response.status}`;
+  const code = actionMessage?.code ?? codeOf(details) ?? platformErrorCodes.httpError;
   return new AppError(message, {
     code,
     status: response.status,
@@ -105,6 +107,7 @@ async function appErrorFromResponse(response: Response) {
     scope: recordField(details, 'scope'),
     targets: targetsOf(details),
     details: recordField(details, 'details') ?? (isRecord(details) ? details : undefined),
+    actionMessage,
   });
 }
 
@@ -133,6 +136,23 @@ function codeOf(details: unknown) {
 
 function traceIdOf(details: unknown) {
   return objectField(details, 'traceId');
+}
+
+function actionMessageOf(details: unknown) {
+  if (!isRecord(details) || !isRecord(details.actionMessage)) {
+    return undefined;
+  }
+  const text = objectField(details.actionMessage, 'text');
+  if (!text) {
+    return undefined;
+  }
+  const code = objectField(details.actionMessage, 'code');
+  const type = objectField(details.actionMessage, 'type');
+  return {
+    text,
+    code,
+    type,
+  };
 }
 
 function targetsOf(details: unknown): ErrorTarget[] {

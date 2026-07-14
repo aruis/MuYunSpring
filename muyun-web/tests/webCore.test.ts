@@ -88,6 +88,49 @@ test('http client sends platform trace header', async () => {
   }
 });
 
+test('http client prefers backend action message on error responses', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        traceId: 'trace-business',
+        code: 'VALIDATION_FAILED',
+        status: 422,
+        message: 'fallback validation message',
+        actionMessage: {
+          code: 'iam.employee-account.username-occupied',
+          text: '登录账号已被占用',
+          type: 'WARNING',
+        },
+      },
+      { status: 422, headers: { 'X-MuYun-Trace-Id': 'trace-header' } },
+    );
+
+  try {
+    const http = createHttpClient({ baseUrl: 'http://api.local' });
+
+    await assert.rejects(
+      () => http.request({ path: '/iam.employee/employee-1/account/provision', method: 'POST' }),
+      (error) => {
+        assert.equal(error instanceof AppError, true);
+        const appError = error as AppError;
+        assert.equal(appError.status, 422);
+        assert.equal(appError.traceId, 'trace-business');
+        assert.equal(appError.code, 'iam.employee-account.username-occupied');
+        assert.equal(appError.message, '登录账号已被占用');
+        assert.deepEqual(appError.actionMessage, {
+          code: 'iam.employee-account.username-occupied',
+          text: '登录账号已被占用',
+          type: 'WARNING',
+        });
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('web action result changes keep backend change when local fact duplicates it', () => {
   const result = withWebActionResultChanges(
     {

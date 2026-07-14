@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -92,7 +93,9 @@ class EmployeeDelegationServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(delegation("principal-1", "principal-1")))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-delegation.self-delegation-denied"))
                     .hasMessageContaining("delegate must differ from principal");
         }
     }
@@ -105,7 +108,9 @@ class EmployeeDelegationServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(delegation))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-delegation.principal-position-owner-mismatch"))
                     .hasMessageContaining("principal position does not belong");
         }
     }
@@ -119,7 +124,9 @@ class EmployeeDelegationServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(delegation))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-delegation.invalid-effective-range"))
                     .hasMessageContaining("effectiveFrom must be before effectiveTo");
         }
     }
@@ -134,10 +141,14 @@ class EmployeeDelegationServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(moduleScoped))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-delegation.module-scope-required"))
                     .hasMessageContaining("moduleAliases are required");
             assertThatThrownBy(() -> service.beforeInsert(actionScoped))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-delegation.action-scope-required"))
                     .hasMessageContaining("actionKeys are required");
         }
     }
@@ -252,7 +263,9 @@ class EmployeeDelegationServiceContractTest {
         doReturn(delegation).when(service).select("delegation-1");
 
         assertThatThrownBy(() -> service.deleteDelegation("principal-1", "delegation-1"))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("iam.employee-delegation.not-principal-owned"))
                 .hasMessageContaining("does not belong to principal employee");
     }
 
@@ -305,7 +318,9 @@ class EmployeeDelegationServiceContractTest {
                 CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
                 "delegate-1", null, "principal-1", null,
                 "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z")))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("iam.employee-delegation.operator-not-delegate"))
                 .hasMessageContaining("operator is not bound to delegate employee");
     }
 
@@ -357,7 +372,9 @@ class EmployeeDelegationServiceContractTest {
                 CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
                 "delegate-1", null, "principal-1", null,
                 "sales.order", "create", Instant.parse("2026-01-01T00:00:00Z")))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("iam.employee-delegation.not-allowed"))
                 .hasMessageContaining("employee delegation is not allowed");
     }
 
@@ -380,7 +397,9 @@ class EmployeeDelegationServiceContractTest {
                 CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
                 "delegate-1", null, "principal-1", null,
                 "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z")))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("iam.employee-delegation.not-allowed"))
                 .hasMessageContaining("employee delegation is not allowed");
     }
 

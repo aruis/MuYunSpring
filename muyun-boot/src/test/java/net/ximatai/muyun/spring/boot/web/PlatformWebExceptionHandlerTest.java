@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.ability.action.ActionMessageType;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
@@ -40,9 +43,27 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("DYNAMIC_FIELD_REQUIRED"))
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.message").value("客户名称不能为空"))
+                .andExpect(jsonPath("$.actionMessage").doesNotExist())
                 .andExpect(jsonPath("$.targets[0].kind").value("field"))
                 .andExpect(jsonPath("$.targets[0].fieldName").value("customerName"))
                 .andExpect(jsonPath("$.targets[0].relationAlias").value("main"));
+    }
+
+    @Test
+    void shouldReturnActionMessageForBusinessExceptionWithoutLosingHttpStatus() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/business")
+                        .header(RequestTraceContext.TRACE_ID_HEADER, "trace-business")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.traceId").value("trace-business"))
+                .andExpect(jsonPath("$.code").value("iam.employee-account.username-occupied"))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.message").value("登录账号已被占用"))
+                .andExpect(jsonPath("$.actionMessage.code").value("iam.employee-account.username-occupied"))
+                .andExpect(jsonPath("$.actionMessage.text").value("登录账号已被占用"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
     @Test
@@ -54,7 +75,10 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.AUTH_REQUIRED))
                 .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value("current user context is not available"));
+                .andExpect(jsonPath("$.message").value("current user context is not available"))
+                .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.AUTH_REQUIRED))
+                .andExpect(jsonPath("$.actionMessage.text").value("current user context is not available"))
+                .andExpect(jsonPath("$.actionMessage.type").value("ERROR"));
     }
 
     @Test
@@ -67,6 +91,32 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.traceId").value("trace-2"))
                 .andExpect(jsonPath("$.code").value("DYNAMIC_DESCRIPTOR_MISSING"))
                 .andExpect(jsonPath("$.scope.moduleAlias").value("crm.customer"));
+    }
+
+    @Test
+    void shouldReturnWarningActionMessageForOptimisticLockConflict() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_VERSION))
+                .andExpect(jsonPath("$.message").value("record version conflict"))
+                .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.CONFLICT_VERSION))
+                .andExpect(jsonPath("$.actionMessage.text").value("record version conflict"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
+    }
+
+    @Test
+    void shouldReturnWarningActionMessageForBadRequest() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/bad-request"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message").value("name must not be blank"))
+                .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.actionMessage.text").value("name must not be blank"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
     @Test
@@ -95,6 +145,14 @@ class PlatformWebExceptionHandlerTest {
                     ErrorTarget.field("customerName").relation("main"));
         }
 
+        @GetMapping("/demo/business")
+        String business() {
+            throw new BusinessException(
+                    "iam.employee-account.username-occupied",
+                    "登录账号已被占用",
+                    ActionMessageType.WARNING);
+        }
+
         @GetMapping("/demo/auth")
         String auth() {
             throw new AuthenticationRequiredException("current user context is not available");
@@ -104,6 +162,16 @@ class PlatformWebExceptionHandlerTest {
         String config() {
             throw PlatformErrors.config("DYNAMIC_DESCRIPTOR_MISSING", "模块页面配置不存在",
                     ErrorScope.module("crm.customer"));
+        }
+
+        @GetMapping("/demo/optimistic-lock")
+        String optimisticLock() {
+            throw new OptimisticLockException("record version conflict");
+        }
+
+        @GetMapping("/demo/bad-request")
+        String badRequest() {
+            throw new IllegalArgumentException("name must not be blank");
         }
 
         @GetMapping("/demo/unexpected")

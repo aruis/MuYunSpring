@@ -141,7 +141,7 @@ HTTP 状态码用于全局兜底和传输层语义，不承载完整业务含义
 
 特殊链路优先消费 `code`、`targets` 和 `details`；未消费时再交给全局兜底按 HTTP 状态和 UI 上下文处理。
 
-阶段限制：历史代码中大量 `new PlatformException(message)` 仍表示 `VALIDATION_FAILED + 400`，覆盖了请求语义错误、配置规则错误和部分业务校验。当前阶段不批量重判这些调用点。新增业务校验应优先使用 `PlatformErrors.validation(...)` 或 `PlatformErrors.business(...)` 返回 `422`；后续按业务链路逐步把可定位的表单/记录校验从默认 `PlatformException(message)` 迁出。
+阶段限制：历史代码中大量 `new PlatformException(message)` 仍表示 `VALIDATION_FAILED + 400`，覆盖了请求语义错误、配置规则错误和部分业务校验。当前阶段不批量重判这些调用点。新增字段级校验可继续使用 `PlatformErrors.validation(...)`；新增业务动作失败应优先使用 `BusinessExceptions` 返回稳定 `ActionMessage` 和合适 HTTP 状态。后续按业务链路逐步把可定位的表单/记录校验从默认 `PlatformException(message)` 迁出。
 
 ## 前端处理模型
 
@@ -306,10 +306,9 @@ throw PlatformErrors.validation(
 ```
 
 ```java
-throw PlatformErrors.business(
+throw BusinessExceptions.warning(
         "DUPLICATE_RECORD_MATCHED",
-        "发现可能重复的记录",
-        ErrorDetails.of("duplicateRecordIds", duplicateRecordIds));
+        "发现可能重复的记录");
 ```
 
 ```java
@@ -416,6 +415,6 @@ function tryHandleImportError(
 2. 不继续提前建设：全局错误 store、toast/modal/page-error adapter、动态表单字段错误 handler、查重确认弹窗、导入结果面板和工作流动作区提示。
 3. 触发后再建设：对应前端页面或运行器进入真实开发，且能够明确错误展示位置、消费规则和“已处理后不再全局兜底”的返回契约。
 4. 如果先进入 workbench 全局通知建设，先接通用 toast/modal/page-error adapter，再接业务特殊 handler。
-5. 后端持续约束：新增可定位业务校验优先使用 `PlatformErrors.validation(...)` 或 `PlatformErrors.business(...)`；历史 `new PlatformException(message)` 按业务链路逐步迁移，不做无差别批量重判。
+5. 后端持续约束：新增字段级校验优先使用 `PlatformErrors.validation(...)`，新增业务动作失败优先使用 `BusinessExceptions`；历史 `new PlatformException(message)` 按业务链路逐步迁移，不做无差别批量重判。
 
 跨专题剩余债务记录在 [技术债记录](../../TECHNICAL_DEBT.md) 的 `DD-004`；本文件保留具体错误契约和触发条件。

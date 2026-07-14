@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.ability.query.QueryField;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -342,7 +343,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         .eq("id", Preconditions.requireText(grantId, "grantId"))),
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
         if (grant == null || !SortAbility.sameValue(role.getId(), grant.getRoleId())) {
-            throw new PlatformException("account role grant does not belong to role: " + grantId);
+            throw BusinessExceptions.warning("iam.role.account-grant-role-mismatch",
+                    "account role grant does not belong to role: " + grantId);
         }
         return accountRoleGrantDao.deleteById(grant.getId());
     }
@@ -385,7 +387,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         .eq("id", Preconditions.requireText(grantId, "grantId"))),
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
         if (grant == null || !SortAbility.sameValue(role.getId(), grant.getRoleId())) {
-            throw new PlatformException("employment role grant does not belong to role: " + grantId);
+            throw BusinessExceptions.warning("iam.role.employment-grant-role-mismatch",
+                    "employment role grant does not belong to role: " + grantId);
         }
         return employmentRoleGrantDao.deleteById(grant.getId());
     }
@@ -746,13 +749,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             role = selectPlatformSharedRole(validRoleId);
         }
         if (role == null || !Boolean.TRUE.equals(role.getEnabled())) {
-            throw new PlatformException("role is not active: " + roleId);
+            throw BusinessExceptions.warning("iam.role.inactive", "role is not active: " + roleId);
         }
         normalizeLoadedRoleDefaults(role);
         if (role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM
                 && role.getSharePolicy() != RoleSharePolicy.PLATFORM
                 && TenantContext.currentTenantId().isPresent()) {
-            throw new PlatformException("platform private role cannot be bound by tenant: " + roleId);
+            throw BusinessExceptions.warning("iam.role.platform-private-not-bindable",
+                    "platform private role cannot be bound by tenant: " + roleId);
         }
         return role;
     }
@@ -802,29 +806,33 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private Role requireConfigurableRole(String roleId) {
         Role role = requireEnabledRole(roleId);
         if (role.getRoleKind() == RoleKind.GROUP) {
-            throw new PlatformException("role group cannot be granted actions directly: " + roleId);
+            throw BusinessExceptions.warning("iam.role.group-action-grant-denied",
+                    "role group cannot be granted actions directly: " + roleId);
         }
         return role;
     }
 
     private void requireAccountRole(Role role) {
         if (role.getAssignmentType() != RoleAssignmentType.ACCOUNT) {
-            throw new PlatformException("role is not account role: " + role.getId());
+            throw BusinessExceptions.warning("iam.role.not-account-role", "role is not account role: " + role.getId());
         }
         if (role.getRoleKind() == RoleKind.GROUP || role.getRoleKind() == RoleKind.DATA_GRANT) {
-            throw new PlatformException("role kind cannot be granted to account: " + role.getId());
+            throw BusinessExceptions.warning("iam.role.account-grant-kind-denied",
+                    "role kind cannot be granted to account: " + role.getId());
         }
     }
 
     private void requireEmploymentAssignableRole(Role role) {
         if (role.getAssignmentType() != RoleAssignmentType.EMPLOYMENT) {
-            throw new PlatformException("role is not employment role: " + role.getId());
+            throw BusinessExceptions.warning("iam.role.not-employment-role",
+                    "role is not employment role: " + role.getId());
         }
     }
 
     private void requireSystemManagedMutationAllowed(Role role, String operation) {
         if (role != null && Boolean.TRUE.equals(role.getSystemManaged()) && !CurrentUserContext.isSystem()) {
-            throw new PlatformException("system managed role cannot be modified by " + operation + ": " + role.getId());
+            throw BusinessExceptions.warning("iam.role.system-managed-mutation-denied",
+                    "system managed role cannot be modified by " + operation + ": " + role.getId());
         }
     }
 
@@ -1154,7 +1162,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private void ensureDataGrantUnique(String employeePositionId, Role newRole) {
         if (effectiveDataGrantRoleIds(employeePositionId, newRole).size() > 1) {
-            throw new PlatformException("employment can have at most one data grant role: " + employeePositionId);
+            throw BusinessExceptions.warning("iam.role.data-grant-duplicate",
+                    "employment can have at most one data grant role: " + employeePositionId);
         }
     }
 
@@ -1352,15 +1361,18 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                                      String referenceFieldId) {
         DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
         if (role.getAssignmentType() == RoleAssignmentType.ACCOUNT && policy != DataScopePolicy.NONE) {
-            throw new PlatformException("account role action cannot configure data scope: " + role.getId());
+            throw BusinessExceptions.warning("iam.role.account-role-data-scope-denied",
+                    "account role action cannot configure data scope: " + role.getId());
         }
         if (role.getRoleKind() == RoleKind.DATA_GRANT) {
             if (policy == DataScopePolicy.NONE || policy == DataScopePolicy.INHERIT_DATA_GRANT) {
-                throw new PlatformException("data grant role must configure concrete data scope: " + role.getId());
+                throw BusinessExceptions.warning("iam.role.data-grant-scope-required",
+                        "data grant role must configure concrete data scope: " + role.getId());
             }
         }
         if (policy == DataScopePolicy.CUSTOM) {
-            throw new PlatformException("custom data scope policy is not supported yet");
+            throw BusinessExceptions.warning("iam.role.custom-data-scope-unsupported",
+                    "custom data scope policy is not supported yet");
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             Preconditions.requireText(referenceFieldId, "referenceFieldId");
