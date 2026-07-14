@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationChange;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationRecordIdSource;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationResult;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -139,7 +140,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     @CustomActionEndpoint(value = "changePassword", title = "修改密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
     @BusinessMutationResult(code = "iam.user.password-changed", message = "密码已修改",
-            change = BusinessMutationChange.UPDATED, module = UserAccountService.class)
+            change = BusinessMutationChange.UPDATED, module = UserAccountService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public int changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
@@ -155,7 +157,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     @CustomActionEndpoint(value = "resetPassword", title = "重置密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
     @BusinessMutationResult(code = "iam.user.password-reset", message = "密码已重置",
-            change = BusinessMutationChange.UPDATED, module = UserAccountService.class)
+            change = BusinessMutationChange.UPDATED, module = UserAccountService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public ResetPasswordResponse resetPassword(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             UserAccountService.PasswordResetResult result = service().resetPassword(id);

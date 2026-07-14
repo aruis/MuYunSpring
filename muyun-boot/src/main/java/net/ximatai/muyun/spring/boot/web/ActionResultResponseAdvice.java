@@ -71,16 +71,40 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         }
         String moduleAlias = moduleAliasResolver.moduleAlias(result.module());
         switch (result.change()) {
-            case UPDATED -> BusinessMutationResultSupport.successUpdated(result.code(), result.message(),
-                    moduleAlias, pathVariable(request, result.recordIdPathVariable()));
-            case COLLECTION_CHANGED -> BusinessMutationResultSupport.successCollectionChanged(
-                    result.code(), result.message(), moduleAlias);
+            case UPDATED -> {
+                requireRecordIdSource(result, BusinessMutationRecordIdSource.PATH_VARIABLE);
+                BusinessMutationResultSupport.successUpdated(result.code(), result.message(),
+                        moduleAlias, pathVariable(request, result.recordId()));
+            }
+            case COLLECTION_CHANGED -> {
+                requireNoRecordId(result);
+                BusinessMutationResultSupport.successCollectionChanged(
+                        result.code(), result.message(), moduleAlias);
+            }
+        }
+    }
+
+    private void requireRecordIdSource(BusinessMutationResult result, BusinessMutationRecordIdSource source) {
+        if (result.recordIdSource() != source) {
+            throw new IllegalArgumentException(result.change() + " requires recordIdSource " + source);
+        }
+        if (result.recordId() == null || result.recordId().isBlank()) {
+            throw new IllegalArgumentException(result.change() + " requires recordId");
+        }
+    }
+
+    private void requireNoRecordId(BusinessMutationResult result) {
+        if (result.recordIdSource() != BusinessMutationRecordIdSource.NONE) {
+            throw new IllegalArgumentException(result.change() + " does not support recordIdSource");
+        }
+        if (result.recordId() != null && !result.recordId().isBlank()) {
+            throw new IllegalArgumentException(result.change() + " does not support recordId");
         }
     }
 
     private String pathVariable(ServerHttpRequest request, String key) {
         if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException("recordIdPathVariable must not be blank");
+            throw new IllegalArgumentException("recordId must not be blank");
         }
         if (!(request instanceof ServletServerHttpRequest servletRequest)) {
             throw new IllegalArgumentException("path variables require servlet request");

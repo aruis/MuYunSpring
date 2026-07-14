@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.BusinessMutationChange;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationRecordIdSource;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationResult;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
@@ -22,7 +23,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     @PostMapping("/ui-configs/{id}/publish")
     @CustomActionEndpoint(value = "publishUiConfig", title = "发布 UI 配置", level = PlatformActionLevel.RECORD)
     @BusinessMutationResult(code = "platform.ui-config.published", message = "UI 配置已发布",
-            change = BusinessMutationChange.UPDATED, module = PlatformUiConfigService.class)
+            change = BusinessMutationChange.UPDATED, module = PlatformUiConfigService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public int publishUiConfig(@PathVariable String id) {
         return webScope(() -> {
             service().publishUiConfig(id);
@@ -33,7 +35,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     @PostMapping("/ui-configs/{id}/unpublish")
     @CustomActionEndpoint(value = "unpublishUiConfig", title = "取消发布 UI 配置", level = PlatformActionLevel.RECORD)
     @BusinessMutationResult(code = "platform.ui-config.unpublished", message = "UI 配置已取消发布",
-            change = BusinessMutationChange.UPDATED, module = PlatformUiConfigService.class)
+            change = BusinessMutationChange.UPDATED, module = PlatformUiConfigService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public int unpublishUiConfig(@PathVariable String id) {
         return webScope(() -> {
             service().unpublishUiConfig(id);
@@ -44,7 +47,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     @PostMapping("/query-templates/{id}/publish")
     @CustomActionEndpoint(value = "publishQueryTemplate", title = "发布查询模板", level = PlatformActionLevel.RECORD)
     @BusinessMutationResult(code = "platform.query-template.published", message = "查询模板已发布",
-            change = BusinessMutationChange.UPDATED, module = PlatformQueryTemplateService.class)
+            change = BusinessMutationChange.UPDATED, module = PlatformQueryTemplateService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public int publishQueryTemplate(@PathVariable String id) {
         return webScope(() -> {
             service().publishQueryTemplate(id);
@@ -56,7 +60,8 @@ public class PlatformPageConfigPublishWebController extends WebSupport<PlatformP
     @CustomActionEndpoint(value = "unpublishQueryTemplate", title = "取消发布查询模板",
             level = PlatformActionLevel.RECORD)
     @BusinessMutationResult(code = "platform.query-template.unpublished", message = "查询模板已取消发布",
-            change = BusinessMutationChange.UPDATED, module = PlatformQueryTemplateService.class)
+            change = BusinessMutationChange.UPDATED, module = PlatformQueryTemplateService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
     public int unpublishQueryTemplate(@PathVariable String id) {
         return webScope(() -> {
             service().unpublishQueryTemplate(id);

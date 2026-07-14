@@ -19,5 +19,7 @@ public @interface BusinessMutationResult {
 
     Class<?> module();
 
-    String recordIdPathVariable() default "id";
+    BusinessMutationRecordIdSource recordIdSource() default BusinessMutationRecordIdSource.NONE;
+
+    String recordId() default "";
 }

@@ -100,6 +100,33 @@ class ActionResultResponseAdviceTest {
         }
     }
 
+    @Test
+    void shouldReportAnnotatedCollectionChangedResultBeforeWrapping() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS);
+        Method method = TestController.class.getDeclaredMethod("grant");
+        MethodParameter returnType = new MethodParameter(method, -1);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            Object response = advice.beforeBodyWrite(
+                    1,
+                    returnType,
+                    MediaType.APPLICATION_JSON,
+                    null,
+                    new ServletServerHttpRequest(new MockHttpServletRequest()),
+                    null
+            );
+
+            assertThat(response).isInstanceOf(ActionResultResponse.class);
+            ActionResultResponse actionResult = (ActionResultResponse) response;
+            assertThat(actionResult.message().code()).isEqualTo("demo.granted");
+            assertThat(actionResult.changes()).singleElement().satisfies(change -> {
+                assertThat(change.type()).isEqualTo("collection-changed");
+                assertThat(change.moduleAlias()).isEqualTo("demo.module");
+                assertThat(change.recordId()).isNull();
+            });
+        }
+    }
+
     private static final class TestController {
         @StandardMutation(StandardMutationKind.SORT)
         int sort() {
@@ -107,8 +134,15 @@ class ActionResultResponseAdviceTest {
         }
 
         @BusinessMutationResult(code = "demo.published", message = "已发布",
-                change = BusinessMutationChange.UPDATED, module = DemoModule.class)
+                change = BusinessMutationChange.UPDATED, module = DemoModule.class,
+                recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
         int publish() {
+            return 1;
+        }
+
+        @BusinessMutationResult(code = "demo.granted", message = "已授权",
+                change = BusinessMutationChange.COLLECTION_CHANGED, module = DemoModule.class)
+        int grant() {
             return 1;
         }
     }
