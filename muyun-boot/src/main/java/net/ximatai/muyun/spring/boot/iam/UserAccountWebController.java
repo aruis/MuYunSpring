@@ -5,6 +5,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.boot.web.BusinessMutation;
+import net.ximatai.muyun.spring.boot.web.BusinessMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
@@ -136,12 +138,17 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     @PostMapping("/changePassword/{id}")
     @CustomActionEndpoint(value = "changePassword", title = "修改密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
+    @BusinessMutation
     public int changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             int changed = service().changePassword(id, request.password());
             if (changed > 0 && userSessionService != null) {
                 userSessionService.revokeUserSessions(id);
+            }
+            if (changed > 0) {
+                BusinessMutationResultSupport.successUpdated("iam.user.password-changed",
+                        "密码已修改", UserAccountService.MODULE_ALIAS, id);
             }
             return changed;
         }));
@@ -150,11 +157,16 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     @PostMapping("/resetPassword/{id}")
     @CustomActionEndpoint(value = "resetPassword", title = "重置密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
+    @BusinessMutation
     public ResetPasswordResponse resetPassword(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             UserAccountService.PasswordResetResult result = service().resetPassword(id);
             if (result.count() > 0 && userSessionService != null) {
                 userSessionService.revokeUserSessions(id);
+            }
+            if (result.count() > 0) {
+                BusinessMutationResultSupport.successUpdated("iam.user.password-reset",
+                        "密码已重置", UserAccountService.MODULE_ALIAS, id);
             }
             return new ResetPasswordResponse(result.count(), result.temporaryPassword(), result.expiresAt());
         }));
