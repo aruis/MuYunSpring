@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.StandardMutation;
+import net.ximatai.muyun.spring.boot.web.StandardMutationKind;
+import net.ximatai.muyun.spring.boot.web.StandardMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
@@ -52,15 +55,18 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
+    @StandardMutation(StandardMutationKind.SORT)
     public int sort(@PathVariable String id,
-                                 @RequestBody(required = false) TreeSortWebRequest request) {
+                    @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             if (blank(normalized.previousId()) && blank(normalized.nextId()) && blank(normalized.parentId())) {
                 throw new IllegalArgumentException("module tree sort requires previousId, nextId, or parentId");
             }
-            service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-            return 1;
+            return StandardMutationResultSupport.sorted(this, () -> {
+                service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
+                return 1;
+            });
         });
     }
 

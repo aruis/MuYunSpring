@@ -10,6 +10,9 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
+import net.ximatai.muyun.spring.boot.web.StandardMutation;
+import net.ximatai.muyun.spring.boot.web.StandardMutationKind;
+import net.ximatai.muyun.spring.boot.web.StandardMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
@@ -85,48 +88,56 @@ abstract class ModuleScopedRuleTreeWebSupport<
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
+    @StandardMutation(StandardMutationKind.DELETE)
     public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().delete(id);
+            return StandardMutationResultSupport.deleted(this, id, () -> service().delete(id));
         });
     }
 
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
+    @StandardMutation(StandardMutationKind.ENABLE)
     public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().enable(id);
+            return StandardMutationResultSupport.enabled(this, id, () -> service().enable(id));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
+    @StandardMutation(StandardMutationKind.DISABLE)
     public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return service().disable(id);
+            return StandardMutationResultSupport.disabled(this, id, () -> service().disable(id));
         });
     }
 
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
+    @StandardMutation(StandardMutationKind.SORT)
     public int sort(HttpServletRequest servletRequest,
-                                 @PathVariable String id,
-                                 @RequestBody(required = false) SortWebRequest request) {
+                    @PathVariable String id,
+                    @RequestBody(required = false) SortWebRequest request) {
         return webScope(() -> {
             SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
             requireScopedRecord(servletRequest, id);
             if (hasText(normalized.previousId())) {
                 requireScopedRecord(servletRequest, normalized.previousId());
-                service().moveAfter(id, normalized.previousId());
-                return 1;
+                return StandardMutationResultSupport.sorted(this, () -> {
+                    service().moveAfter(id, normalized.previousId());
+                    return 1;
+                });
             }
             if (hasText(normalized.nextId())) {
                 requireScopedRecord(servletRequest, normalized.nextId());
-                service().moveBefore(id, normalized.nextId());
-                return 1;
+                return StandardMutationResultSupport.sorted(this, () -> {
+                    service().moveBefore(id, normalized.nextId());
+                    return 1;
+                });
             }
             throw new IllegalArgumentException("rule sort requires previousId or nextId");
         });

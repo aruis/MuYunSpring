@@ -9,7 +9,6 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 import java.util.List;
-import java.util.function.IntSupplier;
 
 final class StaticStandardMutationSupport {
     private StaticStandardMutationSupport() {
@@ -39,44 +38,27 @@ final class StaticStandardMutationSupport {
     }
 
     static void created(ScopedWeb<?> web, String id) {
-        StaticCrudActionResultSupport.created(web.webScopeName(), id);
+        StandardMutationResultSupport.created(web, id);
     }
 
     static void updated(ScopedWeb<?> web, String id) {
-        StaticCrudActionResultSupport.updated(web.webScopeName(), id);
+        StandardMutationResultSupport.updated(web, id);
     }
 
-    static int enabled(ScopedWeb<?> web, String id, IntSupplier action) {
-        return countMutation(id, action,
-                recordId -> StaticCrudActionResultSupport.enabled(web.webScopeName(), recordId));
+    static int enabled(ScopedWeb<?> web, String id, java.util.function.IntSupplier action) {
+        return StandardMutationResultSupport.enabled(web, id, action);
     }
 
-    static int disabled(ScopedWeb<?> web, String id, IntSupplier action) {
-        return countMutation(id, action,
-                recordId -> StaticCrudActionResultSupport.disabled(web.webScopeName(), recordId));
+    static int disabled(ScopedWeb<?> web, String id, java.util.function.IntSupplier action) {
+        return StandardMutationResultSupport.disabled(web, id, action);
     }
 
-    static int deleted(ScopedWeb<?> web, String id, IntSupplier action) {
-        return countMutation(id, action,
-                recordId -> StaticCrudActionResultSupport.deleted(web.webScopeName(), recordId));
+    static int deleted(ScopedWeb<?> web, String id, java.util.function.IntSupplier action) {
+        return StandardMutationResultSupport.deleted(web, id, action);
     }
 
-    static int sorted(ScopedWeb<?> web, IntSupplier action) {
-        int count = action.getAsInt();
-        if (count > 0) {
-            StaticCrudActionResultSupport.sorted(web.webScopeName());
-        }
-        return count;
-    }
-
-    private static int countMutation(String id,
-                                     IntSupplier action,
-                                     java.util.function.Consumer<String> successReporter) {
-        int count = action.getAsInt();
-        if (count > 0) {
-            successReporter.accept(id);
-        }
-        return count;
+    static int sorted(ScopedWeb<?> web, java.util.function.IntSupplier action) {
+        return StandardMutationResultSupport.sorted(web, action);
     }
 
     static ActionExecutionPolicy actionPolicy(ScopedWeb<?> web, PlatformAction fallback) {
