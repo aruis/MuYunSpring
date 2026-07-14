@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.BusinessMutation;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
@@ -143,6 +144,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     }
 
     @PostMapping("/{employeeId}/account/provision")
+    @BusinessMutation
     @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
     public AccountProvisionResponse provisionAccount(@PathVariable String employeeId,
@@ -155,11 +157,14 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     }
 
     @PostMapping("/{employeeId}/account/delete")
+    @BusinessMutation
     @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
-    public WebCountResponse deleteAccount(@PathVariable String employeeId) {
-        return employeeRecordScope(employeeId,
-                () -> new WebCountResponse(employeeAccountService.removeAccount(employeeId)));
+    public void deleteAccount(@PathVariable String employeeId) {
+        employeeRecordScope(employeeId, () -> {
+            employeeAccountService.removeAccount(employeeId);
+            return null;
+        });
     }
 
     @GetMapping("/{employeeId}/positions")

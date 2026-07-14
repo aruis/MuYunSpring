@@ -72,6 +72,12 @@ test('platform action error handler matches by code or marker facts', () => {
 
 test('platform action result message prefers business message and falls back safely', () => {
   assert.equal(resolvePlatformActionResultMessage({ message: '已保存' }), '已保存');
+  assert.equal(
+    resolvePlatformActionResultMessage({
+      message: { code: 'iam.employee-account.provisioned', text: '账号已创建并绑定职员', type: 'SUCCESS' },
+    }),
+    '账号已创建并绑定职员',
+  );
   assert.equal(resolvePlatformActionResultMessage({ message: '   ' }, '默认成功'), '默认成功');
   assert.equal(resolvePlatformActionResultMessage({ count: 1 }, '已删除'), '已删除');
   assert.equal(resolvePlatformActionResultMessage(undefined), '操作成功');
@@ -105,6 +111,18 @@ test('platform action result resolves data changes without dispatching UI reacti
     },
   });
   assert.deepEqual(handled, []);
+});
+
+test('platform action result exposes message metadata and change set id', () => {
+  const actionResult = resolvePlatformActionResult({
+    message: { code: 'iam.employee-account.removed', text: '账户已移除', type: 'SUCCESS' },
+    changeSetId: 'change-set-1',
+  });
+
+  assert.equal(actionResult.message, '账户已移除');
+  assert.equal(actionResult.messageCode, 'iam.employee-account.removed');
+  assert.equal(actionResult.messageType, 'SUCCESS');
+  assert.equal(actionResult.changeSetId, 'change-set-1');
 });
 
 test('platform action result local reactions compose without duplicate local defaults', async () => {

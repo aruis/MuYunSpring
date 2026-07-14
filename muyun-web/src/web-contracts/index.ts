@@ -44,14 +44,27 @@ export interface WebDataChange {
   [key: string]: unknown;
 }
 
+export type WebActionMessageType = 'SUCCESS' | 'INFO' | 'WARNING' | 'ERROR' | string;
+
+export interface WebActionMessage {
+  code?: string;
+  text?: string;
+  type?: WebActionMessageType;
+}
+
 export interface WebActionResultFacts {
-  message?: string;
+  message?: string | WebActionMessage;
   resultType?: string;
   changes?: WebDataChange[];
+  changeSetId?: string;
 }
 
 export type WebActionResult<TFacts extends Record<string, unknown> = Record<string, unknown>> = TFacts &
   WebActionResultFacts;
+
+export interface WebActionResultEnvelope<TData = unknown> extends WebActionResultFacts {
+  data: TData;
+}
 
 export interface WebCountResponse extends WebActionResultFacts {
   count: number;

@@ -235,34 +235,43 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
 
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
+    @BusinessMutation
     @ResponseStatus(HttpStatus.CREATED)
     default WebRecordResponse<T> insert(@RequestBody T record) {
         return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            StaticCrudActionResultSupport.created(webScopeName(), id);
             return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         }));
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
+    @BusinessMutation
     default WebRecordResponse<T> update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return MutationTenantScopeExecutor.forUpdate(this, id, record, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
             T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
+            StaticCrudActionResultSupport.updated(webScopeName(), id);
             return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         }));
     }
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
+    @BusinessMutation
     default WebCountResponse delete(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
             T record = service().select(id);
-            return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
+            int count = service().delete(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.deleted(webScopeName(), id);
+            }
+            return new WebCountResponse(count, successMessage(record, "已删除"));
         }));
     }
 

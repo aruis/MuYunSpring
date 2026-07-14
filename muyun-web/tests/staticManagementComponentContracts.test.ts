@@ -532,12 +532,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /解绑/);
   assert.match(
     employeeViewSource,
-    /presentPlatformSuccess\('账号已创建并绑定职员'[\s\S]*source: 'employee-management'/,
+    /handlePlatformActionSuccess\(result,[\s\S]*source: 'employee-management'/,
   );
-  assert.match(
-    employeeViewSource,
-    /presentPlatformSuccess\('账户已移除'[\s\S]*source: 'employee-management'/,
-  );
+  assert.doesNotMatch(employeeViewSource, /presentPlatformSuccess\('账号已创建并绑定职员'/);
+  assert.doesNotMatch(employeeViewSource, /presentPlatformSuccess\('账户已移除'/);
   assert.match(employeeViewSource, /departmentId: \{[\s\S]*controlType: 'recordPicker'/);
   assert.match(employeeViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(employeeViewSource, /employeeFormPickerConfigs/);

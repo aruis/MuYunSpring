@@ -16,20 +16,28 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
         extends ScopedWeb<S>, RecordLabelWeb<T> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
+    @BusinessMutation
     default WebCountResponse enable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.ENABLE, id);
             int count = service().enable(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.enabled(webScopeName(), id);
+            }
             return new WebCountResponse(count, successMessage(service().select(id), "已启用"));
         }));
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
+    @BusinessMutation
     default WebCountResponse disable(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             requireDataScopeRecord(PlatformAction.DISABLE, id);
             int count = service().disable(id);
+            if (count > 0) {
+                StaticCrudActionResultSupport.disabled(webScopeName(), id);
+            }
             return new WebCountResponse(count, successMessage(service().select(id), "已停用"));
         }));
     }

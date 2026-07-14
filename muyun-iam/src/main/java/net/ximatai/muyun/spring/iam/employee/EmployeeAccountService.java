@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.action.ActionMessageReporter;
+import net.ximatai.muyun.spring.ability.action.DataChangeRecorder;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -21,15 +23,29 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
 
     private final EmployeeService employeeService;
     private final UserAccountService userAccountService;
+    private final ActionMessageReporter actionMessageReporter;
+    private final DataChangeRecorder dataChangeRecorder;
+
+    public EmployeeAccountService(EmployeeAccountDao employeeAccountDao,
+                                  ActiveTenantVerifier activeTenantVerifier,
+                                  EmployeeService employeeService,
+                                  UserAccountService userAccountService) {
+        this(employeeAccountDao, activeTenantVerifier, employeeService, userAccountService,
+                new ActionMessageReporter(), new DataChangeRecorder());
+    }
 
     @Autowired
     public EmployeeAccountService(EmployeeAccountDao employeeAccountDao,
                                   ActiveTenantVerifier activeTenantVerifier,
                                   EmployeeService employeeService,
-                                  UserAccountService userAccountService) {
+                                  UserAccountService userAccountService,
+                                  ActionMessageReporter actionMessageReporter,
+                                  DataChangeRecorder dataChangeRecorder) {
         super(MODULE_ALIAS, EmployeeAccount.class, employeeAccountDao, activeTenantVerifier);
         this.employeeService = employeeService;
         this.userAccountService = userAccountService;
+        this.actionMessageReporter = actionMessageReporter;
+        this.dataChangeRecorder = dataChangeRecorder;
     }
 
     @Override
@@ -74,6 +90,10 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         binding.setEmployeeId(validEmployeeId);
         binding.setUserId(userId);
         String bindingId = bindAccount(validEmployeeId, binding);
+        actionMessageReporter.success("iam.employee-account.provisioned", "账号已创建并绑定职员");
+        dataChangeRecorder.created(UserAccountService.class, userId);
+        dataChangeRecorder.created(EmployeeAccountService.class, bindingId);
+        dataChangeRecorder.updated(EmployeeService.class, validEmployeeId);
         return new AccountProvisionResult(userAccountService.select(userId), select(bindingId));
     }
 
@@ -93,6 +113,12 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
                     ACCOUNT_REMOVAL_OPERATOR_ID, "Employee Account Removal"))) {
                 userAccountService.delete(userId);
             }
+        }
+        if (deleted > 0) {
+            actionMessageReporter.success("iam.employee-account.removed", "账户已移除");
+            dataChangeRecorder.deleted(EmployeeAccountService.class, binding.getId());
+            dataChangeRecorder.deleted(UserAccountService.class, userId);
+            dataChangeRecorder.updated(EmployeeService.class, validEmployeeId);
         }
         return deleted;
     }

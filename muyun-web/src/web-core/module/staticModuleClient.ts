@@ -1,6 +1,7 @@
 import type {
   TreeSortRequest,
   WebActionResultFacts,
+  WebActionResultEnvelope,
   QuerySchema,
   WebCountResponse,
   WebListResponse,
@@ -71,7 +72,7 @@ export function createStaticResourceCrudClient<TRecord>(
     view: (id) => http.request<TRecord>({ path: `${modulePath}/view/${encodeURIComponent(id)}` }),
     insert: async (record) =>
       normalizeRecordMutationResponse(
-        await http.request<TRecord | WebRecordResponse<TRecord>>({
+        await http.request<TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>>({
           method: 'POST',
           path: `${modulePath}/insert`,
           body: record,
@@ -79,27 +80,33 @@ export function createStaticResourceCrudClient<TRecord>(
       ),
     update: async (id, record) =>
       normalizeRecordMutationResponse(
-        await http.request<TRecord | WebRecordResponse<TRecord>>({
+        await http.request<TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>>({
           method: 'POST',
           path: `${modulePath}/update/${encodeURIComponent(id)}`,
           body: record,
         }),
       ),
-    delete: (id) =>
-      http.request<WebCountResponse>({
-        method: 'POST',
-        path: `${modulePath}/delete/${encodeURIComponent(id)}`,
-      }),
-    enable: (id) =>
-      http.request<WebCountResponse>({
-        method: 'POST',
-        path: `${modulePath}/enable/${encodeURIComponent(id)}`,
-      }),
-    disable: (id) =>
-      http.request<WebCountResponse>({
-        method: 'POST',
-        path: `${modulePath}/disable/${encodeURIComponent(id)}`,
-      }),
+    delete: async (id) =>
+      normalizeCountMutationResponse(
+        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+          method: 'POST',
+          path: `${modulePath}/delete/${encodeURIComponent(id)}`,
+        }),
+      ),
+    enable: async (id) =>
+      normalizeCountMutationResponse(
+        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+          method: 'POST',
+          path: `${modulePath}/enable/${encodeURIComponent(id)}`,
+        }),
+      ),
+    disable: async (id) =>
+      normalizeCountMutationResponse(
+        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+          method: 'POST',
+          path: `${modulePath}/disable/${encodeURIComponent(id)}`,
+        }),
+      ),
   };
 }
 
@@ -138,12 +145,14 @@ export function createStaticResourceTreeClient<TRecord>(
         path: `${modulePath}/tree/${encodeURIComponent(id)}`,
         query,
       }),
-    sort: (id, request) =>
-      http.request<WebCountResponse>({
-        method: 'POST',
-        path: `${modulePath}/sort/${encodeURIComponent(id)}`,
-        body: request,
-      }),
+    sort: async (id, request) =>
+      normalizeCountMutationResponse(
+        await http.request<WebCountResponse | WebActionResultEnvelope<null>>({
+          method: 'POST',
+          path: `${modulePath}/sort/${encodeURIComponent(id)}`,
+          body: request,
+        }),
+      ),
   };
 }
 
@@ -153,8 +162,17 @@ function modulePathOf(moduleAlias: string) {
 }
 
 function normalizeRecordMutationResponse<TRecord>(
-  response: TRecord | WebRecordResponse<TRecord>,
+  response: TRecord | WebRecordResponse<TRecord> | WebActionResultEnvelope<TRecord>,
 ): StaticRecordMutationResult<TRecord> {
+  if (isWebActionResultEnvelope<TRecord>(response)) {
+    return {
+      record: response.data,
+      message: response.message,
+      resultType: response.resultType,
+      changes: response.changes,
+      changeSetId: response.changeSetId,
+    };
+  }
   if (isWebRecordResponse(response)) {
     return {
       record: response.record,
@@ -164,6 +182,25 @@ function normalizeRecordMutationResponse<TRecord>(
     };
   }
   return { record: response };
+}
+
+function normalizeCountMutationResponse(
+  response: WebCountResponse | WebActionResultEnvelope<null>,
+): WebCountResponse {
+  if (isWebActionResultEnvelope(response)) {
+    return {
+      count: 0,
+      message: response.message,
+      resultType: response.resultType,
+      changes: response.changes,
+      changeSetId: response.changeSetId,
+    };
+  }
+  return response;
+}
+
+function isWebActionResultEnvelope<TData>(response: unknown): response is WebActionResultEnvelope<TData> {
+  return typeof response === 'object' && response !== null && 'data' in response && 'changeSetId' in response;
 }
 
 function isWebRecordResponse<TRecord>(
