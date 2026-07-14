@@ -188,7 +188,11 @@ class IamWebControllerIT {
                                 {"previousId":"org-0","parentId":"root"}
                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.organization')]")
+                        .exists());
 
         verify(organizationService).moveInTree(any(Criteria.class), eq("org-1"), eq("org-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }
@@ -240,7 +244,11 @@ class IamWebControllerIT {
                                 {"previousId":"dept-0","parentId":"root"}
                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value(1));
+                .andExpect(jsonPath("$.data").value(1))
+                .andExpect(jsonPath("$.message.code").value("platform.crud.sorted"))
+                .andExpect(jsonPath("$.message.text").value("排序成功"))
+                .andExpect(jsonPath("$.changes[?(@.type == 'collection-changed' && @.moduleAlias == 'iam.department')]")
+                        .exists());
 
         verify(departmentService).moveInTree(any(Criteria.class), eq("dept-1"), eq("dept-0"), eq(null), eq(TreeAbility.ROOT_ID));
     }

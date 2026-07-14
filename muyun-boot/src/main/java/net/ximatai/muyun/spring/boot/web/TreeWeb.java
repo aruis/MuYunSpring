@@ -24,16 +24,19 @@ import java.util.Set;
 public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeAbility<T>> extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
+    @StandardMutation(StandardMutationKind.SORT)
     default int sort(HttpServletRequest httpRequest,
-                                  @PathVariable String id,
-                                  @RequestBody(required = false) TreeSortWebRequest request) {
-        return webScope(() -> {
+                     @PathVariable String id,
+                     @RequestBody(required = false) TreeSortWebRequest request) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
             requireSortInput(normalized);
             requireTreeSortScope(httpRequest, id, normalized);
-            moveTree(httpRequest, id, normalized);
-            return 1;
-        });
+            return StaticStandardMutationSupport.sorted(this, () -> {
+                moveTree(httpRequest, id, normalized);
+                return 1;
+            });
+        }));
     }
 
     @GetMapping("/tree")
