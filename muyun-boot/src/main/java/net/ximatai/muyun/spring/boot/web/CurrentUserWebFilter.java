@@ -26,6 +26,10 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         Optional<CurrentUser> currentUser = currentUserProvider.currentUser();
         if (currentUser.isEmpty()) {
+            if (hasBearerToken(request)) {
+                rejectAuthenticationRequired(response);
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -63,6 +67,22 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
         return "/iam.auth/context".equals(path)
                 || "/iam.auth/changeOwnPassword".equals(path)
                 || "/iam.auth/logout".equals(path);
+    }
+
+    private boolean hasBearerToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        String prefix = "Bearer ";
+        return header != null && header.regionMatches(true, 0, prefix, 0, prefix.length())
+                && !header.substring(prefix.length()).isBlank();
+    }
+
+    private void rejectAuthenticationRequired(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("""
+                {"code":"AUTH_REQUIRED","status":401,"message":"current user context is not available"}
+                """);
     }
 
     private void rejectPasswordChangeRequired(HttpServletResponse response) throws IOException {

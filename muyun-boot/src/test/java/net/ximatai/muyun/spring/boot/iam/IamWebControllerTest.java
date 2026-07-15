@@ -124,7 +124,7 @@ class IamWebControllerTest {
         TenantWebController tenantController = new TenantWebController();
         OrganizationWebController organizationController = new OrganizationWebController();
         PositionWebController positionController = new PositionWebController();
-        UserAccountWebController userAccountController = new UserAccountWebController(null);
+        UserAccountWebController userAccountController = new UserAccountWebController();
         RoleWebController roleController = new RoleWebController(grantableActionResolver);
         ReflectionTestUtils.setField(tenantController, "service", tenantService);
         ReflectionTestUtils.setField(organizationController, "service", organizationService);
@@ -1083,7 +1083,7 @@ class IamWebControllerTest {
     void shouldExposeUserSelectorQuery() throws Exception {
         RoleService roleService = mock(RoleService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
-        UserAccountWebController controller = new UserAccountWebController(null, provider(roleService));
+        UserAccountWebController controller = new UserAccountWebController(provider(roleService));
         ReflectionTestUtils.setField(controller, "service", userAccountService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addFilters(new CurrentUserWebFilter(() ->
@@ -1120,7 +1120,7 @@ class IamWebControllerTest {
     void shouldApplyActiveCriteriaBeforeUserProjectionQuery() throws Exception {
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
         StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
-        UserAccountWebController controller = new UserAccountWebController(null);
+        UserAccountWebController controller = new UserAccountWebController();
         ReflectionTestUtils.setField(controller, "service", userAccountService);
         controller.setStaticRecordReadProjectionService(projectionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)

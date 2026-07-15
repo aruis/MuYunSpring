@@ -43,6 +43,17 @@ class CurrentUserWebFilterTest {
                 .andExpect(content().string("context"));
     }
 
+    @Test
+    void shouldRejectInvalidBearerTokenBeforeBusinessHandler() throws Exception {
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new TestController())
+                .addFilters(new CurrentUserWebFilter(Optional::empty))
+                .build();
+
+        mvc.perform(get("/business").header("Authorization", "Bearer stale-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("AUTH_REQUIRED")));
+    }
+
     private MockMvc restrictedMvc() {
         return MockMvcBuilders.standaloneSetup(new TestController())
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(

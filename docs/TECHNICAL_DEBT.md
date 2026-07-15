@@ -51,6 +51,8 @@
 | TD-026 | 应用归属引用保护仍缺少贡献式检查契约 | 当前删除应用时只在 `ApplicationService` 中显式检查模块、元数据和字典类目等已接入引用；仓库内其他 `applicationAlias` 归属模型后续增多时，如果继续扩硬编码清单，容易遗漏并产生孤儿配置数据 | 进入计量单位、工作流、配置包或更多应用归属模型的删除治理时，沉淀应用归属引用检查贡献接口或注册表，由各业务能力贡献引用存在性、展示名称和错误详情，`ApplicationService` 只编排统一拒绝语义 |
 | TD-028 | `QuerySchema` 外部查询值描述仍过于粗糙 | `QuerySchema.ExternalCriteria` 目前只暴露 key，并固定为 `OBJECT` / `PAGE_CONTEXT`，缺少字段结构、来源语义和校验契约；随着静态查询模板、动态页面上下文和外部查询值增多，ability 层可能继续携带页面交付语义 | 后续扩展 external query values 前，引入 `ExternalCriteriaDescriptor` 或等价能力契约，由能力层声明 valueType、来源、对象字段结构和校验边界，Web 层只负责序列化 |
 | TD-029 | 关联投影查询仍需继续平台化 | 当前已将静态列表 SQL join 上移到来源无关的 `RelationProjectionReadService` / `RelationProjection*` 能力，并收敛输出字段、cardinality 和 relation 字段查询边界；但动态元数据接入、字段保护 SQL 输出执行器、projection plan 缓存和循环保护尚未完成 | 按 [关联投影查询治理](architecture/RELATION_PROJECTION_GOVERNANCE.md) 分阶段回收，动态表单业务推进时优先把动态引用字段、模块关系和字典标题编译到同一套 `RelationProjection` |
+| TD-031 | 列表主记录的运行态状态摘要接口尚未平台化 | 用户管理已通过 `iam.user` 专用批量接口读取在线状态，并在前端用共享组合式逻辑刷新主子表；但“主表记录 + 运行态子资源状态摘要”的后端端点、权限校验和数据变化刷新仍是业务专用形态 | 出现第二个需要在列表主记录展示运行态子资源摘要的管理页时，沉淀通用 `record status summary` 或 child resource summary 契约，复用动作权限、数据权限、批量读取和实时数据变化语义 |
+| TD-032 | 列表运行态展示列尚未形成平台契约 | 用户管理在线状态列当前由页面本地声明，并通过专用状态接口和实时消息刷新；这类列不是静态模型字段，也不是 SQL 读投影字段，不能进入 `ModuleUiDefinition`、查询 schema、表单字段、导入导出字段或后端静态 UI 字段校验白名单 | 出现第二个类似“主表列表展示运行态状态摘要”的场景时，沉淀 client computed/status column 契约，明确列声明、位置、数据源、权限、批量加载、实时刷新事件，以及不参与排序筛选、表单和导入导出的边界 |
 
 ## 运维治理触发回收
 

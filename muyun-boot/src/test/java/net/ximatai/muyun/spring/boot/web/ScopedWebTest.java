@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -12,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ScopedWebTest {
     @AfterEach
     void tearDown() {
+        CurrentUserContext.clear();
         TenantContext.clear();
     }
 
@@ -37,7 +40,9 @@ class ScopedWebTest {
     void shouldVerifyActiveTenantInTenantContext() {
         VerifyingScopedWeb web = new VerifyingScopedWeb();
 
-        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+        try (CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                CurrentUser.tenantUser("user-1", "alice", "tenant-a"));
+             TenantContext.Scope ignoredTenant = TenantContext.use("tenant-a")) {
             assertThat(web.webScope(() -> "ok")).isEqualTo("ok");
         }
 

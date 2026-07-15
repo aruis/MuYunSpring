@@ -1,5 +1,5 @@
 import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs';
-import type { WebCommittedChangeSet, WebRealtimeEnvelope } from '@muyun/web-contracts';
+import type { WebCommittedChangeSet, WebRealtimeEnvelope, WebUserNotification } from '@muyun/web-contracts';
 import type { DataChangeDispatcher } from './dataChanges';
 
 export type RealtimeConnectionState =
@@ -88,16 +88,103 @@ export interface StompErrorFrame {
 
 export const realtimeMessageTypes = {
   dataChange: 'platform.data-change',
+  securityNotification: 'platform.security-notification',
+} as const;
+
+export const realtimeDestinations = {
+  userDataChanges: '/user/queue/platform/data-changes',
+  userNotifications: '/user/queue/platform/notifications',
+  userImMessages: '/user/queue/platform/im/messages',
+  platformPing: '/app/platform/ping',
+  imMessagesSend: '/app/platform/im/messages/send',
 } as const;
 
 export const dataChangeChannel: RealtimeChannel<WebCommittedChangeSet> = {
-  destination: '/user/queue/platform/data-changes',
+  destination: realtimeDestinations.userDataChanges,
   type: realtimeMessageTypes.dataChange,
 };
 
-export const platformPingCommand: RealtimeCommand<{ timestamp: string }> = {
-  destination: '/app/platform/ping',
+export const userNotificationChannel: RealtimeChannel<WebUserNotification> = {
+  destination: realtimeDestinations.userNotifications,
+  type: realtimeMessageTypes.securityNotification,
 };
+
+export const userImMessageChannel: RealtimeChannel<unknown> = {
+  destination: realtimeDestinations.userImMessages,
+};
+
+export const platformPingCommand: RealtimeCommand<{ timestamp: string }> = {
+  destination: realtimeDestinations.platformPing,
+};
+
+export const imMessageSendCommand: RealtimeCommand<unknown> = {
+  destination: realtimeDestinations.imMessagesSend,
+};
+
+export function tenantPublicDataChangeChannel(tenantId: string): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(`/topic/platform/tenants/${pathSegment(tenantId)}/public/data-changes`);
+}
+
+export function tenantPublicNotificationChannel(tenantId: string): RealtimeChannel<unknown> {
+  return { destination: `/topic/platform/tenants/${pathSegment(tenantId)}/public/notifications` };
+}
+
+export function organizationPublicDataChangeChannel(
+  organizationId: string,
+): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(`/topic/platform/organizations/${pathSegment(organizationId)}/public/data-changes`);
+}
+
+export function organizationPublicNotificationChannel(organizationId: string): RealtimeChannel<unknown> {
+  return {
+    destination: `/topic/platform/organizations/${pathSegment(organizationId)}/public/notifications`,
+  };
+}
+
+export function moduleDataChangeChannel(moduleAlias: string): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(`/topic/platform/modules/${pathSegment(moduleAlias)}/data-changes`);
+}
+
+export function recordDataChangeChannel(
+  moduleAlias: string,
+  recordId: string,
+): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(
+    `/topic/platform/modules/${pathSegment(moduleAlias)}/records/${pathSegment(recordId)}/data-changes`,
+  );
+}
+
+export function resourceDataChangeChannel(
+  moduleAlias: string,
+  resourceKey: string,
+): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(
+    `/topic/platform/modules/${pathSegment(moduleAlias)}/resources/${pathSegment(resourceKey)}/data-changes`,
+  );
+}
+
+export function resourceRecordDataChangeChannel(
+  moduleAlias: string,
+  resourceKey: string,
+  recordId: string,
+): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(
+    `/topic/platform/modules/${pathSegment(moduleAlias)}/resources/${pathSegment(resourceKey)}/records/${pathSegment(recordId)}/data-changes`,
+  );
+}
+
+export function contextDataChangeChannel(
+  contextType: string,
+  contextId: string,
+): RealtimeChannel<WebCommittedChangeSet> {
+  return dataChangeTopic(
+    `/topic/platform/contexts/${pathSegment(contextType)}/${pathSegment(contextId)}/data-changes`,
+  );
+}
+
+export function imConversationMessageChannel(conversationId: string): RealtimeChannel<unknown> {
+  return { destination: `/topic/platform/im/conversations/${pathSegment(conversationId)}/messages` };
+}
 
 export function createRealtimeClient(options: RealtimeClientOptions = {}): RealtimeClient {
   let connectionState: RealtimeConnectionState = 'idle';
@@ -211,6 +298,27 @@ export function connectRealtimeDataChanges(
   return realtime.subscribe(dataChangeChannel, (changeSet) => {
     void dispatcher.dispatch(changeSet);
   });
+}
+
+export function connectRealtimeUserNotifications(
+  realtime: RealtimeClient,
+  handler: RealtimeHandler<WebUserNotification>,
+): RealtimeSubscription {
+  return realtime.subscribe(userNotificationChannel, handler);
+}
+
+function dataChangeTopic(destination: string): RealtimeChannel<WebCommittedChangeSet> {
+  return {
+    destination,
+    type: realtimeMessageTypes.dataChange,
+  };
+}
+
+function pathSegment(value: string) {
+  if (!value?.trim()) {
+    throw new Error('Realtime destination path segment must not be blank');
+  }
+  return encodeURIComponent(value.trim());
 }
 
 function defaultStompClientFactory(options: StompClientFactoryOptions): StompClientAdapter {

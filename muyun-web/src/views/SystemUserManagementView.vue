@@ -21,9 +21,15 @@ import {
   type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
-import { UiButton, UiError, UiInput, UiSpin } from '@muyun/vue-ui-antdv';
-import type { ResetPasswordResponse, UserAccount, WebQueryRequest } from '@muyun/web-contracts';
+import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
+import type {
+  ResetPasswordResponse,
+  UserAccount,
+  UserSessionView,
+  WebQueryRequest,
+} from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
 
@@ -44,14 +50,23 @@ const userDraft = ref<Partial<UserAccount>>(createSystemUserDraft());
 const passwordDraft = ref('');
 const resetPasswordResult = ref<ResetPasswordResponse>();
 const formFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const {
+  expandedUserKeys,
+  handleUserListLoaded,
+  handleUserRowExpand,
+  loadUserSessions,
+  userOnlineStatusTitle,
+  userSessionState,
+} = useUserSessionRows({ context: userContext, source: 'system-user-management' });
 
 const systemUserContext = computed(
   () => createSystemUserModuleContext(userContext) as ModuleContext<QueryListRecord>,
 );
 const columns = computed<RecordQueryListColumn[]>(() => [
-  { key: 'username', title: '账号', width: '26%' },
+  { key: 'username', title: '账号', width: '24%' },
+  { key: 'onlineStatus', title: '在线状态', width: '14%', align: 'center' },
   { key: 'passwordStatusTitle', title: '密码状态', width: '18%' },
-  { key: 'lastLoginAt', title: '最后登录', width: '26%' },
+  { key: 'lastLoginAt', title: '最后登录', width: '24%' },
   { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
 ]);
 const detailTitle = computed(() => {
@@ -122,7 +137,9 @@ const formFieldFallback = computed<Record<SystemUserFormFieldName, RecordFormFie
 }));
 const formFieldNames = computed<SystemUserFormFieldName[]>(() => ['username', 'enabled']);
 
-onMounted(loadFormDefinition);
+onMounted(() => {
+  void loadFormDefinition();
+});
 
 async function loadFormDefinition() {
   try {
@@ -347,6 +364,68 @@ async function resetUserLoginPassword() {
   });
 }
 
+async function revokeUserSession(record: Partial<UserAccount> | QueryListRecord, session: UserSessionView) {
+  await executeStaticRecordAction<UserAccount, number>({
+    loading: savingUser,
+    source: 'system-user-management',
+    record: () => (record?.id ? (record as UserAccount) : undefined),
+    canExecute: (user) => userContext.can('revokeSession', user.id) === true && !session.current,
+    deniedMessage: '当前用户无权下线该登录会话',
+    confirm: (user) =>
+      confirmAction({
+        title: '下线登录会话',
+        content: `确认下线系统账号「${systemUserTitle(user)}」的该登录会话？`,
+        okText: '下线',
+        danger: true,
+      }),
+    execute: (user) =>
+      userContext.http.request<number>({
+        method: 'POST',
+        path: `/iam.user/${encodeURIComponent(user.id!)}/sessions/${encodeURIComponent(session.id)}/revoke`,
+      }),
+    onExecuted: (_, user) => {
+      void loadUserSessions(user.id);
+      reloadKey.value += 1;
+    },
+  });
+}
+
+async function revokeAllUserSessions(record: Partial<UserAccount> | QueryListRecord) {
+  const userId = String(record.id ?? '');
+  const sessionIds = revokableUserSessions(userId).map((session) => session.id);
+  if (sessionIds.length === 0) {
+    presentPlatformMessage('当前没有可下线的登录会话', {
+      source: 'system-user-management',
+      phase: 'validation',
+    });
+    return;
+  }
+  await executeStaticRecordAction<UserAccount, number>({
+    loading: savingUser,
+    source: 'system-user-management',
+    record: () => (record?.id ? (record as UserAccount) : undefined),
+    canExecute: (user) => userContext.can('revokeSessions', user.id) === true,
+    deniedMessage: '当前用户无权批量下线登录会话',
+    confirm: (user) =>
+      confirmAction({
+        title: '批量下线登录会话',
+        content: `确认下线系统账号「${systemUserTitle(user)}」的 ${sessionIds.length} 个登录会话？`,
+        okText: '全部下线',
+        danger: true,
+      }),
+    execute: (user) =>
+      userContext.http.request<number>({
+        method: 'POST',
+        path: `/iam.user/${encodeURIComponent(user.id!)}/sessions/revoke`,
+        body: { sessionIds },
+      }),
+    onExecuted: (_, user) => {
+      void loadUserSessions(user.id);
+      reloadKey.value += 1;
+    },
+  });
+}
+
 async function toggleUserEnabled() {
   await executeStaticRecordAction({
     loading: savingUser,
@@ -382,6 +461,31 @@ function commitDetailRecord(record: UserAccount, nextMode: SystemUserDetailMode 
   loadingDetail.value = false;
   detailLoadFailed.value = false;
   detailRequestSeq.value += 1;
+}
+
+function revokableUserSessions(userId: string | undefined) {
+  if (!userId || userContext.can('revokeSession', userId) !== true) {
+    return [];
+  }
+  return userSessionState(userId).records.filter((session) => !session.current);
+}
+
+function canRevokeUserSession(userId: string | undefined, session: UserSessionView) {
+  return Boolean(userId) && !session.current && userContext.can('revokeSession', userId) === true;
+}
+
+function sessionTitle(session: UserSessionView) {
+  return session.loginUserAgent || session.loginIp || session.id;
+}
+
+function sessionTerminalTitle(session: UserSessionView) {
+  const terminal = session.terminalTypeTitle || '其他终端';
+  const platform = session.platformTypeTitle;
+  return platform ? `${terminal} / ${platform}` : terminal;
+}
+
+function sessionTime(value: string | undefined) {
+  return value ?? '-';
 }
 
 function createSystemUserDraft(): Partial<UserAccount> {
@@ -444,16 +548,101 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       :context="systemUserContext"
       title="系统账号"
       :columns="columns"
+      :cell-renderers="{ onlineStatus: userOnlineStatusTitle }"
       :row-actions-of="rowActionsOf"
       :selected-key="selectedUserKey"
+      :expanded-row-keys="expandedUserKeys"
       :reload-key="reloadKey"
       :ready="true"
       quick-search-placeholder="搜索账号、姓名、手机号或邮箱"
       empty-description="暂无系统账号"
       @row-action="handleRowAction"
       @row-dblclick="handleRowDblclick"
+      @row-expand="handleUserRowExpand"
+      @loaded="handleUserListLoaded"
       @select="selectedUserKey = String($event.id ?? '')"
-    />
+    >
+      <template #expandedRow="{ record }">
+        <section class="system-user-session-section">
+          <div class="system-user-session-header">
+            <h3>在线会话</h3>
+            <div class="system-user-session-actions">
+              <UiButton
+                type="text"
+                icon-name="reload"
+                :disabled="userSessionState(String(record.id ?? '')).loading"
+                @click="loadUserSessions(String(record.id ?? ''))"
+              >
+                刷新
+              </UiButton>
+              <UiButton
+                v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
+                danger
+                icon-name="power"
+                :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
+                @click="revokeAllUserSessions(record)"
+              >
+                全部下线
+              </UiButton>
+            </div>
+          </div>
+          <UiSpin
+            v-if="userSessionState(String(record.id ?? '')).loading"
+            class="system-user-session-state"
+            tip="加载在线会话"
+          />
+          <UiError
+            v-else-if="userSessionState(String(record.id ?? '')).error"
+            title="在线会话加载失败"
+            :message="userSessionState(String(record.id ?? '')).error ?? '无法加载在线会话，请重试'"
+          />
+          <p
+            v-else-if="userSessionState(String(record.id ?? '')).records.length === 0"
+            class="system-user-session-empty"
+          >
+            当前无在线会话
+          </p>
+          <div v-else class="system-user-session-list">
+            <article
+              v-for="session in userSessionState(String(record.id ?? '')).records"
+              :key="session.id"
+              class="system-user-session-item"
+            >
+              <div class="system-user-session-main">
+                <strong :title="sessionTitle(session)">{{ sessionTitle(session) }}</strong>
+                <span v-if="session.current" class="system-user-session-badge">当前会话</span>
+              </div>
+              <dl class="system-user-session-meta">
+                <div>
+                  <dt>登录</dt>
+                  <dd :title="sessionTime(session.issuedAt)">{{ sessionTime(session.issuedAt) }}</dd>
+                </div>
+                <div>
+                  <dt>活跃</dt>
+                  <dd :title="sessionTime(session.lastSeenAt)">{{ sessionTime(session.lastSeenAt) }}</dd>
+                </div>
+                <div>
+                  <dt>IP</dt>
+                  <dd :title="session.loginIp || '-'">{{ session.loginIp || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>终端</dt>
+                  <dd :title="sessionTerminalTitle(session)">{{ sessionTerminalTitle(session) }}</dd>
+                </div>
+              </dl>
+              <UiButton
+                danger
+                icon-name="power"
+                :disabled="savingUser || !canRevokeUserSession(String(record.id ?? ''), session)"
+                @click="revokeUserSession(record, session)"
+              >
+                下线
+              </UiButton>
+            </article>
+          </div>
+        </section>
+      </template>
+    </RecordQueryListPanel>
 
     <RecordModeDrawer
       :open="detailOpen"
@@ -590,6 +779,125 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
 
 .system-user-password-reset-result small {
   color: var(--muyun-text-muted);
+}
+
+.system-user-session-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 14px 46px;
+  border-top: 1px solid var(--muyun-border-subtle);
+  background: #fbfcfe;
+}
+
+.system-user-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.system-user-session-header h3 {
+  margin: 0;
+  color: var(--muyun-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.system-user-session-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.system-user-session-state {
+  min-height: 56px;
+}
+
+.system-user-session-empty {
+  margin: 0;
+  color: var(--muyun-text-muted);
+  font-size: 13px;
+}
+
+.system-user-session-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--muyun-border-subtle);
+  border-radius: 6px;
+  background: var(--muyun-surface);
+}
+
+.system-user-session-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(360px, 2fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--muyun-border-subtle);
+}
+
+.system-user-session-item:last-child {
+  border-bottom: 0;
+}
+
+.system-user-session-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.system-user-session-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muyun-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-user-session-badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 12px;
+}
+
+.system-user-session-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.system-user-session-meta div {
+  min-width: 0;
+}
+
+.system-user-session-meta dt {
+  color: var(--muyun-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.system-user-session-meta dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--muyun-text);
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-user-session-item > :deep(.ant-btn) {
+  min-width: 64px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .system-user-detail-state {

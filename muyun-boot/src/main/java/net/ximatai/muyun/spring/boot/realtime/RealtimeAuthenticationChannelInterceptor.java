@@ -30,23 +30,30 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
             return message;
         }
         if (StompCommand.CONNECT.equals(command)) {
-            CurrentUser currentUser = authenticate(accessor)
+            String token = bearerToken(accessor);
+            CurrentUser currentUser = authenticate(token)
                     .orElseThrow(() -> new IllegalArgumentException("realtime authentication required"));
             if (currentUser.passwordChangeRequired()) {
                 throw new IllegalArgumentException("password change required");
             }
-            accessor.setUser(new CurrentUserPrincipal(currentUser));
+            accessor.setUser(new CurrentUserPrincipal(currentUser, token));
             return message;
         }
-        if ((StompCommand.SUBSCRIBE.equals(command) || StompCommand.SEND.equals(command))
-                && accessor.getUser() == null) {
-            throw new IllegalArgumentException("realtime authentication required");
+        if (StompCommand.SUBSCRIBE.equals(command) || StompCommand.SEND.equals(command)) {
+            CurrentUserPrincipal principal = currentUserPrincipal(accessor.getUser())
+                    .orElseThrow(() -> new IllegalArgumentException("realtime authentication required"));
+            CurrentUser currentUser = authenticate(principal.token())
+                    .orElseThrow(() -> new IllegalArgumentException("realtime authentication required"));
+            if (currentUser.passwordChangeRequired()) {
+                throw new IllegalArgumentException("password change required");
+            }
+            accessor.setUser(new CurrentUserPrincipal(currentUser, principal.token()));
         }
         return message;
     }
 
-    private Optional<CurrentUser> authenticate(StompHeaderAccessor accessor) {
-        return userSessionService.currentUser(bearerToken(accessor));
+    private Optional<CurrentUser> authenticate(String token) {
+        return userSessionService.currentUser(token);
     }
 
     private String bearerToken(StompHeaderAccessor accessor) {
@@ -62,9 +69,15 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
     }
 
     public static CurrentUser currentUser(Principal principal) {
+        return currentUserPrincipal(principal)
+                .map(CurrentUserPrincipal::currentUser)
+                .orElse(null);
+    }
+
+    private static Optional<CurrentUserPrincipal> currentUserPrincipal(Principal principal) {
         if (principal instanceof CurrentUserPrincipal currentUserPrincipal) {
-            return currentUserPrincipal.currentUser();
+            return Optional.of(currentUserPrincipal);
         }
-        return null;
+        return Optional.empty();
     }
 }

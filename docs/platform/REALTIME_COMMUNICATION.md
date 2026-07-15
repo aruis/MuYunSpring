@@ -164,7 +164,16 @@ WebSocket endpoint + SockJS fallback
 
 平台 destination 使用稳定命名，不直接使用 Controller URL 风格。
 
-建议初始命名：
+统一基础前缀：
+
+```text
+/ws/platform
+/app/platform/**
+/topic/platform/**
+/user/queue/platform/**
+```
+
+当前默认通道：
 
 ```text
 /user/queue/platform/data-changes
@@ -172,13 +181,25 @@ WebSocket endpoint + SockJS fallback
 /app/platform/ping
 ```
 
-未来 IM 或协同能力可以扩展：
+租户、机构、业务兴趣和 IM 等后续能力使用统一的复数资源段：
 
 ```text
-/app/im/message
-/topic/im/rooms/{roomId}
-/user/queue/im/messages
-/topic/platform/presence/{scope}
+/topic/platform/tenants/{tenantId}/public/data-changes
+/topic/platform/tenants/{tenantId}/public/notifications
+/topic/platform/organizations/{organizationId}/public/data-changes
+/topic/platform/organizations/{organizationId}/public/notifications
+
+/topic/platform/modules/{moduleAlias}/data-changes
+/topic/platform/modules/{moduleAlias}/records/{recordId}/data-changes
+/topic/platform/modules/{moduleAlias}/resources/{resourceKey}/data-changes
+/topic/platform/modules/{moduleAlias}/resources/{resourceKey}/records/{recordId}/data-changes
+
+/topic/platform/contexts/{contextType}/{contextId}/data-changes
+
+/user/queue/platform/im/messages
+/topic/platform/im/conversations/{conversationId}/messages
+
+/app/platform/im/messages/send
 ```
 
 命名原则：
@@ -186,8 +207,135 @@ WebSocket endpoint + SockJS fallback
 1. `/topic/**` 表示服务端广播订阅。
 2. `/user/queue/**` 表示用户级点对点消息。
 3. `/app/**` 表示客户端发往服务端的命令入口。
-4. destination 字符串集中定义，不散落在业务代码中。
-5. destination 只表达通道，不表达 UI 行为。
+4. 平台域固定为 `/platform`。
+5. 集合路径使用复数：`tenants`、`organizations`、`modules`、`records`、`resources`。
+6. 公共频道显式包含 `/public/`。
+7. `data-changes`、`notifications`、`im/messages` 分离，不复用 payload。
+8. destination 字符串集中定义，不散落在业务代码中。
+9. destination 只表达通道，不表达 UI 行为。
+10. `moduleAlias`、`recordId`、`resourceKey`、`contextId` 作为路径变量时必须进行路径编码。
+
+### 5.2.1 频道分层
+
+平台频道分成两类：
+
+```text
+接收范围频道
+  ├── user
+  ├── tenant public
+  └── organization public
+
+业务兴趣频道
+  ├── module
+  ├── record
+  ├── resource
+  └── context / conversation
+```
+
+接收范围频道解决“谁可以收到”。业务兴趣频道解决“谁正在关心这个对象”。业务兴趣频道可以降低噪声和提升体验，但不得单独作为权限边界。
+
+建议订阅策略：
+
+| 场景 | 订阅方式 |
+| --- | --- |
+| 登录后默认 | user queue |
+| 登录后可选 | 当前租户 public、当前机构 public |
+| 页面打开列表 | module channel |
+| 页面打开详情或编辑 | record channel |
+| 业务上下文、任务空间、协同房间 | context / conversation channel |
+
+租户和机构 public channel 是公共事实频道，不是数据权限频道。任何需要角色、数据权限、记录级可见性判断的变化，不得进入公共频道。
+
+### 5.2.2 User Queue 隔离
+
+用户私有频道不在路径中暴露 `userId`：
+
+```text
+/user/queue/platform/data-changes
+/user/queue/platform/notifications
+/user/queue/platform/im/messages
+```
+
+所有客户端订阅的是同一个逻辑地址，但服务端发送时必须指定目标用户：
+
+```java
+simpMessagingTemplate.convertAndSendToUser(
+        userId,
+        "/queue/platform/notifications",
+        payload
+);
+```
+
+隔离依赖 STOMP user destination 机制和 CONNECT 阶段绑定的 `Principal`。`Principal.getName()` 必须稳定使用平台 `userId`，不得使用可变的用户名、昵称或显示名。
+
+禁止使用普通广播模拟用户私有消息：
+
+```java
+// 禁止
+simpMessagingTemplate.convertAndSend("/user/queue/platform/notifications", payload);
+```
+
+多端登录时，同一 `userId` 的多个 WebSocket session 都会收到 user queue 消息。这是用户级通知和多端同步的默认语义。只针对某个登录会话生效的通知必须在 payload 中携带稳定会话标识，由客户端按当前登录会话过滤；不得把 session 信息塞进 user queue 路径。
+
+### 5.2.3 典型业务场景
+
+单据详情或编辑协同：
+
+```text
+/topic/platform/modules/{moduleAlias}/records/{recordId}/data-changes
+```
+
+用户打开详情页或编辑页时按需订阅。后端发送前必须确认事件可进入该 record channel；敏感记录仍可选择精确 fan-out 到用户 queue。
+
+模块列表新增、删除或集合变化：
+
+```text
+/topic/platform/modules/{moduleAlias}/data-changes
+```
+
+列表页打开时按需订阅。新增、删除通常发送 `collection-changed`，可不携带具体 `recordId`。如果模块涉及复杂数据权限，优先发送低敏集合变化信号，前端收到后自行重新查询当前列表。
+
+内部 IM 私信：
+
+```text
+/user/queue/platform/im/messages
+```
+
+IM 发送命令：
+
+```text
+/app/platform/im/messages/send
+```
+
+如果存在会话或群聊，可扩展：
+
+```text
+/topic/platform/im/conversations/{conversationId}/messages
+```
+
+IM 不复用 `DataChange` payload，应定义独立消息契约和会话权限。
+
+业务预警或个人待办提醒：
+
+```text
+/user/queue/platform/notifications
+```
+
+后端根据规则精确计算接收人并 `sendToUser`。若预警天然属于租户或机构公共低敏信息，才允许进入 public notification channel。
+
+安全通知也使用用户私有 notification queue。例如密码被管理员修改、重置，或用户自助修改密码成功后，业务层先产生用户安全事实，再由安全事件 adapter 统一撤销用户 session，并由 realtime adapter 向对应用户发送安全通知：
+
+```text
+/user/queue/platform/notifications
+```
+
+payload 表达稳定安全事实，例如 `platform.security.password-changed`、`platform.security.password-reset`、`platform.security.force-logout` 和 `logoutRequired`。后端不表达 Toast、弹窗、倒计时秒数或跳转方式；前端根据安全事实决定展示方式，并在本地完成退出登录。
+
+用户管理中的单个登录会话下线发送 `platform.security.session-revoked` 安全事实，payload 携带 `targetSessionId`。由于 STOMP user queue 仍按 `userId` fan-out，同一用户的其他会话可能收到该消息，但只有当前登录 `sessionId` 与 `targetSessionId` 相同的前端才执行本地退出；其他会话必须忽略。
+
+用户登录或登录会话被撤销时，不向无授权的模块级 topic 广播账号或 session 标识。用户管理页的在线状态和会话明细仍通过 `/iam.user/sessions/status`、`/iam.user/{id}/sessions` 等权限接口读取；管理员执行定点下线或批量下线后由动作结果触发本页刷新。跨页面、跨操作者的会话集合实时同步需要等待平台补齐 destination 订阅授权或受权限约束的 fan-out 机制后再接入。
+
+前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageModuleDataChanges` 和 `usePageDataChangeHandler`。页面只声明所需实时事实和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
 
 ### 5.3 发布门面
 
@@ -240,16 +388,16 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 推荐规则：
 
 1. CONNECT 阶段校验 token。
-2. 建立 STOMP Principal 和当前用户上下文。
-3. SUBSCRIBE 阶段校验 destination 权限。
-4. SEND 阶段校验 command 权限。
+2. 建立 STOMP Principal 和当前用户上下文，并保留可复核的登录态标识。
+3. SUBSCRIBE 阶段复核登录态仍有效，并校验 destination 权限。
+4. SEND 阶段复核登录态仍有效，并校验 command 权限。
 5. 用户级消息必须通过 user destination 发送，不手写用户私有 topic。
 
 权限粒度按能力演进：
 
 | 阶段 | 权限口径 |
 | --- | --- |
-| 数据变化广播 | 第一阶段只推送当前发起用户 queue；后续共享广播需按租户或作用域过滤 payload |
+| 数据变化广播 | 第一阶段只推送当前发起用户 queue；后续共享广播按公共频道、业务兴趣频道或精确到人 fan-out 选择出口 |
 | 用户通知 | 只能接收当前用户 queue |
 | IM / 协同 | 按房间、会话、参与者或业务资源校验 |
 | 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
@@ -266,6 +414,44 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 - 系统态变化和跨用户共享广播后续需要显式声明可见范围。
 
 多租户过滤是平台实时层责任，不应要求业务页面自行丢弃不属于自己的事件。
+
+后续支持租户和机构公共频道时，订阅可以按身份归属处理，但发送必须按事件可见性处理。
+
+前端可以默认订阅：
+
+```text
+/topic/platform/tenants/{tenantId}/public/data-changes
+/topic/platform/organizations/{organizationId}/public/data-changes
+```
+
+但这两个频道只能承载真正公共、低敏、天然应被该范围内所有人知道的变化。
+
+适合进入公共频道：
+
+- 字典变化；
+- 菜单、页面配置发布；
+- 公共组织结构变化；
+- 岗位类别、基础配置类变化；
+- 低敏平台配置刷新信号。
+
+不得进入公共频道：
+
+- 用户账号；
+- 角色授权；
+- 员工敏感资料；
+- 审批或工作流业务单据；
+- 业务交易数据；
+- 任何需要角色、数据权限或记录级可见性判断的变化。
+
+敏感或专有变化应选择：
+
+```text
+精确到人：/user/queue/platform/**
+业务级兴趣频道：/topic/platform/modules/**、/topic/platform/contexts/**
+服务端按权限 fan-out：后续能力
+```
+
+因此，安全边界不依赖前端是否订阅了 tenant/org public channel，而依赖后端只把公共事件发送到公共频道。
 
 ## 6. 前端设计
 

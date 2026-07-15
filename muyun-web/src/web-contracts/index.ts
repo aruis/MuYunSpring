@@ -79,6 +79,13 @@ export interface WebRealtimeEnvelope<TPayload = unknown> {
   payload: TPayload;
 }
 
+export interface WebUserNotification {
+  code: string;
+  message: string;
+  logoutRequired?: boolean;
+  targetSessionId?: string;
+}
+
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];
@@ -106,6 +113,7 @@ export interface LoginRequest {
 export interface LoginResult {
   token: string;
   tokenType: 'Bearer' | string;
+  sessionId?: string;
   issuedAt: string;
   currentUser: CurrentUser;
   passwordChangeRequired?: boolean;
@@ -555,6 +563,32 @@ export interface UserEmployeeBindingView {
   employeeTitle?: string;
   organizationId?: string;
   departmentId?: string;
+}
+
+export interface UserSessionView {
+  id: string;
+  userId: string;
+  username?: string;
+  tenantId?: string;
+  organizationId?: string;
+  issuedAt: string;
+  expiresAt: string;
+  maxExpiresAt?: string;
+  lastSeenAt?: string;
+  passwordChangeRequired?: boolean;
+  loginIp?: string;
+  loginUserAgent?: string;
+  terminalType?: string;
+  terminalTypeTitle?: string;
+  platformType?: string;
+  platformTypeTitle?: string;
+  current: boolean;
+}
+
+export interface UserSessionStatusView {
+  userId: string;
+  online: boolean;
+  activeSessionCount: number;
 }
 
 export type UserPasswordStatus = 'normal' | 'initial' | 'resetRequired' | 'expired';

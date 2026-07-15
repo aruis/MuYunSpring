@@ -15,9 +15,24 @@ import {
   resolveGlobalErrorPresentation,
   actionResultData,
   connectRealtimeDataChanges,
+  connectRealtimeUserNotifications,
   createDataChangeDispatcher,
   webDataChanges,
   createRealtimeClient,
+  contextDataChangeChannel,
+  imConversationMessageChannel,
+  imMessageSendCommand,
+  moduleDataChangeChannel,
+  organizationPublicDataChangeChannel,
+  organizationPublicNotificationChannel,
+  recordDataChangeChannel,
+  realtimeDestinations,
+  resourceDataChangeChannel,
+  resourceRecordDataChangeChannel,
+  tenantPublicDataChangeChannel,
+  tenantPublicNotificationChannel,
+  userImMessageChannel,
+  userNotificationChannel,
   withWebActionResultChanges,
   type StompClientAdapter,
   type StompClientFactoryOptions,
@@ -387,6 +402,109 @@ test('realtime data change channel dispatches committed change sets', async () =
   await Promise.resolve();
 
   assert.deepEqual(handled, ['change-set-1']);
+});
+
+test('realtime user notification channel handles security notifications', async () => {
+  const stomp = new FakeStompClient();
+  const realtime = createRealtimeClient({
+    clientFactory: (options) => {
+      stomp.options = options;
+      return stomp;
+    },
+  });
+  const handled: unknown[] = [];
+
+  connectRealtimeUserNotifications(realtime, (notification) => {
+    handled.push(notification);
+  });
+  await realtime.connect();
+  stomp.connect();
+  stomp.emit(
+    '/user/queue/platform/notifications',
+    JSON.stringify({
+      id: 'message-1',
+      type: 'platform.security-notification',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: {
+        code: 'platform.security.password-reset',
+        message: '你的密码已被重置，请重新登录',
+        logoutRequired: true,
+      },
+    }),
+  );
+  stomp.emit(
+    '/user/queue/platform/notifications',
+    JSON.stringify({
+      id: 'message-2',
+      type: 'platform.other',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: { message: 'ignored' },
+    }),
+  );
+  await Promise.resolve();
+
+  assert.deepEqual(handled, [
+    {
+      code: 'platform.security.password-reset',
+      message: '你的密码已被重置，请重新登录',
+      logoutRequired: true,
+    },
+  ]);
+});
+
+test('realtime channel factories build standard destinations', () => {
+  assert.equal(realtimeDestinations.userDataChanges, '/user/queue/platform/data-changes');
+  assert.deepEqual(userNotificationChannel, {
+    destination: '/user/queue/platform/notifications',
+    type: 'platform.security-notification',
+  });
+  assert.equal(userImMessageChannel.destination, '/user/queue/platform/im/messages');
+  assert.equal(imMessageSendCommand.destination, '/app/platform/im/messages/send');
+  assert.deepEqual(tenantPublicDataChangeChannel('tenant-a'), {
+    destination: '/topic/platform/tenants/tenant-a/public/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(tenantPublicNotificationChannel('tenant-a'), {
+    destination: '/topic/platform/tenants/tenant-a/public/notifications',
+  });
+  assert.deepEqual(organizationPublicDataChangeChannel('org-1'), {
+    destination: '/topic/platform/organizations/org-1/public/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(organizationPublicNotificationChannel('org-1'), {
+    destination: '/topic/platform/organizations/org-1/public/notifications',
+  });
+  assert.deepEqual(moduleDataChangeChannel('iam.employee'), {
+    destination: '/topic/platform/modules/iam.employee/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(recordDataChangeChannel('iam.employee', 'employee-1'), {
+    destination: '/topic/platform/modules/iam.employee/records/employee-1/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(resourceDataChangeChannel('iam.employee', 'children'), {
+    destination: '/topic/platform/modules/iam.employee/resources/children/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(resourceRecordDataChangeChannel('iam.employee', 'children', 'employee-1'), {
+    destination: '/topic/platform/modules/iam.employee/resources/children/records/employee-1/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(contextDataChangeChannel('workflow', 'task-1'), {
+    destination: '/topic/platform/contexts/workflow/task-1/data-changes',
+    type: 'platform.data-change',
+  });
+  assert.deepEqual(imConversationMessageChannel('conversation-1'), {
+    destination: '/topic/platform/im/conversations/conversation-1/messages',
+  });
+});
+
+test('realtime channel factories encode destination path segments', () => {
+  assert.equal(
+    recordDataChangeChannel('order/form', 'record 1').destination,
+    '/topic/platform/modules/order%2Fform/records/record%201/data-changes',
+  );
+  assert.throws(() => moduleDataChangeChannel(' '), /Realtime destination path segment must not be blank/);
 });
 
 test('static module client normalizes backend action envelopes', async () => {

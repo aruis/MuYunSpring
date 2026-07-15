@@ -465,6 +465,11 @@ test('employee management uses organization scope and platform query list panel'
     /presentPlatformError\(cause, \{ source: 'record-query-list-panel', phase: 'load' \}\)/,
   );
   assert.match(panelSource, /tableColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(panelSource, /cellRenderers\?: Record<string, \(record: QueryListRecord\) => string>/);
+  assert.match(panelSource, /props\.cellRenderers\[column\.key\]/);
+  assert.match(panelSource, /@dblclick\.stop/);
+  assert.match(panelSource, /class="record-query-list-row-actions" @click\.stop @dblclick\.stop/);
+  assert.match(panelSource, /toggleRowExpanded\(row, \$event\)/);
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
@@ -755,6 +760,7 @@ test('role management keeps basic scope management separate from binding and aut
 
 test('user management keeps account basics separate from employment binding and role authorization', () => {
   const userViewSource = readSource('src/views/UserManagementView.vue');
+  const userSessionRowsSource = readSource('src/views/useUserSessionRows.ts');
   const routesSource = readSource('src/app/businessRoutes.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
@@ -768,16 +774,21 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /user-management-page/);
   assert.match(userViewSource, /<CrudRecordListExplorer/);
   assert.match(userViewSource, /<RecordQueryListPanel/);
+  assert.match(userViewSource, /:expanded-row-keys="expandedUserKeys"/);
+  assert.match(userViewSource, /@row-expand="handleUserRowExpand"/);
+  assert.match(userViewSource, /<template #expandedRow="\{ record \}">/);
   assert.match(userViewSource, /standard-crud-actions/);
   assert.match(userViewSource, /standard-crud-row-actions/);
-  assert.doesNotMatch(userViewSource, /userListColumns/);
-  assert.doesNotMatch(userViewSource, /:columns=/);
+  assert.match(userViewSource, /const userListColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(userViewSource, /key: 'onlineStatus'/);
+  assert.match(userViewSource, /:columns="userListColumns"/);
   assert.match(userViewSource, /canBrowseTenants/);
   assert.match(userViewSource, /currentUserTenant/);
   assert.match(userViewSource, /initializeTenantUserScope/);
   assert.match(userViewSource, /fieldName: 'tenantId'/);
   assert.match(userViewSource, /createScopedUserModuleContext/);
-  assert.match(userViewSource, /onMounted\(loadUserFormDefinition\)/);
+  assert.match(userViewSource, /onMounted\(\(\) => \{/);
+  assert.match(userViewSource, /void loadUserFormDefinition\(\)/);
   assert.match(userViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(userViewSource, /userFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
   assert.match(userViewSource, /<RecordFormFields/);
@@ -789,6 +800,28 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
   assert.match(userViewSource, /title: '重置密码'/);
+  assert.match(userViewSource, /在线会话/);
+  assert.match(userViewSource, /终端/);
+  assert.match(userViewSource, /terminalTypeTitle/);
+  assert.match(userViewSource, /platformTypeTitle/);
+  assert.match(userViewSource, /sessionTerminalTitle/);
+  assert.match(userViewSource, /<strong :title="sessionTitle\(session\)"/);
+  assert.match(userViewSource, /<dd :title="sessionTerminalTitle\(session\)"/);
+  assert.match(userViewSource, /useUserSessionRows\(\{ context: userContext, source: 'user-management' \}\)/);
+  assert.match(userViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
+  assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
+  assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
+  assert.match(userSessionRowsSource, /function userOnlineStatusTitle\(record: \{ id\?: string \}\)/);
+  assert.match(userSessionRowsSource, /loadUserSessions/);
+  assert.match(userSessionRowsSource, /loadUserSessionActions/);
+  assert.match(userSessionRowsSource, /options\.context\.recordActions\(userId\)/);
+  assert.match(userSessionRowsSource, /userSessionStates = ref<Record<string, UserSessionState>>/);
+  assert.match(
+    userSessionRowsSource,
+    /function userSessionState\(userId: string \| undefined\): UserSessionState/,
+  );
+  assert.match(userViewSource, /revokeUserSession/);
+  assert.match(userViewSource, /revokeAllUserSessions/);
   assert.match(userViewSource, /temporaryPassword/);
   assert.match(
     userViewSource,
@@ -797,6 +830,12 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
+  assert.match(userSessionRowsSource, /path: `\/iam\.user\/\$\{encodeURIComponent\(userId\)\}\/sessions`/);
+  assert.match(userViewSource, /sessions\/\$\{encodeURIComponent\(session\.id\)\}\/revoke`/);
+  assert.match(
+    userViewSource,
+    /path: `\/iam\.user\/\$\{encodeURIComponent\(user\.id!\)\}\/sessions\/revoke`/,
+  );
   assert.match(userViewSource, /type="password"/);
   assert.match(inputSource, /type\?: 'text' \| 'password'/);
   assert.match(iconSource, /LockOutlined/);
@@ -807,6 +846,12 @@ test('user management keeps account basics separate from employment binding and 
   );
   assert.match(contractsSource, /passwordStatusTitle\?: string/);
   assert.match(contractsSource, /export interface ResetPasswordResponse/);
+  assert.match(contractsSource, /export interface UserSessionView/);
+  assert.match(contractsSource, /export interface UserSessionStatusView/);
+  assert.match(contractsSource, /terminalType\?: string/);
+  assert.match(contractsSource, /terminalTypeTitle\?: string/);
+  assert.match(contractsSource, /platformType\?: string/);
+  assert.match(contractsSource, /platformTypeTitle\?: string/);
   assert.match(contractsSource, /username\?: string/);
   assert.match(contractsSource, /password\?: string/);
   assert.doesNotMatch(contractsSource, /passwordHash/);
@@ -822,11 +867,13 @@ test('user management keeps account basics separate from employment binding and 
   assert.doesNotMatch(userViewSource, /系统账号/);
   assert.doesNotMatch(userViewSource, /operator: 'NULL'/);
   assert.doesNotMatch(userViewSource, /permissionMatrix/);
-  assert.doesNotMatch(userViewSource, /sessionList|sessionAudit|revokeSession/);
+  assert.doesNotMatch(userViewSource, /sessionAudit/);
+  assert.doesNotMatch(userViewSource, /forceLogout/);
 });
 
 test('system user management is a separate root account entry', () => {
   const systemUserViewSource = readSource('src/views/SystemUserManagementView.vue');
+  const userSessionRowsSource = readSource('src/views/useUserSessionRows.ts');
   const userViewSource = readSource('src/views/UserManagementView.vue');
   const routesSource = readSource('src/app/businessRoutes.ts');
 
@@ -838,6 +885,9 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /height: calc\(100vh - 116px\)/);
   assert.match(systemUserViewSource, /overflow: hidden/);
   assert.match(systemUserViewSource, /<RecordQueryListPanel/);
+  assert.match(systemUserViewSource, /:expanded-row-keys="expandedUserKeys"/);
+  assert.match(systemUserViewSource, /@row-expand="handleUserRowExpand"/);
+  assert.match(systemUserViewSource, /<template #expandedRow="\{ record \}">/);
   assert.match(systemUserViewSource, /<RecordModeDrawer/);
   assert.match(systemUserViewSource, /:mode="detailMode"/);
   assert.match(systemUserViewSource, /:form-modes="\['edit', 'resetPassword'\]"/);
@@ -858,6 +908,31 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(systemUserViewSource, /title: '修改密码'/);
   assert.match(systemUserViewSource, /title: '重置密码'/);
+  assert.match(systemUserViewSource, /在线会话/);
+  assert.match(systemUserViewSource, /终端/);
+  assert.match(systemUserViewSource, /terminalTypeTitle/);
+  assert.match(systemUserViewSource, /platformTypeTitle/);
+  assert.match(systemUserViewSource, /sessionTerminalTitle/);
+  assert.match(systemUserViewSource, /<strong :title="sessionTitle\(session\)"/);
+  assert.match(systemUserViewSource, /<dd :title="sessionTerminalTitle\(session\)"/);
+  assert.match(systemUserViewSource, /key: 'onlineStatus'/);
+  assert.match(
+    systemUserViewSource,
+    /useUserSessionRows\(\{ context: userContext, source: 'system-user-management' \}\)/,
+  );
+  assert.match(systemUserViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
+  assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
+  assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
+  assert.match(userSessionRowsSource, /loadUserSessions/);
+  assert.match(userSessionRowsSource, /loadUserSessionActions/);
+  assert.match(userSessionRowsSource, /options\.context\.recordActions\(userId\)/);
+  assert.match(userSessionRowsSource, /userSessionStates = ref<Record<string, UserSessionState>>/);
+  assert.match(
+    userSessionRowsSource,
+    /function userSessionState\(userId: string \| undefined\): UserSessionState/,
+  );
+  assert.match(systemUserViewSource, /revokeUserSession/);
+  assert.match(systemUserViewSource, /revokeAllUserSessions/);
   assert.match(systemUserViewSource, /temporaryPassword/);
   assert.match(
     systemUserViewSource,
@@ -866,6 +941,12 @@ test('system user management is a separate root account entry', () => {
   assert.match(
     systemUserViewSource,
     /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
+  );
+  assert.match(userSessionRowsSource, /path: `\/iam\.user\/\$\{encodeURIComponent\(userId\)\}\/sessions`/);
+  assert.match(systemUserViewSource, /sessions\/\$\{encodeURIComponent\(session\.id\)\}\/revoke`/);
+  assert.match(
+    systemUserViewSource,
+    /path: `\/iam\.user\/\$\{encodeURIComponent\(user\.id!\)\}\/sessions\/revoke`/,
   );
   assert.match(systemUserViewSource, /tenantId: undefined/);
   assert.match(systemUserViewSource, /enabled: \{ label: '允许登录'/);
@@ -876,6 +957,7 @@ test('system user management is a separate root account entry', () => {
   assert.doesNotMatch(systemUserViewSource, /standard-crud-row-actions/);
   assert.doesNotMatch(systemUserViewSource, /actionCode: 'create'/);
   assert.doesNotMatch(systemUserViewSource, /actionCode: 'delete'/);
+  assert.doesNotMatch(systemUserViewSource, /forceLogout/);
   assert.doesNotMatch(userViewSource, /iam\.system_user/);
 });
 
@@ -910,6 +992,8 @@ test('password management is a dedicated security settings page', () => {
 
 test('workbench exposes own password change through auth boundary', () => {
   const appSource = readSource('src/App.vue');
+  const realtimeSource = readSource('src/app/realtime.ts');
+  const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
   const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
   const dialogSource = readSource('src/app/ChangeOwnPasswordDialog.vue');
   const authClientSource = readSource('src/web-core/clients.ts');
@@ -918,6 +1002,19 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(workbenchSource, /title: '修改密码'/);
   assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
   assert.match(appSource, /authClient\.changeOwnPassword/);
+  assert.match(appSource, /onUserNotification: handleSecurityNotification/);
+  assert.match(pageRealtimeSource, /usePageModuleDataChanges\(moduleAlias: string\)/);
+  assert.match(pageRealtimeSource, /onMounted\(\(\) => \{/);
+  assert.match(pageRealtimeSource, /onUnmounted\(\(\) => \{/);
+  assert.match(realtimeSource, /subscribeAppModuleDataChanges\(moduleAlias: string\)/);
+  assert.match(realtimeSource, /moduleDataChangeChannel\(moduleAlias\)/);
+  assert.match(realtimeSource, /appDataChangeDispatcher\.dispatch\(changeSet\)/);
+  assert.doesNotMatch(realtimeSource, /moduleDataChangeChannel\('iam\.user'\)/);
+  assert.match(appSource, /function handleSecurityNotification\(notification: WebUserNotification\)/);
+  assert.match(appSource, /startSecurityLogoutCountdown\(5\)/);
+  assert.match(appSource, /function forceLocalLogout\(\)/);
+  assert.match(appSource, /v-if="securityNotification"/);
+  assert.match(appSource, /立即重新登录/);
   assert.match(appSource, /effectiveAuthToken/);
   assert.match(appSource, /currentPassword: currentPassword\.value/);
   assert.match(appSource, /newPassword: newPassword\.value/);

@@ -21,12 +21,15 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -356,6 +359,65 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldPublishSecurityEventsWhenPasswordChanges() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(dao.updateById(any(UserAccount.class))).thenReturn(1);
+        RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService,
+                provider(null),
+                provider(null),
+                provider(null),
+                provider(eventPublisher),
+                provider(revocationService));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            service.changePassword("user-1", "secret2");
+            UserAccountService.PasswordResetResult resetResult = service.resetPassword("user-1");
+            service.changeOwnPassword("user-1", resetResult.temporaryPassword(), "secret3");
+        }
+
+        assertThat(eventPublisher.events).containsExactly(
+                UserSecurityEvent.passwordChanged("user-1"),
+                UserSecurityEvent.passwordReset("user-1"),
+                UserSecurityEvent.passwordChanged("user-1")
+        );
+        verify(revocationService).revokeUserSessions("user-1", "password changed");
+        verify(revocationService).revokeUserSessions("user-1", "password reset");
+        verify(revocationService).revokeUserSessions("user-1", "own password changed");
+    }
+
+    @Test
+    void shouldPublishSecurityEventWhenForceLogout() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
+        when(revocationService.revokeUserSessions("user-1", "force logout")).thenReturn(2);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService,
+                provider(null),
+                provider(null),
+                provider(null),
+                provider(eventPublisher),
+                provider(revocationService));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.forceLogout("user-1")).isEqualTo(2);
+        }
+
+        assertThat(eventPublisher.events).containsExactly(UserSecurityEvent.forceLogout("user-1"));
+        verify(revocationService).revokeUserSessions("user-1", "force logout");
+        verify(dao, never()).updateById(any(UserAccount.class));
+    }
+
+    @Test
     void shouldRejectCurrentUserPasswordAdministration() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
@@ -380,6 +442,25 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldRejectCurrentUserForceLogout() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
+            assertThatThrownBy(() -> service.forceLogout("user-1"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("cannot force logout current user")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.user.force-logout-current-user"));
+        }
+
+        verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
+    }
+
+    @Test
     void shouldContributeCurrentUserPasswordAdministrationAvailability() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
@@ -394,6 +475,11 @@ class UserAccountServiceContractTest {
                     });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "changePassword", "user-1"))
                     .hasValueSatisfying(decision -> assertThat(decision.available()).isFalse());
+            assertThat(service.availability(UserAccountService.MODULE_ALIAS, "forceLogout", "user-1"))
+                    .hasValueSatisfying(decision -> {
+                        assertThat(decision.available()).isFalse();
+                        assertThat(decision.reason()).isEqualTo("cannot force logout current user");
+                    });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-2"))
                     .isEmpty();
         }
@@ -439,5 +525,27 @@ class UserAccountServiceContractTest {
                 .filter(field -> fieldName.equals(field.name()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Missing query field: " + fieldName));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ObjectProvider<T> provider(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(bean);
+        when(provider.getIfAvailable(any(Supplier.class))).thenAnswer(invocation -> {
+            if (bean != null) {
+                return bean;
+            }
+            return invocation.<Supplier<T>>getArgument(0).get();
+        });
+        return provider;
+    }
+
+    private static final class RecordingUserSecurityEventPublisher implements UserSecurityEventPublisher {
+        private final List<UserSecurityEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(UserSecurityEvent event) {
+            events.add(event);
+        }
     }
 }

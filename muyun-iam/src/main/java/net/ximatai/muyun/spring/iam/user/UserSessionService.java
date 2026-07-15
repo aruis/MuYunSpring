@@ -5,7 +5,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -20,6 +22,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Service
 public class UserSessionService {
@@ -30,34 +33,101 @@ public class UserSessionService {
 
     private final UserAccountService userAccountService;
     private final UserSessionRecordService userSessionRecordService;
+    private final UserSessionRevocationService userSessionRevocationService;
     private final ActiveTenantVerifier activeTenantVerifier;
+    private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
+    private final Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     public UserSessionService(UserAccountService userAccountService,
                               UserSessionRecordService userSessionRecordService,
-                              ActiveTenantVerifier activeTenantVerifier) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier, Clock.systemUTC());
+                              ActiveTenantVerifier activeTenantVerifier,
+                              ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
+                              ObjectProvider<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
+                              ObjectProvider<UserSessionRevocationService> userSessionRevocationService) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier,
+                userSessionRevocationService == null ? null : userSessionRevocationService.getIfAvailable(),
+                userSecurityEventPublisher == null
+                        ? () -> UserSecurityEventPublisher.NOOP
+                        : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
+                userSessionLifecycleEventPublisher == null
+                        ? () -> UserSessionLifecycleEventPublisher.NOOP
+                        : () -> userSessionLifecycleEventPublisher.getIfAvailable(
+                        () -> UserSessionLifecycleEventPublisher.NOOP),
+                Clock.systemUTC());
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService, clock);
+        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
+                       UserSecurityEventPublisher userSecurityEventPublisher, Clock clock) {
+        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, userSecurityEventPublisher, UserSessionLifecycleEventPublisher.NOOP, clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
+                       UserSecurityEventPublisher userSecurityEventPublisher,
+                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
+                       Clock clock) {
+        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock);
     }
 
     UserSessionService(UserAccountService userAccountService,
                        UserSessionRecordService userSessionRecordService,
                        Clock clock) {
-        this(userAccountService, userSessionRecordService, userAccountService, clock);
+        this(userAccountService, userSessionRecordService, userAccountService,
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
     }
 
     UserSessionService(UserAccountService userAccountService,
                        UserSessionRecordService userSessionRecordService,
                        ActiveTenantVerifier activeTenantVerifier,
                        Clock clock) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier,
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       UserSessionRevocationService userSessionRevocationService,
+                       UserSecurityEventPublisher userSecurityEventPublisher,
+                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
+                       Clock clock) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier,
+                userSessionRevocationService,
+                () -> userSecurityEventPublisher == null ? UserSecurityEventPublisher.NOOP : userSecurityEventPublisher,
+                () -> userSessionLifecycleEventPublisher == null
+                        ? UserSessionLifecycleEventPublisher.NOOP
+                        : userSessionLifecycleEventPublisher,
+                clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       UserSessionRevocationService userSessionRevocationService,
+                       Supplier<UserSecurityEventPublisher> userSecurityEventPublisher,
+                       Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
+                       Clock clock) {
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
+        this.userSessionRevocationService = userSessionRevocationService == null
+                ? new UserSessionRevocationService(userSessionRecordService, userSessionLifecycleEventPublisher, clock)
+                : userSessionRevocationService;
         this.activeTenantVerifier = activeTenantVerifier;
+        this.userSecurityEventPublisher = userSecurityEventPublisher == null
+                ? () -> UserSecurityEventPublisher.NOOP
+                : userSecurityEventPublisher;
+        this.userSessionLifecycleEventPublisher = userSessionLifecycleEventPublisher == null
+                ? () -> UserSessionLifecycleEventPublisher.NOOP
+                : userSessionLifecycleEventPublisher;
         this.clock = clock;
     }
 
@@ -96,9 +166,16 @@ public class UserSessionService {
             session.setMaxExpiresAt(maxExpiresAt);
             session.setLastSeenAt(issuedAt);
             session.setPasswordChangeRequired(passwordChangeRequired);
-            userSessionRecordService.issue(session);
+            session.setLoginIp(normalizeBlank(ip));
+            session.setLoginUserAgent(normalizeBlank(userAgent));
+            String sessionId = userSessionRecordService.issue(session);
+            if (session.getId() == null || session.getId().isBlank()) {
+                session.setId(sessionId);
+            }
             userAccountService.recordLoginSuccess(user.getId(), issuedAt, ip, userAgent);
-            return LoginResult.bearer(token, issuedAt, currentUser,
+            userSessionLifecycleEventPublisher.get()
+                    .publish(UserSessionLifecycleEvent.loggedIn(currentUser.userId(), session.getId()));
+            return LoginResult.bearer(token, session.getId(), issuedAt, currentUser,
                     passwordChangeRequired,
                     userAccountService.effectivePasswordStatus(user),
                     user.getPasswordExpiresAt());
@@ -115,6 +192,7 @@ public class UserSessionService {
         }
         Instant now = now();
         if (isExpired(session, now)) {
+            userSessionRevocationService.revoke(session, now, "session expired");
             return Optional.empty();
         }
         try (TenantContext.Scope ignored = sessionTenantScope(session.getTenantId())) {
@@ -123,7 +201,7 @@ public class UserSessionService {
             }
             UserAccount user = userAccountService.select(session.getUserId());
             if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
-                revoke(session, now, "user inactive");
+                userSessionRevocationService.revoke(session, now, "user inactive");
                 return Optional.empty();
             }
             if (!updateLastSeenIfDue(session, now)) {
@@ -136,16 +214,12 @@ public class UserSessionService {
     public void logout(String token) {
         UserSession session = sessionByToken(token);
         if (session != null) {
-            revoke(session, now(), "logout");
+            userSessionRevocationService.revoke(session, now(), "logout");
         }
     }
 
     public int changeOwnPassword(String userId, String currentPassword, String newPassword) {
-        int changed = userAccountService.changeOwnPassword(userId, currentPassword, newPassword);
-        if (changed > 0) {
-            revokeUserSessions(userId);
-        }
-        return changed;
+        return userAccountService.changeOwnPassword(userId, currentPassword, newPassword);
     }
 
     private void verifyActiveTenantForLogin(String tenantId) {
@@ -164,7 +238,7 @@ public class UserSessionService {
             activeTenantVerifier.verifyActiveTenant(session.getTenantId());
             return true;
         } catch (PlatformException exception) {
-            revoke(session, now, "tenant inactive");
+            userSessionRevocationService.revoke(session, now, "tenant inactive");
             return false;
         }
     }
@@ -175,17 +249,83 @@ public class UserSessionService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    public void revokeUserSessions(String userId) {
-        if (userId == null || userId.isBlank()) {
-            return;
+    public int revokeUserSessions(String userId) {
+        return userSessionRevocationService.revokeUserSessions(userId, "user sessions revoked");
+    }
+
+    public List<UserSessionView> activeSessionsOfUser(String userId, String currentToken) {
+        String validUserId = normalizeBlank(userId);
+        if (validUserId == null) {
+            return List.of();
         }
         Instant now = now();
-        List<UserSession> sessions = userSessionRecordService.listByUserId(userId);
-        for (UserSession session : sessions) {
-            if (session.getRevokedAt() == null) {
-                revoke(session, now, "user sessions revoked");
-            }
+        String currentTokenHash = currentTokenHash(currentToken);
+        return userSessionRecordService.listByUserId(validUserId).stream()
+                .filter(session -> isActive(session, now))
+                .map(session -> UserSessionView.from(session, currentTokenHash != null
+                        && currentTokenHash.equals(session.getTokenHash())))
+                .toList();
+    }
+
+    public List<UserSessionStatusView> activeSessionStatuses(List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
         }
+        Instant now = now();
+        return userIds.stream()
+                .map(this::normalizeBlank)
+                .filter(userId -> userId != null)
+                .distinct()
+                .map(userId -> {
+                    long count = userSessionRecordService.listByUserId(userId).stream()
+                            .filter(session -> isActive(session, now))
+                            .count();
+                    return new UserSessionStatusView(userId, count > 0, count);
+                })
+                .toList();
+    }
+
+    public UserSessionStatusView activeSessionStatus(String userId) {
+        String validUserId = normalizeBlank(userId);
+        if (validUserId == null) {
+            return new UserSessionStatusView(null, false, 0);
+        }
+        return activeSessionStatuses(List.of(validUserId)).stream()
+                .findFirst()
+                .orElse(new UserSessionStatusView(validUserId, false, 0));
+    }
+
+    public int revokeUserSession(String userId, String sessionId, String currentToken) {
+        String validUserId = normalizeBlank(userId);
+        String validSessionId = normalizeBlank(sessionId);
+        if (validUserId == null || validSessionId == null) {
+            return 0;
+        }
+        UserSession session = userSessionRecordService.findById(validSessionId);
+        if (session == null || !validUserId.equals(session.getUserId())) {
+            return 0;
+        }
+        rejectCurrentSessionRevoke(session, currentToken);
+        Instant now = now();
+        if (!isActive(session, now)) {
+            return 0;
+        }
+        if (!userSessionRevocationService.revoke(session, now, "user session revoked by administrator")) {
+            return 0;
+        }
+        userSecurityEventPublisher.get().publish(UserSecurityEvent.sessionRevoked(validUserId, validSessionId));
+        return 1;
+    }
+
+    public int revokeUserSessions(String userId, List<String> sessionIds, String currentToken) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String sessionId : sessionIds) {
+            count += revokeUserSession(userId, sessionId, currentToken);
+        }
+        return count;
     }
 
     private UserSession sessionByToken(String token) {
@@ -194,6 +334,11 @@ public class UserSessionService {
             return null;
         }
         return userSessionRecordService.findByTokenHash(tokenHash(normalized));
+    }
+
+    private String currentTokenHash(String token) {
+        String normalized = normalizeToken(token);
+        return normalized == null ? null : tokenHash(normalized);
     }
 
     private String normalizeToken(String token) {
@@ -209,20 +354,6 @@ public class UserSessionService {
             return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available", exception);
-        }
-    }
-
-    private void revoke(UserSession session, Instant now, String reason) {
-        UserSession current = session;
-        for (int attempt = 0; attempt < 2 && current != null && current.getRevokedAt() == null; attempt++) {
-            Integer expectedVersion = current.getVersion();
-            current.setRevokedAt(now);
-            current.setRevokedReason(reason);
-            int updated = userSessionRecordService.updateSession(current, expectedVersion, now);
-            if (updated > 0) {
-                return;
-            }
-            current = sessionById(current.getId());
         }
     }
 
@@ -245,6 +376,18 @@ public class UserSessionService {
 
     private boolean isExpired(UserSession session, Instant now) {
         return !now.isBefore(session.getExpiresAt()) || !now.isBefore(effectiveMaxExpiresAt(session));
+    }
+
+    private boolean isActive(UserSession session, Instant now) {
+        return session != null && session.getRevokedAt() == null && !isExpired(session, now);
+    }
+
+    private void rejectCurrentSessionRevoke(UserSession session, String currentToken) {
+        String currentTokenHash = currentTokenHash(currentToken);
+        if (currentTokenHash != null && currentTokenHash.equals(session.getTokenHash())) {
+            throw BusinessExceptions.warning("iam.user-session.revoke-current-denied",
+                    "cannot revoke current session from user management");
+        }
     }
 
     private Instant effectiveMaxExpiresAt(UserSession session) {
