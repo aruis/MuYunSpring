@@ -1,8 +1,10 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
+import net.ximatai.muyun.spring.boot.realtime.DataChangeRealtimePublisher;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -134,6 +136,59 @@ class ActionResultResponseAdviceTest {
     }
 
     @Test
+    void shouldPublishCommittedChangeSetAfterWrapping() throws Exception {
+        RecordingDataChangeRealtimePublisher publisher = new RecordingDataChangeRealtimePublisher();
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(
+                type -> DemoModule.MODULE_ALIAS, objectMapper, publisher);
+        Method method = TestController.class.getDeclaredMethod("grant");
+        MethodParameter returnType = new MethodParameter(method, -1);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            Object response = advice.beforeBodyWrite(
+                    1,
+                    returnType,
+                    MediaType.APPLICATION_JSON,
+                    null,
+                    new ServletServerHttpRequest(new MockHttpServletRequest()),
+                    null
+            );
+
+            assertThat(response).isInstanceOf(ActionResultResponse.class);
+            assertThat(publisher.published).isNotNull();
+            assertThat(publisher.published.changeSetId())
+                    .isEqualTo(((ActionResultResponse) response).changeSetId());
+            assertThat(publisher.published.changes())
+                    .isEqualTo(((ActionResultResponse) response).changes());
+        }
+    }
+
+    @Test
+    void shouldKeepActionResultWhenDataChangePublishFails() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(
+                type -> DemoModule.MODULE_ALIAS, objectMapper, new ThrowingDataChangeRealtimePublisher());
+        Method method = TestController.class.getDeclaredMethod("grant");
+        MethodParameter returnType = new MethodParameter(method, -1);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            Object response = advice.beforeBodyWrite(
+                    1,
+                    returnType,
+                    MediaType.APPLICATION_JSON,
+                    null,
+                    new ServletServerHttpRequest(new MockHttpServletRequest()),
+                    null
+            );
+
+            assertThat(response).isInstanceOf(ActionResultResponse.class);
+            ActionResultResponse actionResult = (ActionResultResponse) response;
+            assertThat(actionResult.message().code()).isEqualTo("demo.granted");
+            assertThat(actionResult.changes()).singleElement()
+                    .extracting("moduleAlias")
+                    .isEqualTo("demo.module");
+        }
+    }
+
+    @Test
     void shouldSerializeActionResultWhenStringConverterIsSelected() throws Exception {
         ActionResultResponseAdvice advice = new ActionResultResponseAdvice(type -> DemoModule.MODULE_ALIAS, objectMapper);
         Method method = TestController.class.getDeclaredMethod("grantString");
@@ -198,5 +253,21 @@ class ActionResultResponseAdviceTest {
 
     public static final class DemoModule {
         public static final String MODULE_ALIAS = "demo.module";
+    }
+
+    private static final class RecordingDataChangeRealtimePublisher implements DataChangeRealtimePublisher {
+        private CommittedChangeSet published;
+
+        @Override
+        public void publish(CommittedChangeSet changeSet) {
+            this.published = changeSet;
+        }
+    }
+
+    private static final class ThrowingDataChangeRealtimePublisher implements DataChangeRealtimePublisher {
+        @Override
+        public void publish(CommittedChangeSet changeSet) {
+            throw new IllegalStateException("broker unavailable");
+        }
     }
 }

@@ -1,0 +1,64 @@
+package net.ximatai.muyun.spring.boot.realtime;
+
+import net.ximatai.muyun.spring.boot.web.MuYunSpringCorsProperties;
+import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.config.ChannelRegistration;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+import java.util.List;
+
+@Configuration
+@EnableWebSocketMessageBroker
+public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerConfigurer {
+    private final UserSessionService userSessionService;
+    private final MuYunSpringCorsProperties corsProperties;
+
+    public MuYunSpringRealtimeConfiguration(UserSessionService userSessionService,
+                                            ObjectProvider<MuYunSpringCorsProperties> corsProperties) {
+        this.userSessionService = userSessionService;
+        this.corsProperties = corsProperties.getIfAvailable();
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        var endpoint = registry.addEndpoint("/ws/platform");
+        List<String> allowedOrigins = corsProperties == null ? List.of() : corsProperties.getAllowedOrigins();
+        if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
+            endpoint.setAllowedOrigins(allowedOrigins.toArray(String[]::new));
+        } else {
+            endpoint.setAllowedOriginPatterns("*");
+        }
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.setApplicationDestinationPrefixes("/app");
+        registry.enableSimpleBroker("/topic", "/queue");
+        registry.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(new RealtimeAuthenticationChannelInterceptor(userSessionService));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(RealtimeMessagePublisher.class)
+    public RealtimeMessagePublisher realtimeMessagePublisher(SimpMessagingTemplate messagingTemplate) {
+        return new StompRealtimeMessagePublisher(messagingTemplate);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(DataChangeRealtimePublisher.class)
+    public DataChangeRealtimePublisher dataChangeRealtimePublisher(RealtimeMessagePublisher messagePublisher) {
+        return new StompDataChangeRealtimePublisher(messagePublisher);
+    }
+}

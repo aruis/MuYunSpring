@@ -1,0 +1,699 @@
+# 平台实时通信设计
+
+## 1. 目标
+
+建立统一的平台实时通信底座，先承载数据变化广播，后续可承载用户通知、在线状态、协同动作、IM 类双向消息等实时能力。
+
+该底座需要同时满足：
+
+1. 单向广播和双向通信复用同一套连接、鉴权、心跳、重连和观测机制。
+2. 业务代码不直接依赖 WebSocket、STOMP、topic 字符串或前端实时通信库。
+3. 后端只表达业务事实和消息，不向前端下达刷新、弹窗、关闭页面等 UI 指令。
+4. 前端业务页面不直接处理传输协议，只消费平台定义的事件、命令和状态。
+5. 静态链路和动态链路未来都能接入同一套实时能力，但不因为动态链路牺牲静态业务代码直觉。
+6. 第一阶段可用进程内 broker 打通链路，后续可演进到外部 broker、可靠 outbox 和多实例广播。
+
+实时通信底座是平台基础设施，不是单个业务专题的附属能力。数据变化广播、通知中心、IM、工作流待办提醒等能力可以复用它，但不能把各自业务语义混在同一套 payload 中。
+
+## 2. 非目标
+
+本能力不负责：
+
+- 建立完整 IM 产品；
+- 建立通用企业事件总线；
+- 保证第一阶段消息可靠补发；
+- 在实时消息中携带完整业务数据快照；
+- 通过实时消息表达 Toast、弹窗、页面刷新、路由跳转等 UI 行为；
+- 让业务 Controller、Service 或前端页面直接依赖 STOMP 传输细节；
+- 在第一阶段治理动态表单、动态动作或工作流动作的完整实时链路。
+
+动态表单、动态动作和工作流实时消息后续应接入同一外部契约，但当前只保留扩展边界，不作为本阶段正式治理范围。
+
+## 3. 技术选型
+
+平台实时通信主选：
+
+```text
+WebSocket + STOMP
+```
+
+后端：
+
+```text
+spring-boot-starter-websocket
+Spring WebSocket MessageBroker
+Spring simple broker
+```
+
+前端：
+
+```text
+@stomp/stompjs
+```
+
+暂不默认引入：
+
+```text
+sockjs-client
+RabbitMQ / ActiveMQ
+Kafka / Redis pubsub
+Socket.IO
+RSocket
+```
+
+### 3.1 选择 STOMP 的原因
+
+平台不选择裸 WebSocket 作为业务协议。裸 WebSocket 只提供双向字节或文本通道，后续会逼平台自行发明订阅、路由、用户队列、错误帧、心跳、重连恢复、权限拦截和消息确认语义。
+
+STOMP 提供已经被 Spring 和前端生态验证的消息语义：
+
+- topic 订阅；
+- user queue；
+- application destination；
+- frame header；
+- heartbeat；
+- broker relay 演进路径；
+- 前端自动重连和生命周期回调。
+
+数据变化广播只是 STOMP 订阅模型的一种用法。未来双向通信、用户通知、在线状态和 IM 能在同一连接机制下扩展，而不需要再引入第二套实时技术栈。
+
+### 3.2 SSE 的定位
+
+SSE 适合单向服务端推送。如果平台只建设数据变化广播，SSE 会更轻。
+
+当前选择 STOMP 的原因是平台希望同步建设单向广播和未来双向通信的共同道路。选型权衡从“最轻广播”转为“统一实时通信底座”。
+
+SSE 不作为默认路线，但仍可作为未来特定部署或公开订阅场景的补充 adapter。业务契约不得依赖 SSE 或 STOMP 的差异。
+
+### 3.3 SockJS 的定位
+
+SockJS 的主要价值是当 WebSocket 不可用时提供 fallback。它适合老浏览器或强代理环境兼容，但不适合作为新平台默认主干。
+
+平台第一阶段不启用 SockJS。后续如果客户网络环境大量拦截 WebSocket Upgrade，可以作为部署兼容开关评估：
+
+```text
+WebSocket endpoint + SockJS fallback
+```
+
+启用 SockJS 不应改变业务事件契约、destination 命名和前端业务 API。
+
+### 3.4 外部 broker 的定位
+
+第一阶段使用 Spring simple broker，目标是打通平台实时能力的边界、封装和前后端链路。
+
+进入以下场景后，再升级外部 broker 或 broker relay：
+
+- 多实例部署需要跨节点广播；
+- 实时连接数和 topic 数达到 simple broker 难以承担的规模；
+- 需要 broker 级监控、限流、隔离和路由；
+- 需要与其他系统共享消息通道；
+- IM、协同或通知中心成为核心产品能力。
+
+外部 broker 是传输层演进，不应影响业务发布和订阅门面。
+
+## 4. 分层设计
+
+```text
+业务能力层
+  ├── ActionResult / DataChange
+  ├── 用户通知
+  ├── 在线状态
+  └── 后续 IM / 协同能力
+
+平台实时门面层
+  ├── DataChangeRealtimePublisher
+  ├── NotificationPublisher
+  ├── RealtimeMessagePublisher
+  └── RealtimeChannel / RealtimeCommand 契约
+
+实时传输适配层
+  ├── Spring WebSocket / STOMP
+  ├── @stomp/stompjs
+  ├── 鉴权、心跳、重连、连接状态
+  └── destination 权限
+
+运行与可靠性层
+  ├── simple broker
+  ├── 连接事件和观测
+  ├── 后续 broker relay
+  └── 后续 outbox / offset 补偿
+```
+
+业务能力层不得直接调用 STOMP API。传输适配层不得定义业务事实。
+
+## 5. 后端设计
+
+### 5.1 WebSocket Endpoint
+
+平台统一暴露一个实时通信入口：
+
+```text
+/ws/platform
+```
+
+该入口负责：
+
+- 建立 WebSocket 连接；
+- 接收 STOMP CONNECT；
+- 绑定当前用户、租户和 trace 上下文；
+- 配置 heartbeat；
+- 处理连接建立、断开、异常和订阅事件；
+- 进入统一 destination 权限校验。
+
+### 5.2 Destination 约定
+
+平台 destination 使用稳定命名，不直接使用 Controller URL 风格。
+
+建议初始命名：
+
+```text
+/user/queue/platform/data-changes
+/user/queue/platform/notifications
+/app/platform/ping
+```
+
+未来 IM 或协同能力可以扩展：
+
+```text
+/app/im/message
+/topic/im/rooms/{roomId}
+/user/queue/im/messages
+/topic/platform/presence/{scope}
+```
+
+命名原则：
+
+1. `/topic/**` 表示服务端广播订阅。
+2. `/user/queue/**` 表示用户级点对点消息。
+3. `/app/**` 表示客户端发往服务端的命令入口。
+4. destination 字符串集中定义，不散落在业务代码中。
+5. destination 只表达通道，不表达 UI 行为。
+
+### 5.3 发布门面
+
+平台提供稳定后端门面，普通业务代码不直接使用 `SimpMessagingTemplate`，也不直接面向实时通道发布数据变化。
+
+基础门面：
+
+```java
+public interface RealtimeMessagePublisher {
+    void broadcast(RealtimeTopic topic, Object payload);
+
+    void sendToUser(String userId, RealtimeQueue queue, Object payload);
+}
+```
+
+领域门面：
+
+```java
+public interface DataChangeRealtimePublisher {
+    void publish(CommittedChangeSet changeSet);
+}
+```
+
+业务动作链路只需要形成 `CommittedChangeSet`。事务提交后的平台事件 adapter 负责调用实时门面，并将它发送到当前用户的数据变化通道。
+
+不建议业务 Service 调用：
+
+```java
+simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes", payload);
+```
+
+因为这会把业务事实、通道命名和传输技术耦合在一起。业务 Service 应继续通过 ActionResult / DataChange 契约报告事实，不因为实时通信底座存在而新增传输层依赖。
+
+### 5.4 客户端命令入口
+
+客户端发往服务端的 STOMP command 统一进入平台实时命令层。
+
+第一阶段只保留轻量探活或诊断命令：
+
+```text
+/app/platform/ping
+```
+
+后续 IM、在线状态或协同命令进入独立业务 adapter。业务 adapter 可以处理命令，但不负责连接、鉴权、心跳和底层消息路由。
+
+### 5.5 鉴权与权限
+
+实时连接的鉴权应复用现有登录态和当前用户上下文。
+
+推荐规则：
+
+1. CONNECT 阶段校验 token。
+2. 建立 STOMP Principal 和当前用户上下文。
+3. SUBSCRIBE 阶段校验 destination 权限。
+4. SEND 阶段校验 command 权限。
+5. 用户级消息必须通过 user destination 发送，不手写用户私有 topic。
+
+权限粒度按能力演进：
+
+| 阶段 | 权限口径 |
+| --- | --- |
+| 数据变化广播 | 第一阶段只推送当前发起用户 queue；后续共享广播需按租户或作用域过滤 payload |
+| 用户通知 | 只能接收当前用户 queue |
+| IM / 协同 | 按房间、会话、参与者或业务资源校验 |
+| 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
+
+### 5.6 租户与作用域
+
+后端广播不得把跨租户数据变化无差别推给所有连接。
+
+第一阶段采用保守策略：
+
+- 数据变化只发送到当前发起用户的 user queue；
+- 不向全局 topic 广播 recordId、moduleAlias 或 facts；
+- 无法判断当前用户时不发送实时数据变化；
+- 系统态变化和跨用户共享广播后续需要显式声明可见范围。
+
+多租户过滤是平台实时层责任，不应要求业务页面自行丢弃不属于自己的事件。
+
+## 6. 前端设计
+
+### 6.1 封装位置
+
+前端实时能力进入 `web-core`，作为无 UI 平台能力。
+
+建议分层：
+
+```text
+web-contracts
+  └── 实时消息、通道、命令和数据变化 payload 类型
+
+web-core
+  ├── realtime client
+  ├── connection state
+  ├── subscribe / publish 门面
+  ├── data change dispatcher
+  └── token / trace / reconnect 适配
+
+platform-workbench
+  └── 应用启动后建立实时连接并提供全局状态出口
+
+views / business pages
+  └── 不直接 import @stomp/stompjs
+```
+
+业务页面不直接创建 STOMP client，不直接写 destination 字符串。
+
+### 6.2 前端门面
+
+前端提供稳定门面：
+
+```ts
+export interface RealtimeClient {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  subscribe<T>(channel: RealtimeChannel<T>, handler: RealtimeHandler<T>): RealtimeSubscription;
+  publish<T>(command: RealtimeCommand<T>, payload: T): void;
+}
+```
+
+通道通过类型声明集中定义：
+
+```ts
+export const dataChangeChannel: RealtimeChannel<CommittedChangeSet>;
+export const userNotificationChannel: RealtimeChannel<UserNotification>;
+export const platformPingCommand: RealtimeCommand<PlatformPingRequest>;
+```
+
+业务代码应使用：
+
+```ts
+realtime.subscribe(dataChangeChannel, handleChangeSet);
+```
+
+而不是：
+
+```ts
+client.subscribe('/user/queue/platform/data-changes', callback);
+```
+
+### 6.3 连接生命周期
+
+实时连接由应用壳或 workbench 管理，业务页面只订阅平台通道。
+
+连接状态至少包含：
+
+```text
+idle
+connecting
+connected
+reconnecting
+disconnected
+unauthorized
+failed
+```
+
+前端统一处理：
+
+- token 注入；
+- reconnect delay；
+- heartbeat；
+- 页面可见性恢复；
+- logout 后断开连接；
+- login 或租户切换后重建连接；
+- 订阅恢复；
+- trace 和诊断日志。
+
+业务页面不应自行处理重连和认证刷新。
+
+### 6.4 数据变化消费
+
+数据变化广播进入既有数据变化消费机制：
+
+```text
+STOMP message
+  -> RealtimeClient
+  -> dataChangeChannel
+  -> DataChangeDispatcher
+  -> Query invalidation / 页面策略
+```
+
+发起操作的页面可能同时收到：
+
+- HTTP ActionResult 中的 `changeSetId`；
+- 实时广播中的同一 `changeSetId`。
+
+前端必须按 `changeSetId` 去重，避免重复刷新或重复提示。
+
+前端不得根据 `message.text` 或实时 payload 文案做逻辑分支。
+
+## 7. 消息契约
+
+### 7.1 RealtimeEnvelope
+
+实时传输层可以统一包装 envelope：
+
+```json
+{
+  "id": "message-1",
+  "type": "platform.data-change",
+  "occurredAt": "2026-07-15T10:00:00Z",
+  "traceId": "trace-1",
+  "payload": {
+    "changeSetId": "change-set-1",
+    "changes": []
+  }
+}
+```
+
+字段语义：
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | 实时消息 ID，用于诊断和后续补偿 |
+| `type` | 平台消息类型，不等同于 UI 类型 |
+| `occurredAt` | 事件形成时间 |
+| `traceId` | 关联 HTTP 动作或后台任务 |
+| `payload` | 业务事实载荷 |
+
+`payload` 必须是稳定契约对象，不使用临时 `Map` 作为跨层协议。
+
+### 7.2 DataChange Payload
+
+数据变化广播 payload 复用 `CommittedChangeSet`：
+
+```json
+{
+  "changeSetId": "change-set-1",
+  "changes": [
+    {
+      "moduleAlias": "iam.employee",
+      "recordId": "employee-1",
+      "type": "record-updated"
+    }
+  ]
+}
+```
+
+广播只表达数据事实：
+
+- 哪个模块或资源变化；
+- 哪条记录或集合变化；
+- 变化类型；
+- 变化批次；
+- 必要的租户、作用域或版本。
+
+广播不表达：
+
+- 是否刷新页面；
+- 是否关闭弹窗；
+- 是否弹出 Toast；
+- 是否跳转路由；
+- 具体 UI 文案。
+
+### 7.3 命令与事件分离
+
+服务端广播使用事件语义，客户端发送使用命令语义。
+
+```text
+Event: 已经发生的事实
+Command: 客户端请求服务端执行的动作
+```
+
+数据变化、通知、任务到达属于事件。发送 IM 消息、加入房间、更新在线状态属于命令。
+
+命令必须经过权限、参数校验和业务处理，不因为来自 WebSocket 就绕过 HTTP 动作链路的治理原则。
+
+## 8. 可靠性与一致性
+
+### 8.1 第一阶段
+
+第一阶段实时消息采用当前用户 queue 的尽力投递：
+
+```text
+业务事务提交
+  -> 形成 CommittedChangeSet
+  -> 发布进程内事件
+  -> STOMP user queue
+```
+
+约束：
+
+- 广播失败不得使已提交业务操作失败；
+- 事务回滚不得广播数据变化；
+- HTTP ActionResult 和实时广播共享同一份 `CommittedChangeSet`；
+- 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端同步信号；跨用户同步需要后续补齐租户、作用域和权限过滤。
+
+### 8.2 后续 Outbox
+
+进入多实例、可靠补偿或审计要求后，数据变化事件演进为 outbox：
+
+```text
+业务数据 + outbox
+  同一事务提交
+      ↓
+异步分发器
+      ↓
+STOMP broker / 外部 broker
+      ↓
+前端订阅者
+```
+
+Outbox 解决的是已提交事实的可靠分发，不改变 `CommittedChangeSet` 契约。
+
+### 8.3 断线恢复
+
+STOMP 重连只能恢复连接和订阅，不等同于业务消息可靠补发。
+
+第一阶段断线期间可能错过广播。前端恢复连接后可以触发轻量状态校准，例如重新拉取当前页面依赖的查询。
+
+后续如果需要精确补发，应引入：
+
+- realtime message offset；
+- data change outbox 查询；
+- 用户通知未读队列；
+- IM 消息存储。
+
+不同业务能力按自身可靠性要求补齐，不把所有实时消息强行升级为同一可靠级别。
+
+## 9. 代理与部署
+
+WebSocket/STOMP 对网关和反向代理有明确要求。
+
+部署环境必须支持：
+
+- HTTP Upgrade；
+- 长连接；
+- 合理的 idle timeout；
+- `Connection: Upgrade` 和 `Upgrade: websocket` 透传；
+- TLS 终止后的 `wss` 转发；
+- 多实例下的会话路由或外部 broker；
+- 必要的连接数、消息速率和 topic 数监控。
+
+如果特定环境无法稳定支持 WebSocket Upgrade，再评估 SockJS fallback 或 SSE adapter。该选择属于部署兼容，不改变平台实时消息契约。
+
+## 10. 动静一体边界
+
+实时通信底座不区分静态和动态业务来源。
+
+静态链路：
+
+```text
+Java Service
+  -> ActionResult / DataChange reporter
+  -> CommittedChangeSet
+  -> DataChangeRealtimePublisher
+```
+
+动态链路未来应通过元数据和运行时 adapter 进入同一契约：
+
+```text
+Dynamic action / Dynamic CRUD
+  -> Runtime mutation adapter
+  -> CommittedChangeSet
+  -> DataChangeRealtimePublisher
+```
+
+动态侧不要求静态业务代码退回字符串硬编码模式。静态侧继续优先使用 Java 类型强引用、平台注解和稳定门面。
+
+## 11. 代码边界
+
+### 11.1 后端边界
+
+允许依赖 STOMP 的范围：
+
+```text
+boot web adapter
+platform realtime adapter
+测试中的实时通信适配测试
+```
+
+不允许直接依赖 STOMP 的范围：
+
+```text
+业务 Service
+Ability 核心层
+ActionResult / DataChange 契约层
+动态元数据核心模型
+```
+
+后端实时适配代码应依赖平台门面：
+
+```text
+DataChangeRealtimePublisher
+NotificationPublisher
+RealtimeMessagePublisher
+```
+
+普通业务 Service 不应为了数据变化广播直接依赖这些门面。通知、IM、协同等后续双向能力如果需要业务服务主动发送消息，应先沉淀对应领域门面，再由领域门面适配实时通信底座。
+
+### 11.2 前端边界
+
+允许直接依赖 `@stomp/stompjs` 的范围：
+
+```text
+web-core realtime transport
+相关测试
+```
+
+不允许直接依赖 `@stomp/stompjs` 的范围：
+
+```text
+views
+platform-components
+dynamic-page-runtime
+platform-workbench 业务视图
+```
+
+这些层只能依赖 `RealtimeClient`、`RealtimeChannel`、`RealtimeCommand` 和具体平台通道。
+
+## 12. 契约测试
+
+至少覆盖：
+
+- 后端业务发布门面能把 `CommittedChangeSet` 映射到数据变化 destination；
+- 业务代码不直接依赖 `SimpMessagingTemplate`；
+- destination 常量集中定义；
+- CONNECT 鉴权失败时连接不可用；
+- SUBSCRIBE 无权限时不能订阅受限通道；
+- 事务回滚不广播数据变化；
+- HTTP ActionResult 和实时广播共享 `changeSetId`；
+- 前端 `RealtimeClient` 能恢复订阅；
+- 前端按 `changeSetId` 去重；
+- 前端业务页面不直接 import `@stomp/stompjs`；
+- logout、token 失效或租户切换时连接生命周期正确收敛。
+
+涉及真实 WebSocket 握手、STOMP frame 和 broker 行为的测试应优先使用 Spring WebSocket 测试或集成测试，不长期只依赖 fake。
+
+## 13. 阶段路线
+
+### 13.1 第一阶段：修路
+
+目标是打通统一实时通信基础设施，不铺大量业务。
+
+范围：
+
+1. 引入后端 WebSocket/STOMP 依赖。
+2. 建立 `/ws/platform` endpoint。
+3. 建立后端实时发布门面。
+4. 建立数据变化广播 adapter。
+5. 引入前端 `@stomp/stompjs`。
+6. 建立前端 `RealtimeClient` 和通道契约。
+7. 将数据变化通道接入现有 DataChange 消费机制。
+8. 写明代理、心跳、重连、权限和后续 broker 边界。
+
+不做：
+
+- 完整 IM；
+- 通知中心产品化；
+- 动态表单实时治理；
+- 外部 broker；
+- 可靠 outbox；
+- SockJS fallback。
+
+### 13.2 第二阶段：平台能力接入
+
+按收益逐步接入：
+
+1. 数据变化跨页面刷新；
+2. 用户级平台通知；
+3. 工作台待办提醒；
+4. 长任务进度事件；
+5. 配置刷新提示；
+6. 在线状态或协同信号。
+
+每类能力都必须先定义业务 payload 和权限边界，再接入实时通道。
+
+### 13.3 第三阶段：可靠性和规模
+
+触发条件成熟后推进：
+
+1. DataChange outbox；
+2. 外部 broker relay；
+3. 多实例广播；
+4. 消息 offset 和补偿拉取；
+5. SockJS fallback 或 SSE adapter；
+6. 消息限流、监控、审计和运维面板。
+
+### 13.4 第四阶段：双向业务产品
+
+如果后续建设 IM 或协同：
+
+1. 独立定义 IM 或协同领域模型；
+2. 复用实时连接、鉴权、心跳、重连和 user destination；
+3. 不复用 DataChange payload；
+4. 根据业务需要引入消息存储、未读、撤回、房间权限和历史分页。
+
+## 14. 与既有契约关系
+
+实时通信底座与 [动作结果与数据变更契约](ACTION_RESULT_AND_DATA_CHANGE.md) 的关系：
+
+```text
+ActionResult / DataChange
+  -> 形成 CommittedChangeSet
+  -> HTTP 回执
+  -> 实时通信底座广播
+```
+
+ActionResult 解决同步 HTTP 回执。实时通信底座解决异步订阅者通知。两者共享数据变化事实，但职责不同。
+
+前端 ActionResult reaction 和实时 data change reaction 应使用相同 `changeSetId` 去重，并共同遵守“前端决定 UI 响应”的边界。
+
+## 15. 参考依据
+
+- [Spring Framework WebSocket/STOMP 官方文档](https://docs.spring.io/spring-framework/reference/web/websocket/stomp.html)；
+- [Spring user destination 官方文档](https://docs.spring.io/spring-framework/reference/web/websocket/stomp/user-destination.html)；
+- [StompJS heartbeat、auto reconnect 和 lifecycle 文档](https://stomp-js.github.io/guide/stompjs/using-stompjs-v5.html)；
+- [SockJS 在 Spring 中的 fallback 定位](https://docs.spring.io/spring-framework/reference/web/websocket/fallback.html)；
+- 当前项目 ActionResult / DataChange 契约和前端 web-core 分层。

@@ -14,6 +14,7 @@ import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
 import { businessModuleRoutes, businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
+import { connectAppRealtime } from './app/realtime';
 import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
 import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
@@ -40,6 +41,7 @@ const currentPassword = ref('');
 const newPassword = ref('');
 const confirmPassword = ref('');
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
+let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
@@ -69,11 +71,15 @@ async function loadWorkbench() {
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
+    reconnectRealtime();
     syncBrowserUrl(state);
   } catch (cause) {
     if (requiresLogin(cause)) {
       clearAuthToken();
+      startup.value = undefined;
+      activeTabKey.value = undefined;
       loginRequired.value = true;
+      disconnectRealtime();
     }
     error.value = cause instanceof Error ? cause.message : 'Workbench startup failed';
   } finally {
@@ -188,11 +194,25 @@ async function handleLogout() {
     error.value = undefined;
     loginRequired.value = true;
     loading.value = false;
+    disconnectRealtime();
     logoutLoading.value = false;
     if (currentBrowserPath() !== '/') {
       window.history.replaceState(window.history.state, '', '/');
     }
   }
+}
+
+function reconnectRealtime() {
+  disconnectRealtime();
+  if (!usesMockStartup()) {
+    realtimeConnection = connectAppRealtime();
+  }
+}
+
+function disconnectRealtime() {
+  const current = realtimeConnection;
+  realtimeConnection = undefined;
+  void current?.disconnect();
 }
 
 function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {

@@ -66,6 +66,19 @@ export interface WebActionResultEnvelope<TData = unknown> extends WebActionResul
   data: TData;
 }
 
+export interface WebCommittedChangeSet {
+  changeSetId: string;
+  changes: WebDataChange[];
+}
+
+export interface WebRealtimeEnvelope<TPayload = unknown> {
+  id: string;
+  type: string;
+  occurredAt: string;
+  traceId?: string;
+  payload: TPayload;
+}
+
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];

@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class MutationContext {
     private final String changeSetId;
@@ -58,7 +59,7 @@ public class MutationContext {
         if (committedChangeSet != null) {
             return committedChangeSet;
         }
-        if (TransactionScopeSupport.isTransactionActive()) {
+        if (TransactionScopeSupport.isTransactionActive() && !transactionCommitted) {
             return CommittedChangeSet.empty(changeSetId);
         }
         if (commitHookRegistered && !transactionCommitted) {
@@ -67,6 +68,20 @@ public class MutationContext {
         }
         committedChangeSet = commit(commitResolver);
         return committedChangeSet;
+    }
+
+    public void afterCommit(DataChangeModuleAliasResolver resolver, Consumer<CommittedChangeSet> consumer) {
+        Objects.requireNonNull(consumer, "consumer must not be null");
+        if (!TransactionScopeSupport.isTransactionActive()) {
+            consumer.accept(committedChangeSet(resolver));
+            return;
+        }
+        TransactionScopeSupport.afterCommitOrNow(() -> {
+            synchronized (this) {
+                transactionCommitted = true;
+            }
+            consumer.accept(committedChangeSet(resolver));
+        });
     }
 
     private void registerCommitHookIfNeeded() {
