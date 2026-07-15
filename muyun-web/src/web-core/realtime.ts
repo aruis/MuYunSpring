@@ -1,5 +1,10 @@
 import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs';
-import type { WebCommittedChangeSet, WebRealtimeEnvelope, WebUserNotification } from '@muyun/web-contracts';
+import type {
+  WebBusinessRealtimeEvent,
+  WebCommittedChangeSet,
+  WebRealtimeEnvelope,
+  WebUserNotification,
+} from '@muyun/web-contracts';
 import type { DataChangeDispatcher } from './dataChanges';
 
 export type RealtimeConnectionState =
@@ -89,11 +94,13 @@ export interface StompErrorFrame {
 export const realtimeMessageTypes = {
   dataChange: 'platform.data-change',
   securityNotification: 'platform.security-notification',
+  businessEvent: 'platform.business-event',
 } as const;
 
 export const realtimeDestinations = {
   userDataChanges: '/user/queue/platform/data-changes',
   userNotifications: '/user/queue/platform/notifications',
+  userBusinessEvents: '/user/queue/platform/business-events',
   userImMessages: '/user/queue/platform/im/messages',
   platformPing: '/app/platform/ping',
   imMessagesSend: '/app/platform/im/messages/send',
@@ -107,6 +114,11 @@ export const dataChangeChannel: RealtimeChannel<WebCommittedChangeSet> = {
 export const userNotificationChannel: RealtimeChannel<WebUserNotification> = {
   destination: realtimeDestinations.userNotifications,
   type: realtimeMessageTypes.securityNotification,
+};
+
+export const userBusinessEventChannel: RealtimeChannel<WebBusinessRealtimeEvent> = {
+  destination: realtimeDestinations.userBusinessEvents,
+  type: realtimeMessageTypes.businessEvent,
 };
 
 export const userImMessageChannel: RealtimeChannel<unknown> = {
@@ -305,6 +317,13 @@ export function connectRealtimeUserNotifications(
   handler: RealtimeHandler<WebUserNotification>,
 ): RealtimeSubscription {
   return realtime.subscribe(userNotificationChannel, handler);
+}
+
+export function connectRealtimeBusinessEvents(
+  realtime: RealtimeClient,
+  handler: RealtimeHandler<WebBusinessRealtimeEvent>,
+): RealtimeSubscription {
+  return realtime.subscribe(userBusinessEventChannel, handler);
 }
 
 function dataChangeTopic(destination: string): RealtimeChannel<WebCommittedChangeSet> {

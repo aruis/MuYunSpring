@@ -1,6 +1,11 @@
 import { ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
-import type { UserAccount, UserSessionStatusView, UserSessionView } from '@muyun/web-contracts';
+import type {
+  UserAccount,
+  UserSessionStatusView,
+  UserSessionView,
+  WebBusinessRealtimeEvent,
+} from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 
 export interface UserSessionState {
@@ -15,6 +20,7 @@ export interface UserSessionRowsOptions {
 }
 
 export function useUserSessionRows(options: UserSessionRowsOptions) {
+  const userSessionChangedEventType = 'iam.user.session.changed';
   const expandedUserKeys = ref<string[]>([]);
   const userSessionStates = ref<Record<string, UserSessionState>>({});
   const visibleUserIds = ref<string[]>([]);
@@ -62,6 +68,22 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
   function handleUserListLoaded(records: Array<{ id?: string }>) {
     visibleUserIds.value = records.map((record) => String(record.id ?? '')).filter(Boolean);
     void loadUserOnlineStatuses(visibleUserIds.value);
+  }
+
+  function handleUserSessionBusinessEvent(event: WebBusinessRealtimeEvent) {
+    if (event.type !== userSessionChangedEventType || event.moduleAlias !== 'iam.user') {
+      return;
+    }
+    const userId = String(event.recordId ?? '');
+    if (!userId) {
+      return;
+    }
+    if (visibleUserIds.value.includes(userId)) {
+      void loadUserOnlineStatuses([userId]);
+    }
+    if (expandedUserKeys.value.includes(userId)) {
+      void loadUserSessions(userId);
+    }
   }
 
   async function loadUserOnlineStatuses(userIds: string[]) {
@@ -118,6 +140,7 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     expandedUserKeys,
     handleUserListLoaded,
     handleUserRowExpand,
+    handleUserSessionBusinessEvent,
     loadUserSessions,
     resetUserSessionRows,
     userOnlineStatusTitle,

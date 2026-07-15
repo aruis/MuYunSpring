@@ -14,6 +14,7 @@ import {
   platformErrorCodes,
   resolveGlobalErrorPresentation,
   actionResultData,
+  connectRealtimeBusinessEvents,
   connectRealtimeDataChanges,
   connectRealtimeUserNotifications,
   createDataChangeDispatcher,
@@ -31,6 +32,7 @@ import {
   resourceRecordDataChangeChannel,
   tenantPublicDataChangeChannel,
   tenantPublicNotificationChannel,
+  userBusinessEventChannel,
   userImMessageChannel,
   userNotificationChannel,
   withWebActionResultChanges,
@@ -452,11 +454,65 @@ test('realtime user notification channel handles security notifications', async 
   ]);
 });
 
+test('realtime business event channel handles user private business events', async () => {
+  const stomp = new FakeStompClient();
+  const realtime = createRealtimeClient({
+    clientFactory: (options) => {
+      stomp.options = options;
+      return stomp;
+    },
+  });
+  const handled: unknown[] = [];
+
+  connectRealtimeBusinessEvents(realtime, (event) => {
+    handled.push(event);
+  });
+  await realtime.connect();
+  stomp.connect();
+  stomp.emit(
+    '/user/queue/platform/business-events',
+    JSON.stringify({
+      id: 'message-1',
+      type: 'platform.business-event',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: {
+        type: 'iam.user.session.changed',
+        moduleAlias: 'iam.user',
+        recordId: 'user-1',
+        reason: 'LOGGED_IN',
+      },
+    }),
+  );
+  stomp.emit(
+    '/user/queue/platform/business-events',
+    JSON.stringify({
+      id: 'message-2',
+      type: 'platform.other',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: { type: 'ignored' },
+    }),
+  );
+  await Promise.resolve();
+
+  assert.deepEqual(handled, [
+    {
+      type: 'iam.user.session.changed',
+      moduleAlias: 'iam.user',
+      recordId: 'user-1',
+      reason: 'LOGGED_IN',
+    },
+  ]);
+});
+
 test('realtime channel factories build standard destinations', () => {
   assert.equal(realtimeDestinations.userDataChanges, '/user/queue/platform/data-changes');
   assert.deepEqual(userNotificationChannel, {
     destination: '/user/queue/platform/notifications',
     type: 'platform.security-notification',
+  });
+  assert.deepEqual(userBusinessEventChannel, {
+    destination: '/user/queue/platform/business-events',
+    type: 'platform.business-event',
   });
   assert.equal(userImMessageChannel.destination, '/user/queue/platform/im/messages');
   assert.equal(imMessageSendCommand.destination, '/app/platform/im/messages/send');

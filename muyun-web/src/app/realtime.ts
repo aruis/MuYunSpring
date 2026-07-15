@@ -1,17 +1,23 @@
 import {
   createDataChangeDispatcher,
   createRealtimeClient,
+  connectRealtimeBusinessEvents,
   connectRealtimeDataChanges,
   connectRealtimeUserNotifications,
   moduleDataChangeChannel,
   type RealtimeClient,
   type RealtimeSubscription,
 } from '@muyun/web-core';
-import type { WebCommittedChangeSet, WebUserNotification } from '@muyun/web-contracts';
+import type {
+  WebBusinessRealtimeEvent,
+  WebCommittedChangeSet,
+  WebUserNotification,
+} from '@muyun/web-contracts';
 import { effectiveAuthToken } from './authSession';
 
 export const appDataChangeDispatcher = createDataChangeDispatcher();
 const moduleDataChangeSubscriptions = new Map<string, DataChangeTopicSubscription>();
+const businessEventHandlers = new Set<(event: WebBusinessRealtimeEvent) => void | Promise<void>>();
 let activeRealtime: RealtimeClient | undefined;
 
 export interface AppRealtimeOptions {
@@ -44,6 +50,11 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
   const userNotificationSubscription = connectRealtimeUserNotifications(realtime, (notification) => {
     options.onUserNotification?.(notification);
   });
+  const businessEventSubscription = connectRealtimeBusinessEvents(realtime, (event) => {
+    for (const handler of businessEventHandlers) {
+      void handler(event);
+    }
+  });
   bindPageRealtimeSubscriptions(realtime);
   void realtime.connect();
   return {
@@ -51,6 +62,7 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
     async disconnect() {
       dataChangeSubscription.unsubscribe();
       userNotificationSubscription.unsubscribe();
+      businessEventSubscription.unsubscribe();
       unbindPageRealtimeSubscriptions();
       if (activeRealtime === realtime) {
         activeRealtime = undefined;
@@ -87,6 +99,17 @@ export function subscribeAppModuleDataChanges(moduleAlias: string) {
 
 export function subscribeAppDataChanges(handler: (changeSet: WebCommittedChangeSet) => void | Promise<void>) {
   return appDataChangeDispatcher.subscribe(handler);
+}
+
+export function subscribeAppBusinessEvents(
+  handler: (event: WebBusinessRealtimeEvent) => void | Promise<void>,
+) {
+  businessEventHandlers.add(handler);
+  return {
+    unsubscribe() {
+      businessEventHandlers.delete(handler);
+    },
+  };
 }
 
 function bindPageRealtimeSubscriptions(realtime: RealtimeClient) {
