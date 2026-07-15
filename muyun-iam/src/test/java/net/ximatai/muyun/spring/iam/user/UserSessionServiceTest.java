@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,10 +56,15 @@ class UserSessionServiceTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
         assertThat(login.tokenType()).isEqualTo("Bearer");
+        assertThat(login.sessionId()).isEqualTo(persistedSession.get().getId());
+        assertThat(login.sessionId()).isNotBlank();
         assertThat(login.issuedAt()).isEqualTo(clock.instant());
         assertThat(login.currentUser()).isEqualTo(
                 CurrentUser.tenantUser("user-1", "alice", "tenant-a", null, true));
@@ -67,8 +73,12 @@ class UserSessionServiceTest {
         assertThat(persistedSession.get().getTenantId()).isEqualTo("tenant-a");
         assertThat(persistedSession.get().getUserId()).isEqualTo("user-1");
         assertThat(persistedSession.get().getPasswordChangeRequired()).isTrue();
+        assertThat(persistedSession.get().getLoginIp()).isNull();
+        assertThat(persistedSession.get().getLoginUserAgent()).isNull();
         assertThat(persistedSession.get().getTokenHash()).hasSize(64);
         assertThat(persistedSession.get().getTokenHash()).isNotEqualTo(login.token());
+        assertThat(lifecycleEventPublisher.events)
+                .containsExactly(UserSessionLifecycleEvent.loggedIn("user-1", login.sessionId()));
         assertThat(persistedSession.get().getExpiresAt()).isEqualTo(clock.instant().plusSeconds(43_200));
         assertThat(persistedSession.get().getMaxExpiresAt()).isEqualTo(clock.instant().plusSeconds(604_800));
         persistedSession.get().setLastSeenAt(clock.instant().minusSeconds(120));
@@ -116,7 +126,10 @@ class UserSessionServiceTest {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
@@ -125,6 +138,8 @@ class UserSessionServiceTest {
         assertThat(sessionService.currentUser(login.token())).isEmpty();
         assertThat(persistedSession.get().getRevokedAt()).isEqualTo(clock.instant());
         assertThat(persistedSession.get().getRevokedReason()).isEqualTo("user inactive");
+        assertThat(lifecycleEventPublisher.events).contains(
+                UserSessionLifecycleEvent.revoked("user-1", persistedSession.get().getId()));
     }
 
     @Test
@@ -153,12 +168,17 @@ class UserSessionServiceTest {
         UserSession session = activeSession("session-1", "user-1");
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         assertThat(sessionService.currentUser("token-1")).isEmpty();
 
         assertThat(session.getRevokedAt()).isEqualTo(clock.instant());
         assertThat(session.getRevokedReason()).isEqualTo("tenant inactive");
+        assertThat(lifecycleEventPublisher.events)
+                .containsExactly(UserSessionLifecycleEvent.revoked("user-1", "session-1"));
         verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
         verify(sessionDao).updateByIdAndVersion(session, 0);
     }
@@ -198,13 +218,15 @@ class UserSessionServiceTest {
         UserAccountService userService = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
-        captureInsertedSession(sessionDao);
+        AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
         UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1", "127.0.0.1", "Browser");
 
         assertThat(login.passwordChangeRequired()).isTrue();
         assertThat(login.passwordStatus()).isEqualTo(PasswordStatus.INITIAL);
+        assertThat(persistedSession.get().getLoginIp()).isEqualTo("127.0.0.1");
+        assertThat(persistedSession.get().getLoginUserAgent()).isEqualTo("Browser");
         assertThat(user.getLastLoginIp()).isEqualTo("127.0.0.1");
         assertThat(user.getLastLoginUserAgent()).isEqualTo("Browser");
     }
@@ -254,11 +276,42 @@ class UserSessionServiceTest {
         UserSession expired = activeSession("session-1", "user-1");
         expired.setExpiresAt(clock.instant().minusSeconds(1));
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(expired));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         assertThat(sessionService.currentUser("token-1")).isEmpty();
+        assertThat(expired.getRevokedAt()).isEqualTo(clock.instant());
+        assertThat(expired.getRevokedReason()).isEqualTo("session expired");
+        assertThat(lifecycleEventPublisher.events)
+                .containsExactly(UserSessionLifecycleEvent.revoked("user-1", "session-1"));
         verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
-        verify(sessionDao, never()).updateByIdAndVersion(any(UserSession.class), any());
+        verify(sessionDao).updateByIdAndVersion(expired, 0);
+    }
+
+    @Test
+    void shouldPublishLifecycleEventWhenUserLogsOut() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
+
+        sessionService.logout("token-1");
+
+        assertThat(session.getRevokedAt()).isEqualTo(clock.instant());
+        assertThat(session.getRevokedReason()).isEqualTo("logout");
+        assertThat(lifecycleEventPublisher.events)
+                .containsExactly(UserSessionLifecycleEvent.revoked("user-1", "session-1"));
+        verify(sessionDao).updateByIdAndVersion(session, 0);
     }
 
     @Test
@@ -351,15 +404,172 @@ class UserSessionServiceTest {
         revoked.setRevokedReason("logout");
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(web, mobile, revoked));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+                UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         sessionService.revokeUserSessions("user-1");
 
         assertThat(web.getRevokedReason()).isEqualTo("user sessions revoked");
         assertThat(mobile.getRevokedReason()).isEqualTo("user sessions revoked");
         assertThat(revoked.getRevokedReason()).isEqualTo("logout");
+        assertThat(lifecycleEventPublisher.events).containsExactly(
+                UserSessionLifecycleEvent.revoked("user-1", "session-web"),
+                UserSessionLifecycleEvent.revoked("user-1", "session-mobile")
+        );
         verify(sessionDao).updateByIdAndVersion(web, 0);
         verify(sessionDao).updateByIdAndVersion(mobile, 0);
+    }
+
+    @Test
+    void shouldListActiveSessionsOfUserWithoutTokenHash() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession active = activeSession("session-active", "user-1");
+        active.setLoginIp("127.0.0.1");
+        active.setLoginUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/150.0.0.0 Safari/537.36");
+        UserSession expired = activeSession("session-expired", "user-1");
+        expired.setExpiresAt(clock.instant().minusSeconds(1));
+        UserSession revoked = activeSession("session-revoked", "user-1");
+        revoked.setRevokedAt(clock.instant().minusSeconds(1));
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(active, expired, revoked));
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThat(sessionService.activeSessionsOfUser("user-1", null))
+                .containsExactly(new UserSessionView(
+                        "session-active",
+                        "user-1",
+                        "alice",
+                        "tenant-a",
+                        "org-1",
+                        active.getIssuedAt(),
+                        active.getExpiresAt(),
+                        active.getMaxExpiresAt(),
+                        active.getLastSeenAt(),
+                        active.getPasswordChangeRequired(),
+                        "127.0.0.1",
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/150.0.0.0 Safari/537.36",
+                        "desktopWeb",
+                        "Web 桌面端",
+                        "macos",
+                        "macOS",
+                        false
+                ));
+    }
+
+    @Test
+    void shouldClassifySessionTerminalTypeFromUserAgent() {
+        UserSession desktop = activeSession("desktop", "user-1");
+        desktop.setLoginUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/150.0.0.0 Safari/537.36");
+        UserSession windows = activeSession("windows", "user-1");
+        windows.setLoginUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/150.0.0.0 Safari/537.36");
+        UserSession mobile = activeSession("mobile", "user-1");
+        mobile.setLoginUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148 Safari/604.1");
+        UserSession android = activeSession("android", "user-1");
+        android.setLoginUserAgent("Mozilla/5.0 (Linux; Android 15; Pixel 9) Mobile Safari/537.36");
+        UserSession tablet = activeSession("tablet", "user-1");
+        tablet.setLoginUserAgent("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) Version/18.0 Safari/604.1");
+        UserSession desktopApp = activeSession("desktop-app", "user-1");
+        desktopApp.setLoginUserAgent("Mozilla/5.0 Electron/30.0.0 Chrome/124.0.0.0");
+        UserSession mobileApp = activeSession("mobile-app", "user-1");
+        mobileApp.setLoginUserAgent("okhttp/4.12.0");
+
+        assertThat(UserSessionView.from(desktop, false).terminalTypeTitle()).isEqualTo("Web 桌面端");
+        assertThat(UserSessionView.from(desktop, false).platformTypeTitle()).isEqualTo("macOS");
+        assertThat(UserSessionView.from(windows, false).platformTypeTitle()).isEqualTo("Windows");
+        assertThat(UserSessionView.from(mobile, false).terminalTypeTitle()).isEqualTo("Web 移动端");
+        assertThat(UserSessionView.from(mobile, false).platformTypeTitle()).isEqualTo("iOS");
+        assertThat(UserSessionView.from(android, false).platformTypeTitle()).isEqualTo("Android");
+        assertThat(UserSessionView.from(tablet, false).terminalTypeTitle()).isEqualTo("Web 平板端");
+        assertThat(UserSessionView.from(tablet, false).platformTypeTitle()).isEqualTo("iOS");
+        assertThat(UserSessionView.from(desktopApp, false).terminalTypeTitle()).isEqualTo("桌面客户端");
+        assertThat(UserSessionView.from(mobileApp, false).terminalTypeTitle()).isEqualTo("移动客户端");
+    }
+
+    @Test
+    void shouldRevokeSingleUserSession() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
+        RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
+                new RecordingUserSessionLifecycleEventPublisher();
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, eventPublisher,
+                lifecycleEventPublisher, clock);
+
+        assertThat(sessionService.revokeUserSession("user-1", "session-1", null)).isEqualTo(1);
+
+        assertThat(session.getRevokedAt()).isEqualTo(clock.instant());
+        assertThat(session.getRevokedReason()).isEqualTo("user session revoked by administrator");
+        assertThat(eventPublisher.events).containsExactly(UserSecurityEvent.sessionRevoked("user-1", "session-1"));
+        assertThat(lifecycleEventPublisher.events)
+                .containsExactly(UserSessionLifecycleEvent.revoked("user-1", "session-1"));
+        verify(sessionDao).updateByIdAndVersion(session, 0);
+    }
+
+    @Test
+    void shouldIgnoreSessionThatDoesNotBelongToUser() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-2");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThat(sessionService.revokeUserSession("user-1", "session-1", null)).isZero();
+
+        verify(sessionDao, never()).updateByIdAndVersion(any(UserSession.class), any());
+    }
+
+    @Test
+    void shouldRejectRevokingCurrentSessionFromUserManagement() {
+        UserAccount user = activeUser();
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
+        persistedSession.get().setId("session-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(persistedSession.get()));
+
+        assertThatThrownBy(() -> sessionService.revokeUserSession("user-1", "session-1", login.token()))
+                .isInstanceOf(net.ximatai.muyun.spring.ability.action.BusinessException.class)
+                .hasMessageContaining("cannot revoke current session");
+
+        verify(sessionDao, never()).updateByIdAndVersion(any(UserSession.class), any());
+    }
+
+    @Test
+    void shouldRevokeSelectedUserSessions() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession web = activeSession("session-web", "user-1");
+        UserSession mobile = activeSession("session-mobile", "user-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(web))
+                .thenReturn(List.of(mobile));
+        when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThat(sessionService.revokeUserSessions("user-1", List.of("session-web", "session-mobile"), null))
+                .isEqualTo(2);
+
+        assertThat(web.getRevokedReason()).isEqualTo("user session revoked by administrator");
+        assertThat(mobile.getRevokedReason()).isEqualTo("user session revoked by administrator");
     }
 
     @Test
@@ -385,9 +595,28 @@ class UserSessionServiceTest {
         when(sessionDao.insert(any())).thenAnswer(invocation -> {
             UserSession session = invocation.getArgument(0);
             reference.set(session);
-            return session.getId();
+            return "session-1";
         });
         return reference;
+    }
+
+    private static final class RecordingUserSecurityEventPublisher implements UserSecurityEventPublisher {
+        private final List<UserSecurityEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(UserSecurityEvent event) {
+            events.add(event);
+        }
+    }
+
+    private static final class RecordingUserSessionLifecycleEventPublisher
+            implements UserSessionLifecycleEventPublisher {
+        private final List<UserSessionLifecycleEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(UserSessionLifecycleEvent event) {
+            events.add(event);
+        }
     }
 
     private UserSession activeSession(String id, String userId) {

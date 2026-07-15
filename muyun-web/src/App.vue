@@ -4,6 +4,7 @@ import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
 import { presentPlatformError } from '@muyun/platform-components';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type {
+  LoginResult,
   MenuNavigationTarget,
   MenuRecord,
   WebUserNotification,
@@ -13,7 +14,9 @@ import {
   clearAuthToken,
   effectiveAuthToken,
   isAuthenticationRequiredError,
+  saveAuthSessionId,
   saveAuthToken,
+  storedAuthSessionId,
 } from './app/authSession';
 import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
@@ -99,8 +102,9 @@ async function loadWorkbench() {
   }
 }
 
-async function handleAuthenticated(token: string) {
-  saveAuthToken(token);
+async function handleAuthenticated(result: LoginResult) {
+  saveAuthToken(result.token);
+  saveAuthSessionId(result.sessionId);
   loginRequired.value = false;
   loginLoading.value = true;
   try {
@@ -239,6 +243,9 @@ function handleRealtimeUnauthorized() {
 }
 
 function handleSecurityNotification(notification: WebUserNotification) {
+  if (notification.targetSessionId && notification.targetSessionId !== storedAuthSessionId()) {
+    return;
+  }
   if (!notification.logoutRequired) {
     return;
   }

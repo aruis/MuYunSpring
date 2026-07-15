@@ -45,6 +45,12 @@ public class UserSession extends StandardEntity {
             comment = "Whether this session is restricted to password change")
     private Boolean passwordChangeRequired;
 
+    @Column(name = "login_ip", type = ColumnType.VARCHAR, length = 64, comment = "Login IP snapshot")
+    private String loginIp;
+
+    @Column(name = "login_user_agent", type = ColumnType.VARCHAR, length = 512, comment = "Login user agent snapshot")
+    private String loginUserAgent;
+
     @Column(name = "revoked_at", type = ColumnType.TIMESTAMP, comment = "Revoked at")
     private Instant revokedAt;
 

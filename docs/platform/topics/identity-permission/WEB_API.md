@@ -8,7 +8,7 @@
 
 | 方法   | URL                 | 功能                                                                                               |
 | ------ | ------------------- | -------------------------------------------------------------------------------------------------- |
-| `POST` | `/iam.auth/login`   | 用户登录。请求包含 `tenantId`、`username`、`password`；返回 Bearer token、签发时间和当前用户信息。 |
+| `POST` | `/iam.auth/login`   | 用户登录。请求包含 `tenantId`、`username`、`password`；返回 Bearer token、当前登录 `sessionId`、签发时间和当前用户信息。 |
 | `POST` | `/iam.auth/logout`  | 当前 Bearer token 登出。token 从 `Authorization: Bearer ...` 读取。                                |
 | `GET`  | `/iam.auth/context` | 返回当前请求解析出的用户上下文，用于前端会话恢复和启动态确认。                                     |
 
@@ -190,7 +190,10 @@
 | `POST` | `/iam.user/disable/{id}`        | 停用用户。                                                             |
 | `POST` | `/iam.user/changePassword/{id}` | 修改用户密码；成功后撤销该用户现有 session。                           |
 | `POST` | `/iam.user/resetPassword/{id}`  | 重置用户密码并返回临时密码；成功后撤销该用户现有 session。             |
-| `POST` | `/iam.user/forceLogout/{id}`    | 管理员强制用户下线；成功后撤销该用户现有 session 并发送安全通知。      |
+| `POST` | `/iam.user/forceLogout/{id}`    | 管理员强制用户全部会话下线；保留为账号级兜底动作。                    |
+| `GET`  | `/iam.user/{id}/sessions`       | 查询用户当前有效登录会话；返回登录时间、最近活跃、IP、User-Agent 等。  |
+| `POST` | `/iam.user/{id}/sessions/{sessionId}/revoke` | 下线用户指定登录会话；禁止通过用户管理入口下线当前会话。 |
+| `POST` | `/iam.user/{id}/sessions/revoke` | 批量下线用户指定登录会话；请求体包含 `sessionIds`。                   |
 | `POST` | `/iam.user/selector/query`      | 用户选择器查询；支持按角色、账号关键字和启用状态过滤，返回轻量用户项。 |
 
 用户列表和用户绑定职员详情可返回绑定职员摘要字段；这些摘要属于用户管理入口的读模型，权限口径跟随 `iam.user` 的查询或查看入口，不额外要求调用方具备 `iam.employee` 查看权限。

@@ -75,6 +75,27 @@ class ActionEndpointAnnotationTest {
         assertThat(forceLogoutEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
         assertThat(forceLogoutEndpoint.dataAuth()).isTrue();
         assertThat(forceLogoutEndpoint.recordIdPathVariable()).isEqualTo("id");
+
+        CustomActionEndpoint sessionsEndpoint = customEndpoint(UserAccountWebController.class, "activeSessions",
+                String.class, HttpServletRequest.class);
+        assertThat(sessionsEndpoint.value()).isEqualTo("sessions");
+        assertThat(sessionsEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(sessionsEndpoint.dataAuth()).isTrue();
+        assertThat(sessionsEndpoint.recordIdPathVariable()).isEqualTo("id");
+
+        CustomActionEndpoint revokeSessionEndpoint = customEndpoint(UserAccountWebController.class, "revokeSession",
+                String.class, String.class, HttpServletRequest.class);
+        assertThat(revokeSessionEndpoint.value()).isEqualTo("revokeSession");
+        assertThat(revokeSessionEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(revokeSessionEndpoint.dataAuth()).isTrue();
+        assertThat(revokeSessionEndpoint.recordIdPathVariable()).isEqualTo("id");
+
+        CustomActionEndpoint revokeSessionsEndpoint = customEndpoint(UserAccountWebController.class, "revokeSessions",
+                String.class, UserAccountWebController.RevokeSessionsRequest.class, HttpServletRequest.class);
+        assertThat(revokeSessionsEndpoint.value()).isEqualTo("revokeSessions");
+        assertThat(revokeSessionsEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(revokeSessionsEndpoint.dataAuth()).isTrue();
+        assertThat(revokeSessionsEndpoint.recordIdPathVariable()).isEqualTo("id");
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {

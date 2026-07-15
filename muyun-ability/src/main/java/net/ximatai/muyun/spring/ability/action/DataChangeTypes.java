@@ -5,6 +5,7 @@ public final class DataChangeTypes {
     public static final String RECORD_UPDATED = "record-updated";
     public static final String RECORD_DELETED = "record-deleted";
     public static final String COLLECTION_CHANGED = "collection-changed";
+    public static final String SESSION_COLLECTION_CHANGED = "session-collection-changed";
 
     private DataChangeTypes() {
     }

@@ -275,7 +275,7 @@ simpMessagingTemplate.convertAndSendToUser(
 simpMessagingTemplate.convertAndSend("/user/queue/platform/notifications", payload);
 ```
 
-多端登录时，同一 `userId` 的多个 WebSocket session 都会收到 user queue 消息。这是用户级通知和多端同步的默认语义。若未来需要只发当前设备或当前浏览器 tab，应引入 session/channel 级标识，而不是把 session 信息塞进 user queue 路径。
+多端登录时，同一 `userId` 的多个 WebSocket session 都会收到 user queue 消息。这是用户级通知和多端同步的默认语义。只针对某个登录会话生效的通知必须在 payload 中携带稳定会话标识，由客户端按当前登录会话过滤；不得把 session 信息塞进 user queue 路径。
 
 ### 5.2.3 典型业务场景
 
@@ -330,6 +330,12 @@ IM 不复用 `DataChange` payload，应定义独立消息契约和会话权限�
 ```
 
 payload 表达稳定安全事实，例如 `platform.security.password-changed`、`platform.security.password-reset`、`platform.security.force-logout` 和 `logoutRequired`。后端不表达 Toast、弹窗、倒计时秒数或跳转方式；前端根据安全事实决定展示方式，并在本地完成退出登录。
+
+用户管理中的单个登录会话下线发送 `platform.security.session-revoked` 安全事实，payload 携带 `targetSessionId`。由于 STOMP user queue 仍按 `userId` fan-out，同一用户的其他会话可能收到该消息，但只有当前登录 `sessionId` 与 `targetSessionId` 相同的前端才执行本地退出；其他会话必须忽略。
+
+用户登录或登录会话被撤销时，还会向 `iam.user` 模块 data-change topic 广播 `session-collection-changed`。撤销包括用户主动退出、管理员定点下线、账号级强制下线、改密撤销以及访问时发现 session 已过期或账号/租户已失效。该消息只表达 `recordId=userId` 的会话集合发生变化，最多携带低敏 `sessionId`，不携带 IP、User-Agent、token hash 或终端明细。用户管理页收到后只刷新已展开用户的会话子列表，明细仍通过 `/iam.user/{id}/sessions` 权限接口重新读取。
+
+前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageModuleDataChanges` 和 `usePageDataChangeHandler`。页面只声明所需实时事实和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
 
 ### 5.3 发布门面
 

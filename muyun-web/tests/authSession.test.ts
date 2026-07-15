@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AppError, platformErrorCodes } from '../src/web-core/index.ts';
-import { effectiveAuthToken, isAuthenticationRequiredError } from '../src/app/authSession.ts';
+import {
+  clearAuthToken,
+  effectiveAuthToken,
+  isAuthenticationRequiredError,
+  saveAuthSessionId,
+  saveAuthToken,
+  storedAuthSessionId,
+} from '../src/app/authSession.ts';
 
 test('effectiveAuthToken falls back to env token outside browser storage', () => {
   assert.equal(effectiveAuthToken(' env-token '), 'env-token');
@@ -9,6 +16,39 @@ test('effectiveAuthToken falls back to env token outside browser storage', () =>
 
 test('effectiveAuthToken ignores blank env token', () => {
   assert.equal(effectiveAuthToken('   '), undefined);
+});
+
+test('auth session storage keeps token and session id together', () => {
+  const storage = new Map<string, string>();
+  const previousWindow = globalThis.window;
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+    },
+  });
+
+  try {
+    saveAuthToken(' token-1 ');
+    saveAuthSessionId(' session-1 ');
+
+    assert.equal(effectiveAuthToken(), 'token-1');
+    assert.equal(storedAuthSessionId(), 'session-1');
+
+    clearAuthToken();
+
+    assert.equal(effectiveAuthToken(), undefined);
+    assert.equal(storedAuthSessionId(), undefined);
+  } finally {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: previousWindow,
+    });
+  }
 });
 
 test('isAuthenticationRequiredError uses backend auth-required code for login recovery', () => {

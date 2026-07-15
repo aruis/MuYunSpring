@@ -26,6 +26,11 @@ public class StompSecurityRealtimeNotifier implements SecurityRealtimeNotifier {
         send(userId, SecurityNotification.forceLogout());
     }
 
+    @Override
+    public void notifySessionRevoked(String userId, String sessionId) {
+        send(userId, SecurityNotification.sessionRevoked(sessionId));
+    }
+
     private void send(String userId, SecurityNotification notification) {
         if (userId == null || userId.isBlank()) {
             return;

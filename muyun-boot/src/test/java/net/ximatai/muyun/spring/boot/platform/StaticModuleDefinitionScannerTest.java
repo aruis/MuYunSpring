@@ -291,7 +291,8 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "enable", "disable", "userSelector", "changePassword", "resetPassword",
-                                "forceLogout", "employeeBinding");
+                                "forceLogout", "sessions", "sessionStatuses", "revokeSession", "revokeSessions",
+                                "employeeBinding");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("userSelector"))
                         .singleElement()
                         .satisfies(action -> {
@@ -315,6 +316,31 @@ class StaticModuleDefinitionScannerTest {
                         .singleElement()
                         .satisfies(action -> {
                             assertThat(action.title()).isEqualTo("强制下线");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("sessions"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("在线会话");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("sessionStatuses"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("在线状态");
+                            assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("revokeSession"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("下线会话");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("revokeSessions"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("批量下线会话");
                             assertThat(action.dataAuth()).isTrue();
                         });
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeBinding"))
@@ -349,7 +375,8 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(view.fields()).extracting(field -> field.fieldRef().relationCode())
                                     .containsOnlyNulls();
                             assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                                    .contains("username", "employeeNo", "employeeTitle");
+                                    .contains("username", "employeeNo", "employeeTitle")
+                                    .doesNotContain("onlineStatus");
                         });
             });
             assertThat(byAlias.get("iam.system_user")).satisfies(definition -> {

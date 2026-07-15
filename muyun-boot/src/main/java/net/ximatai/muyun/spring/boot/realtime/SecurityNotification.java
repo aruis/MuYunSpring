@@ -3,11 +3,17 @@ package net.ximatai.muyun.spring.boot.realtime;
 public record SecurityNotification(
         String code,
         String message,
-        boolean logoutRequired
+        boolean logoutRequired,
+        String targetSessionId
 ) {
     public static final String PASSWORD_CHANGED = "platform.security.password-changed";
     public static final String PASSWORD_RESET = "platform.security.password-reset";
     public static final String FORCE_LOGOUT = "platform.security.force-logout";
+    public static final String SESSION_REVOKED = "platform.security.session-revoked";
+
+    public SecurityNotification(String code, String message, boolean logoutRequired) {
+        this(code, message, logoutRequired, null);
+    }
 
     public SecurityNotification {
         if (code == null || code.isBlank()) {
@@ -18,6 +24,7 @@ public record SecurityNotification(
         }
         code = code.trim();
         message = message.trim();
+        targetSessionId = targetSessionId == null ? null : targetSessionId.trim();
     }
 
     public static SecurityNotification passwordChanged() {
@@ -30,5 +37,9 @@ public record SecurityNotification(
 
     public static SecurityNotification forceLogout() {
         return new SecurityNotification(FORCE_LOGOUT, "你的登录会话已被管理员强制下线，请重新登录", true);
+    }
+
+    public static SecurityNotification sessionRevoked(String sessionId) {
+        return new SecurityNotification(SESSION_REVOKED, "当前登录会话已被管理员下线，请重新登录", true, sessionId);
     }
 }

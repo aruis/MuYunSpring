@@ -36,6 +36,11 @@ public record DataChange(
         return new DataChange(DataChangeTypes.COLLECTION_CHANGED, moduleAlias, null, null, null, Map.of());
     }
 
+    public static DataChange sessionCollectionChanged(String moduleAlias, String recordId, String sessionId) {
+        return new DataChange(DataChangeTypes.SESSION_COLLECTION_CHANGED, moduleAlias, recordId, null, null,
+                sessionId == null || sessionId.isBlank() ? Map.of() : Map.of("sessionId", sessionId.trim()));
+    }
+
     private static Map<String, Object> normalizeFacts(Map<String, Object> facts) {
         if (facts == null || facts.isEmpty()) {
             return Map.of();

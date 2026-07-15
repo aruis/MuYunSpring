@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { AuthClient } from '@muyun/web-core';
+import type { LoginResult } from '@muyun/web-contracts';
 import { normalizeInitialValue, resolveLoginTenantDefaults } from './loginTenant';
 
 defineOptions({ name: 'LoginView' });
@@ -12,7 +13,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  authenticated: [token: string];
+  authenticated: [result: LoginResult];
 }>();
 
 const loginTenantDefaults = resolveLoginTenantDefaults(import.meta.env.VITE_MUYUN_LOGIN_TENANT_ID);
@@ -42,7 +43,7 @@ async function submit() {
       formError.value = undefined;
       return;
     }
-    emit('authenticated', result.token);
+    emit('authenticated', result);
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'Login failed';
   } finally {
@@ -76,7 +77,7 @@ async function submitPasswordChange() {
       username: username.value,
       password: newPassword.value,
     });
-    emit('authenticated', result.token);
+    emit('authenticated', result);
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'Password change failed';
   } finally {

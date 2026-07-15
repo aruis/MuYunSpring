@@ -19,11 +19,20 @@ public class UserSecurityRealtimeEventPublisher implements UserSecurityEventPubl
         if (event == null) {
             return;
         }
-        userSessionService.revokeUserSessions(event.userId());
         switch (event.type()) {
-            case PASSWORD_CHANGED -> securityRealtimeNotifier.notifyPasswordChanged(event.userId());
-            case PASSWORD_RESET -> securityRealtimeNotifier.notifyPasswordReset(event.userId());
-            case FORCE_LOGOUT -> securityRealtimeNotifier.notifyForceLogout(event.userId());
+            case PASSWORD_CHANGED -> {
+                userSessionService.revokeUserSessions(event.userId());
+                securityRealtimeNotifier.notifyPasswordChanged(event.userId());
+            }
+            case PASSWORD_RESET -> {
+                userSessionService.revokeUserSessions(event.userId());
+                securityRealtimeNotifier.notifyPasswordReset(event.userId());
+            }
+            case FORCE_LOGOUT -> {
+                userSessionService.revokeUserSessions(event.userId());
+                securityRealtimeNotifier.notifyForceLogout(event.userId());
+            }
+            case SESSION_REVOKED -> securityRealtimeNotifier.notifySessionRevoked(event.userId(), event.sessionId());
         }
     }
 }

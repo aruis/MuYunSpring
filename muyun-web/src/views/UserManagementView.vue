@@ -22,12 +22,21 @@ import {
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
+  type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
 import { UiButton, UiError, UiInput, UiRecordExplorerItem, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
-import type { ResetPasswordResponse, Tenant, UserAccount, WebQueryRequest } from '@muyun/web-contracts';
+import type {
+  ResetPasswordResponse,
+  Tenant,
+  UserAccount,
+  UserSessionView,
+  WebQueryRequest,
+} from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
+import { usePageDataChangeHandler, usePageModuleDataChanges } from '../app/pageRealtime';
+import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'UserManagementView' });
 
@@ -53,6 +62,18 @@ const userDraft = ref<Partial<UserAccount>>(createUserDraft(undefined));
 const passwordDraft = ref('');
 const resetPasswordResult = ref<ResetPasswordResponse>();
 const userFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const {
+  expandedUserKeys,
+  handleUserListLoaded,
+  handleUserRowExpand,
+  handleUserSessionDataChanges,
+  loadUserSessions,
+  resetUserSessionRows,
+  userOnlineStatusTitle,
+  userSessionState,
+} = useUserSessionRows({ context: userContext, source: 'user-management' });
+usePageModuleDataChanges('iam.user');
+usePageDataChangeHandler(handleUserSessionDataChanges);
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const canBrowseTenants = computed(() => currentUser?.value?.system === true);
@@ -71,6 +92,15 @@ const currentUserTenant = computed<Tenant | undefined>(() => {
 const userListContext = computed(
   () => createScopedUserModuleContext(userContext, selectedTenant.value) as ModuleContext<QueryListRecord>,
 );
+const userListColumns = computed<RecordQueryListColumn[]>(() => [
+  { key: 'username', title: '账号', width: '180px' },
+  { key: 'onlineStatus', title: '在线状态', width: '100px', align: 'center' },
+  { key: 'enabled', title: '状态', type: 'enabledStatus', width: '90px', align: 'center' },
+  { key: 'passwordStatus', title: '密码状态', width: '120px' },
+  { key: 'employeeNo', title: '职员工号', width: '150px' },
+  { key: 'employeeTitle', title: '职员姓名', width: '150px' },
+  { key: 'lastLoginAt', title: '最后登录时间', width: '180px' },
+]);
 const userListReady = computed(() => Boolean(selectedTenant.value?.id));
 const userListTitle = computed(() => {
   if (!selectedTenant.value) {
@@ -132,14 +162,6 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
         disabled: savingUser.value,
       },
       {
-        key: 'forceLogout',
-        actionCode: 'forceLogout',
-        title: '强制下线',
-        iconName: 'power',
-        danger: true,
-        disabled: savingUser.value,
-      },
-      {
         key: 'delete',
         actionCode: 'delete',
         title: '删除',
@@ -173,13 +195,16 @@ const userFormFieldFallback = computed<Record<UserFormFieldName, RecordFormField
 }));
 const userFormFieldNames = computed<UserFormFieldName[]>(() => ['username', 'enabled']);
 
-onMounted(loadUserFormDefinition);
+onMounted(() => {
+  void loadUserFormDefinition();
+});
 
 watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
 
 watch(selectedTenant, () => {
   selectedUserKey.value = undefined;
   selectedUser.value = undefined;
+  resetUserSessionRows();
   userDraft.value = createUserDraft(selectedTenant.value);
   closeUserDetail();
   userReloadKey.value += 1;
@@ -381,10 +406,6 @@ function handleUserDetailAction(action: RecordActionItem) {
     void resetUserLoginPassword();
     return;
   }
-  if (action.key === 'forceLogout' && selectedUser.value) {
-    void forceLogoutUser();
-    return;
-  }
   if (action.key === 'delete') {
     void removeUser(selectedUser.value);
   }
@@ -468,26 +489,60 @@ async function resetUserLoginPassword() {
   });
 }
 
-async function forceLogoutUser() {
+async function revokeUserSession(record: Partial<UserAccount> | QueryListRecord, session: UserSessionView) {
   await executeStaticRecordAction<UserAccount, number>({
     loading: savingUser,
     source: 'user-management',
-    record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
-    canExecute: (user) => userContext.can('forceLogout', user.id) === true,
-    deniedMessage: '当前用户无权强制用户下线',
+    record: () => (record?.id ? (record as UserAccount) : undefined),
+    canExecute: (user) => userContext.can('revokeSession', user.id) === true && !session.current,
+    deniedMessage: '当前用户无权下线该登录会话',
     confirm: (user) =>
       confirmAction({
-        title: '强制下线',
-        content: `确认强制用户「${userTitle(user)}」下线？`,
-        okText: '强制下线',
+        title: '下线登录会话',
+        content: `确认下线用户「${userTitle(user)}」的该登录会话？`,
+        okText: '下线',
         danger: true,
       }),
     execute: (user) =>
       userContext.http.request<number>({
         method: 'POST',
-        path: `/iam.user/forceLogout/${encodeURIComponent(user.id!)}`,
+        path: `/iam.user/${encodeURIComponent(user.id!)}/sessions/${encodeURIComponent(session.id)}/revoke`,
       }),
-    onExecuted: () => {
+    onExecuted: (_, user) => {
+      void loadUserSessions(user.id);
+      userReloadKey.value += 1;
+    },
+  });
+}
+
+async function revokeAllUserSessions(record: Partial<UserAccount> | QueryListRecord) {
+  const userId = String(record.id ?? '');
+  const sessionIds = revokableUserSessions(userId).map((session) => session.id);
+  if (sessionIds.length === 0) {
+    presentPlatformMessage('当前没有可下线的登录会话', { source: 'user-management', phase: 'validation' });
+    return;
+  }
+  await executeStaticRecordAction<UserAccount, number>({
+    loading: savingUser,
+    source: 'user-management',
+    record: () => (record?.id ? (record as UserAccount) : undefined),
+    canExecute: (user) => userContext.can('revokeSessions', user.id) === true,
+    deniedMessage: '当前用户无权批量下线登录会话',
+    confirm: (user) =>
+      confirmAction({
+        title: '批量下线登录会话',
+        content: `确认下线用户「${userTitle(user)}」的 ${sessionIds.length} 个登录会话？`,
+        okText: '全部下线',
+        danger: true,
+      }),
+    execute: (user) =>
+      userContext.http.request<number>({
+        method: 'POST',
+        path: `/iam.user/${encodeURIComponent(user.id!)}/sessions/revoke`,
+        body: { sessionIds },
+      }),
+    onExecuted: (_, user) => {
+      void loadUserSessions(user.id);
       userReloadKey.value += 1;
     },
   });
@@ -561,6 +616,31 @@ function commitUserDetailRecord(record: UserAccount, nextMode: UserDetailMode = 
   userDetailRequestSeq.value += 1;
   const requestSeq = userDetailRequestSeq.value;
   return requestSeq;
+}
+
+function revokableUserSessions(userId: string | undefined) {
+  if (!userId || userContext.can('revokeSession', userId) !== true) {
+    return [];
+  }
+  return userSessionState(userId).records.filter((session) => !session.current);
+}
+
+function canRevokeUserSession(userId: string | undefined, session: UserSessionView) {
+  return Boolean(userId) && !session.current && userContext.can('revokeSession', userId) === true;
+}
+
+function sessionTitle(session: UserSessionView) {
+  return session.loginUserAgent || session.loginIp || session.id;
+}
+
+function sessionTerminalTitle(session: UserSessionView) {
+  const terminal = session.terminalTypeTitle || '其他终端';
+  const platform = session.platformTypeTitle;
+  return platform ? `${terminal} / ${platform}` : terminal;
+}
+
+function sessionTime(value: string | undefined) {
+  return value ?? '-';
 }
 
 function createUserDraft(tenant: Tenant | undefined): Partial<UserAccount> {
@@ -687,10 +767,13 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       class="user-list-panel"
       :context="userListContext"
       :title="userListTitle"
+      :columns="userListColumns"
       standard-crud-actions
       standard-crud-row-actions
       create-title="新建用户"
       :selected-key="selectedUserKey"
+      :expanded-row-keys="expandedUserKeys"
+      :cell-renderers="{ onlineStatus: userOnlineStatusTitle }"
       :reload-key="userReloadKey"
       :ready="userListReady"
       quick-search-placeholder="搜索账号"
@@ -699,8 +782,91 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       @action="handleUserListAction"
       @row-action="handleUserRowAction"
       @row-dblclick="handleUserRowDblclick"
+      @row-expand="handleUserRowExpand"
+      @loaded="handleUserListLoaded"
       @select="selectedUserKey = String($event.id ?? '')"
-    />
+    >
+      <template #expandedRow="{ record }">
+        <section class="user-session-section">
+          <div class="user-session-header">
+            <h3>在线会话</h3>
+            <div class="user-session-actions">
+              <UiButton
+                type="text"
+                icon-name="reload"
+                :disabled="userSessionState(String(record.id ?? '')).loading"
+                @click="loadUserSessions(String(record.id ?? ''))"
+              >
+                刷新
+              </UiButton>
+              <UiButton
+                v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
+                danger
+                icon-name="power"
+                :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
+                @click="revokeAllUserSessions(record)"
+              >
+                全部下线
+              </UiButton>
+            </div>
+          </div>
+          <UiSpin
+            v-if="userSessionState(String(record.id ?? '')).loading"
+            class="user-session-state"
+            tip="加载在线会话"
+          />
+          <UiError
+            v-else-if="userSessionState(String(record.id ?? '')).error"
+            title="在线会话加载失败"
+            :message="userSessionState(String(record.id ?? '')).error ?? '无法加载在线会话，请重试'"
+          />
+          <p
+            v-else-if="userSessionState(String(record.id ?? '')).records.length === 0"
+            class="user-session-empty"
+          >
+            当前无在线会话
+          </p>
+          <div v-else class="user-session-list">
+            <article
+              v-for="session in userSessionState(String(record.id ?? '')).records"
+              :key="session.id"
+              class="user-session-item"
+            >
+              <div class="user-session-main">
+                <strong :title="sessionTitle(session)">{{ sessionTitle(session) }}</strong>
+                <span v-if="session.current" class="user-session-badge">当前会话</span>
+              </div>
+              <dl class="user-session-meta">
+                <div>
+                  <dt>登录</dt>
+                  <dd :title="sessionTime(session.issuedAt)">{{ sessionTime(session.issuedAt) }}</dd>
+                </div>
+                <div>
+                  <dt>活跃</dt>
+                  <dd :title="sessionTime(session.lastSeenAt)">{{ sessionTime(session.lastSeenAt) }}</dd>
+                </div>
+                <div>
+                  <dt>IP</dt>
+                  <dd :title="session.loginIp || '-'">{{ session.loginIp || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>终端</dt>
+                  <dd :title="sessionTerminalTitle(session)">{{ sessionTerminalTitle(session) }}</dd>
+                </div>
+              </dl>
+              <UiButton
+                danger
+                icon-name="power"
+                :disabled="savingUser || !canRevokeUserSession(String(record.id ?? ''), session)"
+                @click="revokeUserSession(record, session)"
+              >
+                下线
+              </UiButton>
+            </article>
+          </div>
+        </section>
+      </template>
+    </RecordQueryListPanel>
 
     <RecordDetailDrawer
       :open="userDetailOpen"
@@ -848,6 +1014,125 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
 
 .user-password-reset-result small {
   color: var(--muyun-text-muted);
+}
+
+.user-session-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 14px 46px;
+  border-top: 1px solid var(--muyun-border-subtle);
+  background: #fbfcfe;
+}
+
+.user-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.user-session-header h3 {
+  margin: 0;
+  color: var(--muyun-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-session-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.user-session-state {
+  min-height: 56px;
+}
+
+.user-session-empty {
+  margin: 0;
+  color: var(--muyun-text-muted);
+  font-size: 13px;
+}
+
+.user-session-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--muyun-border-subtle);
+  border-radius: 6px;
+  background: var(--muyun-surface);
+}
+
+.user-session-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(360px, 2fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--muyun-border-subtle);
+}
+
+.user-session-item:last-child {
+  border-bottom: 0;
+}
+
+.user-session-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-session-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muyun-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-session-badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 12px;
+}
+
+.user-session-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.user-session-meta div {
+  min-width: 0;
+}
+
+.user-session-meta dt {
+  color: var(--muyun-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.user-session-meta dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--muyun-text);
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-session-item > :deep(.ant-btn) {
+  min-width: 64px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .user-detail-state {

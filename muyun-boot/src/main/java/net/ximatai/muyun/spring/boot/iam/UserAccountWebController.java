@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -40,6 +41,9 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import net.ximatai.muyun.spring.iam.user.UserSessionStatusView;
+import net.ximatai.muyun.spring.iam.user.UserSessionView;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,7 +53,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
@@ -73,23 +80,26 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     private final RoleService roleService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeService employeeService;
+    private final UserSessionService userSessionService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
     public UserAccountWebController() {
-        this(null, null, null);
+        this(null, null, null, null);
     }
 
     public UserAccountWebController(ObjectProvider<RoleService> roleService) {
-        this(roleService, null, null);
+        this(roleService, null, null, null);
     }
 
     @Autowired
     public UserAccountWebController(ObjectProvider<RoleService> roleService,
                                     ObjectProvider<EmployeeAccountService> employeeAccountService,
-                                    ObjectProvider<EmployeeService> employeeService) {
+                                    ObjectProvider<EmployeeService> employeeService,
+                                    ObjectProvider<UserSessionService> userSessionService) {
         this.roleService = roleService == null ? null : roleService.getIfAvailable();
         this.employeeAccountService = employeeAccountService == null ? null : employeeAccountService.getIfAvailable();
         this.employeeService = employeeService == null ? null : employeeService.getIfAvailable();
+        this.userSessionService = userSessionService == null ? null : userSessionService.getIfAvailable();
     }
 
     @Autowired(required = false)
@@ -169,6 +179,86 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         }));
     }
 
+    @GetMapping("/{id}/sessions")
+    @CustomActionEndpoint(value = "sessions", title = "在线会话",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    public List<UserSessionView> activeSessions(@PathVariable String id, HttpServletRequest request) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            if (userSessionService == null) {
+                return List.of();
+            }
+            return userSessionService.activeSessionsOfUser(id, bearerToken(request));
+        }));
+    }
+
+    @PostMapping("/sessions/status")
+    @CustomActionEndpoint(value = "sessionStatuses", title = "在线状态", level = PlatformActionLevel.LIST,
+            dataAuth = true)
+    public List<UserSessionStatusView> sessionStatuses(@RequestBody(required = false) SessionStatusRequest request) {
+        return webScope(() -> {
+            if (userSessionService == null || request == null) {
+                return List.of();
+            }
+            List<String> userIds = request.userIds() == null ? List.of() : request.userIds().stream()
+                    .filter(userId -> userId != null && !userId.isBlank())
+                    .distinct()
+                    .toList();
+            if (userIds.isEmpty()) {
+                return List.of();
+            }
+            requireReadableUsers(userIds);
+            return userSessionService.activeSessionStatuses(userIds);
+        });
+    }
+
+    private void requireReadableUsers(List<String> userIds) {
+        DataScopeAbility<UserAccount> dataScope = DataScopeAbility.cast(service());
+        List<UserAccount> visibleUsers = dataScope.listForAction(PlatformAction.QUERY, Criteria.of().in("id", userIds));
+        Set<String> visibleUserIds = visibleUsers.stream()
+                .map(UserAccount::getId)
+                .collect(Collectors.toSet());
+        if (visibleUserIds.size() != userIds.size() || !visibleUserIds.containsAll(userIds)) {
+            throw new net.ximatai.muyun.spring.common.exception.PlatformException(
+                    "record data permission denied: " + UserAccountService.MODULE_ALIAS + ".query");
+        }
+    }
+
+    @PostMapping("/{id}/sessions/{sessionId}/revoke")
+    @CustomActionEndpoint(value = "revokeSession", title = "下线会话",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    @BusinessMutationResult(code = "iam.user-session.revoked", message = "登录会话已下线",
+            change = BusinessMutationChange.UPDATED, module = UserAccountService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
+    public int revokeSession(@PathVariable String id,
+                             @PathVariable String sessionId,
+                             HttpServletRequest request) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            if (userSessionService == null) {
+                return 0;
+            }
+            return userSessionService.revokeUserSession(id, sessionId, bearerToken(request));
+        }));
+    }
+
+    @PostMapping("/{id}/sessions/revoke")
+    @CustomActionEndpoint(value = "revokeSessions", title = "批量下线会话",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    @BusinessMutationResult(code = "iam.user-session.revoked-batch", message = "登录会话已下线",
+            change = BusinessMutationChange.UPDATED, module = UserAccountService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
+    public int revokeSessions(@PathVariable String id,
+                              @RequestBody RevokeSessionsRequest requestBody,
+                              HttpServletRequest request) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            if (userSessionService == null) {
+                return 0;
+            }
+            return userSessionService.revokeUserSessions(id,
+                    requestBody == null ? List.of() : requestBody.sessionIds(),
+                    bearerToken(request));
+        }));
+    }
+
     @Override
     public Optional<String> tenantIdForCreate(UserAccount record) {
         return tenantIdForUser(record);
@@ -227,6 +317,12 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     public record ResetPasswordResponse(int count, String temporaryPassword, java.time.Instant expiresAt) {
+    }
+
+    public record RevokeSessionsRequest(List<String> sessionIds) {
+    }
+
+    public record SessionStatusRequest(List<String> userIds) {
     }
 
     public record UserSelectorRequest(
@@ -325,5 +421,17 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             return Optional.empty();
         }
         return Optional.of(user.getTenantId().trim());
+    }
+
+    private String bearerToken(HttpServletRequest request) {
+        String header = request == null ? null : request.getHeader("Authorization");
+        if (header == null || header.isBlank()) {
+            return null;
+        }
+        String prefix = "Bearer ";
+        if (!header.regionMatches(true, 0, prefix, 0, prefix.length())) {
+            return null;
+        }
+        return header.substring(prefix.length()).trim();
     }
 }
