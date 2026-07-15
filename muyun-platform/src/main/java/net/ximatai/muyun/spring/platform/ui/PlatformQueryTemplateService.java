@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -65,7 +66,8 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
     public void beforeDelete(String id) {
         PlatformQueryTemplate existing = select(id);
         if (existing != null && Boolean.TRUE.equals(existing.getPublished())) {
-            throw new PlatformException("Published query template cannot be deleted; unpublish first: " + id);
+            throw BusinessExceptions.warning("platform.query-template.published-delete-denied",
+                    "Published query template cannot be deleted; unpublish first: " + id);
         }
     }
 
@@ -84,7 +86,8 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
     public PlatformQueryTemplate requireQueryTemplate(String id) {
         PlatformQueryTemplate template = id == null || id.isBlank() ? null : select(id);
         if (template == null) {
-            throw new PlatformException("Query template requires existing config: " + id);
+            throw BusinessExceptions.warning("platform.query-template.not-found",
+                    "Query template requires existing config: " + id);
         }
         return template;
     }
@@ -107,7 +110,8 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
         String moduleAlias = PlatformNameRules.requireModuleAlias(template.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
         if (module == null) {
-            throw new PlatformException("Query template requires existing module: " + moduleAlias);
+            throw BusinessExceptions.warning("platform.query-template.module-not-found",
+                    "Query template requires existing module: " + moduleAlias);
         }
         String alias = PlatformNameRules.requireIdentifier(template.getAlias(), "queryTemplateAlias");
         template.setModuleAlias(moduleAlias);
@@ -146,12 +150,14 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
                 && Objects.equals(existing.getSortOrder(), updated.getSortOrder())) {
             return;
         }
-        throw new PlatformException("Published query template cannot be edited; unpublish first: " + existing.getId());
+        throw BusinessExceptions.warning("platform.query-template.published-edit-denied",
+                "Published query template cannot be edited; unpublish first: " + existing.getId());
     }
 
     private void rejectDirectPublish(PlatformQueryTemplate template) {
         if (Boolean.TRUE.equals(template.getPublished()) && !PlatformPageConfigPublishContext.active()) {
-            throw new PlatformException("Query template can only be published through publish service: "
+            throw BusinessExceptions.warning("platform.query-template.direct-publish-denied",
+                    "Query template can only be published through publish service: "
                     + template.getId());
         }
     }
@@ -161,7 +167,8 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
             return;
         }
         if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
-            throw new PlatformException("Query template can only be published through publish service: "
+            throw BusinessExceptions.warning("platform.query-template.direct-publish-denied",
+                    "Query template can only be published through publish service: "
                     + updated.getId());
         }
     }

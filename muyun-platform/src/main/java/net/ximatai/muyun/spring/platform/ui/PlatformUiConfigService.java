@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,8 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
     public void beforeDelete(String id) {
         PlatformUiConfig existing = select(id);
         if (existing != null && Boolean.TRUE.equals(existing.getPublished())) {
-            throw new PlatformException("Published UI config cannot be deleted; unpublish first: " + id);
+            throw BusinessExceptions.warning("platform.ui-config.published-delete-denied",
+                    "Published UI config cannot be deleted; unpublish first: " + id);
         }
     }
 
@@ -81,7 +83,8 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
     public PlatformUiConfig requireUiConfig(String id) {
         PlatformUiConfig uiConfig = id == null || id.isBlank() ? null : select(id);
         if (uiConfig == null) {
-            throw new PlatformException("UI config requires existing config: " + id);
+            throw BusinessExceptions.warning("platform.ui-config.not-found",
+                    "UI config requires existing config: " + id);
         }
         return uiConfig;
     }
@@ -143,12 +146,14 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
                 && Objects.equals(existing.getSortOrder(), updated.getSortOrder())) {
             return;
         }
-        throw new PlatformException("Published UI config cannot be edited; unpublish first: " + existing.getId());
+        throw BusinessExceptions.warning("platform.ui-config.published-edit-denied",
+                "Published UI config cannot be edited; unpublish first: " + existing.getId());
     }
 
     private void rejectDirectPublish(PlatformUiConfig uiConfig) {
         if (Boolean.TRUE.equals(uiConfig.getPublished()) && !PlatformPageConfigPublishContext.active()) {
-            throw new PlatformException("UI config can only be published through publish service: " + uiConfig.getId());
+            throw BusinessExceptions.warning("platform.ui-config.direct-publish-denied",
+                    "UI config can only be published through publish service: " + uiConfig.getId());
         }
     }
 
@@ -157,7 +162,8 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
             return;
         }
         if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
-            throw new PlatformException("UI config can only be published through publish service: " + updated.getId());
+            throw BusinessExceptions.warning("platform.ui-config.direct-publish-denied",
+                    "UI config can only be published through publish service: " + updated.getId());
         }
     }
 }

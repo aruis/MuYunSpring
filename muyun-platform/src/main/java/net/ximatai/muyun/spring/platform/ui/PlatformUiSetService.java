@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -68,7 +69,8 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
     public PlatformUiSet requireUiSet(String id) {
         PlatformUiSet uiSet = id == null || id.isBlank() ? null : select(id);
         if (uiSet == null) {
-            throw new PlatformException("UI set requires existing config: " + id);
+            throw BusinessExceptions.warning("platform.ui-set.not-found",
+                    "UI set requires existing config: " + id);
         }
         return uiSet;
     }
@@ -77,13 +79,14 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
         String moduleAlias = PlatformNameRules.requireModuleAlias(uiSet.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
         if (module == null) {
-            throw new PlatformException("UI set requires existing module: " + moduleAlias);
+            throw BusinessExceptions.warning("platform.ui-set.module-not-found",
+                    "UI set requires existing module: " + moduleAlias);
         }
         String alias = PlatformNameRules.requireIdentifier(uiSet.getAlias(), "uiSetAlias");
         uiSet.setModuleAlias(moduleAlias);
         uiSet.setAlias(alias);
         if (uiSet.getSetType() == null) {
-            throw new PlatformException("UI set type must not be null");
+            throw BusinessExceptions.warning("platform.ui-set.type-required", "UI set type must not be null");
         }
         if (uiSet.getTitle() == null || uiSet.getTitle().isBlank()) {
             uiSet.setTitle(alias);
