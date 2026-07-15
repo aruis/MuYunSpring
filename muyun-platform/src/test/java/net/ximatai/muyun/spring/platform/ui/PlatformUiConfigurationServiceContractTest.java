@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
@@ -889,7 +890,9 @@ class PlatformUiConfigurationServiceContractTest {
         publishedConfig.setLayoutJson("{\"changed\":true}");
         PlatformUiConfig editedPublishedConfig = publishedConfig;
         assertThatThrownBy(() -> uiConfigService.update(editedPublishedConfig))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.ui-config.published-edit-denied"))
                 .hasMessageContaining("Published UI config cannot be edited");
 
         PlatformUiConfigField publishedField = uiFieldUpdate(uiConfigFieldService.select(fieldId));
@@ -916,7 +919,9 @@ class PlatformUiConfigurationServiceContractTest {
         String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
 
         assertThatThrownBy(() -> uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true)))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.ui-config.direct-publish-denied"))
                 .hasMessageContaining("only be published through publish service");
 
         String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
@@ -924,7 +929,9 @@ class PlatformUiConfigurationServiceContractTest {
         PlatformUiConfig directPublish = uiConfigUpdate(uiConfigService.select(uiConfigId));
         directPublish.setPublished(true);
         assertThatThrownBy(() -> uiConfigService.update(directPublish))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.ui-config.direct-publish-denied"))
                 .hasMessageContaining("only be published through publish service");
 
         assertThatCode(() -> publishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
@@ -944,7 +951,9 @@ class PlatformUiConfigurationServiceContractTest {
         publishedTemplate.setTitle("Changed");
         PlatformQueryTemplate editedPublishedTemplate = publishedTemplate;
         assertThatThrownBy(() -> queryTemplateService.update(editedPublishedTemplate))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.query-template.published-edit-denied"))
                 .hasMessageContaining("Published query template cannot be edited");
 
         PlatformQueryItem publishedItem = queryItemUpdate(queryItemService.select(itemId));
@@ -973,7 +982,9 @@ class PlatformUiConfigurationServiceContractTest {
         PlatformQueryTemplate directInsert = queryTemplate("crm.customer", "direct", true);
         directInsert.setPublished(true);
         assertThatThrownBy(() -> queryTemplateService.insert(directInsert))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.query-template.direct-publish-denied"))
                 .hasMessageContaining("only be published through publish service");
 
         String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
@@ -982,10 +993,39 @@ class PlatformUiConfigurationServiceContractTest {
         PlatformQueryTemplate directPublish = queryTemplateUpdate(queryTemplateService.select(templateId));
         directPublish.setPublished(true);
         assertThatThrownBy(() -> queryTemplateService.update(directPublish))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.query-template.direct-publish-denied"))
                 .hasMessageContaining("only be published through publish service");
 
         assertThatCode(() -> publishService.publishQueryTemplate(templateId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldReturnBusinessCodesForUiSetConfigurationFailures() {
+        PlatformUiSet missingModule = uiSet("crm.missing", "list", PlatformUiSetType.LIST, false);
+        assertThatThrownBy(() -> uiSetService.insert(missingModule))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code()).isEqualTo("platform.ui-set.module-not-found"))
+                .hasMessageContaining("requires existing module");
+
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        PlatformUiSet missingType = uiSet("crm.customer", "list", null, false);
+        assertThatThrownBy(() -> uiSetService.insert(missingType))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code()).isEqualTo("platform.ui-set.type-required"))
+                .hasMessageContaining("type must not be null");
+    }
+
+    @Test
+    void shouldReturnBusinessCodesForQueryTemplateConfigurationFailures() {
+        PlatformQueryTemplate missingModule = queryTemplate("crm.missing", "default", false);
+        assertThatThrownBy(() -> queryTemplateService.insert(missingModule))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.actionMessage().code())
+                                .isEqualTo("platform.query-template.module-not-found"))
+                .hasMessageContaining("requires existing module");
     }
 
     @Test
