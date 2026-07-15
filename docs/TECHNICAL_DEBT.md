@@ -58,3 +58,4 @@
 | --- | --- | --- | --- |
 | TD-005 | 引用依赖缓存失效已有本地进程内索引和动静态路径闭环，但还不是跨节点治理能力 | 多实例部署和复杂批量刷新仍需要更完整的依赖生命周期管理 | 进入缓存治理或动态发布中心时，补跨节点事件和批量重建策略 |
 | TD-006 | `CacheAbility` 仍使用进程内 Caffeine 本地缓存 | 当前已有默认容量、全量列表 TTL 和 runtime namespace 清理，但还不是可观测、可替换的缓存管理器 | 当缓存需要监控、跨节点一致性或业务级策略时，引入运行态缓存管理器 |
+| TD-030 | 实时数据变化广播仍是第一阶段通道能力 | 当前已通过 WebSocket/STOMP 打通 `CommittedChangeSet` 广播和前端 data change 订阅，但仍是 simple broker + 尽力投递；尚未治理租户/作用域精准过滤、多实例 broker relay、outbox 补偿、消息 offset、SockJS fallback、连接监控和限流 | 进入多实例部署、生产网关代理、跨租户高安全场景、通知中心/IM 产品化或数据变化可靠补发时，按 [平台实时通信设计](platform/REALTIME_COMMUNICATION.md) 回收对应可靠性、隔离和运维能力 |

@@ -43,6 +43,7 @@
 | [外部写入接入边界](EXTERNAL_WRITE_BOUNDARY.md) | 说明外部写入应复用标准模块动作、权限、租户、校验、生命周期和运行审计；幂等、回执、重试和报文治理按触发条件后续建设。 |
 | [后台任务与异步批次边界](BACKGROUND_JOB_AND_BATCH_BOUNDARY.md) | 说明同步批量动作、异步导入、补偿任务、进度查询、重试和批次模型的建设触发条件。 |
 | [动作结果与数据变更契约](ACTION_RESULT_AND_DATA_CHANGE.md) | 说明业务动作成功回执、可读消息、数据变化事实、HTTP 包装和异步广播之间的统一契约。 |
+| [平台实时通信设计](REALTIME_COMMUNICATION.md) | 说明 WebSocket/STOMP 实时通信底座、前后端封装边界、数据变化广播、双向通信预留和后续可靠性演进。 |
 
 ## 平台运行模式
 

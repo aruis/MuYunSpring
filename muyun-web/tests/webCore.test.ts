@@ -14,8 +14,14 @@ import {
   platformErrorCodes,
   resolveGlobalErrorPresentation,
   actionResultData,
+  connectRealtimeDataChanges,
+  createDataChangeDispatcher,
   webDataChanges,
+  createRealtimeClient,
   withWebActionResultChanges,
+  type StompClientAdapter,
+  type StompClientFactoryOptions,
+  type StompSubscriptionLike,
 } from '../src/web-core/index.ts';
 
 test('auth logout posts bearer token to backend logout endpoint', async () => {
@@ -207,6 +213,114 @@ test('web action result data unwraps backend action envelope', () => {
     id: 'user-1',
     username: 'alice',
   });
+});
+
+test('data change dispatcher deduplicates change sets by id', async () => {
+  const dispatcher = createDataChangeDispatcher();
+  const handled: string[] = [];
+  dispatcher.subscribe((changeSet) => {
+    handled.push(changeSet.changeSetId);
+  });
+
+  assert.equal(
+    await dispatcher.dispatch({
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' }],
+    }),
+    true,
+  );
+  assert.equal(
+    await dispatcher.dispatch({
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' }],
+    }),
+    false,
+  );
+  dispatcher.markHandled('change-set-2');
+  assert.equal(
+    await dispatcher.dispatch({
+      changeSetId: 'change-set-2',
+      changes: [{ type: 'record-deleted', moduleAlias: 'iam.employee', recordId: 'emp-1' }],
+    }),
+    false,
+  );
+  assert.deepEqual(handled, ['change-set-1']);
+});
+
+test('realtime client sends bearer header and restores subscriptions after reconnect', async () => {
+  let factoryOptions: StompClientFactoryOptions | undefined;
+  const stomp = new FakeStompClient();
+  const realtime = createRealtimeClient({
+    baseUrl: 'https://api.local/base',
+    token: 'token-1',
+    clientFactory: (options) => {
+      factoryOptions = options;
+      stomp.options = options;
+      return stomp;
+    },
+  });
+  const received: unknown[] = [];
+
+  realtime.subscribe(
+    { destination: '/user/queue/platform/data-changes', type: 'platform.data-change' },
+    (payload) => {
+      received.push(payload);
+    },
+  );
+  await realtime.connect();
+  stomp.connect();
+
+  assert.equal(factoryOptions?.brokerURL, 'wss://api.local/ws/platform');
+  assert.equal(factoryOptions?.connectHeaders.Authorization, 'Bearer token-1');
+  assert.equal(stomp.subscribeCalls, 1);
+
+  stomp.emit(
+    '/user/queue/platform/data-changes',
+    JSON.stringify({
+      id: 'message-1',
+      type: 'platform.data-change',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: { changeSetId: 'change-set-1', changes: [] },
+    }),
+  );
+  stomp.connect();
+
+  assert.deepEqual(received, [{ changeSetId: 'change-set-1', changes: [] }]);
+  assert.equal(stomp.subscribeCalls, 2);
+});
+
+test('realtime data change channel dispatches committed change sets', async () => {
+  const stomp = new FakeStompClient();
+  const realtime = createRealtimeClient({
+    clientFactory: (options) => {
+      stomp.options = options;
+      return stomp;
+    },
+  });
+  const dispatcher = createDataChangeDispatcher();
+  const handled: string[] = [];
+  dispatcher.subscribe((changeSet) => {
+    handled.push(changeSet.changeSetId);
+  });
+
+  connectRealtimeDataChanges(realtime, dispatcher);
+  await realtime.connect();
+  stomp.connect();
+  stomp.emit(
+    '/user/queue/platform/data-changes',
+    JSON.stringify({
+      id: 'message-1',
+      type: 'platform.data-change',
+      occurredAt: '2026-07-15T10:00:00Z',
+      payload: {
+        changeSetId: 'change-set-1',
+        changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
+      },
+    }),
+  );
+  await Promise.resolve();
+
+  assert.deepEqual(handled, ['change-set-1']);
 });
 
 test('static module client normalizes backend action envelopes', async () => {
@@ -707,6 +821,49 @@ function runtimeContext() {
       { actionCode: 'disable', permissionActionCode: 'enable', title: 'Disable', authorized: true },
     ],
   };
+}
+
+class FakeStompClient implements StompClientAdapter {
+  connected = false;
+  options?: StompClientFactoryOptions;
+  subscribeCalls = 0;
+  private readonly subscriptions = new Map<string, Set<(message: { body: string }) => void>>();
+
+  activate() {
+    // The test controls the exact connect timing through connect().
+  }
+
+  async deactivate() {
+    this.connected = false;
+    this.options?.onDisconnect();
+  }
+
+  connect() {
+    this.connected = true;
+    this.options?.onConnect();
+  }
+
+  subscribe(destination: string, handler: (message: { body: string }) => void): StompSubscriptionLike {
+    this.subscribeCalls += 1;
+    const handlers = this.subscriptions.get(destination) ?? new Set();
+    handlers.add(handler);
+    this.subscriptions.set(destination, handlers);
+    return {
+      unsubscribe: () => {
+        handlers.delete(handler);
+      },
+    };
+  }
+
+  publish() {
+    // Publish behavior is not needed by these tests.
+  }
+
+  emit(destination: string, body: string) {
+    for (const handler of this.subscriptions.get(destination) ?? []) {
+      handler({ body });
+    }
+  }
 }
 
 test('normalizeError keeps AppError and wraps unknown errors', () => {

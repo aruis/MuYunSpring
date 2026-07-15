@@ -6,7 +6,10 @@ import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.DataChangeModuleAliasResolver;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
+import net.ximatai.muyun.spring.boot.realtime.DataChangeRealtimePublisher;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -19,19 +22,39 @@ import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
 @RestControllerAdvice
 @ConditionalOnBean(DataChangeModuleAliasResolver.class)
 public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ActionResultResponseAdvice.class);
+
     private final DataChangeModuleAliasResolver moduleAliasResolver;
     private final ObjectMapper objectMapper;
+    private final DataChangeRealtimePublisher dataChangeRealtimePublisher;
 
     public ActionResultResponseAdvice(DataChangeModuleAliasResolver moduleAliasResolver,
                                       ObjectMapper objectMapper) {
+        this(moduleAliasResolver, objectMapper, (DataChangeRealtimePublisher) null);
+    }
+
+    @Autowired
+    public ActionResultResponseAdvice(DataChangeModuleAliasResolver moduleAliasResolver,
+                                      ObjectMapper objectMapper,
+                                      ObjectProvider<DataChangeRealtimePublisher> dataChangeRealtimePublisher) {
+        this(moduleAliasResolver, objectMapper,
+                dataChangeRealtimePublisher == null ? null : dataChangeRealtimePublisher.getIfAvailable());
+    }
+
+    ActionResultResponseAdvice(DataChangeModuleAliasResolver moduleAliasResolver,
+                               ObjectMapper objectMapper,
+                               DataChangeRealtimePublisher dataChangeRealtimePublisher) {
         this.moduleAliasResolver = moduleAliasResolver;
         this.objectMapper = objectMapper;
+        this.dataChangeRealtimePublisher = dataChangeRealtimePublisher;
     }
 
     @Override
@@ -63,6 +86,7 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         }
         reportAnnotatedMutationResult(returnType, request);
         CommittedChangeSet changeSet = context.committedChangeSet(moduleAliasResolver);
+        context.afterCommit(moduleAliasResolver, this::publishDataChange);
         ActionResultResponse actionResult = new ActionResultResponse(
                 body,
                 context.message(),
@@ -75,6 +99,16 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
             return json(actionResult);
         }
         return actionResult;
+    }
+
+    private void publishDataChange(CommittedChangeSet changeSet) {
+        if (dataChangeRealtimePublisher != null) {
+            try {
+                dataChangeRealtimePublisher.publish(changeSet);
+            } catch (RuntimeException ex) {
+                LOGGER.warn("failed to publish data change set {}", changeSet.changeSetId(), ex);
+            }
+        }
     }
 
     private String json(ActionResultResponse actionResult) {

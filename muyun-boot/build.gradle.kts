@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":muyun-platform"))
     implementation(project(":muyun-iam"))
     implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.websocket)
     implementation(libs.spring.boot.jackson2)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.tx)
