@@ -65,6 +65,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     private final PasswordPolicyRuleService passwordPolicyRuleService;
     private final AccountRoleGrantDao accountRoleGrantDao;
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
+    private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
@@ -89,7 +90,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                               PasswordHashingService passwordHashingService,
                               ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
                               ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
-                              ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao) {
+                              ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao,
+                              ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
         this.passwordPolicyRuleService = passwordPolicyRuleService == null
@@ -97,6 +99,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 : passwordPolicyRuleService.getIfAvailable();
         this.accountRoleGrantDao = accountRoleGrantDao == null ? null : accountRoleGrantDao.getIfAvailable();
         this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
+        this.userSecurityEventPublisher = userSecurityEventPublisher == null
+                ? () -> UserSecurityEventPublisher.NOOP
+                : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP);
     }
 
     public UserAccountService(UserAccountDao userAccountDao,
@@ -125,6 +130,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         this.passwordHashingService = passwordHashingService;
         this.passwordPolicyRuleService = passwordPolicyRuleService;
         this.accountRoleGrantDao = accountRoleGrantDao;
+        this.userSecurityEventPublisher = () -> UserSecurityEventPublisher.NOOP;
         Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
                 ? Optional.empty()
                 : dataScopeCriteriaService;
@@ -300,7 +306,11 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setPasswordStatus(PasswordStatus.NORMAL);
         user.setPasswordChangedAt(Instant.now());
         user.setPasswordExpiresAt(null);
-        return getDao().updateById(user);
+        int count = getDao().updateById(user);
+        if (count > 0) {
+            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+        }
+        return count;
     }
 
     public PasswordResetResult resetPassword(String userId) {
@@ -318,6 +328,9 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
         int count = getDao().updateById(user);
+        if (count > 0) {
+            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordReset(validUserId));
+        }
         return new PasswordResetResult(count, count > 0 ? temporaryPassword : null, user.getPasswordExpiresAt());
     }
 
@@ -335,7 +348,11 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         user.setPasswordExpiresAt(null);
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
-        return getDao().updateById(user);
+        int count = getDao().updateById(user);
+        if (count > 0) {
+            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+        }
+        return count;
     }
 
     public boolean passwordChangeRequired(UserAccount user, Instant now) {

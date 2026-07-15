@@ -40,7 +40,6 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,27 +70,23 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             null
     );
 
-    private final UserSessionService userSessionService;
     private final RoleService roleService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeService employeeService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
-    public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService) {
-        this(userSessionService, null, null, null);
+    public UserAccountWebController() {
+        this(null, null, null);
     }
 
-    public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService,
-                                    ObjectProvider<RoleService> roleService) {
-        this(userSessionService, roleService, null, null);
+    public UserAccountWebController(ObjectProvider<RoleService> roleService) {
+        this(roleService, null, null);
     }
 
     @Autowired
-    public UserAccountWebController(ObjectProvider<UserSessionService> userSessionService,
-                                    ObjectProvider<RoleService> roleService,
+    public UserAccountWebController(ObjectProvider<RoleService> roleService,
                                     ObjectProvider<EmployeeAccountService> employeeAccountService,
                                     ObjectProvider<EmployeeService> employeeService) {
-        this.userSessionService = userSessionService == null ? null : userSessionService.getIfAvailable();
         this.roleService = roleService == null ? null : roleService.getIfAvailable();
         this.employeeAccountService = employeeAccountService == null ? null : employeeAccountService.getIfAvailable();
         this.employeeService = employeeService == null ? null : employeeService.getIfAvailable();
@@ -145,11 +140,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     public int changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
-            int changed = service().changePassword(id, request.password());
-            if (changed > 0 && userSessionService != null) {
-                userSessionService.revokeUserSessions(id);
-            }
-            return changed;
+            return service().changePassword(id, request.password());
         }));
     }
 
@@ -162,9 +153,6 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     public ResetPasswordResponse resetPassword(@PathVariable String id) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             UserAccountService.PasswordResetResult result = service().resetPassword(id);
-            if (result.count() > 0 && userSessionService != null) {
-                userSessionService.revokeUserSessions(id);
-            }
             return new ResetPasswordResponse(result.count(), result.temporaryPassword(), result.expiresAt());
         }));
     }

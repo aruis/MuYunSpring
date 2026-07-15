@@ -100,7 +100,7 @@ class StaticModuleDefinitionScannerTest {
                     new PasswordHashingService());
             context.registerBean(UserAccountService.class, () -> userAccountService);
             context.registerBean(UserAccountWebController.class, () -> {
-                UserAccountWebController controller = new UserAccountWebController(null);
+                UserAccountWebController controller = new UserAccountWebController();
                 ReflectionTestUtils.setField(controller, "service", userAccountService);
                 return controller;
             });

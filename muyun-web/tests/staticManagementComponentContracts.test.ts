@@ -918,6 +918,12 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(workbenchSource, /title: '修改密码'/);
   assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
   assert.match(appSource, /authClient\.changeOwnPassword/);
+  assert.match(appSource, /onUserNotification: handleSecurityNotification/);
+  assert.match(appSource, /function handleSecurityNotification\(notification: WebUserNotification\)/);
+  assert.match(appSource, /startSecurityLogoutCountdown\(5\)/);
+  assert.match(appSource, /function forceLocalLogout\(\)/);
+  assert.match(appSource, /v-if="securityNotification"/);
+  assert.match(appSource, /立即重新登录/);
   assert.match(appSource, /effectiveAuthToken/);
   assert.match(appSource, /currentPassword: currentPassword\.value/);
   assert.match(appSource, /newPassword: newPassword\.value/);

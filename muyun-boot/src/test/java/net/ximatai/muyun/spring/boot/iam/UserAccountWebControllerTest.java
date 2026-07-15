@@ -6,11 +6,9 @@ import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,7 +18,6 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -34,10 +31,9 @@ class UserAccountWebControllerTest {
     }
 
     @Test
-    void shouldRevokeUserSessionsAfterPasswordChanged() {
+    void shouldDelegatePasswordChangeToService() {
         UserAccountService userAccountService = mock(UserAccountService.class);
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        UserAccountWebController controller = new UserAccountWebController(provider(userSessionService));
+        UserAccountWebController controller = new UserAccountWebController();
         ReflectionTestUtils.setField(controller, "service", userAccountService);
         when(userAccountService.changePassword("user-1", "secret2")).thenReturn(1);
 
@@ -46,14 +42,13 @@ class UserAccountWebControllerTest {
                     new UserAccountWebController.ChangePasswordRequest("secret2"))).isEqualTo(1);
         }
 
-        verify(userSessionService).revokeUserSessions("user-1");
+        verify(userAccountService).changePassword("user-1", "secret2");
     }
 
     @Test
-    void shouldRevokeUserSessionsAfterPasswordReset() {
+    void shouldDelegatePasswordResetToService() {
         UserAccountService userAccountService = mock(UserAccountService.class);
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        UserAccountWebController controller = new UserAccountWebController(provider(userSessionService));
+        UserAccountWebController controller = new UserAccountWebController();
         ReflectionTestUtils.setField(controller, "service", userAccountService);
         when(userAccountService.resetPassword("user-1")).thenReturn(
                 new UserAccountService.PasswordResetResult(1, "temp-secret", Instant.parse("2026-07-08T00:00:00Z")));
@@ -65,14 +60,13 @@ class UserAccountWebControllerTest {
             assertThat(response.temporaryPassword()).isEqualTo("temp-secret");
         }
 
-        verify(userSessionService).revokeUserSessions("user-1");
+        verify(userAccountService).resetPassword("user-1");
     }
 
     @Test
     void shouldWrapPasswordBusinessMutationResults() throws Exception {
         UserAccountService userAccountService = mock(UserAccountService.class);
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        UserAccountWebController controller = new UserAccountWebController(provider(userSessionService));
+        UserAccountWebController controller = new UserAccountWebController();
         ReflectionTestUtils.setField(controller, "service", userAccountService);
         when(userAccountService.changePassword("user-1", "secret2")).thenReturn(1);
         when(userAccountService.resetPassword("user-1")).thenReturn(
@@ -107,15 +101,6 @@ class UserAccountWebControllerTest {
                     .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.user' && @.recordId == 'user-1')]")
                             .exists());
         }
-
-        verify(userSessionService, times(2)).revokeUserSessions("user-1");
-    }
-
-    @SuppressWarnings("unchecked")
-    private ObjectProvider<UserSessionService> provider(UserSessionService userSessionService) {
-        ObjectProvider<UserSessionService> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(userSessionService);
-        return provider;
     }
 
     private static String moduleAlias(Class<?> moduleType) {

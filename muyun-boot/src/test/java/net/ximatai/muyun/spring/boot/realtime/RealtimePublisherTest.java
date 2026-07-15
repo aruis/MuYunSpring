@@ -4,12 +4,25 @@ import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.DataChange;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.web.RequestTraceContext;
+import net.ximatai.muyun.spring.iam.user.UserSecurityEvent;
+import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.Test;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class RealtimePublisherTest {
     @Test
@@ -53,6 +66,98 @@ class RealtimePublisherTest {
         assertThat(messagePublisher.payload).isNull();
     }
 
+    @Test
+    void shouldBuildStandardRealtimeDestinations() {
+        assertThat(RealtimeDestinations.USER_IM_MESSAGES.destination()).isEqualTo("/queue/platform/im/messages");
+        assertThat(RealtimeDestinations.IM_MESSAGES_SEND.destination()).isEqualTo("/app/platform/im/messages/send");
+        assertThat(RealtimeDestinations.tenantPublicDataChanges("tenant-a").destination())
+                .isEqualTo("/topic/platform/tenants/tenant-a/public/data-changes");
+        assertThat(RealtimeDestinations.tenantPublicNotifications("tenant-a").destination())
+                .isEqualTo("/topic/platform/tenants/tenant-a/public/notifications");
+        assertThat(RealtimeDestinations.organizationPublicDataChanges("org-1").destination())
+                .isEqualTo("/topic/platform/organizations/org-1/public/data-changes");
+        assertThat(RealtimeDestinations.organizationPublicNotifications("org-1").destination())
+                .isEqualTo("/topic/platform/organizations/org-1/public/notifications");
+        assertThat(RealtimeDestinations.moduleDataChanges("iam.employee").destination())
+                .isEqualTo("/topic/platform/modules/iam.employee/data-changes");
+        assertThat(RealtimeDestinations.recordDataChanges("iam.employee", "employee-1").destination())
+                .isEqualTo("/topic/platform/modules/iam.employee/records/employee-1/data-changes");
+        assertThat(RealtimeDestinations.resourceDataChanges("iam.employee", "children").destination())
+                .isEqualTo("/topic/platform/modules/iam.employee/resources/children/data-changes");
+        assertThat(RealtimeDestinations.resourceRecordDataChanges("iam.employee", "children", "employee-1")
+                .destination()).isEqualTo(
+                        "/topic/platform/modules/iam.employee/resources/children/records/employee-1/data-changes");
+        assertThat(RealtimeDestinations.contextDataChanges("workflow", "task-1").destination())
+                .isEqualTo("/topic/platform/contexts/workflow/task-1/data-changes");
+        assertThat(RealtimeDestinations.imConversationMessages("conversation-1").destination())
+                .isEqualTo("/topic/platform/im/conversations/conversation-1/messages");
+    }
+
+    @Test
+    void shouldEncodeRealtimeDestinationPathSegments() {
+        assertThat(RealtimeDestinations.recordDataChanges("order/form", "record 1").destination())
+                .isEqualTo("/topic/platform/modules/order%2Fform/records/record%201/data-changes");
+
+        assertThatThrownBy(() -> RealtimeDestinations.moduleDataChanges(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("realtime destination path segment must not be blank");
+    }
+
+    @Test
+    void shouldSendPasswordSecurityNotificationsToUserQueue() {
+        RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
+        StompSecurityRealtimeNotifier notifier = new StompSecurityRealtimeNotifier(messagePublisher);
+
+        try (RequestTraceContext.Scope ignored = RequestTraceContext.use("trace-1")) {
+            notifier.notifyPasswordReset("user-1");
+        }
+
+        assertThat(messagePublisher.userId).isEqualTo("user-1");
+        assertThat(messagePublisher.queue).isEqualTo(RealtimeDestinations.USER_NOTIFICATIONS);
+        assertThat(messagePublisher.payload).isInstanceOf(RealtimeEnvelope.class);
+        RealtimeEnvelope<?> envelope = (RealtimeEnvelope<?>) messagePublisher.payload;
+        assertThat(envelope.type()).isEqualTo(StompSecurityRealtimeNotifier.MESSAGE_TYPE);
+        assertThat(envelope.traceId()).isEqualTo("trace-1");
+        assertThat(envelope.payload()).isEqualTo(SecurityNotification.passwordReset());
+    }
+
+    @Test
+    void shouldAdaptUserSecurityEventsToSessionRevocationAndRealtimeNotifications() {
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingSecurityRealtimeNotifier notifier = new RecordingSecurityRealtimeNotifier();
+        UserSecurityRealtimeEventPublisher publisher = new UserSecurityRealtimeEventPublisher(userSessionService,
+                notifier);
+
+        publisher.publish(UserSecurityEvent.passwordChanged("user-1"));
+        publisher.publish(UserSecurityEvent.passwordReset("user-2"));
+
+        verify(userSessionService).revokeUserSessions("user-1");
+        verify(userSessionService).revokeUserSessions("user-2");
+        assertThat(notifier.changedUserIds).containsExactly("user-1");
+        assertThat(notifier.resetUserIds).containsExactly("user-2");
+    }
+
+    @Test
+    void shouldRejectRealtimeSubscribeWhenBoundSessionIsRevoked() {
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RealtimeAuthenticationChannelInterceptor interceptor =
+                new RealtimeAuthenticationChannelInterceptor(userSessionService);
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
+        when(userSessionService.currentUser("token-1"))
+                .thenReturn(Optional.of(currentUser), Optional.empty());
+
+        Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1"),
+                mock(MessageChannel.class));
+        CurrentUserPrincipal principal = (CurrentUserPrincipal) StompHeaderAccessor.wrap(connected).getUser();
+
+        assertThat(principal.currentUser()).isEqualTo(currentUser);
+        assertThat(principal.token()).isEqualTo("token-1");
+        assertThatThrownBy(() -> interceptor.preSend(stompMessage(StompCommand.SUBSCRIBE, principal, null),
+                mock(MessageChannel.class)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("realtime authentication required");
+    }
+
     private static final class RecordingRealtimeMessagePublisher implements RealtimeMessagePublisher {
         private RealtimeTopic topic;
         private String userId;
@@ -72,6 +177,33 @@ class RealtimePublisherTest {
             this.queue = queue;
             this.payload = payload;
             users.add(userId);
+        }
+    }
+
+    private Message<?> stompMessage(StompCommand command, CurrentUserPrincipal principal, String token) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        accessor.setLeaveMutable(true);
+        if (principal != null) {
+            accessor.setUser(principal);
+        }
+        if (token != null) {
+            accessor.addNativeHeader("Authorization", "Bearer " + token);
+        }
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
+    private static final class RecordingSecurityRealtimeNotifier implements SecurityRealtimeNotifier {
+        private final List<String> changedUserIds = new ArrayList<>();
+        private final List<String> resetUserIds = new ArrayList<>();
+
+        @Override
+        public void notifyPasswordChanged(String userId) {
+            changedUserIds.add(userId);
+        }
+
+        @Override
+        public void notifyPasswordReset(String userId) {
+            resetUserIds.add(userId);
         }
     }
 }

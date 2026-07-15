@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import { presentPlatformError, presentPlatformSuccess } from '@muyun/platform-components';
+import { presentPlatformError } from '@muyun/platform-components';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
-import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
+import type {
+  MenuNavigationTarget,
+  MenuRecord,
+  WebUserNotification,
+  WorkbenchStartupState,
+} from '@muyun/web-contracts';
 import {
   clearAuthToken,
   effectiveAuthToken,
@@ -40,8 +45,11 @@ const changePasswordError = ref<string>();
 const currentPassword = ref('');
 const newPassword = ref('');
 const confirmPassword = ref('');
+const securityNotification = ref<WebUserNotification>();
+const securityLogoutCountdown = ref(0);
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
 let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
+let securityLogoutTimer: number | undefined;
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
@@ -56,6 +64,10 @@ onMounted(async () => {
     return;
   }
   await loadWorkbench();
+});
+
+onUnmounted(() => {
+  clearSecurityLogoutTimer();
 });
 
 async function loadWorkbench() {
@@ -152,7 +164,11 @@ async function submitChangeOwnPassword() {
     currentPassword.value = '';
     newPassword.value = '';
     confirmPassword.value = '';
-    presentPlatformSuccess('密码已修改', { source: 'change-own-password' });
+    handleSecurityNotification({
+      code: 'platform.security.password-changed',
+      message: '你的密码已修改，请重新登录',
+      logoutRequired: true,
+    });
   } catch (cause) {
     const error = presentPlatformError(cause, { source: 'change-own-password-dialog', phase: 'action' });
     changePasswordError.value = error.message;
@@ -205,7 +221,10 @@ async function handleLogout() {
 function reconnectRealtime() {
   disconnectRealtime();
   if (!usesMockStartup()) {
-    realtimeConnection = connectAppRealtime({ onUnauthorized: handleRealtimeUnauthorized });
+    realtimeConnection = connectAppRealtime({
+      onUnauthorized: handleRealtimeUnauthorized,
+      onUserNotification: handleSecurityNotification,
+    });
   }
 }
 
@@ -216,11 +235,51 @@ function disconnectRealtime() {
 }
 
 function handleRealtimeUnauthorized() {
+  forceLocalLogout();
+}
+
+function handleSecurityNotification(notification: WebUserNotification) {
+  if (!notification.logoutRequired) {
+    return;
+  }
+  securityNotification.value = notification;
+  startSecurityLogoutCountdown(5);
+}
+
+function startSecurityLogoutCountdown(seconds: number) {
+  clearSecurityLogoutTimer();
+  securityLogoutCountdown.value = seconds;
+  securityLogoutTimer = window.setInterval(() => {
+    securityLogoutCountdown.value -= 1;
+    if (securityLogoutCountdown.value <= 0) {
+      clearSecurityLogoutTimer();
+      forceLocalLogout();
+    }
+  }, 1000);
+}
+
+function clearSecurityLogoutTimer() {
+  if (securityLogoutTimer === undefined) {
+    return;
+  }
+  window.clearInterval(securityLogoutTimer);
+  securityLogoutTimer = undefined;
+}
+
+function forceLocalLogout() {
+  clearSecurityLogoutTimer();
   clearAuthToken();
   startup.value = undefined;
   activeTabKey.value = undefined;
+  error.value = undefined;
   loginRequired.value = true;
+  loading.value = false;
   disconnectRealtime();
+  securityNotification.value = undefined;
+  securityLogoutCountdown.value = 0;
+  if (currentBrowserPath() !== '/') {
+    window.history.replaceState(window.history.state, '', '/');
+  }
 }
 
 function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
@@ -336,4 +395,68 @@ function requiresLogin(cause: unknown) {
     @close="closeChangeOwnPasswordDialog"
     @submit="submitChangeOwnPassword"
   />
+  <div v-if="securityNotification" class="security-notification-mask" role="presentation">
+    <section class="security-notification-dialog" role="alertdialog" aria-modal="true">
+      <h2>需要重新登录</h2>
+      <p>{{ securityNotification.message }}</p>
+      <p class="security-notification-countdown">{{ securityLogoutCountdown }} 秒后自动返回登录页</p>
+      <button type="button" @click="forceLocalLogout">立即重新登录</button>
+    </section>
+  </div>
 </template>
+
+<style scoped>
+.security-notification-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.security-notification-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(400px, 100%);
+  padding: 22px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 22px 54px rgba(15, 23, 42, 0.24);
+}
+
+.security-notification-dialog h2,
+.security-notification-dialog p {
+  margin: 0;
+}
+
+.security-notification-dialog h2 {
+  color: #111827;
+  font-size: 18px;
+}
+
+.security-notification-dialog p {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.security-notification-countdown {
+  color: #64748b;
+}
+
+.security-notification-dialog button {
+  justify-self: end;
+  min-width: 108px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+</style>

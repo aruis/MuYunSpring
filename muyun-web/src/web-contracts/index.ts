@@ -79,6 +79,12 @@ export interface WebRealtimeEnvelope<TPayload = unknown> {
   payload: TPayload;
 }
 
+export interface WebUserNotification {
+  code: string;
+  message: string;
+  logoutRequired?: boolean;
+}
+
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];

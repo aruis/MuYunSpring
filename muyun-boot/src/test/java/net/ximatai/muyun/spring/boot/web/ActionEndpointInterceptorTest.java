@@ -263,7 +263,7 @@ class ActionEndpointInterceptorTest {
     void shouldResolveUserManagementEndpointActionContext() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.user/changePassword/user-1");
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "user-1"));
-        UserAccountWebController controller = new UserAccountWebController(null);
+        UserAccountWebController controller = new UserAccountWebController();
 
         interceptor.preHandle(request, new MockHttpServletResponse(),
                 handler(controller, UserAccountWebController.class.getMethod(
@@ -350,7 +350,7 @@ class ActionEndpointInterceptorTest {
         );
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.user/changePassword/user-1");
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "user-1"));
-        UserAccountWebController controller = new UserAccountWebController(null);
+        UserAccountWebController controller = new UserAccountWebController();
 
         interceptor.preHandle(request, new MockHttpServletResponse(),
                 handler(controller, UserAccountWebController.class.getMethod(

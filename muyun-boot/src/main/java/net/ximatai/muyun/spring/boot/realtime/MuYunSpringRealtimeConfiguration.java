@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.realtime;
 
 import net.ximatai.muyun.spring.boot.web.MuYunSpringCorsProperties;
+import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -60,5 +61,17 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     @ConditionalOnMissingBean(DataChangeRealtimePublisher.class)
     public DataChangeRealtimePublisher dataChangeRealtimePublisher(RealtimeMessagePublisher messagePublisher) {
         return new StompDataChangeRealtimePublisher(messagePublisher);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(SecurityRealtimeNotifier.class)
+    public SecurityRealtimeNotifier securityRealtimeNotifier(RealtimeMessagePublisher messagePublisher) {
+        return new StompSecurityRealtimeNotifier(messagePublisher);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(UserSecurityEventPublisher.class)
+    public UserSecurityEventPublisher userSecurityEventPublisher(SecurityRealtimeNotifier securityRealtimeNotifier) {
+        return new UserSecurityRealtimeEventPublisher(userSessionService, securityRealtimeNotifier);
     }
 }
