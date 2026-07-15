@@ -205,7 +205,7 @@ async function handleLogout() {
 function reconnectRealtime() {
   disconnectRealtime();
   if (!usesMockStartup()) {
-    realtimeConnection = connectAppRealtime();
+    realtimeConnection = connectAppRealtime({ onUnauthorized: handleRealtimeUnauthorized });
   }
 }
 
@@ -213,6 +213,14 @@ function disconnectRealtime() {
   const current = realtimeConnection;
   realtimeConnection = undefined;
   void current?.disconnect();
+}
+
+function handleRealtimeUnauthorized() {
+  clearAuthToken();
+  startup.value = undefined;
+  activeTabKey.value = undefined;
+  loginRequired.value = true;
+  disconnectRealtime();
 }
 
 function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {

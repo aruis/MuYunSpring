@@ -247,6 +247,50 @@ test('data change dispatcher deduplicates change sets by id', async () => {
   assert.deepEqual(handled, ['change-set-1']);
 });
 
+test('data change dispatcher isolates handler errors', async () => {
+  const dispatcher = createDataChangeDispatcher();
+  const handled: string[] = [];
+  dispatcher.subscribe(() => {
+    throw new Error('handler failed');
+  });
+  dispatcher.subscribe((changeSet) => {
+    handled.push(changeSet.changeSetId);
+  });
+
+  assert.equal(
+    await dispatcher.dispatch({
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' }],
+    }),
+    true,
+  );
+  assert.equal(
+    await dispatcher.dispatch({
+      changeSetId: 'change-set-1',
+      changes: [{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'emp-1' }],
+    }),
+    false,
+  );
+  assert.deepEqual(handled, ['change-set-1']);
+});
+
+test('data change dispatcher bounds handled change set ids', async () => {
+  const dispatcher = createDataChangeDispatcher({ maxHandledChangeSetIds: 2 });
+  const handled: string[] = [];
+  dispatcher.subscribe((changeSet) => {
+    handled.push(changeSet.changeSetId);
+  });
+
+  for (const changeSetId of ['change-set-1', 'change-set-2', 'change-set-3', 'change-set-1']) {
+    await dispatcher.dispatch({
+      changeSetId,
+      changes: [{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: changeSetId }],
+    });
+  }
+
+  assert.deepEqual(handled, ['change-set-1', 'change-set-2', 'change-set-3', 'change-set-1']);
+});
+
 test('realtime client sends bearer header and restores subscriptions after reconnect', async () => {
   let factoryOptions: StompClientFactoryOptions | undefined;
   const stomp = new FakeStompClient();
@@ -287,6 +331,28 @@ test('realtime client sends bearer header and restores subscriptions after recon
 
   assert.deepEqual(received, [{ changeSetId: 'change-set-1', changes: [] }]);
   assert.equal(stomp.subscribeCalls, 2);
+});
+
+test('realtime client stops reconnecting on authentication errors', async () => {
+  const stomp = new FakeStompClient();
+  const states: string[] = [];
+  const realtime = createRealtimeClient({
+    clientFactory: (options) => {
+      stomp.options = options;
+      return stomp;
+    },
+    onStateChange: (state) => states.push(state),
+  });
+
+  await realtime.connect();
+  stomp.error({ headers: { message: 'realtime authentication required' } });
+  await Promise.resolve();
+  await realtime.connect();
+
+  assert.equal(realtime.state(), 'unauthorized');
+  assert.deepEqual(states, ['connecting', 'unauthorized']);
+  assert.equal(stomp.activateCalls, 1);
+  assert.equal(stomp.connected, false);
 });
 
 test('realtime data change channel dispatches committed change sets', async () => {
@@ -826,10 +892,12 @@ function runtimeContext() {
 class FakeStompClient implements StompClientAdapter {
   connected = false;
   options?: StompClientFactoryOptions;
+  activateCalls = 0;
   subscribeCalls = 0;
   private readonly subscriptions = new Map<string, Set<(message: { body: string }) => void>>();
 
   activate() {
+    this.activateCalls += 1;
     // The test controls the exact connect timing through connect().
   }
 
@@ -863,6 +931,10 @@ class FakeStompClient implements StompClientAdapter {
     for (const handler of this.subscriptions.get(destination) ?? []) {
       handler({ body });
     }
+  }
+
+  error(frame?: { headers?: Record<string, string>; body?: string }) {
+    this.options?.onStompError(frame);
   }
 }
 
