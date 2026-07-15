@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.ability.action.ActionMessage;
+import net.ximatai.muyun.spring.ability.action.ActionMessageType;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
@@ -31,17 +34,17 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<PlatformWebError> handleAuthenticationRequired(AuthenticationRequiredException exception) {
-        return platformError(exception);
+        return platformError(exception, ActionMessageType.ERROR);
     }
 
     @ExceptionHandler(AuthenticationFailedException.class)
     public ResponseEntity<PlatformWebError> handleAuthenticationFailed(AuthenticationFailedException exception) {
-        return platformError(exception);
+        return platformError(exception, ActionMessageType.ERROR);
     }
 
     @ExceptionHandler(PlatformAccessDeniedException.class)
     public ResponseEntity<PlatformWebError> handleAccessDenied(PlatformAccessDeniedException exception) {
-        return platformError(exception);
+        return platformError(exception, ActionMessageType.ERROR);
     }
 
     @ExceptionHandler(PlatformConfigurationException.class)
@@ -51,8 +54,12 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<PlatformWebError> handleBadRequest(Exception exception) {
+        ActionMessage actionMessage = ActionMessage.warning(
+                PlatformErrorCodes.VALIDATION_FAILED,
+                exception.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 400, exception.getMessage()));
+                .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 400,
+                        exception.getMessage(), actionMessage));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -69,8 +76,12 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler(ModuleDefinitionException.class)
     public ResponseEntity<PlatformWebError> handleModuleDefinition(ModuleDefinitionException exception) {
+        ActionMessage actionMessage = ActionMessage.warning(
+                PlatformErrorCodes.VALIDATION_FAILED,
+                exception.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 400, exception.getMessage()));
+                .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 400,
+                        exception.getMessage(), actionMessage));
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)
@@ -87,8 +98,12 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler(OptimisticLockException.class)
     public ResponseEntity<PlatformWebError> handleOptimisticLock(OptimisticLockException exception) {
+        ActionMessage actionMessage = ActionMessage.warning(
+                PlatformErrorCodes.CONFLICT_VERSION,
+                exception.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(PlatformWebError.of(PlatformErrorCodes.CONFLICT_VERSION, 409, exception.getMessage()));
+                .body(PlatformWebError.of(PlatformErrorCodes.CONFLICT_VERSION, 409,
+                        exception.getMessage(), actionMessage));
     }
 
     @ExceptionHandler(DynamicActionExecutionException.class)
@@ -101,7 +116,14 @@ public class PlatformWebExceptionHandler {
             details.put("context", dynamicActionContext(exception.context()));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(PlatformWebError.of("DYNAMIC_ACTION_FAILED", 400, exception.getMessage(), details));
+                .body(PlatformWebError.of("DYNAMIC_ACTION_FAILED", 400, exception.getMessage(), details)
+                        .withActionMessage(ActionMessage.warning("DYNAMIC_ACTION_FAILED", exception.getMessage())));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<PlatformWebError> handleBusinessException(BusinessException exception) {
+        return ResponseEntity.status(exception.httpStatus())
+                .body(PlatformWebError.of(exception).withActionMessage(exception.actionMessage()));
     }
 
     @ExceptionHandler(PlatformException.class)
@@ -119,6 +141,13 @@ public class PlatformWebExceptionHandler {
 
     private ResponseEntity<PlatformWebError> platformError(PlatformException exception) {
         return ResponseEntity.status(exception.httpStatus()).body(PlatformWebError.of(exception));
+    }
+
+    private ResponseEntity<PlatformWebError> platformError(PlatformException exception,
+                                                           ActionMessageType messageType) {
+        ActionMessage actionMessage = new ActionMessage(exception.code(), exception.getMessage(), messageType);
+        return ResponseEntity.status(exception.httpStatus())
+                .body(PlatformWebError.of(exception).withActionMessage(actionMessage));
     }
 
     private String rootMessage(Throwable exception) {

@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -193,6 +194,35 @@ class MenuWebControllerTest {
         ArgumentCaptor<Menu> captor = ArgumentCaptor.forClass(Menu.class);
         verify(menuService).insert(captor.capture());
         assertThat(captor.getValue().getSchemeId()).isEqualTo("scheme-1");
+    }
+
+    @Test
+    void shouldReturnActionMessageWhenMenuMutationFailsWithBusinessException() throws Exception {
+        TenantContext.setTenantId("tenant-a");
+        MenuService menuService = mock(MenuService.class);
+        MenuManagementWebController controller = new MenuManagementWebController();
+        ReflectionTestUtils.setField(controller, "service", menuService);
+        when(menuService.insert(any(Menu.class))).thenThrow(new BusinessException(
+                "platform.menu.open-mode-required",
+                "Module entry menu requires openMode"));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .build();
+
+        mvc.perform(post("/platform.menu-scheme/scheme-1/menus/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"parentId":"root-1","title":"订单","moduleAlias":"crm.order"}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.code").value("platform.menu.open-mode-required"))
+                .andExpect(jsonPath("$.message").value("Module entry menu requires openMode"))
+                .andExpect(jsonPath("$.actionMessage.code").value("platform.menu.open-mode-required"))
+                .andExpect(jsonPath("$.actionMessage.text").value("Module entry menu requires openMode"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
     @Test

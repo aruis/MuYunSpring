@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
@@ -676,9 +677,14 @@ class IamWebControllerTest {
         currentUser = CurrentUser.systemUser(UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID, "admin");
 
         mvc.perform(post("/iam.user/resetPassword/{id}", UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.message")
-                        .value("cannot administrate current user's password; use change own password"));
+                        .value("cannot administrate current user's password; use change own password"))
+                .andExpect(jsonPath("$.actionMessage.code").value("iam.user.password-admin-current-user"))
+                .andExpect(jsonPath("$.actionMessage.text")
+                        .value("cannot administrate current user's password; use change own password"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
 
         verify(userAccountDao, never()).updateById(any(UserAccount.class));
     }
@@ -692,9 +698,14 @@ class IamWebControllerTest {
                         .content("""
                                 {"password":"new-secret"}
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.message")
-                        .value("cannot administrate current user's password; use change own password"));
+                        .value("cannot administrate current user's password; use change own password"))
+                .andExpect(jsonPath("$.actionMessage.code").value("iam.user.password-admin-current-user"))
+                .andExpect(jsonPath("$.actionMessage.text")
+                        .value("cannot administrate current user's password; use change own password"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
 
         verify(userAccountDao, never()).updateById(any(UserAccount.class));
     }
@@ -805,6 +816,26 @@ class IamWebControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
+    }
+
+    @Test
+    void shouldReturnActionMessageWhenRoleGrantBusinessRuleFails() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(roleService.grantAccountRoleResult("role-1", "user-2", ManagementScopeType.TENANT, "tenant_a"))
+                .thenThrow(new BusinessException("iam.role.not-account-role",
+                        "role is not account role: role-1"));
+
+        mvc.perform(post("/iam.role/{roleId}/account-grants", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"userId":"user-2","managementScopeType":"tenant","managementScopeId":"tenant_a"}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("iam.role.not-account-role"))
+                .andExpect(jsonPath("$.message").value("role is not account role: role-1"))
+                .andExpect(jsonPath("$.actionMessage.code").value("iam.role.not-account-role"))
+                .andExpect(jsonPath("$.actionMessage.text").value("role is not account role: role-1"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
     @Test

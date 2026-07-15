@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.iam.user;
 
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 
 import javax.crypto.SecretKeyFactory;
@@ -52,7 +53,7 @@ public class PasswordHashingService {
 
     private String requirePassword(String password) {
         if (password == null || password.isEmpty()) {
-            throw new PlatformException("password must not be empty");
+            throw BusinessExceptions.warning("iam.user.password-empty", "password must not be empty");
         }
         return password;
     }

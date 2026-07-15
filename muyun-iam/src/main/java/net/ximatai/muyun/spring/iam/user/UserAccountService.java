@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
@@ -421,7 +422,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         CurrentUserContext.currentUser()
                 .filter(currentUser -> currentUser.userId().equals(userId))
                 .ifPresent(currentUser -> {
-                    throw new PlatformException(
+                    throw BusinessExceptions.warning(
+                            "iam.user.password-admin-current-user",
                             "cannot administrate current user's password; use change own password");
                 });
     }
@@ -459,7 +461,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             return;
         }
         if (password == null || password.length() < 6) {
-            throw new PlatformException("密码长度不能少于 6 位");
+            throw BusinessExceptions.warning("iam.user.password-policy-violated", "密码长度不能少于 6 位");
         }
     }
 
@@ -497,7 +499,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 // Configured regex rules can reject random candidates; try another bounded candidate.
             }
         }
-        throw new PlatformException("unable to generate temporary password that satisfies current policy");
+        throw BusinessExceptions.warning("iam.user.temporary-password-unavailable",
+                "unable to generate temporary password that satisfies current policy");
     }
 
     private boolean passwordExpired(UserAccount user, Instant now) {

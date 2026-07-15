@@ -6,12 +6,14 @@ import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.boot.web.ActionEndpointContextResolver;
 import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
 import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -83,6 +85,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -1008,6 +1011,31 @@ class PlatformConfigurationWebControllerTest {
         verify(service).unpublishUiConfig("ui-config-1");
         verify(service).publishQueryTemplate("query-template-1");
         verify(service).unpublishQueryTemplate("query-template-1");
+    }
+
+    @Test
+    void shouldReturnActionMessageWhenPagePublishBusinessRuleFails() throws Exception {
+        PlatformPageConfigPublishService service = mock(PlatformPageConfigPublishService.class);
+        PlatformPageConfigPublishWebController controller = new PlatformPageConfigPublishWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        doThrow(new BusinessException("platform.ui-config.publish-no-visible-field",
+                "UI config publish requires at least one visible field: ui-config-1"))
+                .when(service).publishUiConfig("ui-config-1");
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .build();
+
+        mvc.perform(post("/platform.page_config_publish/ui-configs/ui-config-1/publish"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("platform.ui-config.publish-no-visible-field"))
+                .andExpect(jsonPath("$.message")
+                        .value("UI config publish requires at least one visible field: ui-config-1"))
+                .andExpect(jsonPath("$.actionMessage.code")
+                        .value("platform.ui-config.publish-no-visible-field"))
+                .andExpect(jsonPath("$.actionMessage.text")
+                        .value("UI config publish requires at least one visible field: ui-config-1"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
     private void assertPagePublishActionResult(MockMvc mvc,

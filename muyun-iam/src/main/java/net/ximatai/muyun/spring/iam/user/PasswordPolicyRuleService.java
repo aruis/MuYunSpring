@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.Preconditions;
@@ -95,7 +96,7 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
     public void validatePassword(String password) {
         for (PasswordPolicyRule rule : activeGlobalRules()) {
             if (!Pattern.compile(rule.getPattern()).matcher(password == null ? "" : password).matches()) {
-                throw new PlatformException(rule.getMessage());
+                throw BusinessExceptions.warning("iam.user.password-policy-violated", rule.getMessage());
             }
         }
     }

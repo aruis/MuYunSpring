@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.ui;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
@@ -67,13 +68,15 @@ public class PlatformPageConfigPublishService {
         PlatformUiConfig uiConfig = uiConfigService.requireUiConfig(uiConfigId);
         PlatformUiSet uiSet = uiSetService.requireUiSet(uiConfig.getUiSetId());
         if (!Boolean.TRUE.equals(uiSet.getEnabled()) || !Boolean.TRUE.equals(uiConfig.getEnabled())) {
-            throw new PlatformException("UI config publish requires enabled set and config: " + uiConfigId);
+            throw BusinessExceptions.warning("platform.ui-config.publish-disabled",
+                    "UI config publish requires enabled set and config: " + uiConfigId);
         }
         uiConfigFieldService.validateUiConfigFields(uiConfig.getId());
         List<PlatformUiConfigField> fields = uiConfigFieldService.listByUiConfigIds(List.of(uiConfig.getId()));
         boolean hasVisibleField = fields.stream().anyMatch(field -> Boolean.TRUE.equals(field.getVisible()));
         if (!hasVisibleField) {
-            throw new PlatformException("UI config publish requires at least one visible field: " + uiConfigId);
+            throw BusinessExceptions.warning("platform.ui-config.publish-no-visible-field",
+                    "UI config publish requires at least one visible field: " + uiConfigId);
         }
         validateLayoutJson(uiSet.getModuleAlias(), uiConfig);
         return uiConfig;
@@ -96,7 +99,8 @@ public class PlatformPageConfigPublishService {
     public PlatformQueryTemplate validateQueryTemplatePublishable(String queryTemplateId) {
         PlatformQueryTemplate template = queryTemplateService.requireQueryTemplate(queryTemplateId);
         if (!Boolean.TRUE.equals(template.getEnabled())) {
-            throw new PlatformException("Query template publish requires enabled template: " + queryTemplateId);
+            throw BusinessExceptions.warning("platform.query-template.publish-disabled",
+                    "Query template publish requires enabled template: " + queryTemplateId);
         }
         queryItemService.compile(template.getId());
         return template;

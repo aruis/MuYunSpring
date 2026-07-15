@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import org.junit.jupiter.api.Test;
@@ -26,8 +27,10 @@ class PasswordPolicyRuleServiceTest {
         service.validatePassword("secret1");
 
         assertThatThrownBy(() -> service.validatePassword("12345"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("密码长度不能少于 6 位");
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("密码长度不能少于 6 位")
+                .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                        .isEqualTo("iam.user.password-policy-violated"));
     }
 
     @Test

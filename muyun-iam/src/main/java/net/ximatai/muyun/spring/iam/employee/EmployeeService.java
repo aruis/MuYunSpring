@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
@@ -117,7 +118,8 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         Department department = departmentService.requireEnabled(employee.getDepartmentId(),
                 "department is not active: " + employee.getDepartmentId());
         if (!SortAbility.sameValue(employee.getOrganizationId(), department.getOrganizationId())) {
-            throw new PlatformException("Employee department must belong to the same organization");
+            throw BusinessExceptions.warning("iam.employee.department-organization-mismatch",
+                    "Employee department must belong to the same organization");
         }
         rejectDuplicate(employee, Criteria.of()
                         .eq("organizationId", employee.getOrganizationId())

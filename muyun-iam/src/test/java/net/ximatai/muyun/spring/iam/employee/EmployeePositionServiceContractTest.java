@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -96,7 +97,9 @@ class EmployeePositionServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(
                     relation("employee-1", "org-1", "dept-2", "position-1", true)))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-position.primary-owner-mismatch"))
                     .hasMessageContaining("main organization and department");
         }
     }
@@ -108,7 +111,9 @@ class EmployeePositionServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeInsert(
                     relation("employee-1", "org-2", "dept-1", "position-1", false)))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-position.department-organization-mismatch"))
                     .hasMessageContaining("same organization");
         }
     }

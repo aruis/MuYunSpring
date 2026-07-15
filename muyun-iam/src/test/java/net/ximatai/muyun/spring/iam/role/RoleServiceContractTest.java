@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.form.FormControlType;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -180,8 +181,10 @@ class RoleServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.grantAccountRole(
                     "platform-private", "user-1", ManagementScopeType.TENANT, "tenant_a"))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("platform private role cannot be bound by tenant");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("platform private role cannot be bound by tenant")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.role.platform-private-not-bindable"));
         }
     }
 
@@ -316,8 +319,10 @@ class RoleServiceContractTest {
                     .hasMessageContaining("system managed role");
             assertThatThrownBy(() -> service.grantAccountRole(
                     "managed-1", "user-1", ManagementScopeType.TENANT, "tenant_a"))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("system managed role");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("system managed role")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.role.system-managed-mutation-denied"));
         }
     }
 
@@ -424,12 +429,16 @@ class RoleServiceContractTest {
                 mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
 
         assertThatThrownBy(() -> service.grantEmploymentRole("account-role", "position-1"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role is not employment role");
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("role is not employment role")
+                .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                        .isEqualTo("iam.role.not-employment-role"));
         assertThatThrownBy(() -> service.grantAccountRole(
                 "employment-role", "user-1", ManagementScopeType.TENANT, "tenant_a"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role is not account role");
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("role is not account role")
+                .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                        .isEqualTo("iam.role.not-account-role"));
     }
 
     @Test

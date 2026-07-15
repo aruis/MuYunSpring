@@ -1,3 +1,5 @@
+import type { WebActionMessage } from '@muyun/web-contracts';
+
 export interface ErrorTarget {
   kind?: string;
   moduleAlias?: string;
@@ -48,6 +50,7 @@ export class AppError extends Error {
   readonly scope?: Record<string, unknown>;
   readonly targets: ErrorTarget[];
   readonly details?: Record<string, unknown>;
+  readonly actionMessage?: WebActionMessage;
 
   constructor(
     message: string,
@@ -58,6 +61,7 @@ export class AppError extends Error {
       scope?: Record<string, unknown>;
       targets?: ErrorTarget[];
       details?: Record<string, unknown>;
+      actionMessage?: WebActionMessage;
     } = {},
   ) {
     super(message);
@@ -68,6 +72,7 @@ export class AppError extends Error {
     this.scope = options.scope;
     this.targets = options.targets ?? [];
     this.details = options.details;
+    this.actionMessage = options.actionMessage;
   }
 }
 

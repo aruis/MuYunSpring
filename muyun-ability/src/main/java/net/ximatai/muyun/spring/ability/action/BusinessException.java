@@ -1,0 +1,43 @@
+package net.ximatai.muyun.spring.ability.action;
+
+import net.ximatai.muyun.spring.common.exception.ErrorScope;
+import net.ximatai.muyun.spring.common.exception.ErrorTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+
+import java.util.List;
+import java.util.Map;
+
+public class BusinessException extends PlatformException {
+    private final ActionMessageType messageType;
+
+    public BusinessException(String code, String message) {
+        this(code, message, ActionMessageType.WARNING);
+    }
+
+    public BusinessException(String code, String message, ActionMessageType messageType) {
+        this(code, 422, message, messageType);
+    }
+
+    public BusinessException(String code, int httpStatus, String message, ActionMessageType messageType) {
+        this(code, httpStatus, message, messageType, ErrorScope.empty(), List.of(), Map.of());
+    }
+
+    public BusinessException(String code,
+                             int httpStatus,
+                             String message,
+                             ActionMessageType messageType,
+                             ErrorScope scope,
+                             List<ErrorTarget> targets,
+                             Map<String, Object> details) {
+        super(code, httpStatus, message, scope, targets, details);
+        this.messageType = messageType == null ? ActionMessageType.WARNING : messageType;
+    }
+
+    public ActionMessage actionMessage() {
+        return new ActionMessage(code(), getMessage(), messageType);
+    }
+
+    public ActionMessageType messageType() {
+        return messageType;
+    }
+}

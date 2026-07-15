@@ -57,8 +57,6 @@ class PlatformExceptionTest {
     @Test
     void factoriesKeepStableStatusBoundaries() {
         assertThat(PlatformErrors.badRequest("INVALID_QUERY", "bad query").httpStatus()).isEqualTo(400);
-        assertThat(PlatformErrors.business("BUSINESS_RULE_FAILED", "business failed", Map.of()).httpStatus())
-                .isEqualTo(422);
         assertThat(PlatformErrors.conflict("DUPLICATE_RECORD_MATCHED", "duplicate", Map.of()).httpStatus())
                 .isEqualTo(409);
         assertThat(PlatformErrors.config("DYNAMIC_DESCRIPTOR_MISSING", "missing",
