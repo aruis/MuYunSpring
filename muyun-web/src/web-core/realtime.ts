@@ -66,7 +66,7 @@ export interface StompClientFactoryOptions {
   onConnect: () => void;
   onDisconnect: () => void;
   onWebSocketClose: () => void;
-  onStompError: () => void;
+  onStompError: (frame?: StompErrorFrame) => void;
 }
 
 export interface StompClientAdapter {
@@ -79,6 +79,11 @@ export interface StompClientAdapter {
 
 export interface StompSubscriptionLike {
   unsubscribe(): void;
+}
+
+export interface StompErrorFrame {
+  headers?: Record<string, string | undefined>;
+  body?: string;
 }
 
 export const realtimeMessageTypes = {
@@ -107,14 +112,33 @@ export function createRealtimeClient(options: RealtimeClientOptions = {}): Realt
       setState('connected');
       restoreSubscriptions();
     },
-    onDisconnect: () => setState('disconnected'),
-    onWebSocketClose: () => setState(connectionState === 'connected' ? 'reconnecting' : 'disconnected'),
-    onStompError: () => setState('failed'),
+    onDisconnect: () => {
+      if (connectionState !== 'unauthorized') {
+        setState('disconnected');
+      }
+    },
+    onWebSocketClose: () => {
+      if (connectionState !== 'unauthorized') {
+        setState(connectionState === 'connected' ? 'reconnecting' : 'disconnected');
+      }
+    },
+    onStompError: (frame) => {
+      if (isAuthenticationErrorFrame(frame)) {
+        setState('unauthorized');
+        void client.deactivate();
+        return;
+      }
+      setState('failed');
+    },
   });
 
   return {
     async connect() {
-      if (connectionState === 'connected' || connectionState === 'connecting') {
+      if (
+        connectionState === 'connected' ||
+        connectionState === 'connecting' ||
+        connectionState === 'unauthorized'
+      ) {
         return;
       }
       setState('connecting');
@@ -245,6 +269,17 @@ function isRealtimeEnvelope(value: unknown): value is WebRealtimeEnvelope<unknow
   }
   const envelope = value as { id?: unknown; type?: unknown; payload?: unknown };
   return typeof envelope.id === 'string' && typeof envelope.type === 'string' && 'payload' in envelope;
+}
+
+function isAuthenticationErrorFrame(frame: StompErrorFrame | undefined) {
+  const message = `${frame?.headers?.message ?? ''}\n${frame?.body ?? ''}`.toLowerCase();
+  return (
+    message.includes('realtime authentication required') ||
+    message.includes('password change required') ||
+    message.includes('auth_required') ||
+    message.includes('auth expired') ||
+    message.includes('unauthorized')
+  );
 }
 
 function unsubscribeActive(subscription: TrackedSubscription<unknown>) {

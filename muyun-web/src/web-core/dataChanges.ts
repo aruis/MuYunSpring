@@ -8,11 +8,16 @@ export interface DataChangeDispatcher {
   markHandled(changeSetId: string | undefined): void;
 }
 
+export interface DataChangeDispatcherOptions {
+  maxHandledChangeSetIds?: number;
+}
+
 export interface DataChangeSubscription {
   unsubscribe(): void;
 }
 
-export function createDataChangeDispatcher(): DataChangeDispatcher {
+export function createDataChangeDispatcher(options: DataChangeDispatcherOptions = {}): DataChangeDispatcher {
+  const maxHandledChangeSetIds = Math.max(1, options.maxHandledChangeSetIds ?? 1000);
   const handledChangeSetIds = new Set<string>();
   const handlers = new Set<DataChangeHandler>();
 
@@ -22,8 +27,10 @@ export function createDataChangeDispatcher(): DataChangeDispatcher {
       if (!normalized || handledChangeSetIds.has(normalized.changeSetId)) {
         return false;
       }
-      handledChangeSetIds.add(normalized.changeSetId);
-      await Promise.all([...handlers].map((handler) => handler(normalized)));
+      rememberHandled(normalized.changeSetId);
+      await Promise.allSettled(
+        [...handlers].map((handler) => Promise.resolve().then(() => handler(normalized))),
+      );
       return true;
     },
     subscribe(handler) {
@@ -37,10 +44,22 @@ export function createDataChangeDispatcher(): DataChangeDispatcher {
     markHandled(changeSetId) {
       const normalized = normalizeChangeSetId(changeSetId);
       if (normalized) {
-        handledChangeSetIds.add(normalized);
+        rememberHandled(normalized);
       }
     },
   };
+
+  function rememberHandled(changeSetId: string) {
+    handledChangeSetIds.delete(changeSetId);
+    handledChangeSetIds.add(changeSetId);
+    while (handledChangeSetIds.size > maxHandledChangeSetIds) {
+      const oldest = handledChangeSetIds.values().next().value;
+      if (!oldest) {
+        return;
+      }
+      handledChangeSetIds.delete(oldest);
+    }
+  }
 }
 
 export function normalizeChangeSet(
