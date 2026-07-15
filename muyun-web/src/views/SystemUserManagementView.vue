@@ -29,7 +29,6 @@ import type {
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { usePageDataChangeHandler, usePageModuleDataChanges } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
@@ -55,13 +54,10 @@ const {
   expandedUserKeys,
   handleUserListLoaded,
   handleUserRowExpand,
-  handleUserSessionDataChanges,
   loadUserSessions,
   userOnlineStatusTitle,
   userSessionState,
 } = useUserSessionRows({ context: userContext, source: 'system-user-management' });
-usePageModuleDataChanges('iam.user');
-usePageDataChangeHandler(handleUserSessionDataChanges);
 
 const systemUserContext = computed(
   () => createSystemUserModuleContext(userContext) as ModuleContext<QueryListRecord>,

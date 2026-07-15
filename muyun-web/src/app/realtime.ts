@@ -11,17 +11,17 @@ import type { WebCommittedChangeSet, WebUserNotification } from '@muyun/web-cont
 import { effectiveAuthToken } from './authSession';
 
 export const appDataChangeDispatcher = createDataChangeDispatcher();
-const pageRealtimeSubscriptions = new Map<number, PageRealtimeSubscription>();
+const moduleDataChangeSubscriptions = new Map<string, DataChangeTopicSubscription>();
 let activeRealtime: RealtimeClient | undefined;
-let nextPageRealtimeSubscriptionId = 1;
 
 export interface AppRealtimeOptions {
   onUnauthorized?: () => void;
   onUserNotification?: (notification: WebUserNotification) => void;
 }
 
-interface PageRealtimeSubscription {
-  bind(realtime: RealtimeClient): RealtimeSubscription;
+interface DataChangeTopicSubscription {
+  moduleAlias: string;
+  references: number;
   active?: RealtimeSubscription;
 }
 
@@ -61,44 +61,50 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
 }
 
 export function subscribeAppModuleDataChanges(moduleAlias: string) {
-  return registerPageRealtimeSubscription((realtime) =>
-    realtime.subscribe(moduleDataChangeChannel(moduleAlias), (changeSet) => {
-      void appDataChangeDispatcher.dispatch(changeSet);
-    }),
-  );
+  const normalized = moduleAlias.trim();
+  if (!normalized) {
+    throw new Error('Module data change subscription requires a moduleAlias');
+  }
+  const existing = moduleDataChangeSubscriptions.get(normalized);
+  const topic = existing ?? { moduleAlias: normalized, references: 0 };
+  topic.references += 1;
+  moduleDataChangeSubscriptions.set(normalized, topic);
+  if (!topic.active && activeRealtime) {
+    topic.active = bindModuleDataChangeTopic(activeRealtime, normalized);
+  }
+  return {
+    unsubscribe() {
+      topic.references -= 1;
+      if (topic.references > 0) {
+        return;
+      }
+      topic.active?.unsubscribe();
+      topic.active = undefined;
+      moduleDataChangeSubscriptions.delete(normalized);
+    },
+  };
 }
 
 export function subscribeAppDataChanges(handler: (changeSet: WebCommittedChangeSet) => void | Promise<void>) {
   return appDataChangeDispatcher.subscribe(handler);
 }
 
-function registerPageRealtimeSubscription(bind: PageRealtimeSubscription['bind']) {
-  const id = nextPageRealtimeSubscriptionId;
-  nextPageRealtimeSubscriptionId += 1;
-  const subscription: PageRealtimeSubscription = { bind };
-  pageRealtimeSubscriptions.set(id, subscription);
-  if (activeRealtime) {
-    subscription.active = subscription.bind(activeRealtime);
-  }
-  return {
-    unsubscribe() {
-      subscription.active?.unsubscribe();
-      subscription.active = undefined;
-      pageRealtimeSubscriptions.delete(id);
-    },
-  };
-}
-
 function bindPageRealtimeSubscriptions(realtime: RealtimeClient) {
-  for (const subscription of pageRealtimeSubscriptions.values()) {
+  for (const subscription of moduleDataChangeSubscriptions.values()) {
     subscription.active?.unsubscribe();
-    subscription.active = subscription.bind(realtime);
+    subscription.active = bindModuleDataChangeTopic(realtime, subscription.moduleAlias);
   }
 }
 
 function unbindPageRealtimeSubscriptions() {
-  for (const subscription of pageRealtimeSubscriptions.values()) {
+  for (const subscription of moduleDataChangeSubscriptions.values()) {
     subscription.active?.unsubscribe();
     subscription.active = undefined;
   }
+}
+
+function bindModuleDataChangeTopic(realtime: RealtimeClient, moduleAlias: string) {
+  return realtime.subscribe(moduleDataChangeChannel(moduleAlias), (changeSet) => {
+    void appDataChangeDispatcher.dispatch(changeSet);
+  });
 }

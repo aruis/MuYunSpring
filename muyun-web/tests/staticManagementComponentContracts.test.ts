@@ -812,10 +812,6 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
   assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
   assert.match(userSessionRowsSource, /function userOnlineStatusTitle\(record: \{ id\?: string \}\)/);
-  assert.match(userViewSource, /usePageModuleDataChanges\('iam\.user'\)/);
-  assert.match(userViewSource, /usePageDataChangeHandler\(handleUserSessionDataChanges\)/);
-  assert.match(userSessionRowsSource, /webDataChangeTypes\.sessionCollectionChanged/);
-  assert.match(userSessionRowsSource, /expandedUserKeys\.value\.includes\(userId\)/);
   assert.match(userSessionRowsSource, /loadUserSessions/);
   assert.match(userSessionRowsSource, /loadUserSessionActions/);
   assert.match(userSessionRowsSource, /options\.context\.recordActions\(userId\)/);
@@ -927,10 +923,6 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
   assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
   assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
-  assert.match(systemUserViewSource, /usePageModuleDataChanges\('iam\.user'\)/);
-  assert.match(systemUserViewSource, /usePageDataChangeHandler\(handleUserSessionDataChanges\)/);
-  assert.match(userSessionRowsSource, /webDataChangeTypes\.sessionCollectionChanged/);
-  assert.match(userSessionRowsSource, /expandedUserKeys\.value\.includes\(userId\)/);
   assert.match(userSessionRowsSource, /loadUserSessions/);
   assert.match(userSessionRowsSource, /loadUserSessionActions/);
   assert.match(userSessionRowsSource, /options\.context\.recordActions\(userId\)/);

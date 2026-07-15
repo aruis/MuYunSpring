@@ -31,7 +31,6 @@ export const webDataChangeTypes = {
   recordUpdated: 'record-updated',
   recordDeleted: 'record-deleted',
   collectionChanged: 'collection-changed',
-  sessionCollectionChanged: 'session-collection-changed',
 } as const;
 
 export type WebDataChangeType = (typeof webDataChangeTypes)[keyof typeof webDataChangeTypes];

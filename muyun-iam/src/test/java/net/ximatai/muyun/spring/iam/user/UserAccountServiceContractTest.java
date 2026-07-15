@@ -366,12 +366,14 @@ class UserAccountServiceContractTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(dao.updateById(any(UserAccount.class))).thenReturn(1);
         RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService,
                 provider(null),
                 provider(null),
                 provider(null),
-                provider(eventPublisher));
+                provider(eventPublisher),
+                provider(revocationService));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             service.changePassword("user-1", "secret2");
@@ -384,6 +386,9 @@ class UserAccountServiceContractTest {
                 UserSecurityEvent.passwordReset("user-1"),
                 UserSecurityEvent.passwordChanged("user-1")
         );
+        verify(revocationService).revokeUserSessions("user-1", "password changed");
+        verify(revocationService).revokeUserSessions("user-1", "password reset");
+        verify(revocationService).revokeUserSessions("user-1", "own password changed");
     }
 
     @Test
@@ -393,18 +398,22 @@ class UserAccountServiceContractTest {
         when(dao.count(any(Criteria.class))).thenReturn(1L);
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
+        when(revocationService.revokeUserSessions("user-1", "force logout")).thenReturn(2);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService,
                 provider(null),
                 provider(null),
                 provider(null),
-                provider(eventPublisher));
+                provider(eventPublisher),
+                provider(revocationService));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            assertThat(service.forceLogout("user-1")).isEqualTo(1);
+            assertThat(service.forceLogout("user-1")).isEqualTo(2);
         }
 
         assertThat(eventPublisher.events).containsExactly(UserSecurityEvent.forceLogout("user-1"));
+        verify(revocationService).revokeUserSessions("user-1", "force logout");
         verify(dao, never()).updateById(any(UserAccount.class));
     }
 

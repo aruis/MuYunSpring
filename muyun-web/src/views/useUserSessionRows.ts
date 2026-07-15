@@ -1,12 +1,6 @@
 import { ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
-import { webDataChangeTypes } from '@muyun/web-contracts';
-import type {
-  UserAccount,
-  UserSessionStatusView,
-  UserSessionView,
-  WebCommittedChangeSet,
-} from '@muyun/web-contracts';
+import type { UserAccount, UserSessionStatusView, UserSessionView } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 
 export interface UserSessionState {
@@ -63,24 +57,6 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     if (expanded && userSessionState(userId).records.length === 0) {
       void loadUserSessions(userId);
     }
-  }
-
-  function handleUserSessionDataChanges(changeSet: WebCommittedChangeSet) {
-    const changedUserIds = new Set(
-      changeSet.changes
-        .filter((change) => change.type === webDataChangeTypes.sessionCollectionChanged)
-        .filter((change) => change.moduleAlias === 'iam.user')
-        .map((change) => (typeof change.recordId === 'string' ? change.recordId.trim() : ''))
-        .filter((userId) => userId),
-    );
-    changedUserIds.forEach((userId) => {
-      if (visibleUserIds.value.includes(userId)) {
-        void loadUserOnlineStatuses([userId]);
-      }
-      if (expandedUserKeys.value.includes(userId)) {
-        void loadUserSessions(userId);
-      }
-    });
   }
 
   function handleUserListLoaded(records: Array<{ id?: string }>) {
@@ -142,7 +118,6 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     expandedUserKeys,
     handleUserListLoaded,
     handleUserRowExpand,
-    handleUserSessionDataChanges,
     loadUserSessions,
     resetUserSessionRows,
     userOnlineStatusTitle,

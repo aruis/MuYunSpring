@@ -2,15 +2,11 @@ package net.ximatai.muyun.spring.boot.realtime;
 
 import net.ximatai.muyun.spring.iam.user.UserSecurityEvent;
 import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
 
 public class UserSecurityRealtimeEventPublisher implements UserSecurityEventPublisher {
-    private final UserSessionService userSessionService;
     private final SecurityRealtimeNotifier securityRealtimeNotifier;
 
-    public UserSecurityRealtimeEventPublisher(UserSessionService userSessionService,
-                                              SecurityRealtimeNotifier securityRealtimeNotifier) {
-        this.userSessionService = userSessionService;
+    public UserSecurityRealtimeEventPublisher(SecurityRealtimeNotifier securityRealtimeNotifier) {
         this.securityRealtimeNotifier = securityRealtimeNotifier;
     }
 
@@ -20,18 +16,9 @@ public class UserSecurityRealtimeEventPublisher implements UserSecurityEventPubl
             return;
         }
         switch (event.type()) {
-            case PASSWORD_CHANGED -> {
-                userSessionService.revokeUserSessions(event.userId());
-                securityRealtimeNotifier.notifyPasswordChanged(event.userId());
-            }
-            case PASSWORD_RESET -> {
-                userSessionService.revokeUserSessions(event.userId());
-                securityRealtimeNotifier.notifyPasswordReset(event.userId());
-            }
-            case FORCE_LOGOUT -> {
-                userSessionService.revokeUserSessions(event.userId());
-                securityRealtimeNotifier.notifyForceLogout(event.userId());
-            }
+            case PASSWORD_CHANGED -> securityRealtimeNotifier.notifyPasswordChanged(event.userId());
+            case PASSWORD_RESET -> securityRealtimeNotifier.notifyPasswordReset(event.userId());
+            case FORCE_LOGOUT -> securityRealtimeNotifier.notifyForceLogout(event.userId());
             case SESSION_REVOKED -> securityRealtimeNotifier.notifySessionRevoked(event.userId(), event.sessionId());
         }
     }

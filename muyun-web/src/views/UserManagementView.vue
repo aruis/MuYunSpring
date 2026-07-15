@@ -35,7 +35,6 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
-import { usePageDataChangeHandler, usePageModuleDataChanges } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'UserManagementView' });
@@ -66,14 +65,11 @@ const {
   expandedUserKeys,
   handleUserListLoaded,
   handleUserRowExpand,
-  handleUserSessionDataChanges,
   loadUserSessions,
   resetUserSessionRows,
   userOnlineStatusTitle,
   userSessionState,
 } = useUserSessionRows({ context: userContext, source: 'user-management' });
-usePageModuleDataChanges('iam.user');
-usePageDataChangeHandler(handleUserSessionDataChanges);
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const canBrowseTenants = computed(() => currentUser?.value?.system === true);

@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.iam.user.UserSecurityEvent;
-import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.Message;
@@ -22,8 +21,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RealtimePublisherTest {
@@ -155,18 +152,13 @@ class RealtimePublisherTest {
 
     @Test
     void shouldAdaptUserSecurityEventsToSessionRevocationAndRealtimeNotifications() {
-        UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingSecurityRealtimeNotifier notifier = new RecordingSecurityRealtimeNotifier();
-        UserSecurityRealtimeEventPublisher publisher = new UserSecurityRealtimeEventPublisher(userSessionService,
-                notifier);
+        UserSecurityRealtimeEventPublisher publisher = new UserSecurityRealtimeEventPublisher(notifier);
 
         publisher.publish(UserSecurityEvent.passwordChanged("user-1"));
         publisher.publish(UserSecurityEvent.passwordReset("user-2"));
         publisher.publish(UserSecurityEvent.forceLogout("user-3"));
 
-        verify(userSessionService).revokeUserSessions("user-1");
-        verify(userSessionService).revokeUserSessions("user-2");
-        verify(userSessionService).revokeUserSessions("user-3");
         assertThat(notifier.changedUserIds).containsExactly("user-1");
         assertThat(notifier.resetUserIds).containsExactly("user-2");
         assertThat(notifier.forceLogoutUserIds).containsExactly("user-3");
@@ -174,37 +166,12 @@ class RealtimePublisherTest {
 
     @Test
     void shouldAdaptSessionRevokedEventToTargetedRealtimeNotification() {
-        UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingSecurityRealtimeNotifier notifier = new RecordingSecurityRealtimeNotifier();
-        UserSecurityRealtimeEventPublisher publisher = new UserSecurityRealtimeEventPublisher(userSessionService,
-                notifier);
+        UserSecurityRealtimeEventPublisher publisher = new UserSecurityRealtimeEventPublisher(notifier);
 
         publisher.publish(UserSecurityEvent.sessionRevoked("user-1", "session-1"));
 
-        verify(userSessionService, never()).revokeUserSessions("user-1");
         assertThat(notifier.revokedSessions).containsExactly("user-1:session-1");
-    }
-
-    @Test
-    void shouldBroadcastUserSessionLifecycleEventsToUserModuleTopic() {
-        RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
-        UserSessionLifecycleRealtimeEventPublisher publisher =
-                new UserSessionLifecycleRealtimeEventPublisher(messagePublisher);
-
-        publisher.publish(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
-
-        assertThat(messagePublisher.topic).isEqualTo(RealtimeDestinations.moduleDataChanges("iam.user"));
-        assertThat(messagePublisher.payload).isInstanceOf(RealtimeEnvelope.class);
-        RealtimeEnvelope<?> envelope = (RealtimeEnvelope<?>) messagePublisher.payload;
-        assertThat(envelope.type()).isEqualTo(StompDataChangeRealtimePublisher.MESSAGE_TYPE);
-        assertThat(envelope.payload()).isInstanceOf(CommittedChangeSet.class);
-        CommittedChangeSet changeSet = (CommittedChangeSet) envelope.payload();
-        assertThat(changeSet.changes()).hasSize(1);
-        DataChange change = changeSet.changes().get(0);
-        assertThat(change.type()).isEqualTo("session-collection-changed");
-        assertThat(change.moduleAlias()).isEqualTo("iam.user");
-        assertThat(change.recordId()).isEqualTo("user-1");
-        assertThat(change.facts()).containsEntry("sessionId", "session-1");
     }
 
     @Test
