@@ -122,6 +122,21 @@ class RealtimePublisherTest {
     }
 
     @Test
+    void shouldSendForceLogoutSecurityNotificationsToUserQueue() {
+        RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
+        StompSecurityRealtimeNotifier notifier = new StompSecurityRealtimeNotifier(messagePublisher);
+
+        notifier.notifyForceLogout("user-1");
+
+        assertThat(messagePublisher.userId).isEqualTo("user-1");
+        assertThat(messagePublisher.queue).isEqualTo(RealtimeDestinations.USER_NOTIFICATIONS);
+        assertThat(messagePublisher.payload).isInstanceOf(RealtimeEnvelope.class);
+        RealtimeEnvelope<?> envelope = (RealtimeEnvelope<?>) messagePublisher.payload;
+        assertThat(envelope.type()).isEqualTo(StompSecurityRealtimeNotifier.MESSAGE_TYPE);
+        assertThat(envelope.payload()).isEqualTo(SecurityNotification.forceLogout());
+    }
+
+    @Test
     void shouldAdaptUserSecurityEventsToSessionRevocationAndRealtimeNotifications() {
         UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingSecurityRealtimeNotifier notifier = new RecordingSecurityRealtimeNotifier();
@@ -130,11 +145,14 @@ class RealtimePublisherTest {
 
         publisher.publish(UserSecurityEvent.passwordChanged("user-1"));
         publisher.publish(UserSecurityEvent.passwordReset("user-2"));
+        publisher.publish(UserSecurityEvent.forceLogout("user-3"));
 
         verify(userSessionService).revokeUserSessions("user-1");
         verify(userSessionService).revokeUserSessions("user-2");
+        verify(userSessionService).revokeUserSessions("user-3");
         assertThat(notifier.changedUserIds).containsExactly("user-1");
         assertThat(notifier.resetUserIds).containsExactly("user-2");
+        assertThat(notifier.forceLogoutUserIds).containsExactly("user-3");
     }
 
     @Test
@@ -195,6 +213,7 @@ class RealtimePublisherTest {
     private static final class RecordingSecurityRealtimeNotifier implements SecurityRealtimeNotifier {
         private final List<String> changedUserIds = new ArrayList<>();
         private final List<String> resetUserIds = new ArrayList<>();
+        private final List<String> forceLogoutUserIds = new ArrayList<>();
 
         @Override
         public void notifyPasswordChanged(String userId) {
@@ -204,6 +223,11 @@ class RealtimePublisherTest {
         @Override
         public void notifyPasswordReset(String userId) {
             resetUserIds.add(userId);
+        }
+
+        @Override
+        public void notifyForceLogout(String userId) {
+            forceLogoutUserIds.add(userId);
         }
     }
 }

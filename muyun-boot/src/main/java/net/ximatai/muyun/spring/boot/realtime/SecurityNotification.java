@@ -7,6 +7,7 @@ public record SecurityNotification(
 ) {
     public static final String PASSWORD_CHANGED = "platform.security.password-changed";
     public static final String PASSWORD_RESET = "platform.security.password-reset";
+    public static final String FORCE_LOGOUT = "platform.security.force-logout";
 
     public SecurityNotification {
         if (code == null || code.isBlank()) {
@@ -25,5 +26,9 @@ public record SecurityNotification(
 
     public static SecurityNotification passwordReset() {
         return new SecurityNotification(PASSWORD_RESET, "你的密码已被重置，请重新登录", true);
+    }
+
+    public static SecurityNotification forceLogout() {
+        return new SecurityNotification(FORCE_LOGOUT, "你的登录会话已被管理员强制下线，请重新登录", true);
     }
 }

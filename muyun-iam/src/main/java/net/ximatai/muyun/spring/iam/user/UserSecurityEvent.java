@@ -22,8 +22,13 @@ public record UserSecurityEvent(
         return new UserSecurityEvent(Type.PASSWORD_RESET, userId);
     }
 
+    public static UserSecurityEvent forceLogout(String userId) {
+        return new UserSecurityEvent(Type.FORCE_LOGOUT, userId);
+    }
+
     public enum Type {
         PASSWORD_CHANGED,
-        PASSWORD_RESET
+        PASSWORD_RESET,
+        FORCE_LOGOUT
     }
 }

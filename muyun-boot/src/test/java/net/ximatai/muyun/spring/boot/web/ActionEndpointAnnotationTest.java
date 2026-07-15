@@ -68,6 +68,13 @@ class ActionEndpointAnnotationTest {
         assertThat(resetEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
         assertThat(resetEndpoint.dataAuth()).isTrue();
         assertThat(resetEndpoint.recordIdPathVariable()).isEqualTo("id");
+
+        CustomActionEndpoint forceLogoutEndpoint = customEndpoint(UserAccountWebController.class, "forceLogout",
+                String.class);
+        assertThat(forceLogoutEndpoint.value()).isEqualTo("forceLogout");
+        assertThat(forceLogoutEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(forceLogoutEndpoint.dataAuth()).isTrue();
+        assertThat(forceLogoutEndpoint.recordIdPathVariable()).isEqualTo("id");
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {

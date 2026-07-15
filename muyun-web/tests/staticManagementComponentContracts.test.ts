@@ -787,8 +787,10 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /enabled: \{ label: '允许登录'/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
+  assert.match(userViewSource, /key: 'forceLogout'[\s\S]*actionCode: 'forceLogout'/);
   assert.match(userViewSource, /title: '修改密码'/);
   assert.match(userViewSource, /title: '重置密码'/);
+  assert.match(userViewSource, /title: '强制下线'/);
   assert.match(userViewSource, /temporaryPassword/);
   assert.match(
     userViewSource,
@@ -797,6 +799,7 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(userViewSource, /path: `\/iam\.user\/changePassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/);
+  assert.match(userViewSource, /path: `\/iam\.user\/forceLogout\/\$\{encodeURIComponent\(user\.id!\)\}`/);
   assert.match(userViewSource, /type="password"/);
   assert.match(inputSource, /type\?: 'text' \| 'password'/);
   assert.match(iconSource, /LockOutlined/);
@@ -855,9 +858,11 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /actionCode: 'update'/);
   assert.match(systemUserViewSource, /actionCode: 'changePassword'/);
   assert.match(systemUserViewSource, /actionCode: 'resetPassword'/);
+  assert.match(systemUserViewSource, /actionCode: 'forceLogout'/);
   assert.match(systemUserViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(systemUserViewSource, /title: '修改密码'/);
   assert.match(systemUserViewSource, /title: '重置密码'/);
+  assert.match(systemUserViewSource, /title: '强制下线'/);
   assert.match(systemUserViewSource, /temporaryPassword/);
   assert.match(
     systemUserViewSource,
@@ -866,6 +871,10 @@ test('system user management is a separate root account entry', () => {
   assert.match(
     systemUserViewSource,
     /path: `\/iam\.user\/resetPassword\/\$\{encodeURIComponent\(user\.id!\)\}`/,
+  );
+  assert.match(
+    systemUserViewSource,
+    /path: `\/iam\.user\/forceLogout\/\$\{encodeURIComponent\(user\.id!\)\}`/,
   );
   assert.match(systemUserViewSource, /tenantId: undefined/);
   assert.match(systemUserViewSource, /enabled: \{ label: '允许登录'/);

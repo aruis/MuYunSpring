@@ -280,6 +280,25 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
+    void shouldResolveUserForceLogoutEndpointActionContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.user/forceLogout/user-1");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "user-1"));
+        UserAccountWebController controller = new UserAccountWebController();
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, UserAccountWebController.class.getMethod("forceLogout", String.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("iam.user");
+            assertThat(context.platformAction()).isNull();
+            assertThat(context.actionCode()).isEqualTo("forceLogout");
+            assertThat(context.permissionCode()).isEqualTo("iam.user:forceLogout");
+            assertThat(context.actionPolicy().requiresDataScope()).isTrue();
+            assertThat(context.recordIds()).containsExactly("user-1");
+        });
+    }
+
+    @Test
     void shouldResolveCustomEndpointModuleAliasFromStaticModuleAnnotation() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/workflow/admin/history/query");
         StaticModuleActionController controller = new StaticModuleActionController();

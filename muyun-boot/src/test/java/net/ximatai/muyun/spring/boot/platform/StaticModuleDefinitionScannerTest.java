@@ -291,7 +291,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "enable", "disable", "userSelector", "changePassword", "resetPassword",
-                                "employeeBinding");
+                                "forceLogout", "employeeBinding");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("userSelector"))
                         .singleElement()
                         .satisfies(action -> {
@@ -309,6 +309,12 @@ class StaticModuleDefinitionScannerTest {
                         .singleElement()
                         .satisfies(action -> {
                             assertThat(action.title()).isEqualTo("重置密码");
+                            assertThat(action.dataAuth()).isTrue();
+                        });
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("forceLogout"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("强制下线");
                             assertThat(action.dataAuth()).isTrue();
                         });
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeBinding"))

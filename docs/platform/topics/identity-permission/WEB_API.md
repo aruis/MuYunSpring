@@ -189,6 +189,8 @@
 | `POST` | `/iam.user/enable/{id}`         | 启用用户。                                                             |
 | `POST` | `/iam.user/disable/{id}`        | 停用用户。                                                             |
 | `POST` | `/iam.user/changePassword/{id}` | 修改用户密码；成功后撤销该用户现有 session。                           |
+| `POST` | `/iam.user/resetPassword/{id}`  | 重置用户密码并返回临时密码；成功后撤销该用户现有 session。             |
+| `POST` | `/iam.user/forceLogout/{id}`    | 管理员强制用户下线；成功后撤销该用户现有 session 并发送安全通知。      |
 | `POST` | `/iam.user/selector/query`      | 用户选择器查询；支持按角色、账号关键字和启用状态过滤，返回轻量用户项。 |
 
 用户列表和用户绑定职员详情可返回绑定职员摘要字段；这些摘要属于用户管理入口的读模型，权限口径跟随 `iam.user` 的查询或查看入口，不额外要求调用方具备 `iam.employee` 查看权限。

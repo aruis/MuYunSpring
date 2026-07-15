@@ -387,6 +387,28 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldPublishSecurityEventWhenForceLogout() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount user = activeUser();
+        when(dao.count(any(Criteria.class))).thenReturn(1L);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService,
+                provider(null),
+                provider(null),
+                provider(null),
+                provider(eventPublisher));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.forceLogout("user-1")).isEqualTo(1);
+        }
+
+        assertThat(eventPublisher.events).containsExactly(UserSecurityEvent.forceLogout("user-1"));
+        verify(dao, never()).updateById(any(UserAccount.class));
+    }
+
+    @Test
     void shouldRejectCurrentUserPasswordAdministration() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
@@ -411,6 +433,25 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldRejectCurrentUserForceLogout() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
+            assertThatThrownBy(() -> service.forceLogout("user-1"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("cannot force logout current user")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.user.force-logout-current-user"));
+        }
+
+        verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
+    }
+
+    @Test
     void shouldContributeCurrentUserPasswordAdministrationAvailability() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccountService service = new UserAccountService(dao, tenantId -> {
@@ -425,6 +466,11 @@ class UserAccountServiceContractTest {
                     });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "changePassword", "user-1"))
                     .hasValueSatisfying(decision -> assertThat(decision.available()).isFalse());
+            assertThat(service.availability(UserAccountService.MODULE_ALIAS, "forceLogout", "user-1"))
+                    .hasValueSatisfying(decision -> {
+                        assertThat(decision.available()).isFalse();
+                        assertThat(decision.reason()).isEqualTo("cannot force logout current user");
+                    });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-2"))
                     .isEmpty();
         }

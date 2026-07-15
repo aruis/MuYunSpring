@@ -157,6 +157,18 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         }));
     }
 
+    @PostMapping("/forceLogout/{id}")
+    @CustomActionEndpoint(value = "forceLogout", title = "强制下线",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
+    @BusinessMutationResult(code = "iam.user.force-logout", message = "用户已下线",
+            change = BusinessMutationChange.UPDATED, module = UserAccountService.class,
+            recordIdSource = BusinessMutationRecordIdSource.PATH_VARIABLE, recordId = "id")
+    public int forceLogout(@PathVariable String id) {
+        return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
+            return service().forceLogout(id);
+        }));
+    }
+
     @Override
     public Optional<String> tenantIdForCreate(UserAccount record) {
         return tenantIdForUser(record);

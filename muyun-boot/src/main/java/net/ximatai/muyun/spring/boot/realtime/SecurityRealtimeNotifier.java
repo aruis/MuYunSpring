@@ -4,4 +4,6 @@ public interface SecurityRealtimeNotifier {
     void notifyPasswordChanged(String userId);
 
     void notifyPasswordReset(String userId);
+
+    void notifyForceLogout(String userId);
 }

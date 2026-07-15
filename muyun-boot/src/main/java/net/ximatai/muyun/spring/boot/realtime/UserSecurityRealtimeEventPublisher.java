@@ -23,6 +23,7 @@ public class UserSecurityRealtimeEventPublisher implements UserSecurityEventPubl
         switch (event.type()) {
             case PASSWORD_CHANGED -> securityRealtimeNotifier.notifyPasswordChanged(event.userId());
             case PASSWORD_RESET -> securityRealtimeNotifier.notifyPasswordReset(event.userId());
+            case FORCE_LOGOUT -> securityRealtimeNotifier.notifyForceLogout(event.userId());
         }
     }
 }

@@ -171,13 +171,14 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                                                                   String actionCode,
                                                                   String recordId) {
         if (!MODULE_ALIAS.equals(moduleAlias)
-                || (!"changePassword".equals(actionCode) && !"resetPassword".equals(actionCode))) {
+                || (!"changePassword".equals(actionCode)
+                && !"resetPassword".equals(actionCode)
+                && !"forceLogout".equals(actionCode))) {
             return Optional.empty();
         }
         return CurrentUserContext.currentUser()
                 .filter(currentUser -> currentUser.userId().equals(recordId))
-                .map(currentUser -> RecordActionAvailabilityDecision.unavailable(
-                        "cannot administrate current user's password"));
+                .map(currentUser -> RecordActionAvailabilityDecision.unavailable(selfAdministrationReason(actionCode)));
     }
 
     @Override
@@ -334,6 +335,18 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         return new PasswordResetResult(count, count > 0 ? temporaryPassword : null, user.getPasswordExpiresAt());
     }
 
+    public int forceLogout(String userId) {
+        String validUserId = Preconditions.requireText(userId, "userId");
+        rejectCurrentUserForceLogout(validUserId);
+        requireRecordScope(forceLogoutPolicy(), List.of(validUserId));
+        UserAccount user = select(validUserId);
+        if (user == null) {
+            return 0;
+        }
+        userSecurityEventPublisher.get().publish(UserSecurityEvent.forceLogout(validUserId));
+        return 1;
+    }
+
     public int changeOwnPassword(String userId, String currentPassword, String newPassword) {
         String validUserId = Preconditions.requireText(userId, "userId");
         UserAccount user = requireEnabled(validUserId,
@@ -445,6 +458,23 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 });
     }
 
+    private void rejectCurrentUserForceLogout(String userId) {
+        CurrentUserContext.currentUser()
+                .filter(currentUser -> currentUser.userId().equals(userId))
+                .ifPresent(currentUser -> {
+                    throw BusinessExceptions.warning(
+                            "iam.user.force-logout-current-user",
+                            "cannot force logout current user");
+                });
+    }
+
+    private String selfAdministrationReason(String actionCode) {
+        if ("forceLogout".equals(actionCode)) {
+            return "cannot force logout current user";
+        }
+        return "cannot administrate current user's password";
+    }
+
     private String requireUsername(String username) {
         return Preconditions.requireText(username, "username").trim();
     }
@@ -495,6 +525,21 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 .map(context -> context.actionPolicy())
                 .orElse(new ActionExecutionPolicy(
                         "resetPassword",
+                        PlatformActionLevel.RECORD,
+                        ActionAccessMode.AUTH_REQUIRED,
+                        true,
+                        true,
+                        ActionDefaultGrantPolicy.NONE,
+                        null
+                ));
+    }
+
+    private ActionExecutionPolicy forceLogoutPolicy() {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> MODULE_ALIAS.equals(context.moduleAlias()))
+                .map(context -> context.actionPolicy())
+                .orElse(new ActionExecutionPolicy(
+                        "forceLogout",
                         PlatformActionLevel.RECORD,
                         ActionAccessMode.AUTH_REQUIRED,
                         true,

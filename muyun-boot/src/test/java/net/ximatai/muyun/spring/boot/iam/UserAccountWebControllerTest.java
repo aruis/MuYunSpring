@@ -64,6 +64,20 @@ class UserAccountWebControllerTest {
     }
 
     @Test
+    void shouldDelegateForceLogoutToService() {
+        UserAccountService userAccountService = mock(UserAccountService.class);
+        UserAccountWebController controller = new UserAccountWebController();
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        when(userAccountService.forceLogout("user-1")).thenReturn(1);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(controller.forceLogout("user-1")).isEqualTo(1);
+        }
+
+        verify(userAccountService).forceLogout("user-1");
+    }
+
+    @Test
     void shouldWrapPasswordBusinessMutationResults() throws Exception {
         UserAccountService userAccountService = mock(UserAccountService.class);
         UserAccountWebController controller = new UserAccountWebController();
@@ -71,6 +85,7 @@ class UserAccountWebControllerTest {
         when(userAccountService.changePassword("user-1", "secret2")).thenReturn(1);
         when(userAccountService.resetPassword("user-1")).thenReturn(
                 new UserAccountService.PasswordResetResult(1, "temp-secret", null));
+        when(userAccountService.forceLogout("user-1")).thenReturn(1);
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addInterceptors(new ActionEndpointInterceptor(new AllowAllActionExecutionPolicyService(),
@@ -98,6 +113,14 @@ class UserAccountWebControllerTest {
                     .andExpect(jsonPath("$.data.temporaryPassword").value("temp-secret"))
                     .andExpect(jsonPath("$.message.code").value("iam.user.password-reset"))
                     .andExpect(jsonPath("$.message.text").value("密码已重置"))
+                    .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.user' && @.recordId == 'user-1')]")
+                            .exists());
+
+            mvc.perform(post("/iam.user/forceLogout/user-1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").value(1))
+                    .andExpect(jsonPath("$.message.code").value("iam.user.force-logout"))
+                    .andExpect(jsonPath("$.message.text").value("用户已下线"))
                     .andExpect(jsonPath("$.changes[?(@.type == 'record-updated' && @.moduleAlias == 'iam.user' && @.recordId == 'user-1')]")
                             .exists());
         }

@@ -21,7 +21,7 @@ import {
   type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
-import { UiButton, UiError, UiInput, UiSpin } from '@muyun/vue-ui-antdv';
+import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
 import type { ResetPasswordResponse, UserAccount, WebQueryRequest } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 
@@ -99,6 +99,14 @@ const detailActions = computed<RecordActionItem[]>(() => {
         actionCode: 'resetPassword',
         title: '重置密码',
         iconName: 'reload',
+        disabled: savingUser.value,
+      },
+      {
+        key: 'forceLogout',
+        actionCode: 'forceLogout',
+        title: '强制下线',
+        iconName: 'power',
+        danger: true,
         disabled: savingUser.value,
       },
     ];
@@ -269,6 +277,10 @@ function handleDetailAction(action: RecordActionItem) {
   }
   if (action.key === 'resetGeneratedPassword' && selectedUser.value) {
     void resetUserLoginPassword();
+    return;
+  }
+  if (action.key === 'forceLogout' && selectedUser.value) {
+    void forceLogoutUser();
   }
 }
 
@@ -342,6 +354,31 @@ async function resetUserLoginPassword() {
       const refreshed = await userContext.crud.view(user.id!);
       commitDetailRecord(refreshed);
       resetPasswordResult.value = result;
+      reloadKey.value += 1;
+    },
+  });
+}
+
+async function forceLogoutUser() {
+  await executeStaticRecordAction<UserAccount, number>({
+    loading: savingUser,
+    source: 'system-user-management',
+    record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
+    canExecute: (user) => userContext.can('forceLogout', user.id) === true,
+    deniedMessage: '当前用户无权强制系统账号下线',
+    confirm: (user) =>
+      confirmAction({
+        title: '强制下线',
+        content: `确认强制系统账号「${systemUserTitle(user)}」下线？`,
+        okText: '强制下线',
+        danger: true,
+      }),
+    execute: (user) =>
+      userContext.http.request<number>({
+        method: 'POST',
+        path: `/iam.user/forceLogout/${encodeURIComponent(user.id!)}`,
+      }),
+    onExecuted: () => {
       reloadKey.value += 1;
     },
   });

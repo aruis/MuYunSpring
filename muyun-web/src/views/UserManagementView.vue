@@ -132,6 +132,14 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
         disabled: savingUser.value,
       },
       {
+        key: 'forceLogout',
+        actionCode: 'forceLogout',
+        title: '强制下线',
+        iconName: 'power',
+        danger: true,
+        disabled: savingUser.value,
+      },
+      {
         key: 'delete',
         actionCode: 'delete',
         title: '删除',
@@ -373,6 +381,10 @@ function handleUserDetailAction(action: RecordActionItem) {
     void resetUserLoginPassword();
     return;
   }
+  if (action.key === 'forceLogout' && selectedUser.value) {
+    void forceLogoutUser();
+    return;
+  }
   if (action.key === 'delete') {
     void removeUser(selectedUser.value);
   }
@@ -451,6 +463,31 @@ async function resetUserLoginPassword() {
       const refreshed = await userContext.crud.view(user.id!);
       commitUserDetailRecord(refreshed);
       resetPasswordResult.value = result;
+      userReloadKey.value += 1;
+    },
+  });
+}
+
+async function forceLogoutUser() {
+  await executeStaticRecordAction<UserAccount, number>({
+    loading: savingUser,
+    source: 'user-management',
+    record: () => (selectedUser.value?.id ? selectedUser.value : undefined),
+    canExecute: (user) => userContext.can('forceLogout', user.id) === true,
+    deniedMessage: '当前用户无权强制用户下线',
+    confirm: (user) =>
+      confirmAction({
+        title: '强制下线',
+        content: `确认强制用户「${userTitle(user)}」下线？`,
+        okText: '强制下线',
+        danger: true,
+      }),
+    execute: (user) =>
+      userContext.http.request<number>({
+        method: 'POST',
+        path: `/iam.user/forceLogout/${encodeURIComponent(user.id!)}`,
+      }),
+    onExecuted: () => {
       userReloadKey.value += 1;
     },
   });

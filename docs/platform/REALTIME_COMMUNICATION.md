@@ -329,7 +329,7 @@ IM 不复用 `DataChange` payload，应定义独立消息契约和会话权限�
 /user/queue/platform/notifications
 ```
 
-payload 表达稳定安全事实，例如 `platform.security.password-changed`、`platform.security.password-reset` 和 `logoutRequired`。后端不表达 Toast、弹窗、倒计时秒数或跳转方式；前端根据安全事实决定展示方式，并在本地完成退出登录。
+payload 表达稳定安全事实，例如 `platform.security.password-changed`、`platform.security.password-reset`、`platform.security.force-logout` 和 `logoutRequired`。后端不表达 Toast、弹窗、倒计时秒数或跳转方式；前端根据安全事实决定展示方式，并在本地完成退出登录。
 
 ### 5.3 发布门面
 
