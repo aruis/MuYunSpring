@@ -27,8 +27,13 @@ public record UserSessionLifecycleEvent(
         return new UserSessionLifecycleEvent(Type.REVOKED, userId, sessionId);
     }
 
+    public static UserSessionLifecycleEvent loggedOut(String userId, String sessionId) {
+        return new UserSessionLifecycleEvent(Type.LOGGED_OUT, userId, sessionId);
+    }
+
     public enum Type {
         LOGGED_IN,
+        LOGGED_OUT,
         REVOKED
     }
 }

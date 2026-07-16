@@ -183,6 +183,14 @@ public class UserSessionService {
     }
 
     public Optional<CurrentUser> currentUser(String token) {
+        return currentUser(token, true);
+    }
+
+    public Optional<CurrentUser> currentUserSnapshot(String token) {
+        return currentUser(token, false);
+    }
+
+    private Optional<CurrentUser> currentUser(String token, boolean touchSession) {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
@@ -192,19 +200,23 @@ public class UserSessionService {
         }
         Instant now = now();
         if (isExpired(session, now)) {
-            userSessionRevocationService.revoke(session, now, "session expired");
+            if (touchSession) {
+                userSessionRevocationService.revoke(session, now, "session expired");
+            }
             return Optional.empty();
         }
         try (TenantContext.Scope ignored = sessionTenantScope(session.getTenantId())) {
-            if (!verifyActiveTenantForSession(session, now)) {
+            if (!verifyActiveTenantForSession(session, now, touchSession)) {
                 return Optional.empty();
             }
             UserAccount user = userAccountService.select(session.getUserId());
             if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
-                userSessionRevocationService.revoke(session, now, "user inactive");
+                if (touchSession) {
+                    userSessionRevocationService.revoke(session, now, "user inactive");
+                }
                 return Optional.empty();
             }
-            if (!updateLastSeenIfDue(session, now)) {
+            if (touchSession && !updateLastSeenIfDue(session, now)) {
                 return Optional.empty();
             }
             return Optional.of(currentUserOf(user, Boolean.TRUE.equals(session.getPasswordChangeRequired())));
@@ -214,7 +226,7 @@ public class UserSessionService {
     public void logout(String token) {
         UserSession session = sessionByToken(token);
         if (session != null) {
-            userSessionRevocationService.revoke(session, now(), "logout");
+            userSessionRevocationService.logout(session, now());
         }
     }
 
@@ -230,7 +242,7 @@ public class UserSessionService {
         }
     }
 
-    private boolean verifyActiveTenantForSession(UserSession session, Instant now) {
+    private boolean verifyActiveTenantForSession(UserSession session, Instant now, boolean revokeWhenInactive) {
         if (session.getTenantId() == null || session.getTenantId().isBlank()) {
             return true;
         }
@@ -238,7 +250,9 @@ public class UserSessionService {
             activeTenantVerifier.verifyActiveTenant(session.getTenantId());
             return true;
         } catch (PlatformException exception) {
-            userSessionRevocationService.revoke(session, now, "tenant inactive");
+            if (revokeWhenInactive) {
+                userSessionRevocationService.revoke(session, now, "tenant inactive");
+            }
             return false;
         }
     }

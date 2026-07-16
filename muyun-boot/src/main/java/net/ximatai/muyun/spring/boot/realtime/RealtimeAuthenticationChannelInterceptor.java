@@ -14,9 +14,16 @@ import java.util.Optional;
 
 public class RealtimeAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final UserSessionService userSessionService;
+    private final RealtimeConnectionRegistry connectionRegistry;
 
     public RealtimeAuthenticationChannelInterceptor(UserSessionService userSessionService) {
+        this(userSessionService, new RealtimeConnectionRegistry());
+    }
+
+    public RealtimeAuthenticationChannelInterceptor(UserSessionService userSessionService,
+                                                    RealtimeConnectionRegistry connectionRegistry) {
         this.userSessionService = userSessionService;
+        this.connectionRegistry = connectionRegistry;
     }
 
     @Override
@@ -36,7 +43,13 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
             if (currentUser.passwordChangeRequired()) {
                 throw new IllegalArgumentException("password change required");
             }
-            accessor.setUser(new CurrentUserPrincipal(currentUser, token));
+            CurrentUserPrincipal principal = new CurrentUserPrincipal(currentUser, token);
+            accessor.setUser(principal);
+            connectionRegistry.register(accessor.getSessionId(), principal);
+            return message;
+        }
+        if (StompCommand.DISCONNECT.equals(command)) {
+            connectionRegistry.unregister(accessor.getSessionId());
             return message;
         }
         if (StompCommand.SUBSCRIBE.equals(command) || StompCommand.SEND.equals(command)) {
@@ -47,7 +60,9 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
             if (currentUser.passwordChangeRequired()) {
                 throw new IllegalArgumentException("password change required");
             }
-            accessor.setUser(new CurrentUserPrincipal(currentUser, principal.token()));
+            CurrentUserPrincipal refreshedPrincipal = new CurrentUserPrincipal(currentUser, principal.token());
+            accessor.setUser(refreshedPrincipal);
+            connectionRegistry.register(accessor.getSessionId(), refreshedPrincipal);
         }
         return message;
     }

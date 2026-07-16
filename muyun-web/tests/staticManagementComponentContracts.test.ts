@@ -817,7 +817,7 @@ test('user management keeps account basics separate from employment binding and 
     userSessionRowsSource,
     /function handleUserSessionBusinessEvent\(event: WebBusinessRealtimeEvent\)/,
   );
-  assert.match(userSessionRowsSource, /event\.type !== userSessionChangedEventType/);
+  assert.match(userSessionRowsSource, /event\.type !== userSessionCollectionChangedEventType/);
   assert.match(userSessionRowsSource, /visibleUserIds\.value\.includes\(userId\)/);
   assert.match(userSessionRowsSource, /expandedUserKeys\.value\.includes\(userId\)/);
   assert.match(userSessionRowsSource, /loadUserSessions/);

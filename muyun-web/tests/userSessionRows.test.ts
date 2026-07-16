@@ -110,10 +110,11 @@ function sessionRowsContext(
 
 function sessionChangedEvent(userId: string) {
   return {
-    type: 'iam.user.session.changed',
+    type: 'iam.user.session.collectionChanged',
     moduleAlias: 'iam.user',
     recordId: userId,
     reason: 'LOGGED_IN',
+    sensitivity: 'DIRTY_MARKER',
   };
 }
 

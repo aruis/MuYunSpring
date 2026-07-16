@@ -4,8 +4,11 @@ public record BusinessRealtimeEvent(
         String type,
         String moduleAlias,
         String recordId,
-        String reason
+        String reason,
+        String sensitivity
 ) {
+    private static final String DIRTY_MARKER_SENSITIVITY = "DIRTY_MARKER";
+
     public BusinessRealtimeEvent {
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("business realtime event type must not be blank");
@@ -20,9 +23,11 @@ public record BusinessRealtimeEvent(
         moduleAlias = moduleAlias.trim();
         recordId = recordId.trim();
         reason = reason == null || reason.isBlank() ? null : reason.trim();
+        sensitivity = sensitivity == null || sensitivity.isBlank() ? DIRTY_MARKER_SENSITIVITY : sensitivity.trim();
     }
 
-    public static BusinessRealtimeEvent userSessionChanged(String userId, String reason) {
-        return new BusinessRealtimeEvent("iam.user.session.changed", "iam.user", userId, reason);
+    public static BusinessRealtimeEvent userSessionCollectionChanged(String userId, String reason) {
+        return new BusinessRealtimeEvent(
+                "iam.user.session.collectionChanged", "iam.user", userId, reason, DIRTY_MARKER_SENSITIVITY);
     }
 }

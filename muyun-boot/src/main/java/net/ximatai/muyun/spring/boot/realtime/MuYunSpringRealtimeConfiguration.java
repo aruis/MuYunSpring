@@ -13,7 +13,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -24,11 +23,14 @@ import java.util.List;
 @EnableWebSocketMessageBroker
 public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerConfigurer {
     private final UserSessionService userSessionService;
+    private final RealtimeConnectionRegistry connectionRegistry;
     private final MuYunSpringCorsProperties corsProperties;
 
     public MuYunSpringRealtimeConfiguration(UserSessionService userSessionService,
+                                            RealtimeConnectionRegistry connectionRegistry,
                                             ObjectProvider<MuYunSpringCorsProperties> corsProperties) {
         this.userSessionService = userSessionService;
+        this.connectionRegistry = connectionRegistry;
         this.corsProperties = corsProperties.getIfAvailable();
     }
 
@@ -52,7 +54,14 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(new RealtimeAuthenticationChannelInterceptor(userSessionService));
+        registration.interceptors(new RealtimeAuthenticationChannelInterceptor(userSessionService,
+                connectionRegistry));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(RealtimeConnectionRegistry.class)
+    public static RealtimeConnectionRegistry realtimeConnectionRegistry() {
+        return new RealtimeConnectionRegistry();
     }
 
     @Bean
@@ -80,6 +89,22 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     }
 
     @Bean
+    @ConditionalOnMissingBean(BusinessRealtimeFanOutPublisher.class)
+    public BusinessRealtimeFanOutPublisher businessRealtimeFanOutPublisher(
+            BusinessRealtimeNotifier businessRealtimeNotifier) {
+        return new OnlineUserBusinessRealtimeFanOutPublisher(
+                connectionRegistry, userSessionService, businessRealtimeNotifier);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(BusinessRealtimeRecipientPolicyFactory.class)
+    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
+    public BusinessRealtimeRecipientPolicyFactory businessRealtimeRecipientPolicyFactory(
+            PlatformRecordActionAvailabilityService actionAvailabilityService) {
+        return new BusinessRealtimeRecipientPolicyFactory(actionAvailabilityService);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(UserSecurityEventPublisher.class)
     public UserSecurityEventPublisher userSecurityEventPublisher(SecurityRealtimeNotifier securityRealtimeNotifier) {
         return new UserSecurityRealtimeEventPublisher(securityRealtimeNotifier);
@@ -89,10 +114,9 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     @ConditionalOnMissingBean(UserSessionLifecycleEventPublisher.class)
     @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
     public UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher(
-            SimpUserRegistry userRegistry,
-            PlatformRecordActionAvailabilityService actionAvailabilityService,
-            BusinessRealtimeNotifier businessRealtimeNotifier) {
+            BusinessRealtimeFanOutPublisher businessRealtimeFanOutPublisher,
+            BusinessRealtimeRecipientPolicyFactory recipientPolicyFactory) {
         return new UserSessionManagementRealtimeEventPublisher(
-                userRegistry, actionAvailabilityService, businessRealtimeNotifier, userSessionService);
+                businessRealtimeFanOutPublisher, recipientPolicyFactory);
     }
 }

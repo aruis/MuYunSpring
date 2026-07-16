@@ -476,10 +476,11 @@ test('realtime business event channel handles user private business events', asy
       type: 'platform.business-event',
       occurredAt: '2026-07-15T10:00:00Z',
       payload: {
-        type: 'iam.user.session.changed',
+        type: 'iam.user.session.collectionChanged',
         moduleAlias: 'iam.user',
         recordId: 'user-1',
         reason: 'LOGGED_IN',
+        sensitivity: 'DIRTY_MARKER',
       },
     }),
   );
@@ -496,10 +497,11 @@ test('realtime business event channel handles user private business events', asy
 
   assert.deepEqual(handled, [
     {
-      type: 'iam.user.session.changed',
+      type: 'iam.user.session.collectionChanged',
       moduleAlias: 'iam.user',
       recordId: 'user-1',
       reason: 'LOGGED_IN',
+      sensitivity: 'DIRTY_MARKER',
     },
   ]);
 });

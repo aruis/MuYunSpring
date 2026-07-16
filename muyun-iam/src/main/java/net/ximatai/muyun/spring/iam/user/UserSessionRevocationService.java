@@ -65,6 +65,14 @@ public class UserSessionRevocationService {
     }
 
     public boolean revoke(UserSession session, Instant now, String reason) {
+        return revoke(session, now, reason, UserSessionLifecycleEvent.Type.REVOKED);
+    }
+
+    public boolean logout(UserSession session, Instant now) {
+        return revoke(session, now, "logout", UserSessionLifecycleEvent.Type.LOGGED_OUT);
+    }
+
+    private boolean revoke(UserSession session, Instant now, String reason, UserSessionLifecycleEvent.Type eventType) {
         UserSession current = session;
         for (int attempt = 0; attempt < 2 && current != null && current.getRevokedAt() == null; attempt++) {
             Integer expectedVersion = current.getVersion();
@@ -72,7 +80,7 @@ public class UserSessionRevocationService {
             current.setRevokedReason(reason);
             int updated = userSessionRecordService.updateSession(current, expectedVersion, now);
             if (updated > 0) {
-                publishSessionRevoked(current);
+                publishSessionLifecycleEvent(current, eventType);
                 return true;
             }
             current = sessionById(current.getId());
@@ -80,13 +88,23 @@ public class UserSessionRevocationService {
         return false;
     }
 
-    private void publishSessionRevoked(UserSession session) {
+    private void publishSessionLifecycleEvent(UserSession session, UserSessionLifecycleEvent.Type eventType) {
         String userId = normalizeBlank(session.getUserId());
         String sessionId = normalizeBlank(session.getId());
         if (userId == null || sessionId == null) {
             return;
         }
-        userSessionLifecycleEventPublisher.get().publish(UserSessionLifecycleEvent.revoked(userId, sessionId));
+        userSessionLifecycleEventPublisher.get().publish(lifecycleEvent(eventType, userId, sessionId));
+    }
+
+    private UserSessionLifecycleEvent lifecycleEvent(
+            UserSessionLifecycleEvent.Type eventType,
+            String userId,
+            String sessionId) {
+        if (UserSessionLifecycleEvent.Type.LOGGED_OUT.equals(eventType)) {
+            return UserSessionLifecycleEvent.loggedOut(userId, sessionId);
+        }
+        return UserSessionLifecycleEvent.revoked(userId, sessionId);
     }
 
     private UserSession sessionById(String id) {
