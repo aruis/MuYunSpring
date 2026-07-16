@@ -5,15 +5,18 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserTimeZoneResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -111,6 +114,37 @@ class UserSessionServiceTest {
         assertThat(persistedSession.get().getLastSeenAt()).isEqualTo(databaseNow);
         assertThat(persistedSession.get().getExpiresAt()).isEqualTo(databaseNow.plusSeconds(43_200));
         assertThat(persistedSession.get().getMaxExpiresAt()).isEqualTo(databaseNow.plusSeconds(604_800));
+    }
+
+    @Test
+    void shouldExposeResolvedDisplayTimeZoneOnCurrentUser() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(activeUser()));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        captureInsertedSession(sessionDao);
+        CurrentUserTimeZoneResolver timeZoneResolver = currentUser -> Optional.of(ZoneId.of("Asia/Shanghai"));
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock, timeZoneResolver);
+
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
+
+        assertThat(login.currentUser().timeZone()).isEqualTo("Asia/Shanghai");
+    }
+
+    @Test
+    void shouldNotExposeDisplayTimeZoneWithoutResolver() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(activeUser()));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        captureInsertedSession(sessionDao);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
+
+        assertThat(login.currentUser().timeZone()).isNull();
     }
 
     @Test

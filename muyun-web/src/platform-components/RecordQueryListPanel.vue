@@ -15,6 +15,7 @@ import type {
 } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+import DateTimeText from './DateTimeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 import {
@@ -30,7 +31,7 @@ export type QueryListRecord = Record<string, unknown> & { id?: string; enabled?:
 export interface RecordQueryListColumn {
   key: string;
   title: string;
-  type?: 'text' | 'enabledStatus';
+  type?: 'text' | 'enabledStatus' | 'datetime';
   width?: string;
   align?: 'left' | 'center' | 'right';
   titleField?: string;
@@ -622,6 +623,18 @@ function cellValue(record: QueryListRecord, column: RecordQueryListColumn) {
   );
 }
 
+function dateTimeCellValue(record: QueryListRecord, column: RecordQueryListColumn) {
+  const value: unknown =
+    column.render?.(record) ?? props.cellRenderers[column.key]?.(record) ?? record[column.key];
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  if (value instanceof Date || typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+  return String(value);
+}
+
 function displayRecordFieldValue(record: QueryListRecord, fieldName: string, titleField?: string) {
   const titleValue = record[titleField ?? `${fieldName}Title`];
   if (typeof titleValue === 'string' && titleValue.trim()) {
@@ -646,7 +659,12 @@ function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined)
     .map((field) => ({
       key: field.fieldRef.fieldName,
       title: field.label ?? field.fieldRef.fieldName,
-      type: field.uiType === 'enabledStatus' ? 'enabledStatus' : 'text',
+      type:
+        field.uiType === 'enabledStatus'
+          ? 'enabledStatus'
+          : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
+            ? 'datetime'
+            : 'text',
       width: field.width,
       align: columnAlign(field.align),
       titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
@@ -804,6 +822,10 @@ defineExpose({ refresh });
                   <RecordStatusTag
                     v-if="column.type === 'enabledStatus'"
                     :enabled="row.record[column.key] !== false"
+                  />
+                  <DateTimeText
+                    v-else-if="column.type === 'datetime'"
+                    :value="dateTimeCellValue(row.record, column)"
                   />
                   <template v-else>
                     {{ cellValue(row.record, column) }}

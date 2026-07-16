@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
+  DateTimeText,
   RecordActionBar,
   RecordDetailDrawer,
   RecordDetailFields,
@@ -98,7 +99,7 @@ const userListColumns = computed<RecordQueryListColumn[]>(() => [
   { key: 'passwordStatus', title: '密码状态', width: '120px' },
   { key: 'employeeNo', title: '职员工号', width: '150px' },
   { key: 'employeeTitle', title: '职员姓名', width: '150px' },
-  { key: 'lastLoginAt', title: '最后登录时间', width: '180px' },
+  { key: 'lastLoginAt', title: '最后登录时间', type: 'datetime', width: '180px' },
 ]);
 const userListReady = computed(() => Boolean(selectedTenant.value?.id));
 const userListTitle = computed(() => {
@@ -640,10 +641,6 @@ function sessionTerminalTitle(session: UserSessionView) {
   return platform ? `${terminal} / ${platform}` : terminal;
 }
 
-function sessionTime(value: string | undefined) {
-  return value ?? '-';
-}
-
 function createUserDraft(tenant: Tenant | undefined): Partial<UserAccount> {
   return {
     tenantId: tenant?.id,
@@ -839,11 +836,11 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
               <dl class="user-session-meta">
                 <div>
                   <dt>登录</dt>
-                  <dd :title="sessionTime(session.issuedAt)">{{ sessionTime(session.issuedAt) }}</dd>
+                  <dd><DateTimeText :value="session.issuedAt" /></dd>
                 </div>
                 <div>
                   <dt>活跃</dt>
-                  <dd :title="sessionTime(session.lastSeenAt)">{{ sessionTime(session.lastSeenAt) }}</dd>
+                  <dd><DateTimeText :value="session.lastSeenAt" /></dd>
                 </div>
                 <div>
                   <dt>IP</dt>
@@ -913,7 +910,9 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
         >
           <span>临时密码</span>
           <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
-          <small v-if="resetPasswordResult.expiresAt">有效期至 {{ resetPasswordResult.expiresAt }}</small>
+          <small v-if="resetPasswordResult.expiresAt">
+            有效期至 <DateTimeText :value="resetPasswordResult.expiresAt" />
+          </small>
         </div>
 
         <form v-else class="user-form" @submit.prevent="saveUser">

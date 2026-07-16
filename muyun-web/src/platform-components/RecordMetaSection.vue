@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { StandardSortableEntity } from '@muyun/web-contracts';
+import DateTimeText from './DateTimeText.vue';
 
 defineOptions({ name: 'RecordMetaSection' });
 
@@ -27,11 +28,11 @@ defineProps<{
       </div>
       <div>
         <dt>创建时间</dt>
-        <dd>{{ record.createdAt ?? '-' }}</dd>
+        <dd><DateTimeText :value="record.createdAt" /></dd>
       </div>
       <div>
         <dt>更新时间</dt>
-        <dd>{{ record.updatedAt ?? '-' }}</dd>
+        <dd><DateTimeText :value="record.updatedAt" /></dd>
       </div>
     </dl>
   </section>

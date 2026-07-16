@@ -106,6 +106,7 @@ export interface CurrentUser {
   organizationId?: string;
   system: boolean;
   passwordChangeRequired?: boolean;
+  timeZone?: string;
 }
 
 export interface SessionContext {
