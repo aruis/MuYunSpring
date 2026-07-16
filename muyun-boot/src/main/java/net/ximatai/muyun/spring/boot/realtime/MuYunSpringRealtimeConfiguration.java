@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -86,6 +87,7 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
 
     @Bean
     @ConditionalOnMissingBean(UserSessionLifecycleEventPublisher.class)
+    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
     public UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher(
             SimpUserRegistry userRegistry,
             PlatformRecordActionAvailabilityService actionAvailabilityService,
