@@ -4,6 +4,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -11,6 +13,8 @@ import java.util.Optional;
 import java.util.Set;
 
 public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealtimeFanOutPublisher {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OnlineUserBusinessRealtimeFanOutPublisher.class);
+
     private final RealtimeConnectionRegistry connectionRegistry;
     private final UserSessionService userSessionService;
     private final BusinessRealtimeNotifier businessRealtimeNotifier;
@@ -32,9 +36,16 @@ public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealti
         }
         Set<String> notifiedUserIds = new HashSet<>();
         for (CurrentUserPrincipal principal : connectionRegistry.principals()) {
-            currentUser(principal)
-                    .filter(currentUser -> notifiedUserIds.add(currentUser.userId()))
-                    .ifPresent(currentUser -> notifyIfAllowed(event, currentUser, recipientPolicy));
+            Optional<CurrentUser> currentUser = currentUser(principal);
+            if (currentUser.isEmpty()) {
+                LOGGER.debug("Skip business realtime event for stale realtime connection: userId={}, eventType={}, "
+                                + "recordId={}",
+                        principal.currentUser().userId(), event.type(), event.recordId());
+                continue;
+            }
+            currentUser
+                    .filter(user -> notifiedUserIds.add(user.userId()))
+                    .ifPresent(user -> notifyIfAllowed(event, user, recipientPolicy));
         }
     }
 
@@ -48,13 +59,21 @@ public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealti
             if (recipientPolicy.canReceive(currentUser)) {
                 businessRealtimeNotifier.notifyUser(currentUser.userId(), event);
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
             // Realtime fan-out must not break the source business lifecycle.
+            LOGGER.debug("Failed to fan-out business realtime event: userId={}, eventType={}, recordId={}",
+                    currentUser.userId(), event.type(), event.recordId(), exception);
         }
     }
 
     private Optional<CurrentUser> currentUser(CurrentUserPrincipal principal) {
-        return principal == null ? Optional.empty() : userSessionService.currentUserSnapshot(principal.token());
+        if (principal == null) {
+            return Optional.empty();
+        }
+        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter(
+                "business realtime fan-out principal lookup")) {
+            return userSessionService.currentUserSnapshot(principal.token());
+        }
     }
 
     private TenantContext.Scope tenantScope(CurrentUser currentUser) {
