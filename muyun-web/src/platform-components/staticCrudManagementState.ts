@@ -282,8 +282,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     if (!handler) {
       return false;
     }
-    handler.handle(error, context);
-    return true;
+    return handler.handle(error, context) !== false;
   }
 
   function presentActionMessage(

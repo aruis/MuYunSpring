@@ -10,6 +10,7 @@ import {
   RecordStatusSwitch,
   executeStaticFormSave,
   executeStaticRecordAction,
+  normalizeRecordDraft,
   presentPlatformError,
   presentPlatformMessage,
   resolveRecordFormFieldState,
@@ -28,8 +29,8 @@ import type {
   UserSessionView,
   WebQueryRequest,
 } from '@muyun/web-contracts';
-import { useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { usePageBusinessEventHandler } from '../app/pageRealtime';
+import { platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { usePageBusinessEventHandler, usePageRecordExternalChange } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
@@ -60,6 +61,13 @@ const {
   userOnlineStatusTitle,
   userSessionState,
 } = useUserSessionRows({ context: userContext, source: 'system-user-management' });
+
+const userExternalChange = usePageRecordExternalChange({
+  moduleAlias: 'iam.user',
+  recordId: () => selectedUser.value?.id,
+  editing: () => detailMode.value === 'edit',
+  saving: () => savingUser.value,
+});
 
 const systemUserContext = computed(
   () => createSystemUserModuleContext(userContext) as ModuleContext<QueryListRecord>,
@@ -207,6 +215,7 @@ async function openDetail(record: QueryListRecord, mode: SystemUserDetailMode) {
     return;
   }
   selectedUserKey.value = id;
+  userExternalChange.clearExternalChanged();
   detailOpen.value = true;
   detailMode.value = mode;
   selectedUser.value = undefined;
@@ -246,6 +255,7 @@ function closeDetail() {
   detailMode.value = 'view';
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
+  userExternalChange.clearExternalChanged();
   userDraft.value = selectedUser.value ? copySystemUser(selectedUser.value) : createSystemUserDraft();
 }
 
@@ -260,6 +270,7 @@ function cancelDetail() {
   userDraft.value = copySystemUser(selectedUser.value);
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
+  userExternalChange.clearExternalChanged();
   detailMode.value = 'view';
   loadingDetail.value = false;
   detailLoadFailed.value = false;
@@ -279,12 +290,14 @@ function handleDetailAction(action: RecordActionItem) {
   }
   if (action.key === 'edit' && selectedUser.value) {
     userDraft.value = copySystemUser(selectedUser.value);
+    userExternalChange.clearExternalChanged();
     detailMode.value = 'edit';
     return;
   }
   if (action.key === 'resetPassword' && selectedUser.value) {
     passwordDraft.value = '';
     resetPasswordResult.value = undefined;
+    userExternalChange.clearExternalChanged();
     detailMode.value = 'resetPassword';
     return;
   }
@@ -301,6 +314,17 @@ function retryDetail() {
   void openDetail({ ...userDraft.value, id } as QueryListRecord, detailMode.value);
 }
 
+function reloadExternalUserChange() {
+  const id = String(
+    userExternalChange.externalChangedRecordId.value ?? userDraft.value.id ?? selectedUserKey.value ?? '',
+  );
+  if (!id) {
+    return;
+  }
+  userExternalChange.clearExternalChanged();
+  void openDetail({ ...userDraft.value, id } as QueryListRecord, 'edit');
+}
+
 async function saveUser() {
   if (detailMode.value === 'resetPassword') {
     await resetUserPassword();
@@ -315,6 +339,13 @@ async function saveUser() {
     createRecord: () => normalizedSystemUserDraft(userDraft.value),
     validateRecord: validateSystemUserDraft,
     save: (draft) => userContext.crud.update(selectedUser.value!.id!, draft),
+    actionErrorHandlers: [
+      {
+        code: platformErrorCodes.conflictVersion,
+        handle: (_error, { mode, record }) =>
+          mode === 'edit' && userExternalChange.markExternalRecordChanged(record.id),
+      },
+    ],
     onSaved: ({ record }) => {
       commitDetailRecord(record);
       reloadKey.value += 1;
@@ -461,6 +492,7 @@ function commitDetailRecord(record: UserAccount, nextMode: SystemUserDetailMode 
   userDraft.value = copySystemUser(record);
   passwordDraft.value = '';
   detailMode.value = nextMode === 'edit' ? 'edit' : 'view';
+  userExternalChange.clearExternalChanged();
   detailOpen.value = true;
   loadingDetail.value = false;
   detailLoadFailed.value = false;
@@ -503,12 +535,12 @@ function copySystemUser(record: Partial<UserAccount>): Partial<UserAccount> {
 }
 
 function normalizedSystemUserDraft(draft: Partial<UserAccount>): UserAccount {
-  return {
+  return normalizeRecordDraft<UserAccount>(draft, {
     tenantId: undefined,
     username: draft.username?.trim(),
     enabled: draft.enabled !== false,
     password: undefined,
-  } as UserAccount;
+  });
 }
 
 function validateSystemUserDraft(draft: UserAccount) {
@@ -655,10 +687,13 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       :form-modes="['edit', 'resetPassword']"
       :loading="loadingDetail"
       :load-failed="detailLoadFailed"
+      :externally-changed="userExternalChange.externallyChanged.value"
       error-title="详情加载失败"
       error-message="无法加载系统账号详情，请重试"
       @close="closeDetail"
       @retry="retryDetail"
+      @reload-external-change="reloadExternalUserChange"
+      @dismiss-external-change="userExternalChange.clearExternalChanged"
     >
       <template #status>
         <RecordStatusSwitch

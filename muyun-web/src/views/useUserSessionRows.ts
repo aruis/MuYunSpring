@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
+import { createRealtimeRefreshQueue } from '../app/pageRealtime';
 import type {
   UserAccount,
   UserSessionStatusView,
@@ -25,20 +26,28 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
   const userSessionStates = ref<Record<string, UserSessionState>>({});
   const visibleUserIds = ref<string[]>([]);
   const userOnlineStatuses = ref<Record<string, UserSessionStatusView>>({});
-  const pendingOnlineStatusUserIds = new Set<string>();
-  const pendingSessionUserIds = new Set<string>();
-  const onlineStatusRequestVersions = new Map<string, number>();
-  const sessionRequestVersions = new Map<string, number>();
-  let onlineStatusRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-  let sessionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-  let requestVersion = 0;
+  const onlineStatusRefreshQueue = createRealtimeRefreshQueue<string>({
+    load: async (run) => {
+      await loadUserOnlineStatusesNow(run.keys, run.isLatest);
+    },
+  });
+  const sessionRefreshQueue = createRealtimeRefreshQueue<string>({
+    load: async (run) => {
+      await Promise.all(run.keys.map((userId) => loadUserSessionsNow(userId, run.isLatest)));
+    },
+  });
 
-  async function loadUserSessions(userId: string | undefined) {
+  function loadUserSessions(userId: string | undefined) {
+    sessionRefreshQueue.enqueue(userId);
+  }
+
+  async function loadUserSessionsNow(
+    userId: string | undefined,
+    isLatest: (userId: string) => boolean = () => true,
+  ) {
     if (!userId || options.context.can('sessions', userId) === false) {
       return;
     }
-    const version = nextRequestVersion();
-    sessionRequestVersions.set(userId, version);
     setUserSessionState(userId, { ...userSessionState(userId), loading: true, error: undefined });
     try {
       await loadUserSessionActions(userId);
@@ -46,12 +55,12 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
         method: 'GET',
         path: `/iam.user/${encodeURIComponent(userId)}/sessions`,
       });
-      if (sessionRequestVersions.get(userId) !== version) {
+      if (!isLatest(userId)) {
         return;
       }
       setUserSessionState(userId, { records, loading: false, error: undefined });
     } catch (cause) {
-      if (sessionRequestVersions.get(userId) !== version) {
+      if (!isLatest(userId)) {
         return;
       }
       const error = presentPlatformError(cause, { source: `${options.source}-sessions`, phase: 'load' });
@@ -76,13 +85,13 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
       ? Array.from(new Set([...expandedUserKeys.value, userId]))
       : expandedUserKeys.value.filter((key) => key !== userId);
     if (expanded && userSessionState(userId).records.length === 0) {
-      void loadUserSessions(userId);
+      sessionRefreshQueue.enqueue(userId);
     }
   }
 
   function handleUserListLoaded(records: Array<{ id?: string }>) {
     visibleUserIds.value = records.map((record) => String(record.id ?? '')).filter(Boolean);
-    void loadUserOnlineStatuses(visibleUserIds.value);
+    onlineStatusRefreshQueue.enqueue(visibleUserIds.value);
   }
 
   function handleUserSessionBusinessEvent(event: WebBusinessRealtimeEvent) {
@@ -94,29 +103,28 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
       return;
     }
     if (visibleUserIds.value.includes(userId)) {
-      scheduleUserOnlineStatusRefresh([userId]);
+      onlineStatusRefreshQueue.enqueue(userId);
     }
     if (expandedUserKeys.value.includes(userId)) {
-      scheduleUserSessionRefresh(userId);
+      sessionRefreshQueue.enqueue(userId);
     }
   }
 
-  async function loadUserOnlineStatuses(userIds: string[]) {
+  async function loadUserOnlineStatusesNow(
+    userIds: string[],
+    isLatest: (userId: string) => boolean = () => true,
+  ) {
     const ids = Array.from(new Set(userIds.filter(Boolean)));
     if (ids.length === 0) {
       return;
     }
-    const version = nextRequestVersion();
-    ids.forEach((id) => onlineStatusRequestVersions.set(id, version));
     try {
       const statuses = await options.context.http.request<UserSessionStatusView[]>({
         method: 'POST',
         path: '/iam.user/sessions/status',
         body: { userIds: ids },
       });
-      const latestStatuses = statuses.filter(
-        (status) => onlineStatusRequestVersions.get(status.userId) === version,
-      );
+      const latestStatuses = statuses.filter((status) => isLatest(status.userId));
       if (latestStatuses.length === 0) {
         return;
       }
@@ -152,59 +160,9 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     };
   }
 
-  function scheduleUserOnlineStatusRefresh(userIds: string[]) {
-    for (const userId of userIds) {
-      if (userId) {
-        pendingOnlineStatusUserIds.add(userId);
-      }
-    }
-    if (onlineStatusRefreshTimer) {
-      return;
-    }
-    onlineStatusRefreshTimer = setTimeout(() => {
-      onlineStatusRefreshTimer = undefined;
-      const ids = Array.from(pendingOnlineStatusUserIds);
-      pendingOnlineStatusUserIds.clear();
-      void loadUserOnlineStatuses(ids);
-    }, 0);
-  }
-
-  function scheduleUserSessionRefresh(userId: string) {
-    if (!userId) {
-      return;
-    }
-    pendingSessionUserIds.add(userId);
-    if (sessionRefreshTimer) {
-      return;
-    }
-    sessionRefreshTimer = setTimeout(() => {
-      sessionRefreshTimer = undefined;
-      const ids = Array.from(pendingSessionUserIds);
-      pendingSessionUserIds.clear();
-      for (const id of ids) {
-        void loadUserSessions(id);
-      }
-    }, 0);
-  }
-
-  function nextRequestVersion() {
-    requestVersion += 1;
-    return requestVersion;
-  }
-
   function resetUserSessionRows() {
-    if (onlineStatusRefreshTimer) {
-      clearTimeout(onlineStatusRefreshTimer);
-      onlineStatusRefreshTimer = undefined;
-    }
-    if (sessionRefreshTimer) {
-      clearTimeout(sessionRefreshTimer);
-      sessionRefreshTimer = undefined;
-    }
-    pendingOnlineStatusUserIds.clear();
-    pendingSessionUserIds.clear();
-    onlineStatusRequestVersions.clear();
-    sessionRequestVersions.clear();
+    onlineStatusRefreshQueue.reset();
+    sessionRefreshQueue.reset();
     expandedUserKeys.value = [];
     userSessionStates.value = {};
     visibleUserIds.value = [];

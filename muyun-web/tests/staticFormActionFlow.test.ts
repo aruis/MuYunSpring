@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ref } from 'vue';
+import { AppError, platformErrorCodes } from '../src/web-core/index.ts';
 import {
   createPlatformActionResultReactionHandlers,
   handlePlatformActionSuccess,
@@ -9,6 +10,7 @@ import {
   executeStaticFormSave,
   executeStaticRecordAction,
 } from '../src/platform-components/staticFormActionFlow.ts';
+import { normalizeRecordDraft } from '../src/platform-components/recordDraftNormalizer.ts';
 
 interface TestRecord {
   id?: string;
@@ -40,6 +42,28 @@ test('static form save executes mutation once and calls saved callback', async (
   assert.equal(loading.value, false);
 });
 
+test('record draft normalizer preserves standard fields while overriding normalized fields', () => {
+  const draft = {
+    id: 'user-1',
+    version: 7,
+    username: ' admin ',
+    enabled: true,
+  };
+
+  assert.deepEqual(
+    normalizeRecordDraft(draft, {
+      username: draft.username.trim(),
+      enabled: false,
+    }),
+    {
+      id: 'user-1',
+      version: 7,
+      username: 'admin',
+      enabled: false,
+    },
+  );
+});
+
 test('static form save dispatches local result reactions', async () => {
   const loading = ref(false);
   const reactions: string[] = [];
@@ -64,6 +88,38 @@ test('static form save dispatches local result reactions', async () => {
   });
 
   assert.deepEqual(reactions, ['refresh-list:iam.employee']);
+  assert.equal(loading.value, false);
+});
+
+test('static form save lets local action error handlers own matching failures', async () => {
+  const loading = ref(false);
+  const handled: string[] = [];
+
+  const result = await executeStaticFormSave<TestRecord>({
+    loading,
+    mode: 'edit',
+    canSave: () => true,
+    deniedMessage: '无权保存',
+    createRecord: () => ({ id: 'emp-1', title: '职员' }),
+    save: async () => {
+      throw new AppError('record version conflict', {
+        code: platformErrorCodes.conflictVersion,
+        status: 409,
+      });
+    },
+    onSaved: () => undefined,
+    actionErrorHandlers: [
+      {
+        code: platformErrorCodes.conflictVersion,
+        handle: (_error, context) => {
+          handled.push(`${context.mode}:${context.record.id}`);
+        },
+      },
+    ],
+  });
+
+  assert.equal(result, undefined);
+  assert.deepEqual(handled, ['edit:emp-1']);
   assert.equal(loading.value, false);
 });
 

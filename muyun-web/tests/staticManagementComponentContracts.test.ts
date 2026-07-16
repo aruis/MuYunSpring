@@ -88,9 +88,16 @@ test('record containers delegate chain errors to page feedback', () => {
 test('record mode drawer owns detail mode branch switching', () => {
   const drawerSource = readSource('src/platform-components/RecordModeDrawer.vue');
   const indexSource = readSource('src/platform-components/index.ts');
+  const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
 
   assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
+  assert.match(indexSource, /export \{ default as RecordExternalChangeNotice \}/);
+  assert.match(indexSource, /normalizeRecordDraft/);
   assert.match(drawerSource, /defineOptions\(\{ name: 'RecordModeDrawer' \}\)/);
+  assert.match(drawerSource, /RecordExternalChangeNotice/);
+  assert.match(drawerSource, /externallyChanged/);
+  assert.match(drawerSource, /reloadExternalChange/);
+  assert.match(drawerSource, /dismissExternalChange/);
   assert.match(drawerSource, /viewMode: 'view'/);
   assert.match(drawerSource, /formModes: \(\) => \['edit', 'create'\]/);
   assert.match(drawerSource, /const viewModeActive = computed\(\(\) => props\.mode === props\.viewMode\)/);
@@ -106,6 +113,32 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.doesNotMatch(drawerSource, /<template v-else>\s*<slot name="form"/);
   assert.match(drawerSource, /<slot name="view" \/>/);
   assert.match(drawerSource, /<slot name="form" \/>/);
+  assert.match(pageRealtimeSource, /subscribeAppModuleDataChanges\(options\.moduleAlias\)/);
+
+  const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  assert.match(systemUserSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.user'/);
+  assert.match(systemUserSource, /:externally-changed="userExternalChange\.externallyChanged\.value"/);
+  assert.match(systemUserSource, /@reload-external-change="reloadExternalUserChange"/);
+  assert.match(systemUserSource, /@dismiss-external-change="userExternalChange\.clearExternalChanged"/);
+  assert.match(
+    systemUserSource,
+    /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedUser\.value\?\.id[\s\S]*editing: \(\) => detailMode\.value === 'edit'[\s\S]*saving: \(\) => savingUser\.value/,
+  );
+  assert.match(systemUserSource, /code: platformErrorCodes\.conflictVersion/);
+  assert.match(systemUserSource, /userExternalChange\.markExternalRecordChanged\(record\.id\)/);
+
+  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  assert.match(employeeSource, /RecordExternalChangeNotice/);
+  assert.match(employeeSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.employee'/);
+  assert.match(employeeSource, /v-if="employeeExternalChange\.externallyChanged\.value"/);
+  assert.match(employeeSource, /@reload="reloadExternalEmployeeChange"/);
+  assert.match(employeeSource, /@dismiss="employeeExternalChange\.clearExternalChanged"/);
+  assert.match(
+    employeeSource,
+    /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedEmployee\.value\?\.id[\s\S]*editing: \(\) => employeeDetailMode\.value === 'edit'[\s\S]*saving: \(\) => savingEmployee\.value/,
+  );
+  assert.match(employeeSource, /code: platformErrorCodes\.conflictVersion/);
+  assert.match(employeeSource, /employeeExternalChange\.markExternalRecordChanged\(record\.id\)/);
 });
 
 test('record explorer panel focuses and closes search from keyboard', () => {
@@ -519,7 +552,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /<RecordFormFields/);
   assert.match(employeeViewSource, /<RecordDetailFields/);
   assert.match(employeeViewSource, /v-if="employeeDetailMode === 'view'"/);
-  assert.match(employeeViewSource, /<form v-else class="employee-form"/);
+  assert.match(employeeViewSource, /<template v-else>/);
+  assert.match(employeeViewSource, /<form class="employee-form"/);
   assert.match(employeeViewSource, /:display-of="employeeDetailDisplayValue"/);
   assert.match(employeeViewSource, /function employeeDetailDisplayValue/);
   assert.match(employeeViewSource, /resolveRecordFormFieldState/);
@@ -796,6 +830,8 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
   assert.match(userViewSource, /enabled: \{ label: '允许登录'/);
+  assert.match(userViewSource, /function normalizedUserDraft/);
+  assert.match(userViewSource, /normalizeRecordDraft<UserAccount>\(draft,/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
@@ -899,10 +935,15 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /<RecordModeDrawer/);
   assert.match(systemUserViewSource, /:mode="detailMode"/);
   assert.match(systemUserViewSource, /:form-modes="\['edit', 'resetPassword'\]"/);
+  assert.match(systemUserViewSource, /:externally-changed="userExternalChange\.externallyChanged\.value"/);
+  assert.match(systemUserViewSource, /@reload-external-change="reloadExternalUserChange"/);
+  assert.match(systemUserViewSource, /@dismiss-external-change="userExternalChange\.clearExternalChanged"/);
   assert.match(systemUserViewSource, /<template #view>/);
   assert.match(systemUserViewSource, /<template #form>/);
   assert.match(systemUserViewSource, /<RecordDetailFields/);
   assert.match(systemUserViewSource, /<RecordFormFields/);
+  assert.match(systemUserViewSource, /function normalizedSystemUserDraft/);
+  assert.match(systemUserViewSource, /normalizeRecordDraft<UserAccount>\(draft,/);
   assert.match(systemUserViewSource, /<RecordStatusSwitch/);
   assert.match(systemUserViewSource, /<RecordActionBar/);
   assert.match(systemUserViewSource, /fieldName: 'tenantId'/);

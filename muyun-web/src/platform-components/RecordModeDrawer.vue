@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { UiButton } from '@muyun/vue-ui-antdv';
 import RecordDetailDrawer from './RecordDetailDrawer.vue';
+import RecordExternalChangeNotice from './RecordExternalChangeNotice.vue';
 
 defineOptions({ name: 'RecordModeDrawer' });
 
@@ -19,6 +20,11 @@ const props = withDefaults(
     errorTitle?: string;
     errorMessage?: string;
     retryTitle?: string;
+    externallyChanged?: boolean;
+    externalChangeTitle?: string;
+    externalChangeMessage?: string;
+    externalChangeReloadTitle?: string;
+    externalChangeDismissTitle?: string;
   }>(),
   {
     viewMode: 'view',
@@ -30,6 +36,11 @@ const props = withDefaults(
     errorTitle: '详情加载失败',
     errorMessage: '无法加载详情，请重试',
     retryTitle: '重试',
+    externallyChanged: false,
+    externalChangeTitle: undefined,
+    externalChangeMessage: undefined,
+    externalChangeReloadTitle: undefined,
+    externalChangeDismissTitle: undefined,
   },
 );
 
@@ -38,6 +49,7 @@ defineSlots<{
   actions(): unknown;
   loading(): unknown;
   error(): unknown;
+  externalChangeNotice(): unknown;
   view(): unknown;
   form(): unknown;
   default(): unknown;
@@ -46,6 +58,8 @@ defineSlots<{
 const emit = defineEmits<{
   close: [];
   retry: [];
+  reloadExternalChange: [];
+  dismissExternalChange: [];
 }>();
 
 const viewModeActive = computed(() => props.mode === props.viewMode);
@@ -86,6 +100,16 @@ const actualCloseOnOutside = computed(() => props.closeOnOutside ?? viewModeActi
       <slot name="view" />
     </template>
     <template v-else-if="formModeActive">
+      <slot v-if="externallyChanged" name="externalChangeNotice">
+        <RecordExternalChangeNotice
+          :title="externalChangeTitle"
+          :message="externalChangeMessage"
+          :reload-title="externalChangeReloadTitle"
+          :dismiss-title="externalChangeDismissTitle"
+          @reload="emit('reloadExternalChange')"
+          @dismiss="emit('dismissExternalChange')"
+        />
+      </slot>
       <slot name="form" />
     </template>
   </RecordDetailDrawer>

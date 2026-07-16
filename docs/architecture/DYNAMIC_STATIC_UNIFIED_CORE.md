@@ -63,6 +63,8 @@ DynamicRecordService
 
 乐观锁由 Ability 层统一表达：更新和带实体删除以当前记录 `version` 作为 expected version，写入时递增到下一版本；冲突时抛出 `OptimisticLockException`。动态 DAO 和静态 Repository 都通过 MuYunDatabase 条件写入口执行 `id + version` 约束写入；静态删除走条件删除，动态软删走条件更新，避免在业务层手写并发控制。
 
+前端静态编辑页保存时必须把详情加载得到的 `version` 带回更新 payload。业务 normalizer 应以当前 draft 为基底，只覆盖需要归一化的业务字段；优先使用前端平台 helper `normalizeRecordDraft(draft, normalizedFields)`，不得重建一个丢失 `id`、`version` 等标准字段的对象。否则后端会只能按当前库内版本执行更新，无法识别“用户基于旧版本保存”的并发冲突。
+
 缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨模型引用缓存失效已有本地进程内闭环：`ReferencerAbility` 采集引用依赖，目标记录变更时清理引用方缓存；跨节点治理后续再升级。
 
 父子聚合与缓存的关系采用“缓存父记录、按次装配子记录”的策略。父记录命中缓存后仍会重新按关系读取 children，不把装配后的 children 写回父缓存；这样子表变更不需要反向清理父缓存，也避免父缓存被聚合状态污染。聚合装配出的 child 是否继续执行 child service 的完整 `afterSelect` 语义，需要单独设计递归边界，不能在无深度控制的情况下隐式递归。
