@@ -4,23 +4,22 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.springframework.messaging.simp.user.SimpUser;
-import org.springframework.messaging.simp.user.SimpUserRegistry;
 
-import java.security.Principal;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealtimeFanOutPublisher {
-    private final SimpUserRegistry userRegistry;
+    private final RealtimeConnectionRegistry connectionRegistry;
     private final UserSessionService userSessionService;
     private final BusinessRealtimeNotifier businessRealtimeNotifier;
 
     public OnlineUserBusinessRealtimeFanOutPublisher(
-            SimpUserRegistry userRegistry,
+            RealtimeConnectionRegistry connectionRegistry,
             UserSessionService userSessionService,
             BusinessRealtimeNotifier businessRealtimeNotifier) {
-        this.userRegistry = Objects.requireNonNull(userRegistry, "userRegistry must not be null");
+        this.connectionRegistry = Objects.requireNonNull(connectionRegistry, "connectionRegistry must not be null");
         this.userSessionService = Objects.requireNonNull(userSessionService, "userSessionService must not be null");
         this.businessRealtimeNotifier = Objects.requireNonNull(
                 businessRealtimeNotifier, "businessRealtimeNotifier must not be null");
@@ -31,9 +30,11 @@ public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealti
         if (event == null || recipientPolicy == null) {
             return;
         }
-        for (SimpUser user : userRegistry.getUsers()) {
-            currentUser(user.getPrincipal()).ifPresent(currentUser -> notifyIfAllowed(event, currentUser,
-                    recipientPolicy));
+        Set<String> notifiedUserIds = new HashSet<>();
+        for (CurrentUserPrincipal principal : connectionRegistry.principals()) {
+            currentUser(principal)
+                    .filter(currentUser -> notifiedUserIds.add(currentUser.userId()))
+                    .ifPresent(currentUser -> notifyIfAllowed(event, currentUser, recipientPolicy));
         }
     }
 
@@ -52,11 +53,8 @@ public class OnlineUserBusinessRealtimeFanOutPublisher implements BusinessRealti
         }
     }
 
-    private Optional<CurrentUser> currentUser(Principal principal) {
-        if (principal instanceof CurrentUserPrincipal currentUserPrincipal) {
-            return userSessionService.currentUser(currentUserPrincipal.token());
-        }
-        return Optional.empty();
+    private Optional<CurrentUser> currentUser(CurrentUserPrincipal principal) {
+        return principal == null ? Optional.empty() : userSessionService.currentUserSnapshot(principal.token());
     }
 
     private TenantContext.Scope tenantScope(CurrentUser currentUser) {

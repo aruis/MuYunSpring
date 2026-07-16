@@ -15,18 +15,17 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.messaging.simp.user.SimpUser;
-import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.messaging.support.MessageBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RealtimePublisherTest {
@@ -147,7 +146,7 @@ class RealtimePublisherTest {
 
     @Test
     void shouldFanOutBusinessEventsOnlyToAllowedOnlineUsers() {
-        SimpUserRegistry registry = mock(SimpUserRegistry.class);
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
         UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
         OnlineUserBusinessRealtimeFanOutPublisher publisher =
@@ -155,13 +154,12 @@ class RealtimePublisherTest {
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
         CurrentUser viewer = CurrentUser.tenantUser("viewer-1", "Viewer", "demo");
         CurrentUser target = CurrentUser.tenantUser("user-1", "User", "demo");
-        SimpUser adminUser = simpUser(admin);
-        SimpUser viewerUser = simpUser(viewer);
-        SimpUser targetUser = simpUser(target);
-        when(registry.getUsers()).thenReturn(Set.of(adminUser, viewerUser, targetUser));
-        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.of(admin));
-        when(userSessionService.currentUser("token-viewer-1")).thenReturn(Optional.of(viewer));
-        when(userSessionService.currentUser("token-user-1")).thenReturn(Optional.of(target));
+        registry.register("ws-admin", new CurrentUserPrincipal(admin, "token-admin-1"));
+        registry.register("ws-viewer", new CurrentUserPrincipal(viewer, "token-viewer-1"));
+        registry.register("ws-target", new CurrentUserPrincipal(target, "token-user-1"));
+        when(userSessionService.currentUserSnapshot("token-admin-1")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentUserSnapshot("token-viewer-1")).thenReturn(Optional.of(viewer));
+        when(userSessionService.currentUserSnapshot("token-user-1")).thenReturn(Optional.of(target));
         BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN");
 
         publisher.publish(event, currentUser -> "admin-1".equals(currentUser.userId()));
@@ -172,20 +170,40 @@ class RealtimePublisherTest {
 
     @Test
     void shouldSkipBusinessEventFanOutWhenRecipientSessionIsNoLongerValid() {
-        SimpUserRegistry registry = mock(SimpUserRegistry.class);
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
         UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
         OnlineUserBusinessRealtimeFanOutPublisher publisher =
                 new OnlineUserBusinessRealtimeFanOutPublisher(registry, userSessionService, notifier);
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
-        SimpUser adminUser = simpUser(admin);
-        when(registry.getUsers()).thenReturn(Set.of(adminUser));
-        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.empty());
+        registry.register("ws-admin", new CurrentUserPrincipal(admin, "token-admin-1"));
+        when(userSessionService.currentUserSnapshot("token-admin-1")).thenReturn(Optional.empty());
 
         publisher.publish(BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN"),
                 currentUser -> true);
 
         assertThat(notifier.userIds).isEmpty();
+        verify(userSessionService, never()).currentUser("token-admin-1");
+    }
+
+    @Test
+    void shouldFanOutThroughValidConnectionWhenSameUserHasStaleConnection() {
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
+        OnlineUserBusinessRealtimeFanOutPublisher publisher =
+                new OnlineUserBusinessRealtimeFanOutPublisher(registry, userSessionService, notifier);
+        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
+        registry.register("ws-old", new CurrentUserPrincipal(admin, "token-admin-old"));
+        registry.register("ws-new", new CurrentUserPrincipal(admin, "token-admin-new"));
+        when(userSessionService.currentUserSnapshot("token-admin-old")).thenReturn(Optional.empty());
+        when(userSessionService.currentUserSnapshot("token-admin-new")).thenReturn(Optional.of(admin));
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN");
+
+        publisher.publish(event, currentUser -> true);
+
+        assertThat(notifier.userIds).containsExactly("admin-1");
+        assertThat(notifier.events).containsExactly(event);
     }
 
     @Test
@@ -310,22 +328,44 @@ class RealtimePublisherTest {
     @Test
     void shouldRejectRealtimeSubscribeWhenBoundSessionIsRevoked() {
         UserSessionService userSessionService = mock(UserSessionService.class);
+        RealtimeConnectionRegistry connectionRegistry = new RealtimeConnectionRegistry();
         RealtimeAuthenticationChannelInterceptor interceptor =
-                new RealtimeAuthenticationChannelInterceptor(userSessionService);
+                new RealtimeAuthenticationChannelInterceptor(userSessionService, connectionRegistry);
         CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
         when(userSessionService.currentUser("token-1"))
                 .thenReturn(Optional.of(currentUser), Optional.empty());
 
-        Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1"),
+        Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1", "ws-1"),
                 mock(MessageChannel.class));
         CurrentUserPrincipal principal = (CurrentUserPrincipal) StompHeaderAccessor.wrap(connected).getUser();
 
         assertThat(principal.currentUser()).isEqualTo(currentUser);
         assertThat(principal.token()).isEqualTo("token-1");
-        assertThatThrownBy(() -> interceptor.preSend(stompMessage(StompCommand.SUBSCRIBE, principal, null),
+        assertThat(connectionRegistry.contains("ws-1", principal)).isTrue();
+        assertThatThrownBy(() -> interceptor.preSend(stompMessage(StompCommand.SUBSCRIBE, principal, null,
+                "ws-1"),
                 mock(MessageChannel.class)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("realtime authentication required");
+    }
+
+    @Test
+    void shouldUnregisterRealtimeConnectionOnDisconnect() {
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RealtimeConnectionRegistry connectionRegistry = new RealtimeConnectionRegistry();
+        RealtimeAuthenticationChannelInterceptor interceptor =
+                new RealtimeAuthenticationChannelInterceptor(userSessionService, connectionRegistry);
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
+        when(userSessionService.currentUser("token-1")).thenReturn(Optional.of(currentUser));
+
+        Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1", "ws-1"),
+                mock(MessageChannel.class));
+        CurrentUserPrincipal principal = (CurrentUserPrincipal) StompHeaderAccessor.wrap(connected).getUser();
+
+        interceptor.preSend(stompMessage(StompCommand.DISCONNECT, principal, null, "ws-1"),
+                mock(MessageChannel.class));
+
+        assertThat(connectionRegistry.principals()).isEmpty();
     }
 
     private static final class RecordingRealtimeMessagePublisher implements RealtimeMessagePublisher {
@@ -351,8 +391,16 @@ class RealtimePublisherTest {
     }
 
     private Message<?> stompMessage(StompCommand command, CurrentUserPrincipal principal, String token) {
+        return stompMessage(command, principal, token, null);
+    }
+
+    private Message<?> stompMessage(StompCommand command, CurrentUserPrincipal principal, String token,
+                                    String sessionId) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
         accessor.setLeaveMutable(true);
+        if (sessionId != null) {
+            accessor.setSessionId(sessionId);
+        }
         if (principal != null) {
             accessor.setUser(principal);
         }
@@ -360,12 +408,6 @@ class RealtimePublisherTest {
             accessor.addNativeHeader("Authorization", "Bearer " + token);
         }
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
-    }
-
-    private SimpUser simpUser(CurrentUser currentUser) {
-        SimpUser user = mock(SimpUser.class);
-        when(user.getPrincipal()).thenReturn(new CurrentUserPrincipal(currentUser, "token-" + currentUser.userId()));
-        return user;
     }
 
     private static final class RecordingBusinessRealtimeNotifier implements BusinessRealtimeNotifier {

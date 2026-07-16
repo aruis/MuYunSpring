@@ -341,6 +341,33 @@ class UserSessionServiceTest {
     }
 
     @Test
+    void shouldResolveCurrentUserSnapshotWithoutTouchingSession() {
+        Clock accessClock = Clock.fixed(Instant.parse("2026-06-20T10:00:00Z"), ZoneOffset.UTC);
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(activeUser()));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-1");
+        Instant originalLastSeenAt = accessClock.instant().minusSeconds(120);
+        Instant originalExpiresAt = accessClock.instant().plusSeconds(600);
+        session.setVersion(3);
+        session.setIssuedAt(Instant.parse("2026-06-20T00:00:00Z"));
+        session.setLastSeenAt(originalLastSeenAt);
+        session.setExpiresAt(originalExpiresAt);
+        session.setMaxExpiresAt(accessClock.instant().plusSeconds(3600));
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+
+        assertThat(sessionService.currentUserSnapshot("token-1")).contains(
+                CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1"));
+
+        assertThat(session.getLastSeenAt()).isEqualTo(originalLastSeenAt);
+        assertThat(session.getExpiresAt()).isEqualTo(originalExpiresAt);
+        verify(sessionDao, never()).updateByIdAndVersion(any(UserSession.class), any());
+    }
+
+    @Test
     void shouldResolveRestrictedCurrentUserFromPasswordChangeRequiredSession() {
         Clock accessClock = Clock.fixed(Instant.parse("2026-06-20T10:00:00Z"), ZoneOffset.UTC);
         UserAccountDao dao = mock(UserAccountDao.class);
