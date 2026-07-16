@@ -11,7 +11,6 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.lang.NonNull;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
@@ -48,9 +47,10 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
-        ActionEndpoint endpoint = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), ActionEndpoint.class);
-        CustomActionEndpoint customEndpoint = AnnotatedElementUtils.findMergedAnnotation(
-                handlerMethod.getMethod(), CustomActionEndpoint.class);
+        ActionEndpoint endpoint = WebAnnotationSupport.findMergedMethodAnnotation(handlerMethod.getMethod(),
+                handlerMethod.getBeanType(), ActionEndpoint.class);
+        CustomActionEndpoint customEndpoint = WebAnnotationSupport.findMergedMethodAnnotation(
+                handlerMethod.getMethod(), handlerMethod.getBeanType(), CustomActionEndpoint.class);
         if (endpoint != null && customEndpoint != null) {
             throw new IllegalStateException("method cannot declare both standard and custom action endpoint: "
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());

@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.boot.realtime.DataChangeRealtimePublisher;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -17,6 +19,8 @@ import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.lang.reflect.Method;
@@ -32,6 +36,11 @@ class ActionResultResponseAdviceTest {
     @AfterEach
     void tearDown() {
         ActionExecutionContextHolder.clear();
+        CurrentUserContext.clear();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     @Test
@@ -70,6 +79,17 @@ class ActionResultResponseAdviceTest {
     void shouldSupportInheritedStandardMutationHandler() throws Exception {
         ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName, objectMapper);
         Method method = ChildController.class.getMethod("insert");
+        MethodParameter returnType = new MethodParameter(method, -1);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
+            assertThat(advice.supports(returnType, null)).isTrue();
+        }
+    }
+
+    @Test
+    void shouldSupportGenericInterfaceStandardMutationHandler() throws Exception {
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(Class::getSimpleName, objectMapper);
+        Method method = GenericChildController.class.getMethod("update", String.class, DemoRecord.class);
         MethodParameter returnType = new MethodParameter(method, -1);
 
         try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext())) {
@@ -163,6 +183,41 @@ class ActionResultResponseAdviceTest {
     }
 
     @Test
+    void shouldRestoreSourceUserWhenPublishingAfterTransactionCommit() throws Exception {
+        RecordingDataChangeRealtimePublisher publisher = new RecordingDataChangeRealtimePublisher();
+        ActionResultResponseAdvice advice = new ActionResultResponseAdvice(
+                type -> DemoModule.MODULE_ALIAS, objectMapper, publisher);
+        Method method = TestController.class.getDeclaredMethod("grant");
+        MethodParameter returnType = new MethodParameter(method, -1);
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        try (MutationContextHolder.Scope ignored = MutationContextHolder.use(new MutationContext());
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.systemUser("admin-1", "Admin"))) {
+            Object response = advice.beforeBodyWrite(
+                    1,
+                    returnType,
+                    MediaType.APPLICATION_JSON,
+                    null,
+                    new ServletServerHttpRequest(new MockHttpServletRequest()),
+                    null
+            );
+
+            assertThat(response).isInstanceOf(ActionResultResponse.class);
+            assertThat(publisher.published).isNull();
+        }
+
+        assertThat(CurrentUserContext.currentUser()).isEmpty();
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit);
+
+        assertThat(publisher.published).isNotNull();
+        assertThat(publisher.userId).isEqualTo("admin-1");
+        assertThat(CurrentUserContext.currentUser()).isEmpty();
+    }
+
+    @Test
     void shouldKeepActionResultWhenDataChangePublishFails() throws Exception {
         ActionResultResponseAdvice advice = new ActionResultResponseAdvice(
                 type -> DemoModule.MODULE_ALIAS, objectMapper, new ThrowingDataChangeRealtimePublisher());
@@ -251,16 +306,35 @@ class ActionResultResponseAdviceTest {
     private static final class ChildController extends BaseController {
     }
 
+    private interface GenericController<T> {
+        @StandardMutation(StandardMutationKind.UPDATE)
+        int update(String id, T record);
+    }
+
+    private static final class GenericChildController implements GenericController<DemoRecord> {
+        @Override
+        public int update(String id, DemoRecord record) {
+            return 1;
+        }
+    }
+
+    private record DemoRecord(String id) {
+    }
+
     public static final class DemoModule {
         public static final String MODULE_ALIAS = "demo.module";
     }
 
     private static final class RecordingDataChangeRealtimePublisher implements DataChangeRealtimePublisher {
         private CommittedChangeSet published;
+        private String userId;
 
         @Override
         public void publish(CommittedChangeSet changeSet) {
             this.published = changeSet;
+            this.userId = CurrentUserContext.currentUser()
+                    .map(CurrentUser::userId)
+                    .orElse(null);
         }
     }
 

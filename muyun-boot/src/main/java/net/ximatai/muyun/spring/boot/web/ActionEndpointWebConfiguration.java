@@ -65,30 +65,25 @@ public class ActionEndpointWebConfiguration {
             StaticModuleDefinitionCatalog staticModuleDefinitionCatalog) {
         return new StaticModuleDataChangeAliasResolver(staticModuleDefinitionCatalog);
     }
-}
 
-@Configuration
-@ConditionalOnBean(ActionEndpointInterceptor.class)
-class ActionEndpointInterceptorRegistration implements WebMvcConfigurer {
-    private final ActionEndpointInterceptor interceptor;
-    private final ObjectProvider<BusinessMutationInterceptor> businessMutationInterceptor;
-
-    ActionEndpointInterceptorRegistration(ActionEndpointInterceptor interceptor,
-                                          ObjectProvider<BusinessMutationInterceptor> businessMutationInterceptor) {
-        this.interceptor = interceptor;
-        this.businessMutationInterceptor = businessMutationInterceptor;
-    }
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(interceptor)
-                .addPathPatterns("/**")
-                .order(Ordered.HIGHEST_PRECEDENCE + 200);
-        BusinessMutationInterceptor mutationInterceptor = businessMutationInterceptor.getIfAvailable();
-        if (mutationInterceptor != null) {
-            registry.addInterceptor(mutationInterceptor)
-                    .addPathPatterns("/**")
-                    .order(Ordered.HIGHEST_PRECEDENCE + 210);
-        }
+    @Bean
+    @ConditionalOnBean(ActionEndpointInterceptor.class)
+    public WebMvcConfigurer actionEndpointInterceptorRegistration(
+            ActionEndpointInterceptor actionEndpointInterceptor,
+            ObjectProvider<BusinessMutationInterceptor> businessMutationInterceptor) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(actionEndpointInterceptor)
+                        .addPathPatterns("/**")
+                        .order(Ordered.HIGHEST_PRECEDENCE + 200);
+                BusinessMutationInterceptor mutationInterceptor = businessMutationInterceptor.getIfAvailable();
+                if (mutationInterceptor != null) {
+                    registry.addInterceptor(mutationInterceptor)
+                            .addPathPatterns("/**")
+                            .order(Ordered.HIGHEST_PRECEDENCE + 210);
+                }
+            }
+        };
     }
 }

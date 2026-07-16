@@ -139,6 +139,10 @@ test('record mode drawer owns detail mode branch switching', () => {
   );
   assert.match(employeeSource, /code: platformErrorCodes\.conflictVersion/);
   assert.match(employeeSource, /employeeExternalChange\.markExternalRecordChanged\(record\.id\)/);
+  assert.match(employeeSource, /useRealtimeRefreshQueue<string>\(\{/);
+  assert.match(employeeSource, /usePageDataChange\(\{\s*moduleAlias: 'iam\.employee'/);
+  assert.match(employeeSource, /employeeRealtimeRefreshQueue\.enqueue/);
+  assert.match(employeeSource, /employeeReloadKey\.value \+= 1/);
 });
 
 test('static edit draft normalizers preserve standard record fields', () => {

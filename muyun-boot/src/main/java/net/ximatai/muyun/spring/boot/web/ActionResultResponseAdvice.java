@@ -7,12 +7,13 @@ import net.ximatai.muyun.spring.ability.action.DataChangeModuleAliasResolver;
 import net.ximatai.muyun.spring.ability.action.MutationContext;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.boot.realtime.DataChangeRealtimePublisher;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
@@ -66,8 +67,8 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         if (MutationContextHolder.current().isEmpty()) {
             return false;
         }
-        return AnnotatedElementUtils.hasAnnotation(returnType.getMethod(), BusinessMutation.class)
-                || AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), BusinessMutation.class);
+        return WebAnnotationSupport.hasMergedMethodOrTypeAnnotation(returnType.getMethod(),
+                returnType.getContainingClass(), BusinessMutation.class);
     }
 
     @Override
@@ -86,7 +87,9 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         }
         reportAnnotatedMutationResult(returnType, request);
         CommittedChangeSet changeSet = context.committedChangeSet(moduleAliasResolver);
-        context.afterCommit(moduleAliasResolver, this::publishDataChange);
+        CurrentUser sourceUser = CurrentUserContext.currentUser().orElse(null);
+        context.afterCommit(moduleAliasResolver, committedChangeSet -> publishDataChange(committedChangeSet,
+                sourceUser));
         ActionResultResponse actionResult = new ActionResultResponse(
                 body,
                 context.message(),
@@ -101,10 +104,16 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
         return actionResult;
     }
 
-    private void publishDataChange(CommittedChangeSet changeSet) {
+    private void publishDataChange(CommittedChangeSet changeSet, CurrentUser sourceUser) {
         if (dataChangeRealtimePublisher != null) {
             try {
-                dataChangeRealtimePublisher.publish(changeSet);
+                if (sourceUser == null) {
+                    dataChangeRealtimePublisher.publish(changeSet);
+                    return;
+                }
+                try (CurrentUserContext.Scope ignored = CurrentUserContext.use(sourceUser)) {
+                    dataChangeRealtimePublisher.publish(changeSet);
+                }
             } catch (RuntimeException ex) {
                 LOGGER.warn("failed to publish data change set {}", changeSet.changeSetId(), ex);
             }
@@ -120,8 +129,8 @@ public class ActionResultResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     private void reportAnnotatedMutationResult(MethodParameter returnType, ServerHttpRequest request) {
-        BusinessMutationResult result = AnnotatedElementUtils.findMergedAnnotation(
-                returnType.getMethod(), BusinessMutationResult.class);
+        BusinessMutationResult result = WebAnnotationSupport.findMergedMethodAnnotation(
+                returnType.getMethod(), returnType.getContainingClass(), BusinessMutationResult.class);
         if (result == null) {
             return;
         }
