@@ -6,13 +6,15 @@ public record CurrentUser(
         String tenantId,
         String organizationId,
         boolean system,
-        boolean passwordChangeRequired
+        boolean passwordChangeRequired,
+        String timeZone
 ) {
     public CurrentUser {
         userId = requireText(userId, "userId");
         username = normalize(username);
         tenantId = normalize(tenantId);
         organizationId = normalize(organizationId);
+        timeZone = normalize(timeZone);
     }
 
     public static CurrentUser tenantUser(String userId, String username, String tenantId) {
@@ -28,7 +30,16 @@ public record CurrentUser(
                                          String tenantId,
                                          String organizationId,
                                          boolean passwordChangeRequired) {
-        return new CurrentUser(userId, username, tenantId, organizationId, false, passwordChangeRequired);
+        return tenantUser(userId, username, tenantId, organizationId, passwordChangeRequired, null);
+    }
+
+    public static CurrentUser tenantUser(String userId,
+                                         String username,
+                                         String tenantId,
+                                         String organizationId,
+                                         boolean passwordChangeRequired,
+                                         String timeZone) {
+        return new CurrentUser(userId, username, tenantId, organizationId, false, passwordChangeRequired, timeZone);
     }
 
     public static CurrentUser systemUser(String userId, String username) {
@@ -36,7 +47,16 @@ public record CurrentUser(
     }
 
     public static CurrentUser systemUser(String userId, String username, boolean passwordChangeRequired) {
-        return new CurrentUser(userId, username, null, null, true, passwordChangeRequired);
+        return systemUser(userId, username, passwordChangeRequired, null);
+    }
+
+    public static CurrentUser systemUser(String userId, String username, boolean passwordChangeRequired,
+                                         String timeZone) {
+        return new CurrentUser(userId, username, null, null, true, passwordChangeRequired, timeZone);
+    }
+
+    public CurrentUser withTimeZone(String timeZone) {
+        return new CurrentUser(userId, username, tenantId, organizationId, system, passwordChangeRequired, timeZone);
     }
 
     private static String requireText(String value, String name) {

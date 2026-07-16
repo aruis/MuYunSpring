@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import { presentPlatformError } from '@muyun/platform-components';
+import { presentPlatformError, providePlatformTimeZoneContext } from '@muyun/platform-components';
 import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type {
   LoginResult,
@@ -36,6 +36,7 @@ import {
 
 const startup = ref<WorkbenchStartupState>();
 const currentUser = computed(() => startup.value?.session.currentUser);
+const currentTimeZone = computed(() => currentUser.value?.timeZone);
 const loading = ref(true);
 const error = ref<string>();
 const activeTabKey = ref<string>();
@@ -57,6 +58,7 @@ let securityLogoutTimer: number | undefined;
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
 provideCurrentUserContext(currentUser);
+providePlatformTimeZoneContext(currentTimeZone);
 
 const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 

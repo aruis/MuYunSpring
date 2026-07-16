@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserTimeZoneResolver;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
@@ -39,6 +40,7 @@ public class UserSessionService {
     private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
     private final Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher;
     private final Clock clock;
+    private final CurrentUserTimeZoneResolver currentUserTimeZoneResolver;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
@@ -47,6 +49,7 @@ public class UserSessionService {
                               ActiveTenantVerifier activeTenantVerifier,
                               ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
                               ObjectProvider<UserSessionRevocationService> userSessionRevocationService,
+                              ObjectProvider<CurrentUserTimeZoneResolver> currentUserTimeZoneResolver,
                               ApplicationEventPublisher applicationEventPublisher) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier,
                 userSessionRevocationService == null ? null : userSessionRevocationService.getIfAvailable(),
@@ -54,18 +57,28 @@ public class UserSessionService {
                         ? () -> UserSecurityEventPublisher.NOOP
                         : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
                 () -> event -> applicationEventPublisher.publishEvent(event),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                currentUserTimeZoneResolver == null
+                        ? null
+                        : currentUserTimeZoneResolver.getIfAvailable(() -> CurrentUserTimeZoneResolver.NONE));
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
         this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
+    }
+
+    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock,
+                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
+        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock,
+                currentUserTimeZoneResolver);
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
                        UserSecurityEventPublisher userSecurityEventPublisher, Clock clock) {
         this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, userSecurityEventPublisher, UserSessionLifecycleEventPublisher.NOOP, clock);
+                null, userSecurityEventPublisher, UserSessionLifecycleEventPublisher.NOOP, clock, null);
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
@@ -73,14 +86,14 @@ public class UserSessionService {
                        UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
                        Clock clock) {
         this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock);
+                null, userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, null);
     }
 
     UserSessionService(UserAccountService userAccountService,
                        UserSessionRecordService userSessionRecordService,
                        Clock clock) {
         this(userAccountService, userSessionRecordService, userAccountService,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
     }
 
     UserSessionService(UserAccountService userAccountService,
@@ -88,7 +101,7 @@ public class UserSessionService {
                        ActiveTenantVerifier activeTenantVerifier,
                        Clock clock) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock);
+                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
     }
 
     UserSessionService(UserAccountService userAccountService,
@@ -98,13 +111,26 @@ public class UserSessionService {
                        UserSecurityEventPublisher userSecurityEventPublisher,
                        UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
                        Clock clock) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier, userSessionRevocationService,
+                userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, null);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       UserSessionRevocationService userSessionRevocationService,
+                       UserSecurityEventPublisher userSecurityEventPublisher,
+                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
+                       Clock clock,
+                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier,
                 userSessionRevocationService,
                 () -> userSecurityEventPublisher == null ? UserSecurityEventPublisher.NOOP : userSecurityEventPublisher,
                 () -> userSessionLifecycleEventPublisher == null
                         ? UserSessionLifecycleEventPublisher.NOOP
                         : userSessionLifecycleEventPublisher,
-                clock);
+                clock,
+                currentUserTimeZoneResolver);
     }
 
     UserSessionService(UserAccountService userAccountService,
@@ -113,7 +139,8 @@ public class UserSessionService {
                        UserSessionRevocationService userSessionRevocationService,
                        Supplier<UserSecurityEventPublisher> userSecurityEventPublisher,
                        Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
-                       Clock clock) {
+                       Clock clock,
+                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
         this.userSessionRevocationService = userSessionRevocationService == null
@@ -127,6 +154,9 @@ public class UserSessionService {
                 ? () -> UserSessionLifecycleEventPublisher.NOOP
                 : userSessionLifecycleEventPublisher;
         this.clock = clock;
+        this.currentUserTimeZoneResolver = currentUserTimeZoneResolver == null
+                ? CurrentUserTimeZoneResolver.NONE
+                : currentUserTimeZoneResolver;
     }
 
     public LoginResult login(String tenantId, String username, String password) {
@@ -434,11 +464,16 @@ public class UserSessionService {
     }
 
     private CurrentUser currentUserOf(UserAccount user, boolean passwordChangeRequired) {
+        CurrentUser currentUser;
         if (user.getTenantId() == null || user.getTenantId().isBlank()) {
-            return CurrentUser.systemUser(user.getId(), user.getUsername(), passwordChangeRequired);
+            currentUser = CurrentUser.systemUser(user.getId(), user.getUsername(), passwordChangeRequired);
+        } else {
+            currentUser = CurrentUser.tenantUser(user.getId(), user.getUsername(), user.getTenantId(),
+                    user.getOrganizationId(), passwordChangeRequired);
         }
-        return CurrentUser.tenantUser(user.getId(), user.getUsername(), user.getTenantId(),
-                user.getOrganizationId(), passwordChangeRequired);
+        return currentUserTimeZoneResolver.resolveZoneId(currentUser)
+                .map(zoneId -> currentUser.withTimeZone(zoneId.getId()))
+                .orElse(currentUser);
     }
 
     private String normalizeBlank(String value) {
