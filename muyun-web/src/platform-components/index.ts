@@ -5,6 +5,7 @@ export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as RecordActionBar } from './RecordActionBar.vue';
 export { default as RecordDetailDrawer } from './RecordDetailDrawer.vue';
+export { default as RecordExternalChangeNotice } from './RecordExternalChangeNotice.vue';
 export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
@@ -100,7 +101,7 @@ export type {
   PlatformActionResultHandlingContext,
 } from './platformActionResultFeedback';
 export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
-export { createRecordEditorSessionState } from './recordEditorSessionState';
+export { applyRecordExternalChange, createRecordEditorSessionState } from './recordEditorSessionState';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
 export type {
@@ -108,7 +109,7 @@ export type {
   StaticFormSaveOptions,
   StaticRecordActionOptions,
 } from './staticFormActionFlow';
-export type { RecordEditorSessionOptions } from './recordEditorSessionState';
+export type { RecordEditorSessionOptions, RecordExternalChangeOptions } from './recordEditorSessionState';
 export type {
   StaticCrudCardMode,
   StaticCrudConfirmAction,

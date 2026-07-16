@@ -341,7 +341,7 @@ payload 表达稳定安全事实，例如 `platform.security.password-changed`�
 
 payload 只表达低敏脏标记，例如 `type=iam.user.session.collectionChanged`、`moduleAlias=iam.user`、`recordId=userId`、`reason=LOGGED_IN/LOGGED_OUT/REVOKED` 和 `sensitivity=DIRTY_MARKER`，不携带 `sessionId`、IP、User-Agent、token hash 或终端明细。在线用户扫描、接收者 session 复核、当前用户/租户上下文绑定和 user queue 投递由平台业务实时 fan-out 门面负责；“某模块某记录需要某动作权限”的接收策略由平台 recipient policy 工厂负责。IAM adapter 只负责把会话生命周期事实转换为集合变化事件，并声明目标用户需要 `iam.user.sessions` 记录动作权限。用户管理页收到后只刷新当前可见用户的在线状态；如果目标用户子列表已展开，再通过 `/iam.user/{id}/sessions` 权限接口读取会话明细。
 
-前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageModuleDataChanges` 和 `usePageDataChangeHandler`。页面只声明所需实时事实和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
+前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageDataChange` 和 `usePageBusinessEvent`。页面只声明所需实时事实、过滤条件和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。需要按实时事件刷新列表、状态摘要或子资源时，应优先使用 `createRealtimeRefreshQueue` 合并短时间内的重复刷新，并用 latest guard 丢弃过期响应。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
 
 ### 5.3 发布门面
 

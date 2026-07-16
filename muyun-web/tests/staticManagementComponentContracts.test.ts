@@ -88,9 +88,15 @@ test('record containers delegate chain errors to page feedback', () => {
 test('record mode drawer owns detail mode branch switching', () => {
   const drawerSource = readSource('src/platform-components/RecordModeDrawer.vue');
   const indexSource = readSource('src/platform-components/index.ts');
+  const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
 
   assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
+  assert.match(indexSource, /export \{ default as RecordExternalChangeNotice \}/);
   assert.match(drawerSource, /defineOptions\(\{ name: 'RecordModeDrawer' \}\)/);
+  assert.match(drawerSource, /RecordExternalChangeNotice/);
+  assert.match(drawerSource, /externallyChanged/);
+  assert.match(drawerSource, /reloadExternalChange/);
+  assert.match(drawerSource, /dismissExternalChange/);
   assert.match(drawerSource, /viewMode: 'view'/);
   assert.match(drawerSource, /formModes: \(\) => \['edit', 'create'\]/);
   assert.match(drawerSource, /const viewModeActive = computed\(\(\) => props\.mode === props\.viewMode\)/);
@@ -106,6 +112,17 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.doesNotMatch(drawerSource, /<template v-else>\s*<slot name="form"/);
   assert.match(drawerSource, /<slot name="view" \/>/);
   assert.match(drawerSource, /<slot name="form" \/>/);
+  assert.match(pageRealtimeSource, /subscribeAppModuleDataChanges\(options\.moduleAlias\)/);
+
+  const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  assert.match(systemUserSource, /usePageDataChange\(\{\s*moduleAlias: 'iam\.user'/);
+  assert.match(systemUserSource, /:externally-changed="Boolean\(externalChangedUserId\)"/);
+  assert.match(systemUserSource, /@reload-external-change="reloadExternalUserChange"/);
+  assert.match(systemUserSource, /@dismiss-external-change="clearExternalUserChanged"/);
+  assert.match(
+    systemUserSource,
+    /function markExternalUserChanged[\s\S]*savingUser\.value[\s\S]*detailMode\.value !== 'edit'/,
+  );
 });
 
 test('record explorer panel focuses and closes search from keyboard', () => {
@@ -899,6 +916,9 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /<RecordModeDrawer/);
   assert.match(systemUserViewSource, /:mode="detailMode"/);
   assert.match(systemUserViewSource, /:form-modes="\['edit', 'resetPassword'\]"/);
+  assert.match(systemUserViewSource, /:externally-changed="Boolean\(externalChangedUserId\)"/);
+  assert.match(systemUserViewSource, /@reload-external-change="reloadExternalUserChange"/);
+  assert.match(systemUserViewSource, /@dismiss-external-change="clearExternalUserChanged"/);
   assert.match(systemUserViewSource, /<template #view>/);
   assert.match(systemUserViewSource, /<template #form>/);
   assert.match(systemUserViewSource, /<RecordDetailFields/);

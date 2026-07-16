@@ -46,16 +46,17 @@ test('user session rows keep latest session refresh when earlier request finishe
     source: 'test-user',
   });
 
-  const firstLoad = rows.loadUserSessions('user-1');
-  const secondLoad = rows.loadUserSessions('user-1');
+  rows.loadUserSessions('user-1');
+  await waitFor(() => sessionRequests.length === 1);
+  rows.loadUserSessions('user-1');
   await waitFor(() => sessionRequests.length === 2);
 
   sessionRequests[1].resolve([{ id: 'session-latest' } as UserSessionView]);
-  await secondLoad;
+  await flushPromises();
   assert.deepEqual(rows.userSessionState('user-1').records, [{ id: 'session-latest' }]);
 
   sessionRequests[0].resolve([{ id: 'session-stale' } as UserSessionView]);
-  await firstLoad;
+  await flushPromises();
   assert.deepEqual(rows.userSessionState('user-1').records, [{ id: 'session-latest' }]);
 });
 
