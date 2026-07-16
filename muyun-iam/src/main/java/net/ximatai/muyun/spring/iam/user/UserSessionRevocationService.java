@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.iam.user;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -19,12 +19,9 @@ public class UserSessionRevocationService {
     @Autowired
     public UserSessionRevocationService(
             UserSessionRecordService userSessionRecordService,
-            ObjectProvider<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher) {
+            ApplicationEventPublisher applicationEventPublisher) {
         this(userSessionRecordService,
-                userSessionLifecycleEventPublisher == null
-                        ? () -> UserSessionLifecycleEventPublisher.NOOP
-                        : () -> userSessionLifecycleEventPublisher.getIfAvailable(
-                        () -> UserSessionLifecycleEventPublisher.NOOP),
+                () -> event -> applicationEventPublisher.publishEvent(event),
                 Clock.systemUTC());
     }
 

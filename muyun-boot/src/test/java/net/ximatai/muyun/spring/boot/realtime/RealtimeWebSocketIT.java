@@ -3,8 +3,11 @@ package net.ximatai.muyun.spring.boot.realtime;
 import com.fasterxml.jackson.databind.JsonNode;
 import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.DataChange;
+import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailability;
+import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +15,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
@@ -50,7 +54,13 @@ class RealtimeWebSocketIT {
     private DataChangeRealtimePublisher dataChangeRealtimePublisher;
 
     @Autowired
+    private ApplicationEventPublisher applicationEventPublisher;
+
+    @Autowired
     private UserSessionService userSessionService;
+
+    @Autowired
+    private PlatformRecordActionAvailabilityService actionAvailabilityService;
 
     @Autowired
     private SimpUserRegistry userRegistry;
@@ -67,6 +77,11 @@ class RealtimeWebSocketIT {
         @Bean
         UserSessionService userSessionService() {
             return mock(UserSessionService.class);
+        }
+
+        @Bean
+        PlatformRecordActionAvailabilityService actionAvailabilityService() {
+            return mock(PlatformRecordActionAvailabilityService.class);
         }
     }
 
@@ -113,6 +128,41 @@ class RealtimeWebSocketIT {
         }
     }
 
+    @Test
+    @SuppressWarnings("removal")
+    void shouldPublishUserSessionLifecycleEventToConnectedAuthorizedUser() throws Exception {
+        CurrentUser admin = CurrentUser.systemUser("platform.user.super_admin", "Admin");
+        when(userSessionService.currentUser("token-admin")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentUserSnapshot("token-admin")).thenReturn(Optional.of(admin));
+        when(actionAvailabilityService.recordActions("iam.user", "user-1")).thenReturn(
+                new PlatformRecordActionAvailability("user-1",
+                        List.of(new PlatformRecordActionAvailability.Action("sessions", true, null))));
+        WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+        BlockingQueue<JsonNode> messages = new LinkedBlockingQueue<>();
+
+        StompSession adminSession = connect(stompClient, "token-admin");
+        try {
+            adminSession.subscribe(userBusinessEventDestination(), frameHandler(messages));
+            awaitServerSubscriptions(userBusinessEventDestination(), 1);
+
+            applicationEventPublisher.publishEvent(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
+
+            JsonNode envelope = messages.poll(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            assertThat(envelope).isNotNull();
+            assertThat(envelope.path("type").asText()).isEqualTo(StompBusinessRealtimeNotifier.MESSAGE_TYPE);
+            assertThat(envelope.path("payload").path("type").asText())
+                    .isEqualTo("iam.user.session.collectionChanged");
+            assertThat(envelope.path("payload").path("recordId").asText()).isEqualTo("user-1");
+            assertThat(envelope.path("payload").path("reason").asText()).isEqualTo("LOGGED_IN");
+        } finally {
+            if (adminSession.isConnected()) {
+                adminSession.disconnect();
+            }
+            stompClient.stop();
+        }
+    }
+
     private StompSession connect(WebSocketStompClient stompClient, String token) throws Exception {
         StompHeaders connectHeaders = new StompHeaders();
         connectHeaders.add("Authorization", "Bearer " + token);
@@ -141,6 +191,10 @@ class RealtimeWebSocketIT {
 
     private String userDataChangeDestination() {
         return "/user" + RealtimeDestinations.DATA_CHANGES.destination();
+    }
+
+    private String userBusinessEventDestination() {
+        return "/user" + RealtimeDestinations.USER_BUSINESS_EVENTS.destination();
     }
 
     private void awaitServerSubscriptions(String destination, int count) throws InterruptedException {

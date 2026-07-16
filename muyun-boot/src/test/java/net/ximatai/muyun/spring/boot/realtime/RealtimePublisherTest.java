@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailability;
 import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.iam.user.UserSecurityEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
@@ -165,6 +166,29 @@ class RealtimePublisherTest {
         publisher.publish(event, currentUser -> "admin-1".equals(currentUser.userId()));
 
         assertThat(notifier.userIds).containsExactly("admin-1");
+        assertThat(notifier.events).containsExactly(event);
+    }
+
+    @Test
+    void shouldResolveConnectedRecipientsOutsideSourceTenantScope() {
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
+        OnlineUserBusinessRealtimeFanOutPublisher publisher =
+                new OnlineUserBusinessRealtimeFanOutPublisher(registry, userSessionService, notifier);
+        CurrentUser admin = CurrentUser.systemUser("platform.user.super_admin", "Admin");
+        registry.register("ws-admin", new CurrentUserPrincipal(admin, "token-admin-1"));
+        when(userSessionService.currentUserSnapshot("token-admin-1")).thenAnswer(invocation -> {
+            assertThat(TenantContext.tenantFilterBypassed()).isTrue();
+            return Optional.of(admin);
+        });
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("demo-user-1", "LOGGED_IN");
+
+        try (TenantContext.Scope ignored = TenantContext.use("demo")) {
+            publisher.publish(event, currentUser -> true);
+        }
+
+        assertThat(notifier.userIds).containsExactly("platform.user.super_admin");
         assertThat(notifier.events).containsExactly(event);
     }
 

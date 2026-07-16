@@ -3,10 +3,8 @@ package net.ximatai.muyun.spring.boot.realtime;
 import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.boot.web.MuYunSpringCorsProperties;
 import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
-import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -98,10 +96,9 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
 
     @Bean
     @ConditionalOnMissingBean(BusinessRealtimeRecipientPolicyFactory.class)
-    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
     public BusinessRealtimeRecipientPolicyFactory businessRealtimeRecipientPolicyFactory(
-            PlatformRecordActionAvailabilityService actionAvailabilityService) {
-        return new BusinessRealtimeRecipientPolicyFactory(actionAvailabilityService);
+            ObjectProvider<PlatformRecordActionAvailabilityService> actionAvailabilityService) {
+        return new BusinessRealtimeRecipientPolicyFactory(actionAvailabilityService::getIfAvailable);
     }
 
     @Bean
@@ -111,9 +108,8 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     }
 
     @Bean
-    @ConditionalOnMissingBean(UserSessionLifecycleEventPublisher.class)
-    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
-    public UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher(
+    @ConditionalOnMissingBean(UserSessionManagementRealtimeEventPublisher.class)
+    public UserSessionManagementRealtimeEventPublisher userSessionManagementRealtimeEventPublisher(
             BusinessRealtimeFanOutPublisher businessRealtimeFanOutPublisher,
             BusinessRealtimeRecipientPolicyFactory recipientPolicyFactory) {
         return new UserSessionManagementRealtimeEventPublisher(

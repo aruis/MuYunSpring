@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -45,17 +46,14 @@ public class UserSessionService {
                               UserSessionRecordService userSessionRecordService,
                               ActiveTenantVerifier activeTenantVerifier,
                               ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
-                              ObjectProvider<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
-                              ObjectProvider<UserSessionRevocationService> userSessionRevocationService) {
+                              ObjectProvider<UserSessionRevocationService> userSessionRevocationService,
+                              ApplicationEventPublisher applicationEventPublisher) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier,
                 userSessionRevocationService == null ? null : userSessionRevocationService.getIfAvailable(),
                 userSecurityEventPublisher == null
                         ? () -> UserSecurityEventPublisher.NOOP
                         : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
-                userSessionLifecycleEventPublisher == null
-                        ? () -> UserSessionLifecycleEventPublisher.NOOP
-                        : () -> userSessionLifecycleEventPublisher.getIfAvailable(
-                        () -> UserSessionLifecycleEventPublisher.NOOP),
+                () -> event -> applicationEventPublisher.publishEvent(event),
                 Clock.systemUTC());
     }
 

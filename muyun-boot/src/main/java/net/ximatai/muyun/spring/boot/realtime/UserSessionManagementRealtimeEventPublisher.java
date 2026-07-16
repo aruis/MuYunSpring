@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.boot.realtime;
 
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
-import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEventPublisher;
+import org.springframework.context.event.EventListener;
 
 import java.util.Objects;
 
-public class UserSessionManagementRealtimeEventPublisher implements UserSessionLifecycleEventPublisher {
+public class UserSessionManagementRealtimeEventPublisher {
     private static final String USER_MODULE_ALIAS = "iam.user";
     private static final String SESSIONS_ACTION = "sessions";
 
@@ -20,7 +20,7 @@ public class UserSessionManagementRealtimeEventPublisher implements UserSessionL
                 recipientPolicyFactory, "recipientPolicyFactory must not be null");
     }
 
-    @Override
+    @EventListener
     public void publish(UserSessionLifecycleEvent event) {
         if (event == null) {
             return;
