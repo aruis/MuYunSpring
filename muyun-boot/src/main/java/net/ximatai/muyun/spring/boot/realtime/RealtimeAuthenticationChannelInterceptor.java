@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.boot.realtime;
 
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -15,15 +17,23 @@ import java.util.Optional;
 public class RealtimeAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final UserSessionService userSessionService;
     private final RealtimeConnectionRegistry connectionRegistry;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public RealtimeAuthenticationChannelInterceptor(UserSessionService userSessionService) {
-        this(userSessionService, new RealtimeConnectionRegistry());
+        this(userSessionService, new RealtimeConnectionRegistry(), null);
     }
 
     public RealtimeAuthenticationChannelInterceptor(UserSessionService userSessionService,
                                                     RealtimeConnectionRegistry connectionRegistry) {
+        this(userSessionService, connectionRegistry, null);
+    }
+
+    public RealtimeAuthenticationChannelInterceptor(UserSessionService userSessionService,
+                                                    RealtimeConnectionRegistry connectionRegistry,
+                                                    ApplicationEventPublisher applicationEventPublisher) {
         this.userSessionService = userSessionService;
         this.connectionRegistry = connectionRegistry;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -43,13 +53,18 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
             if (currentUser.passwordChangeRequired()) {
                 throw new IllegalArgumentException("password change required");
             }
-            CurrentUserPrincipal principal = new CurrentUserPrincipal(currentUser, token);
+            String loginSessionId = userSessionService.currentSessionId(token)
+                    .orElseThrow(() -> new IllegalArgumentException("realtime authentication required"));
+            CurrentUserPrincipal principal = new CurrentUserPrincipal(currentUser, token, loginSessionId);
             accessor.setUser(principal);
-            connectionRegistry.register(accessor.getSessionId(), principal);
+            if (connectionRegistry.register(accessor.getSessionId(), principal)) {
+                publishPresenceConnected(principal);
+            }
             return message;
         }
         if (StompCommand.DISCONNECT.equals(command)) {
-            connectionRegistry.unregister(accessor.getSessionId());
+            CurrentUserPrincipal principal = connectionRegistry.unregister(accessor.getSessionId());
+            publishPresenceDisconnected(principal);
             return message;
         }
         if (StompCommand.SUBSCRIBE.equals(command) || StompCommand.SEND.equals(command)) {
@@ -60,11 +75,29 @@ public class RealtimeAuthenticationChannelInterceptor implements ChannelIntercep
             if (currentUser.passwordChangeRequired()) {
                 throw new IllegalArgumentException("password change required");
             }
-            CurrentUserPrincipal refreshedPrincipal = new CurrentUserPrincipal(currentUser, principal.token());
+            CurrentUserPrincipal refreshedPrincipal = new CurrentUserPrincipal(currentUser, principal.token(),
+                    principal.loginSessionId());
             accessor.setUser(refreshedPrincipal);
             connectionRegistry.register(accessor.getSessionId(), refreshedPrincipal);
+            connectionRegistry.touch(accessor.getSessionId());
         }
         return message;
+    }
+
+    private void publishPresenceConnected(CurrentUserPrincipal principal) {
+        if (applicationEventPublisher == null || principal == null || principal.loginSessionId() == null) {
+            return;
+        }
+        applicationEventPublisher.publishEvent(UserSessionLifecycleEvent.presenceConnected(
+                principal.currentUser().userId(), principal.loginSessionId()));
+    }
+
+    private void publishPresenceDisconnected(CurrentUserPrincipal principal) {
+        if (applicationEventPublisher == null || principal == null || principal.loginSessionId() == null) {
+            return;
+        }
+        applicationEventPublisher.publishEvent(UserSessionLifecycleEvent.presenceDisconnected(
+                principal.currentUser().userId(), principal.loginSessionId()));
     }
 
     private Optional<CurrentUser> authenticate(String token) {

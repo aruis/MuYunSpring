@@ -9,6 +9,7 @@ public final class RealtimeDestinations {
     public static final RealtimeQueue USER_BUSINESS_EVENTS = RealtimeQueue.of("/queue/platform/business-events");
     public static final RealtimeQueue USER_IM_MESSAGES = RealtimeQueue.of("/queue/platform/im/messages");
     public static final RealtimeCommand PLATFORM_PING = RealtimeCommand.of("/app/platform/ping");
+    public static final RealtimeCommand SESSION_ACTIVITY = RealtimeCommand.of("/app/platform/session/activity");
     public static final RealtimeCommand IM_MESSAGES_SEND = RealtimeCommand.of("/app/platform/im/messages/send");
 
     private RealtimeDestinations() {

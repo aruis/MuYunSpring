@@ -518,8 +518,85 @@ class UserSessionServiceTest {
                         "Web 桌面端",
                         "macos",
                         "macOS",
-                        false
+                        false,
+                        false,
+                        "offline",
+                        "离线",
+                        0,
+                        null,
+                        null
                 ));
+    }
+
+    @Test
+    void shouldAttachPresenceToActiveSessionsAndStatuses() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession active = activeSession("session-active", "user-1");
+        UserSession idle = activeSession("session-idle", "user-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(active, idle));
+        Instant connectedAt = clock.instant().minusSeconds(30);
+        Instant observedAt = clock.instant().minusSeconds(5);
+        UserSessionPresenceLookup presenceLookup = sessionId -> "session-active".equals(sessionId)
+                ? new UserSessionPresence(sessionId, true, 2, connectedAt, observedAt)
+                : UserSessionPresence.absent(sessionId);
+        UserSessionService sessionService = new UserSessionService(userService, new UserSessionRecordService(sessionDao),
+                userService, null, () -> UserSecurityEventPublisher.NOOP,
+                () -> UserSessionLifecycleEventPublisher.NOOP, clock,
+                null, () -> presenceLookup);
+
+        List<UserSessionView> sessions = sessionService.activeSessionsOfUser("user-1", null);
+        List<UserSessionStatusView> statuses = sessionService.activeSessionStatuses(List.of("user-1"));
+
+        assertThat(sessions).extracting(UserSessionView::id).containsExactly("session-active", "session-idle");
+        assertThat(sessions.get(0).present()).isTrue();
+        assertThat(sessions.get(0).presenceStatus()).isEqualTo("online");
+        assertThat(sessions.get(0).connectionCount()).isEqualTo(2);
+        assertThat(sessions.get(0).lastConnectedAt()).isEqualTo(connectedAt);
+        assertThat(sessions.get(0).lastObservedAt()).isEqualTo(observedAt);
+        assertThat(sessions.get(1).present()).isFalse();
+        assertThat(statuses).containsExactly(new UserSessionStatusView("user-1", true, 2, true, 1, 0));
+    }
+
+    @Test
+    void shouldMarkConnectedSessionIdleAfterThreeMinutesWithoutObservedActivity() {
+        UserSession session = activeSession("session-idle", "user-1");
+        session.setLastSeenAt(clock.instant().minus(UserSessionPresence.IDLE_TIMEOUT));
+        Instant observedAt = clock.instant().minus(UserSessionPresence.IDLE_TIMEOUT);
+        UserSessionView view = UserSessionView.from(session, false,
+                new UserSessionPresence(session.getId(), true, 1, clock.instant().minusSeconds(240), observedAt),
+                clock.instant());
+
+        assertThat(view.present()).isTrue();
+        assertThat(view.presenceStatus()).isEqualTo("idle");
+        assertThat(view.presenceStatusTitle()).isEqualTo("闲置");
+    }
+
+    @Test
+    void shouldKeepConnectedSessionIdleWhenOnlyHttpActivityIsRecentAfterObservedActivity() {
+        UserSession session = activeSession("session-active", "user-1");
+        session.setLastSeenAt(clock.instant().minusSeconds(30));
+        Instant observedAt = clock.instant().minus(UserSessionPresence.IDLE_TIMEOUT);
+        UserSessionView view = UserSessionView.from(session, false,
+                new UserSessionPresence(session.getId(), true, 1, clock.instant().minusSeconds(240), observedAt),
+                clock.instant());
+
+        assertThat(view.presenceStatus()).isEqualTo("idle");
+        assertThat(view.presenceStatusTitle()).isEqualTo("闲置");
+    }
+
+    @Test
+    void shouldUseHttpActivityAsFallbackWhenObservedActivityIsMissing() {
+        UserSession session = activeSession("session-active", "user-1");
+        session.setLastSeenAt(clock.instant().minusSeconds(30));
+        UserSessionView view = UserSessionView.from(session, false,
+                new UserSessionPresence(session.getId(), true, 1, clock.instant().minusSeconds(240), null),
+                clock.instant());
+
+        assertThat(view.presenceStatus()).isEqualTo("online");
+        assertThat(view.presenceStatusTitle()).isEqualTo("使用中");
     }
 
     @Test

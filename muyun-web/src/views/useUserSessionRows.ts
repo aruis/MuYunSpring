@@ -20,6 +20,21 @@ export interface UserSessionRowsOptions {
   source: string;
 }
 
+export function userSessionPresenceTitle(
+  session: Pick<UserSessionView, 'presenceStatus' | 'presenceStatusTitle'>,
+) {
+  if (session.presenceStatus === 'online' || session.presenceStatusTitle === '在线使用中') {
+    return '使用中';
+  }
+  if (session.presenceStatus === 'idle') {
+    return '闲置';
+  }
+  if (session.presenceStatus === 'offline' || session.presenceStatusTitle === '未连接') {
+    return '离线';
+  }
+  return session.presenceStatusTitle || '离线';
+}
+
 export function useUserSessionRows(options: UserSessionRowsOptions) {
   const userSessionCollectionChangedEventType = 'iam.user.session.collectionChanged';
   const expandedUserKeys = ref<string[]>([]);
@@ -142,6 +157,14 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     const status = userOnlineStatuses.value[userId];
     if (!status) {
       return '-';
+    }
+    if (status.present) {
+      const presentCount = status.presentSessionCount ?? 0;
+      const idleCount = status.idleSessionCount ?? 0;
+      if (presentCount > 0 && idleCount >= presentCount) {
+        return `闲置 (${presentCount}/${status.activeSessionCount})`;
+      }
+      return `使用中 (${Math.max(0, presentCount - idleCount)}/${status.activeSessionCount})`;
     }
     return status.online ? `在线 (${status.activeSessionCount})` : '离线';
   }

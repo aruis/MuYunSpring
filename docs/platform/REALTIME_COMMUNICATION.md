@@ -348,6 +348,7 @@ payload 只表达低敏脏标记，例如 `type=iam.user.session.collectionChang
 - 全局 realtime 连接重建时，由 `app/realtime` 统一恢复页面级 topic 订阅；
 - 编辑中记录需要提示外部变更时，使用 `usePageRecordExternalChange` 统一处理模块订阅、当前记录匹配、编辑态判断和保存中自身事件保护；
 - 需要按实时事件刷新列表、状态摘要或子资源时，优先使用 `createRealtimeRefreshQueue` 合并短时间内的重复刷新，并用 latest guard 丢弃过期响应；
+- 主子表页面收到子资源集合变化事件时，主表只刷新当前可见记录的摘要；子表只有在对应主记录已展开时才刷新明细。页面不得因为低敏脏标记而全量重查所有主表记录或预取所有子资源；
 - 应用全局连接启动逻辑只订阅用户私有基础队列，不订阅具体业务模块 topic；
 - 业务页面不得直接导入 `app/realtime` 的 `subscribeApp*` 方法，不得直接持有 STOMP subscription 或调用底层 `realtime.subscribe`。
 
@@ -390,10 +391,23 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 | 数据变化 | `DataChangeRealtimePublisher` | 发起用户 `/user/queue/platform/data-changes`；公共 module / record topic | user queue 可发送完整 `CommittedChangeSet`；公共 topic 只能发送清空 `facts` 的低敏脏标记 |
 | 安全通知 | `SecurityRealtimeNotifier` | `/user/queue/platform/notifications` | 只表达安全事实、是否需要退出、目标 session；不携带 token、IP、User-Agent 或 UI 指令 |
 | 业务私有事件 | `BusinessRealtimeNotifier` / `BusinessRealtimeFanOutPublisher` | `/user/queue/platform/business-events` | 只发送给经 recipient policy 判定的用户；普通业务状态变化优先发送低敏脏标记，详情通过业务查询接口读取 |
+| 会话 presence | `UserSessionPresenceLookup` + `UserSessionLifecycleEvent` | 用户管理仍复用 `/user/queue/platform/business-events` | presence 只表达 WebSocket 连接观测，不替代 session 有效性；管理页通过会话查询接口读取完整状态 |
 
 各门面收到空接收人、空事件或无法确认当前用户时必须跳过发送。业务代码不得绕过门面直接调用 `RealtimeMessagePublisher`，除非正在实现新的平台 realtime adapter。
 
-### 5.4 客户端命令入口
+### 5.4 会话有效性与 Presence
+
+用户登录会话和实时在线状态必须分开治理：
+
+- 登录会话是认证安全事实，由 session 表判断是否未过期、未撤销、用户和租户仍有效；
+- presence 是连接观测事实，由实时连接 registry 按登录 `sessionId` 聚合 WebSocket 连接数和最近观测时间；
+- 管理端主表展示会话摘要时应区分“使用中”“闲置”“在线”“离线”：`使用中` 表示存在实时连接且最近有前端观测活动，`闲置` 表示存在实时连接但超过阈值无前端观测活动，`在线` 表示仍有有效 session 但当前没有实时连接，`离线` 表示没有有效 session；
+- 管理端子列表展示单个登录会话的连接状态时只使用“使用中”“闲置”“离线”。子列表中的“离线”表示该有效 session 当前没有实时连接，不等同于用户已失效或 session 已被撤销；
+- 已连接 session 超过 3 分钟没有新的实时观测活动时视为“闲置”。实时观测活动优先来自前端交互上报；没有观测数据时，HTTP 最近请求仅作为兼容兜底。后端定时扫描 presence 阈值变化并发布会话业务事件，用户管理页只响应消息刷新；
+- WebSocket CONNECT / DISCONNECT 发布 `UserSessionLifecycleEvent`，再复用用户管理既有业务事件 fan-out，让已打开的用户管理页刷新摘要和展开行；
+- presence 默认是进程内观测。多节点、断线超时、心跳窗口和外部 broker 统一治理前，不承诺强一致在线人数。
+
+### 5.5 客户端命令入口
 
 客户端发往服务端的 STOMP command 统一进入平台实时命令层。
 
@@ -401,11 +415,20 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 ```text
 /app/platform/ping
+/app/platform/session/activity
 ```
 
-后续 IM、在线状态或协同命令进入独立业务 adapter。业务 adapter 可以处理命令，但不负责连接、鉴权、心跳和底层消息路由。
+`/app/platform/session/activity` 由前端 workbench 统一上报浏览器交互活跃，默认监听 `pointermove`、`pointerdown`、`keydown`、`scroll` 和页面重新可见，且必须节流。业务页面不得自行监听鼠标键盘事件或直接发布 activity command。
 
-### 5.5 鉴权与权限
+客户端 activity 上报是应用级能力，不是页面能力：
+
+- activity reporter 只能随全局 realtime 连接启动和停止，必须在连接断开、用户退出或应用销毁时移除事件监听；
+- 业务页面不得自行实现“页面加载订阅、卸载反订阅”的底层模板代码，应通过页面实时生命周期封装声明事件需求；
+- 新增业务命令必须先进入平台实时命令层，不能从页面直接拼接 `/app/**` destination。
+
+后续 IM、协同命令进入独立业务 adapter。业务 adapter 可以处理命令，但不负责连接、鉴权、心跳和底层消息路由。
+
+### 5.6 鉴权与权限
 
 实时连接的鉴权应复用现有登录态和当前用户上下文。
 
@@ -426,7 +449,7 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 | IM / 协同 | 按房间、会话、参与者或业务资源校验 |
 | 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
 
-### 5.6 租户与作用域
+### 5.7 租户与作用域
 
 后端广播不得把跨租户数据变化无差别推给所有连接。
 
@@ -527,6 +550,7 @@ export const dataChangeChannel: RealtimeChannel<CommittedChangeSet>;
 export const userNotificationChannel: RealtimeChannel<UserNotification>;
 export const userBusinessEventChannel: RealtimeChannel<BusinessRealtimeEvent>;
 export const platformPingCommand: RealtimeCommand<PlatformPingRequest>;
+export const sessionActivityCommand: RealtimeCommand<SessionActivityRequest>;
 ```
 
 业务代码应使用：

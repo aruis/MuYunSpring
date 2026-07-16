@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,13 +24,16 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     private final UserSessionService userSessionService;
     private final RealtimeConnectionRegistry connectionRegistry;
     private final MuYunSpringCorsProperties corsProperties;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public MuYunSpringRealtimeConfiguration(UserSessionService userSessionService,
                                             RealtimeConnectionRegistry connectionRegistry,
-                                            ObjectProvider<MuYunSpringCorsProperties> corsProperties) {
+                                            ObjectProvider<MuYunSpringCorsProperties> corsProperties,
+                                            ApplicationEventPublisher applicationEventPublisher) {
         this.userSessionService = userSessionService;
         this.connectionRegistry = connectionRegistry;
         this.corsProperties = corsProperties.getIfAvailable();
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -53,13 +57,22 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(new RealtimeAuthenticationChannelInterceptor(userSessionService,
-                connectionRegistry));
+                connectionRegistry, applicationEventPublisher));
     }
 
     @Bean
     @ConditionalOnMissingBean(RealtimeConnectionRegistry.class)
     public static RealtimeConnectionRegistry realtimeConnectionRegistry() {
         return new RealtimeConnectionRegistry();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(UserSessionPresenceIdleNotifier.class)
+    public UserSessionPresenceIdleNotifier userSessionPresenceIdleNotifier(
+            RealtimeConnectionRegistry connectionRegistry,
+            UserSessionService userSessionService,
+            ApplicationEventPublisher applicationEventPublisher) {
+        return new UserSessionPresenceIdleNotifier(connectionRegistry, userSessionService, applicationEventPublisher);
     }
 
     @Bean

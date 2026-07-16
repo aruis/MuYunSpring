@@ -588,12 +588,21 @@ export interface UserSessionView {
   platformType?: string;
   platformTypeTitle?: string;
   current: boolean;
+  present?: boolean;
+  presenceStatus?: string;
+  presenceStatusTitle?: string;
+  connectionCount?: number;
+  lastConnectedAt?: string;
+  lastObservedAt?: string;
 }
 
 export interface UserSessionStatusView {
   userId: string;
   online: boolean;
   activeSessionCount: number;
+  present?: boolean;
+  presentSessionCount?: number;
+  idleSessionCount?: number;
 }
 
 export type UserPasswordStatus = 'normal' | 'initial' | 'resetRequired' | 'expired';

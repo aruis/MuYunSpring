@@ -12,12 +12,17 @@ import net.ximatai.muyun.spring.iam.user.UserSecurityEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +30,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -428,6 +435,7 @@ class RealtimePublisherTest {
         CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
         when(userSessionService.currentUser("token-1"))
                 .thenReturn(Optional.of(currentUser), Optional.empty());
+        when(userSessionService.currentSessionId("token-1")).thenReturn(Optional.of("login-session-1"));
 
         Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1", "ws-1"),
                 mock(MessageChannel.class));
@@ -435,6 +443,7 @@ class RealtimePublisherTest {
 
         assertThat(principal.currentUser()).isEqualTo(currentUser);
         assertThat(principal.token()).isEqualTo("token-1");
+        assertThat(principal.loginSessionId()).isEqualTo("login-session-1");
         assertThat(connectionRegistry.contains("ws-1", principal)).isTrue();
         assertThatThrownBy(() -> interceptor.preSend(stompMessage(StompCommand.SUBSCRIBE, principal, null,
                 "ws-1"),
@@ -451,6 +460,7 @@ class RealtimePublisherTest {
                 new RealtimeAuthenticationChannelInterceptor(userSessionService, connectionRegistry);
         CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
         when(userSessionService.currentUser("token-1")).thenReturn(Optional.of(currentUser));
+        when(userSessionService.currentSessionId("token-1")).thenReturn(Optional.of("login-session-1"));
 
         Message<?> connected = interceptor.preSend(stompMessage(StompCommand.CONNECT, null, "token-1", "ws-1"),
                 mock(MessageChannel.class));
@@ -460,6 +470,65 @@ class RealtimePublisherTest {
                 mock(MessageChannel.class));
 
         assertThat(connectionRegistry.principals()).isEmpty();
+    }
+
+    @Test
+    void shouldResolveSessionPresenceFromRealtimeConnections() {
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
+
+        registry.register("ws-1", new CurrentUserPrincipal(currentUser, "token-1", "login-session-1"));
+        registry.register("ws-2", new CurrentUserPrincipal(currentUser, "token-1", "login-session-1"));
+
+        assertThat(registry.presenceOf("login-session-1").present()).isTrue();
+        assertThat(registry.presenceOf("login-session-1").connectionCount()).isEqualTo(2);
+        assertThat(registry.presenceOf("other-session").present()).isFalse();
+    }
+
+    @Test
+    void shouldKeepOriginalConnectedAtWhenRefreshingRealtimeConnection() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-16T08:00:00Z"));
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry(clock);
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
+        CurrentUserPrincipal principal = new CurrentUserPrincipal(currentUser, "token-1", "login-session-1");
+
+        registry.register("ws-1", principal);
+        clock.instant = Instant.parse("2026-07-16T08:01:00Z");
+        registry.register("ws-1", principal);
+
+        assertThat(registry.presenceOf("login-session-1").lastConnectedAt())
+                .isEqualTo(Instant.parse("2026-07-16T08:00:00Z"));
+        assertThat(registry.presenceOf("login-session-1").lastObservedAt())
+                .isEqualTo(Instant.parse("2026-07-16T08:01:00Z"));
+    }
+
+    @Test
+    void shouldPublishPresenceIdleTransitionFromBackendScheduler() {
+        Clock registryClock = Clock.fixed(Instant.parse("2026-07-16T07:56:00Z"), ZoneOffset.UTC);
+        Clock notifierClock = Clock.fixed(Instant.parse("2026-07-16T08:00:00Z"), ZoneOffset.UTC);
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry(registryClock);
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingApplicationEventPublisher publisher = new RecordingApplicationEventPublisher();
+        UserSessionPresenceIdleNotifier notifier =
+                new UserSessionPresenceIdleNotifier(registry, userSessionService, publisher, notifierClock);
+        CurrentUser currentUser = CurrentUser.tenantUser("user-1", "User", "tenant-a");
+        registry.register("ws-1", new CurrentUserPrincipal(currentUser, "token-1", "login-session-1"));
+        when(userSessionService.sessionIdleSince(eq("login-session-1"), any(), eq(notifierClock.instant())))
+                .thenReturn(true);
+
+        notifier.publishIdleTransitions();
+        notifier.publishIdleTransitions();
+
+        assertThat(publisher.events).containsExactly(
+                UserSessionLifecycleEvent.presenceIdle("user-1", "login-session-1"));
+
+        notifier.publishActiveIfIdle(new CurrentUserPrincipal(currentUser, "token-1", "login-session-1"));
+        notifier.publishIdleTransitions();
+
+        assertThat(publisher.events).containsExactly(
+                UserSessionLifecycleEvent.presenceIdle("user-1", "login-session-1"),
+                UserSessionLifecycleEvent.presenceActive("user-1", "login-session-1"),
+                UserSessionLifecycleEvent.presenceIdle("user-1", "login-session-1"));
     }
 
     private static final class RecordingRealtimeMessagePublisher implements RealtimeMessagePublisher {
@@ -494,6 +563,29 @@ class RealtimePublisherTest {
     private record BroadcastMessage(RealtimeTopic topic, Object payload) {
     }
 
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
+    }
+
     private Message<?> stompMessage(StompCommand command, CurrentUserPrincipal principal, String token) {
         return stompMessage(command, principal, token, null);
     }
@@ -521,6 +613,15 @@ class RealtimePublisherTest {
         @Override
         public void notifyUser(String userId, BusinessRealtimeEvent event) {
             userIds.add(userId);
+            events.add(event);
+        }
+    }
+
+    private static final class RecordingApplicationEventPublisher implements ApplicationEventPublisher {
+        private final List<Object> events = new ArrayList<>();
+
+        @Override
+        public void publishEvent(Object event) {
             events.add(event);
         }
     }

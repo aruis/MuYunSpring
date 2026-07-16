@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { useUserSessionRows } from '../src/views/useUserSessionRows.ts';
+import { useUserSessionRows, userSessionPresenceTitle } from '../src/views/useUserSessionRows.ts';
 import type { UserAccount, UserSessionStatusView, UserSessionView } from '../src/web-contracts/index.ts';
 import type { HttpRequestOptions, ModuleContext } from '../src/web-core/index.ts';
 
@@ -90,6 +90,69 @@ test('user session rows keep latest online status when earlier request finishes 
   statusRequests[0].resolve([{ userId: 'user-1', online: false, activeSessionCount: 0 }]);
   await flushPromises();
   assert.equal(rows.userOnlineStatusTitle({ id: 'user-1' }), '在线 (2)');
+});
+
+test('user session rows distinguish present sessions from merely active sessions', async () => {
+  const rows = useUserSessionRows({
+    context: sessionRowsContext((request) => {
+      if (request.path === '/iam.user/sessions/status') {
+        return [
+          {
+            userId: 'user-1',
+            online: true,
+            activeSessionCount: 3,
+            present: true,
+            presentSessionCount: 2,
+            idleSessionCount: 0,
+          },
+        ];
+      }
+      return [];
+    }),
+    source: 'test-user',
+  });
+
+  rows.handleUserListLoaded([{ id: 'user-1' }]);
+  await flushTimers();
+
+  assert.equal(rows.userOnlineStatusTitle({ id: 'user-1' }), '使用中 (2/3)');
+});
+
+test('user session rows shows idle when all present sessions are idle', async () => {
+  const rows = useUserSessionRows({
+    context: sessionRowsContext((request) => {
+      if (request.path === '/iam.user/sessions/status') {
+        return [
+          {
+            userId: 'user-1',
+            online: true,
+            activeSessionCount: 2,
+            present: true,
+            presentSessionCount: 2,
+            idleSessionCount: 2,
+          },
+        ];
+      }
+      return [];
+    }),
+    source: 'test-user',
+  });
+
+  rows.handleUserListLoaded([{ id: 'user-1' }]);
+  await flushTimers();
+
+  assert.equal(rows.userOnlineStatusTitle({ id: 'user-1' }), '闲置 (2/2)');
+});
+
+test('user session presence title normalizes legacy backend labels', () => {
+  assert.equal(
+    userSessionPresenceTitle({ presenceStatus: 'online', presenceStatusTitle: '在线使用中' }),
+    '使用中',
+  );
+  assert.equal(
+    userSessionPresenceTitle({ presenceStatus: 'offline', presenceStatusTitle: '未连接' }),
+    '离线',
+  );
 });
 
 function sessionRowsContext(

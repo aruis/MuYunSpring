@@ -39,6 +39,7 @@ public class UserSessionService {
     private final ActiveTenantVerifier activeTenantVerifier;
     private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
     private final Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher;
+    private final Supplier<UserSessionPresenceLookup> userSessionPresenceLookup;
     private final Clock clock;
     private final CurrentUserTimeZoneResolver currentUserTimeZoneResolver;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -50,6 +51,7 @@ public class UserSessionService {
                               ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
                               ObjectProvider<UserSessionRevocationService> userSessionRevocationService,
                               ObjectProvider<CurrentUserTimeZoneResolver> currentUserTimeZoneResolver,
+                              ObjectProvider<UserSessionPresenceLookup> userSessionPresenceLookup,
                               ApplicationEventPublisher applicationEventPublisher) {
         this(userAccountService, userSessionRecordService, activeTenantVerifier,
                 userSessionRevocationService == null ? null : userSessionRevocationService.getIfAvailable(),
@@ -60,7 +62,10 @@ public class UserSessionService {
                 Clock.systemUTC(),
                 currentUserTimeZoneResolver == null
                         ? null
-                        : currentUserTimeZoneResolver.getIfAvailable(() -> CurrentUserTimeZoneResolver.NONE));
+                        : currentUserTimeZoneResolver.getIfAvailable(() -> CurrentUserTimeZoneResolver.NONE),
+                userSessionPresenceLookup == null
+                        ? () -> UserSessionPresenceLookup.NONE
+                        : () -> userSessionPresenceLookup.getIfAvailable(() -> UserSessionPresenceLookup.NONE));
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
@@ -130,7 +135,8 @@ public class UserSessionService {
                         ? UserSessionLifecycleEventPublisher.NOOP
                         : userSessionLifecycleEventPublisher,
                 clock,
-                currentUserTimeZoneResolver);
+                currentUserTimeZoneResolver,
+                () -> UserSessionPresenceLookup.NONE);
     }
 
     UserSessionService(UserAccountService userAccountService,
@@ -141,6 +147,20 @@ public class UserSessionService {
                        Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
                        Clock clock,
                        CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier, userSessionRevocationService,
+                userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, currentUserTimeZoneResolver,
+                () -> UserSessionPresenceLookup.NONE);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       UserSessionRevocationService userSessionRevocationService,
+                       Supplier<UserSecurityEventPublisher> userSecurityEventPublisher,
+                       Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
+                       Clock clock,
+                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver,
+                       Supplier<UserSessionPresenceLookup> userSessionPresenceLookup) {
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
         this.userSessionRevocationService = userSessionRevocationService == null
@@ -157,6 +177,9 @@ public class UserSessionService {
         this.currentUserTimeZoneResolver = currentUserTimeZoneResolver == null
                 ? CurrentUserTimeZoneResolver.NONE
                 : currentUserTimeZoneResolver;
+        this.userSessionPresenceLookup = userSessionPresenceLookup == null
+                ? () -> UserSessionPresenceLookup.NONE
+                : userSessionPresenceLookup;
     }
 
     public LoginResult login(String tenantId, String username, String password) {
@@ -302,10 +325,12 @@ public class UserSessionService {
         }
         Instant now = now();
         String currentTokenHash = currentTokenHash(currentToken);
+        UserSessionPresenceLookup presenceLookup = userSessionPresenceLookup();
         return userSessionRecordService.listByUserId(validUserId).stream()
                 .filter(session -> isActive(session, now))
                 .map(session -> UserSessionView.from(session, currentTokenHash != null
-                        && currentTokenHash.equals(session.getTokenHash())))
+                        && currentTokenHash.equals(session.getTokenHash()),
+                        presenceLookup.presenceOf(session.getId()), now))
                 .toList();
     }
 
@@ -319,10 +344,23 @@ public class UserSessionService {
                 .filter(userId -> userId != null)
                 .distinct()
                 .map(userId -> {
-                    long count = userSessionRecordService.listByUserId(userId).stream()
+                    List<UserSession> activeSessions = userSessionRecordService.listByUserId(userId).stream()
                             .filter(session -> isActive(session, now))
+                            .toList();
+                    UserSessionPresenceLookup presenceLookup = userSessionPresenceLookup();
+                    List<SessionPresenceSnapshot> snapshots = activeSessions.stream()
+                            .map(session -> new SessionPresenceSnapshot(session,
+                                    presenceLookup.presenceOf(session.getId())))
+                            .toList();
+                    long presentCount = snapshots.stream()
+                            .map(SessionPresenceSnapshot::presence)
+                            .filter(UserSessionPresence::present)
                             .count();
-                    return new UserSessionStatusView(userId, count > 0, count);
+                    long idleCount = snapshots.stream()
+                            .filter(snapshot -> snapshot.presence().idleSince(snapshot.session().getLastSeenAt(), now))
+                            .count();
+                    return new UserSessionStatusView(userId, !activeSessions.isEmpty(), activeSessions.size(),
+                            presentCount > 0, presentCount, idleCount);
                 })
                 .toList();
     }
@@ -330,11 +368,28 @@ public class UserSessionService {
     public UserSessionStatusView activeSessionStatus(String userId) {
         String validUserId = normalizeBlank(userId);
         if (validUserId == null) {
-            return new UserSessionStatusView(null, false, 0);
+            return new UserSessionStatusView(null, false, 0, false, 0, 0);
         }
         return activeSessionStatuses(List.of(validUserId)).stream()
                 .findFirst()
-                .orElse(new UserSessionStatusView(validUserId, false, 0));
+                .orElse(new UserSessionStatusView(validUserId, false, 0, false, 0, 0));
+    }
+
+    public Optional<String> currentSessionId(String token) {
+        UserSession session = sessionByToken(token);
+        if (!isActive(session, now())) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(normalizeBlank(session.getId()));
+    }
+
+    public boolean sessionIdleSince(String sessionId, Instant lastObservedAt, Instant now) {
+        UserSession session = sessionById(sessionId);
+        if (!isActive(session, now)) {
+            return false;
+        }
+        return new UserSessionPresence(session.getId(), true, 1, null, lastObservedAt)
+                .idleSince(session.getLastSeenAt(), now);
     }
 
     public int revokeUserSession(String userId, String sessionId, String currentToken) {
@@ -424,6 +479,11 @@ public class UserSessionService {
         return session != null && session.getRevokedAt() == null && !isExpired(session, now);
     }
 
+    private UserSessionPresenceLookup userSessionPresenceLookup() {
+        UserSessionPresenceLookup lookup = userSessionPresenceLookup.get();
+        return lookup == null ? UserSessionPresenceLookup.NONE : lookup;
+    }
+
     private void rejectCurrentSessionRevoke(UserSession session, String currentToken) {
         String currentTokenHash = currentTokenHash(currentToken);
         if (currentTokenHash != null && currentTokenHash.equals(session.getTokenHash())) {
@@ -485,5 +545,8 @@ public class UserSessionService {
             return null;
         }
         return userSessionRecordService.findById(id);
+    }
+
+    private record SessionPresenceSnapshot(UserSession session, UserSessionPresence presence) {
     }
 }
