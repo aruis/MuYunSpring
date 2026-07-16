@@ -2,43 +2,22 @@ package net.ximatai.muyun.spring.boot.realtime;
 
 import net.ximatai.muyun.spring.ability.action.CommittedChangeSet;
 import net.ximatai.muyun.spring.ability.action.DataChange;
-import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailability;
-import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Supplier;
+import java.util.Map;
 
 public class StompDataChangeRealtimePublisher implements DataChangeRealtimePublisher {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StompDataChangeRealtimePublisher.class);
     public static final String MESSAGE_TYPE = "platform.data-change";
 
     private final RealtimeMessagePublisher messagePublisher;
-    private final RealtimeConnectionRegistry connectionRegistry;
-    private final UserSessionService userSessionService;
-    private final Supplier<PlatformRecordActionAvailabilityService> actionAvailabilityService;
 
     public StompDataChangeRealtimePublisher(RealtimeMessagePublisher messagePublisher) {
-        this(messagePublisher, null, null, () -> null);
-    }
-
-    public StompDataChangeRealtimePublisher(RealtimeMessagePublisher messagePublisher,
-                                            RealtimeConnectionRegistry connectionRegistry,
-                                            UserSessionService userSessionService,
-                                            Supplier<PlatformRecordActionAvailabilityService> actionAvailabilityService) {
         this.messagePublisher = messagePublisher;
-        this.connectionRegistry = connectionRegistry;
-        this.userSessionService = userSessionService;
-        this.actionAvailabilityService = actionAvailabilityService == null ? () -> null : actionAvailabilityService;
     }
 
     @Override
@@ -53,81 +32,54 @@ public class StompDataChangeRealtimePublisher implements DataChangeRealtimePubli
         String traceId = RequestTraceContext.currentTraceId().orElse(null);
         RealtimeEnvelope<CommittedChangeSet> envelope = RealtimeEnvelope.of(MESSAGE_TYPE, traceId, changeSet);
         messagePublisher.sendToUser(currentUser.userId(), RealtimeDestinations.DATA_CHANGES, envelope);
-        fanOutChangeSet(currentUser, changeSet, traceId);
+        broadcastChangeSummaries(changeSet, traceId);
     }
 
-    private void fanOutChangeSet(CurrentUser sourceUser, CommittedChangeSet changeSet, String traceId) {
-        if (connectionRegistry == null || userSessionService == null) {
-            return;
+    private void broadcastChangeSummaries(CommittedChangeSet changeSet, String traceId) {
+        for (Map.Entry<String, List<DataChange>> entry : moduleSummaries(changeSet).entrySet()) {
+            messagePublisher.broadcast(RealtimeDestinations.moduleDataChanges(entry.getKey()),
+                    summaryEnvelope(changeSet.changeSetId(), entry.getValue(), traceId));
         }
-        for (CurrentUserPrincipal principal : connectionRegistry.principals()) {
-            Optional<CurrentUser> currentUser = currentUser(principal);
-            if (currentUser.isEmpty() || Objects.equals(currentUser.get().userId(), sourceUser.userId())) {
+        for (Map.Entry<RecordTopicKey, List<DataChange>> entry : recordSummaries(changeSet).entrySet()) {
+            RecordTopicKey key = entry.getKey();
+            messagePublisher.broadcast(RealtimeDestinations.recordDataChanges(key.moduleAlias(), key.recordId()),
+                    summaryEnvelope(changeSet.changeSetId(), entry.getValue(), traceId));
+        }
+    }
+
+    private RealtimeEnvelope<CommittedChangeSet> summaryEnvelope(String changeSetId, List<DataChange> changes,
+                                                                 String traceId) {
+        return RealtimeEnvelope.of(MESSAGE_TYPE, traceId, new CommittedChangeSet(changeSetId, changes));
+    }
+
+    private Map<String, List<DataChange>> moduleSummaries(CommittedChangeSet changeSet) {
+        Map<String, List<DataChange>> summaries = new LinkedHashMap<>();
+        for (DataChange change : changeSet.changes()) {
+            if (change == null) {
                 continue;
             }
-            notifyIfAllowed(currentUser.get(), changeSet, traceId);
+            summaries.computeIfAbsent(change.moduleAlias(), ignored -> new ArrayList<>()).add(summary(change));
         }
+        return summaries;
     }
 
-    private void notifyIfAllowed(CurrentUser currentUser, CommittedChangeSet changeSet, String traceId) {
-        if (currentUser.passwordChangeRequired()) {
-            return;
-        }
-        try (CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(currentUser);
-             TenantContext.Scope ignoredTenant = tenantScope(currentUser)) {
-            List<DataChange> visibleChanges = changeSet.changes().stream()
-                    .filter(this::canReceive)
-                    .toList();
-            if (visibleChanges.isEmpty()) {
-                return;
+    private Map<RecordTopicKey, List<DataChange>> recordSummaries(CommittedChangeSet changeSet) {
+        Map<RecordTopicKey, List<DataChange>> summaries = new LinkedHashMap<>();
+        for (DataChange change : changeSet.changes()) {
+            if (change == null || change.recordId() == null) {
+                continue;
             }
-            CommittedChangeSet visibleChangeSet = new CommittedChangeSet(changeSet.changeSetId(), visibleChanges);
-            messagePublisher.sendToUser(currentUser.userId(), RealtimeDestinations.DATA_CHANGES,
-                    RealtimeEnvelope.of(MESSAGE_TYPE, traceId, visibleChangeSet));
-        } catch (RuntimeException exception) {
-            LOGGER.debug("Failed to fan-out data change realtime event: userId={}, changeSetId={}",
-                    currentUser.userId(), changeSet.changeSetId(), exception);
+            summaries.computeIfAbsent(new RecordTopicKey(change.moduleAlias(), change.recordId()),
+                    ignored -> new ArrayList<>()).add(summary(change));
         }
+        return summaries;
     }
 
-    private boolean canReceive(DataChange change) {
-        if (change == null || change.recordId() == null) {
-            return false;
-        }
-        PlatformRecordActionAvailabilityService availabilityService = actionAvailabilityService.get();
-        if (availabilityService == null) {
-            return false;
-        }
-        try {
-            PlatformRecordActionAvailability availability =
-                    availabilityService.recordActions(change.moduleAlias(), change.recordId());
-            return availability.actions().stream()
-                    .anyMatch(action -> PlatformAction.VIEW.code().equals(action.actionCode()) && action.available());
-        } catch (RuntimeException exception) {
-            LOGGER.debug("Failed to evaluate data change realtime recipient: moduleAlias={}, recordId={}",
-                    change.moduleAlias(), change.recordId(), exception);
-            return false;
-        }
+    private DataChange summary(DataChange change) {
+        return new DataChange(change.type(), change.moduleAlias(), change.recordId(), change.resourceKey(),
+                change.scope(), Map.of());
     }
 
-    private Optional<CurrentUser> currentUser(CurrentUserPrincipal principal) {
-        if (principal == null) {
-            return Optional.empty();
-        }
-        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter(
-                "data change realtime fan-out principal lookup")) {
-            return userSessionService.currentUserSnapshot(principal.token());
-        }
-    }
-
-    private TenantContext.Scope tenantScope(CurrentUser currentUser) {
-        if (currentUser.system()) {
-            return TenantContext.system("data change realtime fan-out");
-        }
-        String tenantId = currentUser.tenantId();
-        if (tenantId == null || tenantId.isBlank()) {
-            return TenantContext.system("data change realtime fan-out without tenant");
-        }
-        return TenantContext.use(tenantId);
+    private record RecordTopicKey(String moduleAlias, String recordId) {
     }
 }

@@ -415,14 +415,13 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 当前采用保守策略：
 
 - 数据变化先发送到当前发起用户的 user queue；
-- 跨用户数据变化只 fan-out 到当前在线且对目标记录具备 `view` 权限的用户 queue；
-- fan-out 给其他用户前必须过滤 `CommittedChangeSet`，不得把接收人无权查看的记录变化夹带出去；
-- 暂不把普通记录变化直接广播到 module / record topic；
-- 不向全局 topic 广播 recordId、moduleAlias 或 facts；
+- 普通记录变化可以广播到 module / record topic，但只能发送低敏摘要；
+- 公共 topic 摘要不得携带 `facts`、业务字段、会话明细、token、IP、User-Agent 等敏感载荷；
+- 跨用户完整业务 payload 必须走 user queue，并在发送前完成接收者权限过滤；
 - 无法判断当前用户时不发送实时数据变化；
 - 系统态变化和跨用户共享广播后续需要显式声明可见范围。
 
-多租户过滤是平台实时层责任，不应要求业务页面自行丢弃不属于自己的事件。
+公共 topic 的多租户和数据权限边界按“脏标记”处理，允许接收者收到可能无权查看的低敏变化提示。真正的数据读取仍由查询接口负责权限判断。
 
 后续支持租户和机构公共频道时，订阅可以按身份归属处理，但发送必须按事件可见性处理。
 
@@ -607,7 +606,7 @@ STOMP message
 
 ### 7.2 DataChange Payload
 
-数据变化广播 payload 复用 `CommittedChangeSet`：
+数据变化消息 payload 复用 `CommittedChangeSet`。用户私有队列可以承载完整数据变化；公共 topic 只能承载低敏摘要，必须清空 `facts`：
 
 ```json
 {
@@ -637,6 +636,8 @@ STOMP message
 - 是否弹出 Toast；
 - 是否跳转路由；
 - 具体 UI 文案。
+
+公共 topic 上的 `DataChange` 只作为脏标记使用。接收页面不得据此认定当前用户具备记录可见权限，也不得直接展示业务字段；需要展示数据时必须重新调用查询或详情接口，让原有租户、权限和字段控制兜底。
 
 ### 7.3 命令与事件分离
 
