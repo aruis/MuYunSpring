@@ -9,6 +9,7 @@ import {
   executeStaticFormSave,
   executeStaticRecordAction,
 } from '../src/platform-components/staticFormActionFlow.ts';
+import { normalizeRecordDraft } from '../src/platform-components/recordDraftNormalizer.ts';
 
 interface TestRecord {
   id?: string;
@@ -38,6 +39,28 @@ test('static form save executes mutation once and calls saved callback', async (
   assert.deepEqual(calls, [{ title: '销售' }]);
   assert.deepEqual(saved, { id: 'sales', title: '销售' });
   assert.equal(loading.value, false);
+});
+
+test('record draft normalizer preserves standard fields while overriding normalized fields', () => {
+  const draft = {
+    id: 'user-1',
+    version: 7,
+    username: ' admin ',
+    enabled: true,
+  };
+
+  assert.deepEqual(
+    normalizeRecordDraft(draft, {
+      username: draft.username.trim(),
+      enabled: false,
+    }),
+    {
+      id: 'user-1',
+      version: 7,
+      username: 'admin',
+      enabled: false,
+    },
+  );
 });
 
 test('static form save dispatches local result reactions', async () => {

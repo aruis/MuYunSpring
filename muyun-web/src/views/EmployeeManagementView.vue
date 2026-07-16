@@ -23,6 +23,7 @@ import {
   executeStaticFormSave,
   executeStaticRecordAction,
   handlePlatformActionSuccess,
+  normalizeRecordDraft,
   presentPlatformError,
   presentPlatformMessage,
   resolveRecordFormFields,
@@ -602,8 +603,7 @@ function copyEmployee(record: Partial<Employee>): Partial<Employee> {
 }
 
 function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: string): Employee {
-  return {
-    ...draft,
+  return normalizeRecordDraft<Employee>(draft, {
     organizationId,
     departmentId: draft.departmentId?.trim(),
     employeeNo: draft.employeeNo?.trim(),
@@ -612,7 +612,7 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     mobile: draft.mobile?.trim() || undefined,
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
-  } as Employee;
+  });
 }
 
 function validateEmployeeDraft(draft: Employee) {

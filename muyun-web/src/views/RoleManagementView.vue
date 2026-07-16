@@ -14,6 +14,7 @@ import {
   createScopedTreeModuleContext,
   executeStaticFormSave,
   executeStaticRecordAction,
+  normalizeRecordDraft,
   presentPlatformError,
   presentPlatformMessage,
   resolveRecordFormFieldState,
@@ -685,8 +686,7 @@ function copyRole(record: Partial<Role>): Partial<Role> {
 function normalizedRoleDraft(draft: Partial<Role>, scope: RoleScope): Role {
   const roleKind = normalizedRoleKind(draft.roleKind);
   const sharePolicy = normalizedSharePolicy(draft.sharePolicy, scope.kind);
-  return {
-    ...draft,
+  return normalizeRecordDraft<Role>(draft, {
     title: draft.title?.trim(),
     assignmentType: normalizedAssignmentType(draft.assignmentType, roleKind),
     roleKind,
@@ -699,7 +699,7 @@ function normalizedRoleDraft(draft: Partial<Role>, scope: RoleScope): Role {
     description: draft.description?.trim() || undefined,
     enabled: draft.enabled !== false,
     sortOrder: normalizeSortOrder(draft.sortOrder),
-  } as Role;
+  });
 }
 
 function scopeTenantId(scope: RoleScope | undefined) {

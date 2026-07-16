@@ -12,6 +12,7 @@ import {
   RecordStatusSwitch,
   executeStaticFormSave,
   executeStaticRecordAction,
+  normalizeRecordDraft,
   presentPlatformError,
   presentPlatformMessage,
   resolveRecordFormFieldState,
@@ -660,14 +661,12 @@ function normalizedUserDraft(
   mode: UserDetailMode,
   password: string,
 ): UserAccount {
-  const record = {
-    ...draft,
+  return normalizeRecordDraft<UserAccount>(draft, {
     tenantId: tenant?.id ?? draft.tenantId,
     username: draft.username?.trim(),
     enabled: draft.enabled !== false,
     password: mode === 'create' ? password.trim() : undefined,
-  } as UserAccount;
-  return record;
+  });
 }
 
 function validateUserDraft(draft: UserAccount) {

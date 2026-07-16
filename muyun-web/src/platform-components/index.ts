@@ -60,6 +60,7 @@ export {
   defaultCrudRecordListTitle,
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
+export { normalizeRecordDraft } from './recordDraftNormalizer';
 export { resolveRecordDetailDisplayValue } from './recordDetailFieldModel';
 export {
   childResourceDefaultFormViewCode,

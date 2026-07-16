@@ -92,6 +92,7 @@ test('record mode drawer owns detail mode branch switching', () => {
 
   assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
   assert.match(indexSource, /export \{ default as RecordExternalChangeNotice \}/);
+  assert.match(indexSource, /normalizeRecordDraft/);
   assert.match(drawerSource, /defineOptions\(\{ name: 'RecordModeDrawer' \}\)/);
   assert.match(drawerSource, /RecordExternalChangeNotice/);
   assert.match(drawerSource, /externallyChanged/);
@@ -826,7 +827,7 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /username: \{ label: '账号'/);
   assert.match(userViewSource, /enabled: \{ label: '允许登录'/);
   assert.match(userViewSource, /function normalizedUserDraft/);
-  assert.match(userViewSource, /const record = \{\s*\.\.\.draft,/);
+  assert.match(userViewSource, /normalizeRecordDraft<UserAccount>\(draft,/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
@@ -938,7 +939,7 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /<RecordDetailFields/);
   assert.match(systemUserViewSource, /<RecordFormFields/);
   assert.match(systemUserViewSource, /function normalizedSystemUserDraft/);
-  assert.match(systemUserViewSource, /return \{\s*\.\.\.draft,/);
+  assert.match(systemUserViewSource, /normalizeRecordDraft<UserAccount>\(draft,/);
   assert.match(systemUserViewSource, /<RecordStatusSwitch/);
   assert.match(systemUserViewSource, /<RecordActionBar/);
   assert.match(systemUserViewSource, /fieldName: 'tenantId'/);

@@ -10,6 +10,7 @@ import {
   RecordStatusSwitch,
   executeStaticFormSave,
   executeStaticRecordAction,
+  normalizeRecordDraft,
   presentPlatformError,
   presentPlatformMessage,
   resolveRecordFormFieldState,
@@ -527,13 +528,12 @@ function copySystemUser(record: Partial<UserAccount>): Partial<UserAccount> {
 }
 
 function normalizedSystemUserDraft(draft: Partial<UserAccount>): UserAccount {
-  return {
-    ...draft,
+  return normalizeRecordDraft<UserAccount>(draft, {
     tenantId: undefined,
     username: draft.username?.trim(),
     enabled: draft.enabled !== false,
     password: undefined,
-  } as UserAccount;
+  });
 }
 
 function validateSystemUserDraft(draft: UserAccount) {
