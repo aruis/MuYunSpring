@@ -20,6 +20,7 @@ import org.springframework.messaging.support.MessageBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,20 +52,26 @@ class RealtimePublisherTest {
     }
 
     @Test
-    void shouldBroadcastDataChangeEnvelopeToModuleAndRecordTopics() {
+    void shouldBroadcastOnlyDataChangeSummariesToModuleAndRecordTopics() {
         RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
         StompDataChangeRealtimePublisher publisher = new StompDataChangeRealtimePublisher(messagePublisher);
+        CurrentUser source = CurrentUser.tenantUser("source-1", "Source", "tenant-a");
         CommittedChangeSet changeSet = new CommittedChangeSet("change-set-1", List.of(
-                DataChange.recordUpdated("iam.employee", "employee-1"),
+                new DataChange("record-updated", "iam.employee", "employee-1", null, null,
+                        Map.of("name", "敏感姓名")),
                 DataChange.recordUpdated("iam.employee", "employee-1"),
                 DataChange.recordDeleted("iam.employee", "employee-2"),
                 DataChange.collectionChanged("iam.user")));
 
-        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
-                CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(source)) {
             publisher.publish(changeSet);
         }
 
+        assertThat(messagePublisher.userMessages)
+                .extracting(UserMessage::userId)
+                .containsExactly("source-1");
+        assertThat(((RealtimeEnvelope<?>) messagePublisher.userMessages.get(0).payload()).payload())
+                .isEqualTo(changeSet);
         assertThat(messagePublisher.broadcasts)
                 .extracting(BroadcastMessage::topic)
                 .containsExactly(
@@ -72,11 +79,20 @@ class RealtimePublisherTest {
                         RealtimeDestinations.moduleDataChanges("iam.user"),
                         RealtimeDestinations.recordDataChanges("iam.employee", "employee-1"),
                         RealtimeDestinations.recordDataChanges("iam.employee", "employee-2"));
-        assertThat(messagePublisher.broadcasts)
-                .allSatisfy(message -> {
-                    assertThat(message.payload()).isInstanceOf(RealtimeEnvelope.class);
-                    assertThat(((RealtimeEnvelope<?>) message.payload()).payload()).isEqualTo(changeSet);
-                });
+        RealtimeEnvelope<?> employeeEnvelope = (RealtimeEnvelope<?>) messagePublisher.broadcasts.get(0).payload();
+        assertThat(employeeEnvelope.payload()).isInstanceOf(CommittedChangeSet.class);
+        CommittedChangeSet employeeSummary = (CommittedChangeSet) employeeEnvelope.payload();
+        assertThat(employeeSummary.changeSetId()).isEqualTo("change-set-1");
+        assertThat(employeeSummary.changes()).containsExactly(
+                DataChange.recordUpdated("iam.employee", "employee-1"),
+                DataChange.recordUpdated("iam.employee", "employee-1"),
+                DataChange.recordDeleted("iam.employee", "employee-2"));
+        assertThat(employeeSummary.changes())
+                .allSatisfy(change -> assertThat(change.facts()).isEmpty());
+
+        RealtimeEnvelope<?> collectionEnvelope = (RealtimeEnvelope<?>) messagePublisher.broadcasts.get(1).payload();
+        CommittedChangeSet collectionSummary = (CommittedChangeSet) collectionEnvelope.payload();
+        assertThat(collectionSummary.changes()).containsExactly(DataChange.collectionChanged("iam.user"));
     }
 
     @Test
@@ -427,6 +443,7 @@ class RealtimePublisherTest {
         private RealtimeQueue queue;
         private Object payload;
         private final List<String> users = new ArrayList<>();
+        private final List<UserMessage> userMessages = new ArrayList<>();
         private final List<BroadcastMessage> broadcasts = new ArrayList<>();
 
         @Override
@@ -442,7 +459,11 @@ class RealtimePublisherTest {
             this.queue = queue;
             this.payload = payload;
             users.add(userId);
+            userMessages.add(new UserMessage(userId, queue, payload));
         }
+    }
+
+    private record UserMessage(String userId, RealtimeQueue queue, Object payload) {
     }
 
     private record BroadcastMessage(RealtimeTopic topic, Object payload) {

@@ -6,8 +6,10 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class StompDataChangeRealtimePublisher implements DataChangeRealtimePublisher {
     public static final String MESSAGE_TYPE = "platform.data-change";
@@ -30,23 +32,52 @@ public class StompDataChangeRealtimePublisher implements DataChangeRealtimePubli
         String traceId = RequestTraceContext.currentTraceId().orElse(null);
         RealtimeEnvelope<CommittedChangeSet> envelope = RealtimeEnvelope.of(MESSAGE_TYPE, traceId, changeSet);
         messagePublisher.sendToUser(currentUser.userId(), RealtimeDestinations.DATA_CHANGES, envelope);
-        broadcastChangeSet(changeSet, envelope);
+        broadcastChangeSummaries(changeSet, traceId);
     }
 
-    private void broadcastChangeSet(CommittedChangeSet changeSet, RealtimeEnvelope<CommittedChangeSet> envelope) {
-        Set<String> moduleAliases = new LinkedHashSet<>();
-        Set<RecordTopicKey> recordTopics = new LinkedHashSet<>();
-        for (DataChange change : changeSet.changes()) {
-            moduleAliases.add(change.moduleAlias());
-            if (change.recordId() != null) {
-                recordTopics.add(new RecordTopicKey(change.moduleAlias(), change.recordId()));
-            }
+    private void broadcastChangeSummaries(CommittedChangeSet changeSet, String traceId) {
+        for (Map.Entry<String, List<DataChange>> entry : moduleSummaries(changeSet).entrySet()) {
+            messagePublisher.broadcast(RealtimeDestinations.moduleDataChanges(entry.getKey()),
+                    summaryEnvelope(changeSet.changeSetId(), entry.getValue(), traceId));
         }
-        moduleAliases.forEach(moduleAlias ->
-                messagePublisher.broadcast(RealtimeDestinations.moduleDataChanges(moduleAlias), envelope));
-        recordTopics.forEach(topic ->
-                messagePublisher.broadcast(RealtimeDestinations.recordDataChanges(topic.moduleAlias(), topic.recordId()),
-                        envelope));
+        for (Map.Entry<RecordTopicKey, List<DataChange>> entry : recordSummaries(changeSet).entrySet()) {
+            RecordTopicKey key = entry.getKey();
+            messagePublisher.broadcast(RealtimeDestinations.recordDataChanges(key.moduleAlias(), key.recordId()),
+                    summaryEnvelope(changeSet.changeSetId(), entry.getValue(), traceId));
+        }
+    }
+
+    private RealtimeEnvelope<CommittedChangeSet> summaryEnvelope(String changeSetId, List<DataChange> changes,
+                                                                 String traceId) {
+        return RealtimeEnvelope.of(MESSAGE_TYPE, traceId, new CommittedChangeSet(changeSetId, changes));
+    }
+
+    private Map<String, List<DataChange>> moduleSummaries(CommittedChangeSet changeSet) {
+        Map<String, List<DataChange>> summaries = new LinkedHashMap<>();
+        for (DataChange change : changeSet.changes()) {
+            if (change == null) {
+                continue;
+            }
+            summaries.computeIfAbsent(change.moduleAlias(), ignored -> new ArrayList<>()).add(summary(change));
+        }
+        return summaries;
+    }
+
+    private Map<RecordTopicKey, List<DataChange>> recordSummaries(CommittedChangeSet changeSet) {
+        Map<RecordTopicKey, List<DataChange>> summaries = new LinkedHashMap<>();
+        for (DataChange change : changeSet.changes()) {
+            if (change == null || change.recordId() == null) {
+                continue;
+            }
+            summaries.computeIfAbsent(new RecordTopicKey(change.moduleAlias(), change.recordId()),
+                    ignored -> new ArrayList<>()).add(summary(change));
+        }
+        return summaries;
+    }
+
+    private DataChange summary(DataChange change) {
+        return new DataChange(change.type(), change.moduleAlias(), change.recordId(), change.resourceKey(),
+                change.scope(), Map.of());
     }
 
     private record RecordTopicKey(String moduleAlias, String recordId) {

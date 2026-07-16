@@ -139,12 +139,10 @@ export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
 
 export type MenuOpenMode = 'tab' | 'window';
 
-export interface MenuRecord {
+export interface MenuRecord extends StandardEnabledTreeEntity {
   id: string;
-  tenantId?: string;
-  schemeId: string;
-  parentId?: string;
   title: string;
+  schemeId: string;
   openMode?: MenuOpenMode;
   moduleAlias?: string;
   route?: string;
@@ -153,8 +151,6 @@ export interface MenuRecord {
   defaultUiConfigId?: string;
   defaultQueryTemplateId?: string;
   entryParamsJson?: string;
-  enabled?: boolean;
-  sortOrder?: number;
 }
 
 export type MenuTreeNode = WebTreeNode<MenuRecord>;

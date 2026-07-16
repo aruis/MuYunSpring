@@ -285,7 +285,7 @@ simpMessagingTemplate.convertAndSend("/user/queue/platform/notifications", paylo
 /topic/platform/modules/{moduleAlias}/records/{recordId}/data-changes
 ```
 
-用户打开详情页或编辑页时按需订阅。后端发送前必须确认事件可进入该 record channel；敏感记录仍可选择精确 fan-out 到用户 queue。
+用户打开详情页或编辑页时按需订阅。record channel 只承载低敏脏标记，页面收到后重新查询详情；敏感记录的完整 payload 必须选择精确 fan-out 到用户 queue。
 
 模块列表新增、删除或集合变化：
 
@@ -403,7 +403,7 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 | 阶段 | 权限口径 |
 | --- | --- |
-| 数据变化广播 | 第一阶段只推送当前发起用户 queue；后续共享广播按公共频道、业务兴趣频道或精确到人 fan-out 选择出口 |
+| 数据变化广播 | 发起用户始终收到完整 user queue；module / record 共享 topic 只能承载低敏脏标记；跨用户完整 payload 必须通过按权限过滤的 user queue |
 | 用户通知 | 只能接收当前用户 queue |
 | IM / 协同 | 按房间、会话、参与者或业务资源校验 |
 | 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
@@ -412,14 +412,16 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 后端广播不得把跨租户数据变化无差别推给所有连接。
 
-第一阶段采用保守策略：
+当前采用保守策略：
 
-- 数据变化只发送到当前发起用户的 user queue；
-- 不向全局 topic 广播 recordId、moduleAlias 或 facts；
+- 数据变化先发送到当前发起用户的 user queue；
+- 普通记录变化可以广播到 module / record topic，但只能发送低敏摘要；
+- 公共 topic 摘要不得携带 `facts`、业务字段、会话明细、token、IP、User-Agent 等敏感载荷；
+- 跨用户完整业务 payload 必须走 user queue，并在发送前完成接收者权限过滤；
 - 无法判断当前用户时不发送实时数据变化；
 - 系统态变化和跨用户共享广播后续需要显式声明可见范围。
 
-多租户过滤是平台实时层责任，不应要求业务页面自行丢弃不属于自己的事件。
+公共 topic 的多租户和数据权限边界按“脏标记”处理，允许接收者收到可能无权查看的低敏变化提示。真正的数据读取仍由查询接口负责权限判断。
 
 后续支持租户和机构公共频道时，订阅可以按身份归属处理，但发送必须按事件可见性处理。
 
@@ -604,7 +606,7 @@ STOMP message
 
 ### 7.2 DataChange Payload
 
-数据变化广播 payload 复用 `CommittedChangeSet`：
+数据变化消息 payload 复用 `CommittedChangeSet`。用户私有队列可以承载完整数据变化；公共 topic 只能承载低敏摘要，必须清空 `facts`：
 
 ```json
 {
@@ -635,6 +637,8 @@ STOMP message
 - 是否跳转路由；
 - 具体 UI 文案。
 
+公共 topic 上的 `DataChange` 只作为脏标记使用。接收页面不得据此认定当前用户具备记录可见权限，也不得直接展示业务字段；需要展示数据时必须重新调用查询或详情接口，让原有租户、权限和字段控制兜底。
+
 ### 7.3 命令与事件分离
 
 服务端广播使用事件语义，客户端发送使用命令语义。
@@ -652,13 +656,14 @@ Command: 客户端请求服务端执行的动作
 
 ### 8.1 第一阶段
 
-第一阶段实时消息采用当前用户 queue 的尽力投递：
+第一阶段实时消息采用 user queue 的尽力投递：
 
 ```text
 业务事务提交
   -> 形成 CommittedChangeSet
   -> 发布进程内事件
-  -> STOMP user queue
+  -> 发起用户 user queue 接收完整 payload
+  -> module / record topic 接收低敏脏标记
 ```
 
 约束：
@@ -666,7 +671,9 @@ Command: 客户端请求服务端执行的动作
 - 广播失败不得使已提交业务操作失败；
 - 事务回滚不得广播数据变化；
 - HTTP ActionResult 和实时广播共享同一份 `CommittedChangeSet`；
-- 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端同步信号；跨用户同步需要后续补齐租户、作用域和权限过滤。
+- 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端和跨用户脏标记信号；
+- 公共 topic 不得携带 `facts` 或业务字段，不能依赖前端自行丢弃无权数据；
+- 后续如需要跨用户完整 payload fan-out，必须按接收人过滤变化集合。
 
 ### 8.2 后续 Outbox
 
