@@ -169,6 +169,8 @@ throw BusinessExceptions.warning(
 - 平台运行时不变量、调用上下文缺失、数据结构循环和系统故障继续使用平台异常或系统异常；
 - 后端失败消息只表达业务语义，不表达 Toast、弹窗、刷新、关闭页面等前端 UI 行为。
 
+乐观锁冲突统一返回 `CONFLICT_VERSION`。前端保存流可以为该错误配置页面级 `actionErrorHandlers`：当页面能确认当前正在编辑的记录时，局部 handler 标记该记录已发生外部变更，并在编辑区域提示重新加载；当 handler 返回 `false` 或没有匹配 handler 时，错误继续走全局展示。页面级接管不得吞掉不匹配记录、非编辑态或无法定位记录的冲突。
+
 ## 5. BusinessMutation
 
 `BusinessMutation` 是 Web 动作边界标记：
