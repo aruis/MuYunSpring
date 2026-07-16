@@ -51,32 +51,55 @@ class RealtimePublisherTest {
     }
 
     @Test
-    void shouldBroadcastDataChangeEnvelopeToModuleAndRecordTopics() {
+    void shouldFanOutDataChangeEnvelopeToAllowedOnlineUsers() {
         RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
-        StompDataChangeRealtimePublisher publisher = new StompDataChangeRealtimePublisher(messagePublisher);
+        RealtimeConnectionRegistry registry = new RealtimeConnectionRegistry();
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        PlatformRecordActionAvailabilityService actionAvailabilityService =
+                mock(PlatformRecordActionAvailabilityService.class);
+        StompDataChangeRealtimePublisher publisher = new StompDataChangeRealtimePublisher(
+                messagePublisher, registry, userSessionService, () -> actionAvailabilityService);
+        CurrentUser source = CurrentUser.tenantUser("source-1", "Source", "tenant-a");
+        CurrentUser viewer = CurrentUser.tenantUser("viewer-1", "Viewer", "tenant-a");
+        CurrentUser denied = CurrentUser.tenantUser("denied-1", "Denied", "tenant-a");
+        registry.register("ws-source", new CurrentUserPrincipal(source, "token-source"));
+        registry.register("ws-viewer", new CurrentUserPrincipal(viewer, "token-viewer"));
+        registry.register("ws-denied", new CurrentUserPrincipal(denied, "token-denied"));
+        when(userSessionService.currentUserSnapshot("token-source")).thenReturn(Optional.of(source));
+        when(userSessionService.currentUserSnapshot("token-viewer")).thenReturn(Optional.of(viewer));
+        when(userSessionService.currentUserSnapshot("token-denied")).thenReturn(Optional.of(denied));
+        when(actionAvailabilityService.recordActions("iam.employee", "employee-1")).thenAnswer(invocation -> {
+            boolean allowed = CurrentUserContext.currentUser()
+                    .map(user -> "viewer-1".equals(user.userId()))
+                    .orElse(false);
+            return new PlatformRecordActionAvailability("employee-1", List.of(
+                    new PlatformRecordActionAvailability.Action("view", allowed, allowed ? null : "no data auth")));
+        });
+        when(actionAvailabilityService.recordActions("iam.employee", "employee-2")).thenReturn(
+                new PlatformRecordActionAvailability("employee-2", List.of(
+                        new PlatformRecordActionAvailability.Action("view", false, "no data auth"))));
         CommittedChangeSet changeSet = new CommittedChangeSet("change-set-1", List.of(
                 DataChange.recordUpdated("iam.employee", "employee-1"),
                 DataChange.recordUpdated("iam.employee", "employee-1"),
                 DataChange.recordDeleted("iam.employee", "employee-2"),
                 DataChange.collectionChanged("iam.user")));
 
-        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
-                CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(source)) {
             publisher.publish(changeSet);
         }
 
-        assertThat(messagePublisher.broadcasts)
-                .extracting(BroadcastMessage::topic)
-                .containsExactly(
-                        RealtimeDestinations.moduleDataChanges("iam.employee"),
-                        RealtimeDestinations.moduleDataChanges("iam.user"),
-                        RealtimeDestinations.recordDataChanges("iam.employee", "employee-1"),
-                        RealtimeDestinations.recordDataChanges("iam.employee", "employee-2"));
-        assertThat(messagePublisher.broadcasts)
-                .allSatisfy(message -> {
-                    assertThat(message.payload()).isInstanceOf(RealtimeEnvelope.class);
-                    assertThat(((RealtimeEnvelope<?>) message.payload()).payload()).isEqualTo(changeSet);
-                });
+        assertThat(messagePublisher.userMessages)
+                .extracting(UserMessage::userId)
+                .containsExactly("source-1", "viewer-1");
+        assertThat(((RealtimeEnvelope<?>) messagePublisher.userMessages.get(0).payload()).payload())
+                .isEqualTo(changeSet);
+        RealtimeEnvelope<?> viewerEnvelope = (RealtimeEnvelope<?>) messagePublisher.userMessages.get(1).payload();
+        assertThat(viewerEnvelope.payload()).isInstanceOf(CommittedChangeSet.class);
+        CommittedChangeSet viewerChangeSet = (CommittedChangeSet) viewerEnvelope.payload();
+        assertThat(viewerChangeSet.changeSetId()).isEqualTo("change-set-1");
+        assertThat(viewerChangeSet.changes()).containsExactly(
+                DataChange.recordUpdated("iam.employee", "employee-1"),
+                DataChange.recordUpdated("iam.employee", "employee-1"));
     }
 
     @Test
@@ -427,6 +450,7 @@ class RealtimePublisherTest {
         private RealtimeQueue queue;
         private Object payload;
         private final List<String> users = new ArrayList<>();
+        private final List<UserMessage> userMessages = new ArrayList<>();
         private final List<BroadcastMessage> broadcasts = new ArrayList<>();
 
         @Override
@@ -442,7 +466,11 @@ class RealtimePublisherTest {
             this.queue = queue;
             this.payload = payload;
             users.add(userId);
+            userMessages.add(new UserMessage(userId, queue, payload));
         }
+    }
+
+    private record UserMessage(String userId, RealtimeQueue queue, Object payload) {
     }
 
     private record BroadcastMessage(RealtimeTopic topic, Object payload) {

@@ -70,8 +70,14 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
 
     @Bean
     @ConditionalOnMissingBean(DataChangeRealtimePublisher.class)
-    public DataChangeRealtimePublisher dataChangeRealtimePublisher(RealtimeMessagePublisher messagePublisher) {
-        return new StompDataChangeRealtimePublisher(messagePublisher);
+    public DataChangeRealtimePublisher dataChangeRealtimePublisher(
+            RealtimeMessagePublisher messagePublisher,
+            ObjectProvider<PlatformRecordActionAvailabilityService> actionAvailabilityService) {
+        return new StompDataChangeRealtimePublisher(
+                messagePublisher,
+                connectionRegistry,
+                userSessionService,
+                actionAvailabilityService::getIfAvailable);
     }
 
     @Bean

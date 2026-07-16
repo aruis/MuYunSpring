@@ -403,7 +403,7 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 | 阶段 | 权限口径 |
 | --- | --- |
-| 数据变化广播 | 第一阶段只推送当前发起用户 queue；后续共享广播按公共频道、业务兴趣频道或精确到人 fan-out 选择出口 |
+| 数据变化广播 | 发起用户始终收到当前 user queue；其他在线用户只通过 user queue 接收按记录 `view` 权限过滤后的变化；共享 topic 必须先定义公共范围或权限 fan-out 策略 |
 | 用户通知 | 只能接收当前用户 queue |
 | IM / 协同 | 按房间、会话、参与者或业务资源校验 |
 | 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
@@ -412,9 +412,12 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 后端广播不得把跨租户数据变化无差别推给所有连接。
 
-第一阶段采用保守策略：
+当前采用保守策略：
 
-- 数据变化只发送到当前发起用户的 user queue；
+- 数据变化先发送到当前发起用户的 user queue；
+- 跨用户数据变化只 fan-out 到当前在线且对目标记录具备 `view` 权限的用户 queue；
+- fan-out 给其他用户前必须过滤 `CommittedChangeSet`，不得把接收人无权查看的记录变化夹带出去；
+- 暂不把普通记录变化直接广播到 module / record topic；
 - 不向全局 topic 广播 recordId、moduleAlias 或 facts；
 - 无法判断当前用户时不发送实时数据变化；
 - 系统态变化和跨用户共享广播后续需要显式声明可见范围。
@@ -652,13 +655,14 @@ Command: 客户端请求服务端执行的动作
 
 ### 8.1 第一阶段
 
-第一阶段实时消息采用当前用户 queue 的尽力投递：
+第一阶段实时消息采用 user queue 的尽力投递：
 
 ```text
 业务事务提交
   -> 形成 CommittedChangeSet
   -> 发布进程内事件
-  -> STOMP user queue
+  -> 发起用户 user queue
+  -> 按在线用户和记录权限 fan-out 到其他用户 queue
 ```
 
 约束：
@@ -666,7 +670,8 @@ Command: 客户端请求服务端执行的动作
 - 广播失败不得使已提交业务操作失败；
 - 事务回滚不得广播数据变化；
 - HTTP ActionResult 和实时广播共享同一份 `CommittedChangeSet`；
-- 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端同步信号；跨用户同步需要后续补齐租户、作用域和权限过滤。
+- 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端和跨用户脏标记信号；
+- 跨用户 fan-out 必须按接收人过滤变化集合，不能依赖前端自行丢弃无权数据。
 
 ### 8.2 后续 Outbox
 
