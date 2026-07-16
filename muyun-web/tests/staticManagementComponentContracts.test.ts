@@ -141,6 +141,50 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(employeeSource, /employeeExternalChange\.markExternalRecordChanged\(record\.id\)/);
 });
 
+test('static edit draft normalizers preserve standard record fields', () => {
+  const userSource = readSource('src/views/UserManagementView.vue');
+  const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  const roleSource = readSource('src/views/RoleManagementView.vue');
+  const applicationStateSource = readSource('src/views/applicationManagementState.ts');
+  const tenantStateSource = readSource('src/views/tenantManagementState.ts');
+  const organizationStateSource = readSource('src/views/organizationManagementState.ts');
+  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
+  const menuStateSource = readSource('src/views/menuManagementState.ts');
+  const positionStateSource = readSource('src/views/positionManagementState.ts');
+  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
+
+  assert.match(userSource, /function normalizedUserDraft[\s\S]*normalizeRecordDraft<UserAccount>\(draft,/);
+  assert.match(
+    systemUserSource,
+    /function normalizedSystemUserDraft[\s\S]*normalizeRecordDraft<UserAccount>\(draft,/,
+  );
+  assert.match(
+    employeeSource,
+    /function normalizedEmployeeDraft[\s\S]*normalizeRecordDraft<Employee>\(draft,/,
+  );
+  assert.match(roleSource, /function normalizedRoleDraft[\s\S]*normalizeRecordDraft<Role>\(draft,/);
+  assert.match(applicationStateSource, /function normalizedDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(tenantStateSource, /function normalizedDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(organizationStateSource, /function normalizedDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(departmentStateSource, /function normalizeDepartmentDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(menuStateSource, /function normalizeSchemeDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(
+    menuStateSource,
+    /function normalizeMenuDraft[\s\S]*const normalized: MenuRecord = \{\s*\.\.\.record,/,
+  );
+  assert.match(positionStateSource, /function normalizePositionDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(positionStateSource, /function normalizeCategoryDraft[\s\S]*return \{\s*\.\.\.record,/);
+  assert.match(
+    dictionaryStateSource,
+    /function normalizeDictionaryCategoryDraft[\s\S]*return \{\s*\.\.\.record,/,
+  );
+  assert.match(
+    dictionaryStateSource,
+    /function normalizeDictionaryItemDraft[\s\S]*return \{\s*\.\.\.record,/,
+  );
+});
+
 test('record explorer panel focuses and closes search from keyboard', () => {
   const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
@@ -154,6 +198,7 @@ test('record explorer panel focuses and closes search from keyboard', () => {
 
 test('menu management keeps scheme actions inline and delegates search to panel', () => {
   const menuViewSource = readSource('src/views/MenuManagementView.vue');
+  const contractsSource = readSource('src/web-contracts/index.ts');
   const schemePanelStart = menuViewSource.indexOf('title="菜单方案"');
   const menuTreePanelStart = menuViewSource.indexOf('title="菜单树"');
   const schemePanelSource = menuViewSource.slice(schemePanelStart, menuTreePanelStart);
@@ -169,6 +214,7 @@ test('menu management keeps scheme actions inline and delegates search to panel'
   assert.doesNotMatch(schemePanelSource, /title="删除菜单方案"/);
   assert.match(menuTreePanelSource, /search-mode="none"/);
   assert.match(menuTreePanelSource, /search-trigger="external"/);
+  assert.match(contractsSource, /export interface MenuRecord extends StandardEnabledTreeEntity/);
 });
 
 test('static management explorers use unified item descriptors', () => {
