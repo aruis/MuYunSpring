@@ -528,6 +528,7 @@ function copySystemUser(record: Partial<UserAccount>): Partial<UserAccount> {
 
 function normalizedSystemUserDraft(draft: Partial<UserAccount>): UserAccount {
   return {
+    ...draft,
     tenantId: undefined,
     username: draft.username?.trim(),
     enabled: draft.enabled !== false,

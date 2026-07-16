@@ -825,6 +825,8 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
   assert.match(userViewSource, /enabled: \{ label: '允许登录'/);
+  assert.match(userViewSource, /function normalizedUserDraft/);
+  assert.match(userViewSource, /const record = \{\s*\.\.\.draft,/);
   assert.match(userViewSource, /key: 'resetPassword'[\s\S]*actionCode: 'changePassword'/);
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
@@ -935,6 +937,8 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /<template #form>/);
   assert.match(systemUserViewSource, /<RecordDetailFields/);
   assert.match(systemUserViewSource, /<RecordFormFields/);
+  assert.match(systemUserViewSource, /function normalizedSystemUserDraft/);
+  assert.match(systemUserViewSource, /return \{\s*\.\.\.draft,/);
   assert.match(systemUserViewSource, /<RecordStatusSwitch/);
   assert.match(systemUserViewSource, /<RecordActionBar/);
   assert.match(systemUserViewSource, /fieldName: 'tenantId'/);

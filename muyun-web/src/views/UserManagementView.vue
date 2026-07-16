@@ -661,6 +661,7 @@ function normalizedUserDraft(
   password: string,
 ): UserAccount {
   const record = {
+    ...draft,
     tenantId: tenant?.id ?? draft.tenantId,
     username: draft.username?.trim(),
     enabled: draft.enabled !== false,
