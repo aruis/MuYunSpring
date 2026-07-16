@@ -5,12 +5,15 @@ import {
   type WebCommittedChangeSet,
   type WebDataChange,
 } from '@muyun/web-contracts';
-import type { DataChangeSubscription } from '@muyun/web-core';
 import {
   subscribeAppBusinessEvents,
   subscribeAppDataChanges,
   subscribeAppModuleDataChanges,
 } from './realtime';
+
+export interface PageRealtimeSubscription {
+  unsubscribe(): void;
+}
 
 export interface PageBusinessEventOptions {
   type?: string | string[];
@@ -80,25 +83,25 @@ export function createPageDataChangeHandler(options: PageDataChangeOptions) {
 export function usePageDataChangeHandler(
   handler: (changeSet: WebCommittedChangeSet) => void | Promise<void>,
 ) {
-  usePageSubscription(() => subscribeAppDataChanges(handler));
+  usePageRealtimeSubscription(() => subscribeAppDataChanges(handler));
 }
 
 export function usePageModuleDataChanges(moduleAlias: string) {
-  usePageSubscription(() => subscribeAppModuleDataChanges(moduleAlias));
+  usePageRealtimeSubscription(() => subscribeAppModuleDataChanges(moduleAlias));
 }
 
 export function usePageBusinessEventHandler(
   handler: (event: WebBusinessRealtimeEvent) => void | Promise<void>,
 ) {
-  usePageSubscription(() => subscribeAppBusinessEvents(handler));
+  usePageRealtimeSubscription(() => subscribeAppBusinessEvents(handler));
 }
 
 export function usePageBusinessEvent(options: PageBusinessEventOptions) {
-  usePageSubscription(() => subscribeAppBusinessEvents(createPageBusinessEventHandler(options)));
+  usePageRealtimeSubscription(() => subscribeAppBusinessEvents(createPageBusinessEventHandler(options)));
 }
 
 export function usePageDataChange(options: PageDataChangeOptions) {
-  usePageSubscription(() => {
+  usePageRealtimeSubscription(() => {
     const dataChangeSubscription = subscribeAppDataChanges(createPageDataChangeHandler(options));
     const moduleSubscription = options.moduleAlias
       ? subscribeAppModuleDataChanges(options.moduleAlias)
@@ -236,8 +239,8 @@ export function createRealtimeRefreshQueue<TKey extends string>(
   return { enqueue, reset, dispose };
 }
 
-function usePageSubscription(factory: () => DataChangeSubscription) {
-  let subscription: DataChangeSubscription | undefined;
+export function usePageRealtimeSubscription(factory: () => PageRealtimeSubscription) {
+  let subscription: PageRealtimeSubscription | undefined;
   onMounted(() => {
     subscription = factory();
   });

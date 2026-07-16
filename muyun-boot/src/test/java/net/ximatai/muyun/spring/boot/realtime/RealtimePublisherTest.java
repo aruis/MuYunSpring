@@ -188,6 +188,31 @@ class RealtimePublisherTest {
         assertThat(envelope.type()).isEqualTo(StompBusinessRealtimeNotifier.MESSAGE_TYPE);
         assertThat(envelope.traceId()).isEqualTo("trace-1");
         assertThat(envelope.payload()).isEqualTo(event);
+        assertThat(messagePublisher.broadcasts).isEmpty();
+    }
+
+    @Test
+    void shouldSkipBusinessEventsWithoutRecipientUser() {
+        RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
+        StompBusinessRealtimeNotifier notifier = new StompBusinessRealtimeNotifier(messagePublisher);
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN");
+
+        notifier.notifyUser(" ", event);
+        notifier.notifyUser("admin-1", null);
+
+        assertThat(messagePublisher.userMessages).isEmpty();
+        assertThat(messagePublisher.broadcasts).isEmpty();
+    }
+
+    @Test
+    void shouldBuildUserSessionBusinessEventAsDirtyMarkerOnly() {
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_OUT");
+
+        assertThat(event.type()).isEqualTo("iam.user.session.collectionChanged");
+        assertThat(event.moduleAlias()).isEqualTo("iam.user");
+        assertThat(event.recordId()).isEqualTo("user-1");
+        assertThat(event.reason()).isEqualTo("LOGGED_OUT");
+        assertThat(event.sensitivity()).isEqualTo("DIRTY_MARKER");
     }
 
     @Test

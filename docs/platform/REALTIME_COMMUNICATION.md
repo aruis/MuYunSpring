@@ -341,7 +341,15 @@ payload 表达稳定安全事实，例如 `platform.security.password-changed`�
 
 payload 只表达低敏脏标记，例如 `type=iam.user.session.collectionChanged`、`moduleAlias=iam.user`、`recordId=userId`、`reason=LOGGED_IN/LOGGED_OUT/REVOKED` 和 `sensitivity=DIRTY_MARKER`，不携带 `sessionId`、IP、User-Agent、token hash 或终端明细。在线用户扫描、接收者 session 复核、当前用户/租户上下文绑定和 user queue 投递由平台业务实时 fan-out 门面负责；“某模块某记录需要某动作权限”的接收策略由平台 recipient policy 工厂负责。IAM adapter 只负责把会话生命周期事实转换为集合变化事件，并声明目标用户需要 `iam.user.sessions` 记录动作权限。用户管理页收到后只刷新当前可见用户的在线状态；如果目标用户子列表已展开，再通过 `/iam.user/{id}/sessions` 权限接口读取会话明细。
 
-前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageDataChange` 和 `usePageBusinessEvent`。页面只声明所需实时事实、过滤条件和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。编辑中记录需要提示外部变更时，应使用 `usePageRecordExternalChange` 统一处理模块订阅、当前记录匹配、编辑态判断和保存中自身事件保护。需要按实时事件刷新列表、状态摘要或子资源时，应优先使用 `createRealtimeRefreshQueue` 合并短时间内的重复刷新，并用 latest guard 丢弃过期响应。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
+前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过页面实时生命周期封装接入。基础规则：
+
+- 通用页面订阅使用 `usePageRealtimeSubscription`，业务优先使用更具体的 `usePageDataChange`、`usePageBusinessEvent`、`usePageRecordExternalChange`；
+- 页面只声明所需实时事实、过滤条件和处理函数，由封装负责挂载时订阅、卸载时反订阅；
+- 全局 realtime 连接重建时，由 `app/realtime` 统一恢复页面级 topic 订阅；
+- 编辑中记录需要提示外部变更时，使用 `usePageRecordExternalChange` 统一处理模块订阅、当前记录匹配、编辑态判断和保存中自身事件保护；
+- 需要按实时事件刷新列表、状态摘要或子资源时，优先使用 `createRealtimeRefreshQueue` 合并短时间内的重复刷新，并用 latest guard 丢弃过期响应；
+- 应用全局连接启动逻辑只订阅用户私有基础队列，不订阅具体业务模块 topic；
+- 业务页面不得直接导入 `app/realtime` 的 `subscribeApp*` 方法，不得直接持有 STOMP subscription 或调用底层 `realtime.subscribe`。
 
 ### 5.3 发布门面
 
@@ -374,6 +382,16 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 ```
 
 因为这会把业务事实、通道命名和传输技术耦合在一起。业务 Service 应继续通过 ActionResult / DataChange 契约报告事实，不因为实时通信底座存在而新增传输层依赖。
+
+后端发布门面按消息类型分层，不复用 payload：
+
+| 消息类型 | 门面 | 默认 destination | payload 边界 |
+| --- | --- | --- | --- |
+| 数据变化 | `DataChangeRealtimePublisher` | 发起用户 `/user/queue/platform/data-changes`；公共 module / record topic | user queue 可发送完整 `CommittedChangeSet`；公共 topic 只能发送清空 `facts` 的低敏脏标记 |
+| 安全通知 | `SecurityRealtimeNotifier` | `/user/queue/platform/notifications` | 只表达安全事实、是否需要退出、目标 session；不携带 token、IP、User-Agent 或 UI 指令 |
+| 业务私有事件 | `BusinessRealtimeNotifier` / `BusinessRealtimeFanOutPublisher` | `/user/queue/platform/business-events` | 只发送给经 recipient policy 判定的用户；普通业务状态变化优先发送低敏脏标记，详情通过业务查询接口读取 |
+
+各门面收到空接收人、空事件或无法确认当前用户时必须跳过发送。业务代码不得绕过门面直接调用 `RealtimeMessagePublisher`，除非正在实现新的平台 realtime adapter。
 
 ### 5.4 客户端命令入口
 
