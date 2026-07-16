@@ -310,7 +310,7 @@ class UserSessionServiceTest {
         assertThat(session.getRevokedAt()).isEqualTo(clock.instant());
         assertThat(session.getRevokedReason()).isEqualTo("logout");
         assertThat(lifecycleEventPublisher.events)
-                .containsExactly(UserSessionLifecycleEvent.revoked("user-1", "session-1"));
+                .containsExactly(UserSessionLifecycleEvent.loggedOut("user-1", "session-1"));
         verify(sessionDao).updateByIdAndVersion(session, 0);
     }
 

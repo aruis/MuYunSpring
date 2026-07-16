@@ -237,6 +237,23 @@ class RealtimePublisherTest {
     }
 
     @Test
+    void shouldPublishUserSessionCollectionChangesWhenUserLogsOut() {
+        BusinessRealtimeRecipientPolicyFactory policyFactory =
+                mock(BusinessRealtimeRecipientPolicyFactory.class);
+        BusinessRealtimeFanOutPublisher.RecipientPolicy policy = currentUser -> true;
+        RecordingBusinessRealtimeFanOutPublisher fanOutPublisher = new RecordingBusinessRealtimeFanOutPublisher();
+        UserSessionManagementRealtimeEventPublisher publisher =
+                new UserSessionManagementRealtimeEventPublisher(fanOutPublisher, policyFactory);
+        when(policyFactory.recordAction("iam.user", "user-1", "sessions")).thenReturn(policy);
+
+        publisher.publish(UserSessionLifecycleEvent.loggedOut("user-1", "session-1"));
+
+        assertThat(fanOutPublisher.event).isEqualTo(
+                BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_OUT"));
+        assertThat(fanOutPublisher.recipientPolicy).isSameAs(policy);
+    }
+
+    @Test
     void shouldSendForceLogoutSecurityNotificationsToUserQueue() {
         RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
         StompSecurityRealtimeNotifier notifier = new StompSecurityRealtimeNotifier(messagePublisher);

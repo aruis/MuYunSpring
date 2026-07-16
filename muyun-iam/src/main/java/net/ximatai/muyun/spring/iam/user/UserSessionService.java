@@ -214,7 +214,7 @@ public class UserSessionService {
     public void logout(String token) {
         UserSession session = sessionByToken(token);
         if (session != null) {
-            userSessionRevocationService.revoke(session, now(), "logout");
+            userSessionRevocationService.logout(session, now());
         }
     }
 
