@@ -20,7 +20,7 @@ export interface UserSessionRowsOptions {
 }
 
 export function useUserSessionRows(options: UserSessionRowsOptions) {
-  const userSessionChangedEventType = 'iam.user.session.changed';
+  const userSessionCollectionChangedEventType = 'iam.user.session.collectionChanged';
   const expandedUserKeys = ref<string[]>([]);
   const userSessionStates = ref<Record<string, UserSessionState>>({});
   const visibleUserIds = ref<string[]>([]);
@@ -86,7 +86,7 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
   }
 
   function handleUserSessionBusinessEvent(event: WebBusinessRealtimeEvent) {
-    if (event.type !== userSessionChangedEventType || event.moduleAlias !== 'iam.user') {
+    if (event.type !== userSessionCollectionChangedEventType || event.moduleAlias !== 'iam.user') {
       return;
     }
     const userId = String(event.recordId ?? '');

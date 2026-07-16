@@ -130,7 +130,7 @@ class RealtimePublisherTest {
     void shouldSendBusinessEventsToUserQueue() {
         RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
         StompBusinessRealtimeNotifier notifier = new StompBusinessRealtimeNotifier(messagePublisher);
-        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionChanged("user-1", "LOGGED_IN");
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN");
 
         try (RequestTraceContext.Scope ignored = RequestTraceContext.use("trace-1")) {
             notifier.notifyUser("admin-1", event);
@@ -146,15 +146,12 @@ class RealtimePublisherTest {
     }
 
     @Test
-    void shouldFanOutUserSessionChangesOnlyToAuthorizedOnlineManagers() {
+    void shouldFanOutBusinessEventsOnlyToAllowedOnlineUsers() {
         SimpUserRegistry registry = mock(SimpUserRegistry.class);
-        PlatformRecordActionAvailabilityService actionAvailabilityService =
-                mock(PlatformRecordActionAvailabilityService.class);
         UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
-        UserSessionManagementRealtimeEventPublisher publisher =
-                new UserSessionManagementRealtimeEventPublisher(
-                        registry, actionAvailabilityService, notifier, userSessionService);
+        OnlineUserBusinessRealtimeFanOutPublisher publisher =
+                new OnlineUserBusinessRealtimeFanOutPublisher(registry, userSessionService, notifier);
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
         CurrentUser viewer = CurrentUser.tenantUser("viewer-1", "Viewer", "demo");
         CurrentUser target = CurrentUser.tenantUser("user-1", "User", "demo");
@@ -165,6 +162,40 @@ class RealtimePublisherTest {
         when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.of(admin));
         when(userSessionService.currentUser("token-viewer-1")).thenReturn(Optional.of(viewer));
         when(userSessionService.currentUser("token-user-1")).thenReturn(Optional.of(target));
+        BusinessRealtimeEvent event = BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN");
+
+        publisher.publish(event, currentUser -> "admin-1".equals(currentUser.userId()));
+
+        assertThat(notifier.userIds).containsExactly("admin-1");
+        assertThat(notifier.events).containsExactly(event);
+    }
+
+    @Test
+    void shouldSkipBusinessEventFanOutWhenRecipientSessionIsNoLongerValid() {
+        SimpUserRegistry registry = mock(SimpUserRegistry.class);
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
+        OnlineUserBusinessRealtimeFanOutPublisher publisher =
+                new OnlineUserBusinessRealtimeFanOutPublisher(registry, userSessionService, notifier);
+        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
+        SimpUser adminUser = simpUser(admin);
+        when(registry.getUsers()).thenReturn(Set.of(adminUser));
+        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.empty());
+
+        publisher.publish(BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN"),
+                currentUser -> true);
+
+        assertThat(notifier.userIds).isEmpty();
+    }
+
+    @Test
+    void shouldBuildRecordActionRecipientPolicies() {
+        PlatformRecordActionAvailabilityService actionAvailabilityService =
+                mock(PlatformRecordActionAvailabilityService.class);
+        BusinessRealtimeRecipientPolicyFactory policyFactory =
+                new BusinessRealtimeRecipientPolicyFactory(actionAvailabilityService);
+        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
+        CurrentUser viewer = CurrentUser.tenantUser("viewer-1", "Viewer", "demo");
         when(actionAvailabilityService.recordActions("iam.user", "user-1")).thenAnswer(invocation -> {
             String currentUserId = CurrentUserContext.currentUser()
                     .map(CurrentUser::userId)
@@ -177,30 +208,32 @@ class RealtimePublisherTest {
                     List.of(new PlatformRecordActionAvailability.Action("sessions", false, "no data auth")));
         });
 
-        publisher.publish(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
+        BusinessRealtimeFanOutPublisher.RecipientPolicy policy =
+                policyFactory.recordAction("iam.user", "user-1", "sessions");
 
-        assertThat(notifier.userIds).containsExactly("admin-1");
-        assertThat(notifier.events).containsExactly(BusinessRealtimeEvent.userSessionChanged("user-1", "LOGGED_IN"));
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(admin)) {
+            assertThat(policy.canReceive(admin)).isTrue();
+        }
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(viewer)) {
+            assertThat(policy.canReceive(viewer)).isFalse();
+        }
     }
 
     @Test
-    void shouldSkipUserSessionChangeFanOutWhenManagerSessionIsNoLongerValid() {
-        SimpUserRegistry registry = mock(SimpUserRegistry.class);
-        PlatformRecordActionAvailabilityService actionAvailabilityService =
-                mock(PlatformRecordActionAvailabilityService.class);
-        UserSessionService userSessionService = mock(UserSessionService.class);
-        RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
+    void shouldPublishUserSessionCollectionChangesWithRecordActionPolicy() {
+        BusinessRealtimeRecipientPolicyFactory policyFactory =
+                mock(BusinessRealtimeRecipientPolicyFactory.class);
+        BusinessRealtimeFanOutPublisher.RecipientPolicy policy = currentUser -> true;
+        RecordingBusinessRealtimeFanOutPublisher fanOutPublisher = new RecordingBusinessRealtimeFanOutPublisher();
         UserSessionManagementRealtimeEventPublisher publisher =
-                new UserSessionManagementRealtimeEventPublisher(
-                        registry, actionAvailabilityService, notifier, userSessionService);
-        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
-        SimpUser adminUser = simpUser(admin);
-        when(registry.getUsers()).thenReturn(Set.of(adminUser));
-        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.empty());
+                new UserSessionManagementRealtimeEventPublisher(fanOutPublisher, policyFactory);
+        when(policyFactory.recordAction("iam.user", "user-1", "sessions")).thenReturn(policy);
 
         publisher.publish(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
 
-        assertThat(notifier.userIds).isEmpty();
+        assertThat(fanOutPublisher.event).isEqualTo(
+                BusinessRealtimeEvent.userSessionCollectionChanged("user-1", "LOGGED_IN"));
+        assertThat(fanOutPublisher.recipientPolicy).isSameAs(policy);
     }
 
     @Test
@@ -326,6 +359,17 @@ class RealtimePublisherTest {
         public void notifyUser(String userId, BusinessRealtimeEvent event) {
             userIds.add(userId);
             events.add(event);
+        }
+    }
+
+    private static final class RecordingBusinessRealtimeFanOutPublisher implements BusinessRealtimeFanOutPublisher {
+        private BusinessRealtimeEvent event;
+        private RecipientPolicy recipientPolicy;
+
+        @Override
+        public void publish(BusinessRealtimeEvent event, RecipientPolicy recipientPolicy) {
+            this.event = event;
+            this.recipientPolicy = recipientPolicy;
         }
     }
 

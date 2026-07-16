@@ -80,6 +80,23 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     }
 
     @Bean
+    @ConditionalOnMissingBean(BusinessRealtimeFanOutPublisher.class)
+    public BusinessRealtimeFanOutPublisher businessRealtimeFanOutPublisher(
+            SimpUserRegistry userRegistry,
+            BusinessRealtimeNotifier businessRealtimeNotifier) {
+        return new OnlineUserBusinessRealtimeFanOutPublisher(
+                userRegistry, userSessionService, businessRealtimeNotifier);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(BusinessRealtimeRecipientPolicyFactory.class)
+    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
+    public BusinessRealtimeRecipientPolicyFactory businessRealtimeRecipientPolicyFactory(
+            PlatformRecordActionAvailabilityService actionAvailabilityService) {
+        return new BusinessRealtimeRecipientPolicyFactory(actionAvailabilityService);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(UserSecurityEventPublisher.class)
     public UserSecurityEventPublisher userSecurityEventPublisher(SecurityRealtimeNotifier securityRealtimeNotifier) {
         return new UserSecurityRealtimeEventPublisher(securityRealtimeNotifier);
@@ -89,10 +106,9 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     @ConditionalOnMissingBean(UserSessionLifecycleEventPublisher.class)
     @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
     public UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher(
-            SimpUserRegistry userRegistry,
-            PlatformRecordActionAvailabilityService actionAvailabilityService,
-            BusinessRealtimeNotifier businessRealtimeNotifier) {
+            BusinessRealtimeFanOutPublisher businessRealtimeFanOutPublisher,
+            BusinessRealtimeRecipientPolicyFactory recipientPolicyFactory) {
         return new UserSessionManagementRealtimeEventPublisher(
-                userRegistry, actionAvailabilityService, businessRealtimeNotifier, userSessionService);
+                businessRealtimeFanOutPublisher, recipientPolicyFactory);
     }
 }

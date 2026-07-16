@@ -91,6 +91,7 @@ export interface WebBusinessRealtimeEvent {
   moduleAlias: string;
   recordId: string;
   reason?: string;
+  sensitivity?: string;
 }
 
 export interface WebTreeNode<T> {
