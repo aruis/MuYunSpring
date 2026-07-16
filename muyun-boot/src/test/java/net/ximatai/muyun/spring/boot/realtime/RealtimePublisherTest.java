@@ -51,6 +51,35 @@ class RealtimePublisherTest {
     }
 
     @Test
+    void shouldBroadcastDataChangeEnvelopeToModuleAndRecordTopics() {
+        RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
+        StompDataChangeRealtimePublisher publisher = new StompDataChangeRealtimePublisher(messagePublisher);
+        CommittedChangeSet changeSet = new CommittedChangeSet("change-set-1", List.of(
+                DataChange.recordUpdated("iam.employee", "employee-1"),
+                DataChange.recordUpdated("iam.employee", "employee-1"),
+                DataChange.recordDeleted("iam.employee", "employee-2"),
+                DataChange.collectionChanged("iam.user")));
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            publisher.publish(changeSet);
+        }
+
+        assertThat(messagePublisher.broadcasts)
+                .extracting(BroadcastMessage::topic)
+                .containsExactly(
+                        RealtimeDestinations.moduleDataChanges("iam.employee"),
+                        RealtimeDestinations.moduleDataChanges("iam.user"),
+                        RealtimeDestinations.recordDataChanges("iam.employee", "employee-1"),
+                        RealtimeDestinations.recordDataChanges("iam.employee", "employee-2"));
+        assertThat(messagePublisher.broadcasts)
+                .allSatisfy(message -> {
+                    assertThat(message.payload()).isInstanceOf(RealtimeEnvelope.class);
+                    assertThat(((RealtimeEnvelope<?>) message.payload()).payload()).isEqualTo(changeSet);
+                });
+    }
+
+    @Test
     void shouldSkipDataChangeWithoutCurrentUser() {
         RecordingRealtimeMessagePublisher messagePublisher = new RecordingRealtimeMessagePublisher();
         StompDataChangeRealtimePublisher publisher = new StompDataChangeRealtimePublisher(messagePublisher);
@@ -398,11 +427,13 @@ class RealtimePublisherTest {
         private RealtimeQueue queue;
         private Object payload;
         private final List<String> users = new ArrayList<>();
+        private final List<BroadcastMessage> broadcasts = new ArrayList<>();
 
         @Override
         public void broadcast(RealtimeTopic topic, Object payload) {
             this.topic = topic;
             this.payload = payload;
+            broadcasts.add(new BroadcastMessage(topic, payload));
         }
 
         @Override
@@ -412,6 +443,9 @@ class RealtimePublisherTest {
             this.payload = payload;
             users.add(userId);
         }
+    }
+
+    private record BroadcastMessage(RealtimeTopic topic, Object payload) {
     }
 
     private Message<?> stompMessage(StompCommand command, CurrentUserPrincipal principal, String token) {
