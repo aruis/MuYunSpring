@@ -150,9 +150,11 @@ class RealtimePublisherTest {
         SimpUserRegistry registry = mock(SimpUserRegistry.class);
         PlatformRecordActionAvailabilityService actionAvailabilityService =
                 mock(PlatformRecordActionAvailabilityService.class);
+        UserSessionService userSessionService = mock(UserSessionService.class);
         RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
         UserSessionManagementRealtimeEventPublisher publisher =
-                new UserSessionManagementRealtimeEventPublisher(registry, actionAvailabilityService, notifier);
+                new UserSessionManagementRealtimeEventPublisher(
+                        registry, actionAvailabilityService, notifier, userSessionService);
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
         CurrentUser viewer = CurrentUser.tenantUser("viewer-1", "Viewer", "demo");
         CurrentUser target = CurrentUser.tenantUser("user-1", "User", "demo");
@@ -160,6 +162,9 @@ class RealtimePublisherTest {
         SimpUser viewerUser = simpUser(viewer);
         SimpUser targetUser = simpUser(target);
         when(registry.getUsers()).thenReturn(Set.of(adminUser, viewerUser, targetUser));
+        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentUser("token-viewer-1")).thenReturn(Optional.of(viewer));
+        when(userSessionService.currentUser("token-user-1")).thenReturn(Optional.of(target));
         when(actionAvailabilityService.recordActions("iam.user", "user-1")).thenAnswer(invocation -> {
             String currentUserId = CurrentUserContext.currentUser()
                     .map(CurrentUser::userId)
@@ -176,6 +181,25 @@ class RealtimePublisherTest {
 
         assertThat(notifier.userIds).containsExactly("admin-1");
         assertThat(notifier.events).containsExactly(BusinessRealtimeEvent.userSessionChanged("user-1", "LOGGED_IN"));
+    }
+
+    @Test
+    void shouldSkipUserSessionChangeFanOutWhenManagerSessionIsNoLongerValid() {
+        SimpUserRegistry registry = mock(SimpUserRegistry.class);
+        PlatformRecordActionAvailabilityService actionAvailabilityService =
+                mock(PlatformRecordActionAvailabilityService.class);
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        RecordingBusinessRealtimeNotifier notifier = new RecordingBusinessRealtimeNotifier();
+        UserSessionManagementRealtimeEventPublisher publisher =
+                new UserSessionManagementRealtimeEventPublisher(
+                        registry, actionAvailabilityService, notifier, userSessionService);
+        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
+        when(registry.getUsers()).thenReturn(Set.of(simpUser(admin)));
+        when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.empty());
+
+        publisher.publish(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
+
+        assertThat(notifier.userIds).isEmpty();
     }
 
     @Test

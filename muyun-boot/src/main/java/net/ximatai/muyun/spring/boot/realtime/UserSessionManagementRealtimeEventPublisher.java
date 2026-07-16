@@ -7,11 +7,13 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEvent;
 import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEventPublisher;
+import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.messaging.simp.user.SimpUser;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 
 import java.security.Principal;
 import java.util.Objects;
+import java.util.Optional;
 
 public class UserSessionManagementRealtimeEventPublisher implements UserSessionLifecycleEventPublisher {
     private static final String USER_MODULE_ALIAS = "iam.user";
@@ -20,16 +22,19 @@ public class UserSessionManagementRealtimeEventPublisher implements UserSessionL
     private final SimpUserRegistry userRegistry;
     private final PlatformRecordActionAvailabilityService actionAvailabilityService;
     private final BusinessRealtimeNotifier businessRealtimeNotifier;
+    private final UserSessionService userSessionService;
 
     public UserSessionManagementRealtimeEventPublisher(
             SimpUserRegistry userRegistry,
             PlatformRecordActionAvailabilityService actionAvailabilityService,
-            BusinessRealtimeNotifier businessRealtimeNotifier) {
+            BusinessRealtimeNotifier businessRealtimeNotifier,
+            UserSessionService userSessionService) {
         this.userRegistry = Objects.requireNonNull(userRegistry, "userRegistry must not be null");
         this.actionAvailabilityService = Objects.requireNonNull(actionAvailabilityService,
                 "actionAvailabilityService must not be null");
         this.businessRealtimeNotifier = Objects.requireNonNull(businessRealtimeNotifier,
                 "businessRealtimeNotifier must not be null");
+        this.userSessionService = Objects.requireNonNull(userSessionService, "userSessionService must not be null");
     }
 
     @Override
@@ -40,7 +45,7 @@ public class UserSessionManagementRealtimeEventPublisher implements UserSessionL
         BusinessRealtimeEvent notification = BusinessRealtimeEvent.userSessionChanged(
                 event.userId(), event.type().name());
         for (SimpUser user : userRegistry.getUsers()) {
-            CurrentUser currentUser = currentUser(user.getPrincipal());
+            CurrentUser currentUser = currentUser(user.getPrincipal()).orElse(null);
             if (canReceive(currentUser, event.userId())) {
                 businessRealtimeNotifier.notifyUser(currentUser.userId(), notification);
             }
@@ -62,11 +67,11 @@ public class UserSessionManagementRealtimeEventPublisher implements UserSessionL
         }
     }
 
-    private CurrentUser currentUser(Principal principal) {
+    private Optional<CurrentUser> currentUser(Principal principal) {
         if (principal instanceof CurrentUserPrincipal currentUserPrincipal) {
-            return currentUserPrincipal.currentUser();
+            return userSessionService.currentUser(currentUserPrincipal.token());
         }
-        return null;
+        return Optional.empty();
     }
 
     private TenantContext.Scope tenantScope(CurrentUser currentUser) {

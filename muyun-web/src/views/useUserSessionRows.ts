@@ -25,11 +25,20 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
   const userSessionStates = ref<Record<string, UserSessionState>>({});
   const visibleUserIds = ref<string[]>([]);
   const userOnlineStatuses = ref<Record<string, UserSessionStatusView>>({});
+  const pendingOnlineStatusUserIds = new Set<string>();
+  const pendingSessionUserIds = new Set<string>();
+  const onlineStatusRequestVersions = new Map<string, number>();
+  const sessionRequestVersions = new Map<string, number>();
+  let onlineStatusRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let sessionRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let requestVersion = 0;
 
   async function loadUserSessions(userId: string | undefined) {
     if (!userId || options.context.can('sessions', userId) === false) {
       return;
     }
+    const version = nextRequestVersion();
+    sessionRequestVersions.set(userId, version);
     setUserSessionState(userId, { ...userSessionState(userId), loading: true, error: undefined });
     try {
       await loadUserSessionActions(userId);
@@ -37,8 +46,14 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
         method: 'GET',
         path: `/iam.user/${encodeURIComponent(userId)}/sessions`,
       });
+      if (sessionRequestVersions.get(userId) !== version) {
+        return;
+      }
       setUserSessionState(userId, { records, loading: false, error: undefined });
     } catch (cause) {
+      if (sessionRequestVersions.get(userId) !== version) {
+        return;
+      }
       const error = presentPlatformError(cause, { source: `${options.source}-sessions`, phase: 'load' });
       setUserSessionState(userId, { ...userSessionState(userId), loading: false, error: error.message });
     }
@@ -79,10 +94,10 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
       return;
     }
     if (visibleUserIds.value.includes(userId)) {
-      void loadUserOnlineStatuses([userId]);
+      scheduleUserOnlineStatusRefresh([userId]);
     }
     if (expandedUserKeys.value.includes(userId)) {
-      void loadUserSessions(userId);
+      scheduleUserSessionRefresh(userId);
     }
   }
 
@@ -91,15 +106,23 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     if (ids.length === 0) {
       return;
     }
+    const version = nextRequestVersion();
+    ids.forEach((id) => onlineStatusRequestVersions.set(id, version));
     try {
       const statuses = await options.context.http.request<UserSessionStatusView[]>({
         method: 'POST',
         path: '/iam.user/sessions/status',
         body: { userIds: ids },
       });
+      const latestStatuses = statuses.filter(
+        (status) => onlineStatusRequestVersions.get(status.userId) === version,
+      );
+      if (latestStatuses.length === 0) {
+        return;
+      }
       userOnlineStatuses.value = {
         ...userOnlineStatuses.value,
-        ...Object.fromEntries(statuses.map((status) => [status.userId, status])),
+        ...Object.fromEntries(latestStatuses.map((status) => [status.userId, status])),
       };
     } catch (cause) {
       presentPlatformError(cause, { source: `${options.source}-online-status`, phase: 'load' });
@@ -129,7 +152,59 @@ export function useUserSessionRows(options: UserSessionRowsOptions) {
     };
   }
 
+  function scheduleUserOnlineStatusRefresh(userIds: string[]) {
+    for (const userId of userIds) {
+      if (userId) {
+        pendingOnlineStatusUserIds.add(userId);
+      }
+    }
+    if (onlineStatusRefreshTimer) {
+      return;
+    }
+    onlineStatusRefreshTimer = setTimeout(() => {
+      onlineStatusRefreshTimer = undefined;
+      const ids = Array.from(pendingOnlineStatusUserIds);
+      pendingOnlineStatusUserIds.clear();
+      void loadUserOnlineStatuses(ids);
+    }, 0);
+  }
+
+  function scheduleUserSessionRefresh(userId: string) {
+    if (!userId) {
+      return;
+    }
+    pendingSessionUserIds.add(userId);
+    if (sessionRefreshTimer) {
+      return;
+    }
+    sessionRefreshTimer = setTimeout(() => {
+      sessionRefreshTimer = undefined;
+      const ids = Array.from(pendingSessionUserIds);
+      pendingSessionUserIds.clear();
+      for (const id of ids) {
+        void loadUserSessions(id);
+      }
+    }, 0);
+  }
+
+  function nextRequestVersion() {
+    requestVersion += 1;
+    return requestVersion;
+  }
+
   function resetUserSessionRows() {
+    if (onlineStatusRefreshTimer) {
+      clearTimeout(onlineStatusRefreshTimer);
+      onlineStatusRefreshTimer = undefined;
+    }
+    if (sessionRefreshTimer) {
+      clearTimeout(sessionRefreshTimer);
+      sessionRefreshTimer = undefined;
+    }
+    pendingOnlineStatusUserIds.clear();
+    pendingSessionUserIds.clear();
+    onlineStatusRequestVersions.clear();
+    sessionRequestVersions.clear();
     expandedUserKeys.value = [];
     userSessionStates.value = {};
     visibleUserIds.value = [];

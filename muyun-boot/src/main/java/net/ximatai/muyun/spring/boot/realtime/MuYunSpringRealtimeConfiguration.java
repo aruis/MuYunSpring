@@ -93,6 +93,6 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
             PlatformRecordActionAvailabilityService actionAvailabilityService,
             BusinessRealtimeNotifier businessRealtimeNotifier) {
         return new UserSessionManagementRealtimeEventPublisher(
-                userRegistry, actionAvailabilityService, businessRealtimeNotifier);
+                userRegistry, actionAvailabilityService, businessRealtimeNotifier, userSessionService);
     }
 }
