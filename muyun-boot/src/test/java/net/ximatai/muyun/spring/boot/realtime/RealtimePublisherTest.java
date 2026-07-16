@@ -194,7 +194,8 @@ class RealtimePublisherTest {
                 new UserSessionManagementRealtimeEventPublisher(
                         registry, actionAvailabilityService, notifier, userSessionService);
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
-        when(registry.getUsers()).thenReturn(Set.of(simpUser(admin)));
+        SimpUser adminUser = simpUser(admin);
+        when(registry.getUsers()).thenReturn(Set.of(adminUser));
         when(userSessionService.currentUser("token-admin-1")).thenReturn(Optional.empty());
 
         publisher.publish(UserSessionLifecycleEvent.loggedIn("user-1", "session-1"));
