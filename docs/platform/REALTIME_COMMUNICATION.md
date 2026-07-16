@@ -285,7 +285,7 @@ simpMessagingTemplate.convertAndSend("/user/queue/platform/notifications", paylo
 /topic/platform/modules/{moduleAlias}/records/{recordId}/data-changes
 ```
 
-用户打开详情页或编辑页时按需订阅。后端发送前必须确认事件可进入该 record channel；敏感记录仍可选择精确 fan-out 到用户 queue。
+用户打开详情页或编辑页时按需订阅。record channel 只承载低敏脏标记，页面收到后重新查询详情；敏感记录的完整 payload 必须选择精确 fan-out 到用户 queue。
 
 模块列表新增、删除或集合变化：
 
@@ -403,7 +403,7 @@ simpMessagingTemplate.convertAndSendToUser(userId, "/queue/platform/data-changes
 
 | 阶段 | 权限口径 |
 | --- | --- |
-| 数据变化广播 | 发起用户始终收到当前 user queue；其他在线用户只通过 user queue 接收按记录 `view` 权限过滤后的变化；共享 topic 必须先定义公共范围或权限 fan-out 策略 |
+| 数据变化广播 | 发起用户始终收到完整 user queue；module / record 共享 topic 只能承载低敏脏标记；跨用户完整 payload 必须通过按权限过滤的 user queue |
 | 用户通知 | 只能接收当前用户 queue |
 | IM / 协同 | 按房间、会话、参与者或业务资源校验 |
 | 动态能力 | 通过动态元数据、动作权限和数据权限 adapter 接入 |
@@ -662,8 +662,8 @@ Command: 客户端请求服务端执行的动作
 业务事务提交
   -> 形成 CommittedChangeSet
   -> 发布进程内事件
-  -> 发起用户 user queue
-  -> 按在线用户和记录权限 fan-out 到其他用户 queue
+  -> 发起用户 user queue 接收完整 payload
+  -> module / record topic 接收低敏脏标记
 ```
 
 约束：
@@ -672,7 +672,8 @@ Command: 客户端请求服务端执行的动作
 - 事务回滚不得广播数据变化；
 - HTTP ActionResult 和实时广播共享同一份 `CommittedChangeSet`；
 - 前端以 HTTP 回执作为发起动作的即时结果，以实时通道作为当前用户多端和跨用户脏标记信号；
-- 跨用户 fan-out 必须按接收人过滤变化集合，不能依赖前端自行丢弃无权数据。
+- 公共 topic 不得携带 `facts` 或业务字段，不能依赖前端自行丢弃无权数据；
+- 后续如需要跨用户完整 payload fan-out，必须按接收人过滤变化集合。
 
 ### 8.2 后续 Outbox
 
