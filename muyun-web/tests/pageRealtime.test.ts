@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createPageBusinessEventHandler,
   createPageDataChangeHandler,
+  createPageRecordExternalChangeState,
   createRealtimeRefreshQueue,
   type RealtimeRefreshRun,
 } from '../src/app/pageRealtime.ts';
@@ -49,6 +50,43 @@ test('page data change handler forwards only matching changes', async () => {
   await flushPromises();
 
   assert.deepEqual(handled, ['order-1']);
+});
+
+test('page record external change state marks only external editing record changes', () => {
+  let recordId = 'record-1';
+  let editing = false;
+  let saving = false;
+  const state = createPageRecordExternalChangeState({
+    moduleAlias: 'iam.employee',
+    recordId: () => recordId,
+    editing: () => editing,
+    saving: () => saving,
+  });
+
+  state.handleDataChanges([{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'record-1' }]);
+  assert.equal(state.externallyChanged.value, false);
+
+  editing = true;
+  state.handleDataChanges([{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'record-2' }]);
+  assert.equal(state.externallyChanged.value, false);
+
+  saving = true;
+  state.handleDataChanges([{ type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'record-1' }]);
+  assert.equal(state.externallyChanged.value, false);
+
+  saving = false;
+  state.handleDataChanges([
+    { type: 'collection-changed', moduleAlias: 'iam.employee', recordId: 'record-1' },
+    { type: 'record-updated', moduleAlias: 'iam.user', recordId: 'record-1' },
+    { type: 'record-updated', moduleAlias: 'iam.employee', recordId: 'record-1' },
+  ]);
+  assert.equal(state.externallyChanged.value, true);
+  assert.equal(state.externalChangedRecordId.value, 'record-1');
+
+  recordId = 'record-2';
+  state.clearExternalChanged();
+  assert.equal(state.markExternalRecordChanged('record-2'), true);
+  assert.equal(state.externalChangedRecordId.value, 'record-2');
 });
 
 test('realtime refresh queue coalesces keys in one flush', async () => {

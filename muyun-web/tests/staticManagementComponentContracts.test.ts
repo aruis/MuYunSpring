@@ -115,13 +115,24 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(pageRealtimeSource, /subscribeAppModuleDataChanges\(options\.moduleAlias\)/);
 
   const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
-  assert.match(systemUserSource, /usePageDataChange\(\{\s*moduleAlias: 'iam\.user'/);
-  assert.match(systemUserSource, /:externally-changed="Boolean\(externalChangedUserId\)"/);
+  assert.match(systemUserSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.user'/);
+  assert.match(systemUserSource, /:externally-changed="userExternalChange\.externallyChanged\.value"/);
   assert.match(systemUserSource, /@reload-external-change="reloadExternalUserChange"/);
-  assert.match(systemUserSource, /@dismiss-external-change="clearExternalUserChanged"/);
+  assert.match(systemUserSource, /@dismiss-external-change="userExternalChange\.clearExternalChanged"/);
   assert.match(
     systemUserSource,
-    /function markExternalUserChanged[\s\S]*savingUser\.value[\s\S]*detailMode\.value !== 'edit'/,
+    /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedUser\.value\?\.id[\s\S]*editing: \(\) => detailMode\.value === 'edit'[\s\S]*saving: \(\) => savingUser\.value/,
+  );
+
+  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  assert.match(employeeSource, /RecordExternalChangeNotice/);
+  assert.match(employeeSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.employee'/);
+  assert.match(employeeSource, /v-if="employeeExternalChange\.externallyChanged\.value"/);
+  assert.match(employeeSource, /@reload="reloadExternalEmployeeChange"/);
+  assert.match(employeeSource, /@dismiss="employeeExternalChange\.clearExternalChanged"/);
+  assert.match(
+    employeeSource,
+    /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedEmployee\.value\?\.id[\s\S]*editing: \(\) => employeeDetailMode\.value === 'edit'[\s\S]*saving: \(\) => savingEmployee\.value/,
   );
 });
 
@@ -536,7 +547,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /<RecordFormFields/);
   assert.match(employeeViewSource, /<RecordDetailFields/);
   assert.match(employeeViewSource, /v-if="employeeDetailMode === 'view'"/);
-  assert.match(employeeViewSource, /<form v-else class="employee-form"/);
+  assert.match(employeeViewSource, /<template v-else>/);
+  assert.match(employeeViewSource, /<form class="employee-form"/);
   assert.match(employeeViewSource, /:display-of="employeeDetailDisplayValue"/);
   assert.match(employeeViewSource, /function employeeDetailDisplayValue/);
   assert.match(employeeViewSource, /resolveRecordFormFieldState/);
@@ -916,9 +928,9 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /<RecordModeDrawer/);
   assert.match(systemUserViewSource, /:mode="detailMode"/);
   assert.match(systemUserViewSource, /:form-modes="\['edit', 'resetPassword'\]"/);
-  assert.match(systemUserViewSource, /:externally-changed="Boolean\(externalChangedUserId\)"/);
+  assert.match(systemUserViewSource, /:externally-changed="userExternalChange\.externallyChanged\.value"/);
   assert.match(systemUserViewSource, /@reload-external-change="reloadExternalUserChange"/);
-  assert.match(systemUserViewSource, /@dismiss-external-change="clearExternalUserChanged"/);
+  assert.match(systemUserViewSource, /@dismiss-external-change="userExternalChange\.clearExternalChanged"/);
   assert.match(systemUserViewSource, /<template #view>/);
   assert.match(systemUserViewSource, /<template #form>/);
   assert.match(systemUserViewSource, /<RecordDetailFields/);

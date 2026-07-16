@@ -4,6 +4,7 @@ import {
   RecordActionBar,
   RecordDetailDrawer,
   RecordDetailFields,
+  RecordExternalChangeNotice,
   RecordExplorerPanel,
   RecordFormFields,
   RecordMetaSection,
@@ -38,6 +39,7 @@ import type {
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
 import { actionResultData, useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { usePageRecordExternalChange } from '../app/pageRealtime';
 import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
@@ -93,6 +95,12 @@ const savingEmployeeAccount = ref(false);
 const employeeAccountsLoadFailed = ref(false);
 const showAccountProvisionForm = ref(false);
 const accountProvisionDraft = ref<Partial<UserAccount>>(createAccountProvisionDraft(undefined));
+const employeeExternalChange = usePageRecordExternalChange({
+  moduleAlias: 'iam.employee',
+  recordId: () => selectedEmployee.value?.id,
+  editing: () => employeeDetailMode.value === 'edit',
+  saving: () => savingEmployee.value,
+});
 
 const employeeListContext = computed(() => employeeContext as unknown as ModuleContext<QueryListRecord>);
 const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
@@ -271,6 +279,7 @@ function selectOrganization(record: Organization) {
   selectedOrganization.value = record;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
+  employeeExternalChange.clearExternalChanged();
   loadingEmployeeDetail.value = false;
   employeeDetailLoadFailed.value = false;
   employeeDetailDepartment.value = undefined;
@@ -297,6 +306,7 @@ function selectEmployee(record: QueryListRecord) {
     resetEmployeeAccountState();
     selectedEmployee.value = undefined;
     employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+    employeeExternalChange.clearExternalChanged();
     employeeDetailOpen.value = false;
     employeeDetailMode.value = 'view';
   }
@@ -346,6 +356,7 @@ function startCreateEmployee() {
   employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
   selectedEmployee.value = undefined;
   selectedEmployeeKey.value = undefined;
+  employeeExternalChange.clearExternalChanged();
   employeeDetailMode.value = 'create';
   loadingEmployeeDetail.value = false;
   employeeDetailLoadFailed.value = false;
@@ -365,6 +376,7 @@ function closeEmployeeDetail() {
   employeeDetailOpen.value = false;
   employeeDetailMode.value = 'view';
   employeeDetailDepartment.value = undefined;
+  employeeExternalChange.clearExternalChanged();
   resetEmployeeAccountState();
   employeeDraft.value = selectedEmployee.value
     ? copyEmployee(selectedEmployee.value)
@@ -385,6 +397,7 @@ function cancelEmployeeDetail() {
     return;
   }
   employeeDraft.value = copyEmployee(selectedEmployee.value!);
+  employeeExternalChange.clearExternalChanged();
   employeeDetailMode.value = 'view';
   loadingEmployeeDetail.value = false;
   employeeDetailLoadFailed.value = false;
@@ -399,6 +412,7 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
     return;
   }
   selectedEmployeeKey.value = id;
+  employeeExternalChange.clearExternalChanged();
   employeeDetailOpen.value = true;
   employeeDetailMode.value = mode;
   selectedEmployee.value = undefined;
@@ -455,6 +469,7 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
       return;
     }
     employeeDraft.value = copyEmployee(selectedEmployee.value);
+    employeeExternalChange.clearExternalChanged();
     employeeDetailMode.value = 'edit';
     return;
   }
@@ -473,6 +488,20 @@ function retryEmployeeDetail() {
   }
   const mode = employeeDetailMode.value === 'create' ? 'view' : employeeDetailMode.value;
   void openEmployeeDetail({ ...employeeDraft.value, id } as QueryListRecord, mode);
+}
+
+function reloadExternalEmployeeChange() {
+  const id = String(
+    employeeExternalChange.externalChangedRecordId.value ??
+      employeeDraft.value.id ??
+      selectedEmployeeKey.value ??
+      '',
+  );
+  if (!id) {
+    return;
+  }
+  employeeExternalChange.clearExternalChanged();
+  void openEmployeeDetail({ ...employeeDraft.value, id } as QueryListRecord, 'edit');
 }
 
 async function saveEmployee() {
@@ -538,6 +567,7 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         selectedEmployeeKey.value = undefined;
         selectedEmployee.value = undefined;
         employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+        employeeExternalChange.clearExternalChanged();
         loadingEmployeeDetail.value = false;
         employeeDetailLoadFailed.value = false;
         employeeDetailRequestSeq.value += 1;
@@ -605,6 +635,7 @@ function commitEmployeeDetailRecord(record: Employee) {
   employeeDraft.value = copyEmployee(record);
   selectedEmployeeKey.value = record.id;
   employeeDetailMode.value = 'view';
+  employeeExternalChange.clearExternalChanged();
   employeeDetailOpen.value = true;
   loadingEmployeeDetail.value = false;
   employeeDetailLoadFailed.value = false;
@@ -1057,24 +1088,31 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
           <RecordMetaSection :record="employeeDraft" show-sort-order />
         </template>
 
-        <form v-else class="employee-form" @submit.prevent="saveEmployee">
-          <label v-if="employeeFormVisible('organizationId')">
-            <span class="employee-form-label">
-              {{ employeeFormLabel('organizationId') }}
-              <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
-            </span>
-            <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
-          </label>
-          <RecordFormFields
-            :record="employeeDraft as RecordFormRecord"
-            :fields="employeeFormFieldDefinitions"
-            :exclude-field-names="['organizationId']"
-            :fallback="employeeFormFieldFallback"
-            :picker-configs="employeeFormPickerConfigs"
-            :disabled="employeeFormDisabled"
-            @update:field="updateEmployeeDraftField"
+        <template v-else>
+          <RecordExternalChangeNotice
+            v-if="employeeExternalChange.externallyChanged.value"
+            @reload="reloadExternalEmployeeChange"
+            @dismiss="employeeExternalChange.clearExternalChanged"
           />
-        </form>
+          <form class="employee-form" @submit.prevent="saveEmployee">
+            <label v-if="employeeFormVisible('organizationId')">
+              <span class="employee-form-label">
+                {{ employeeFormLabel('organizationId') }}
+                <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
+              </span>
+              <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
+            </label>
+            <RecordFormFields
+              :record="employeeDraft as RecordFormRecord"
+              :fields="employeeFormFieldDefinitions"
+              :exclude-field-names="['organizationId']"
+              :fallback="employeeFormFieldFallback"
+              :picker-configs="employeeFormPickerConfigs"
+              :disabled="employeeFormDisabled"
+              @update:field="updateEmployeeDraftField"
+            />
+          </form>
+        </template>
       </template>
     </RecordDetailDrawer>
   </section>

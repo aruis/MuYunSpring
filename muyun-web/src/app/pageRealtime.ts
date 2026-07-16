@@ -1,5 +1,10 @@
-import { onMounted, onUnmounted } from 'vue';
-import type { WebBusinessRealtimeEvent, WebCommittedChangeSet, WebDataChange } from '@muyun/web-contracts';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import {
+  webDataChangeTypes,
+  type WebBusinessRealtimeEvent,
+  type WebCommittedChangeSet,
+  type WebDataChange,
+} from '@muyun/web-contracts';
 import type { DataChangeSubscription } from '@muyun/web-core';
 import {
   subscribeAppBusinessEvents,
@@ -20,6 +25,22 @@ export interface PageDataChangeOptions {
   recordId?: string | (() => string | undefined);
   handler: (changeSet: WebCommittedChangeSet, changes: WebDataChange[]) => void | Promise<void>;
   predicate?: (change: WebDataChange) => boolean;
+}
+
+export interface PageRecordExternalChangeOptions {
+  moduleAlias: string;
+  recordId: string | (() => string | undefined);
+  editing: boolean | (() => boolean);
+  saving?: boolean | (() => boolean);
+  changeTypes?: string[];
+}
+
+export interface PageRecordExternalChangeState {
+  externalChangedRecordId: Readonly<{ value: string | undefined }>;
+  externallyChanged: Readonly<{ value: boolean }>;
+  markExternalRecordChanged(recordId: string | undefined): boolean;
+  clearExternalChanged(): void;
+  handleDataChanges(changes: WebDataChange[]): void;
 }
 
 export interface RealtimeRefreshQueueOptions<TKey extends string> {
@@ -89,6 +110,63 @@ export function usePageDataChange(options: PageDataChangeOptions) {
       },
     };
   });
+}
+
+export function usePageRecordExternalChange(
+  options: PageRecordExternalChangeOptions,
+): PageRecordExternalChangeState {
+  const state = createPageRecordExternalChangeState(options);
+  usePageDataChange({
+    moduleAlias: options.moduleAlias,
+    handler: (_changeSet, changes) => state.handleDataChanges(changes),
+  });
+  return state;
+}
+
+export function createPageRecordExternalChangeState(
+  options: PageRecordExternalChangeOptions,
+): PageRecordExternalChangeState {
+  const externalChangedRecordId = ref<string>();
+  const externallyChanged = computed(() => Boolean(externalChangedRecordId.value));
+
+  function markExternalRecordChanged(recordId: string | undefined) {
+    const currentRecordId = valueOf(options.recordId);
+    if (
+      valueOf(options.saving) === true ||
+      valueOf(options.editing) !== true ||
+      !recordId ||
+      !currentRecordId ||
+      recordId !== currentRecordId
+    ) {
+      return false;
+    }
+    externalChangedRecordId.value = recordId;
+    return true;
+  }
+
+  function clearExternalChanged() {
+    externalChangedRecordId.value = undefined;
+  }
+
+  function handleDataChanges(changes: WebDataChange[]) {
+    const changeTypes = options.changeTypes ?? [
+      webDataChangeTypes.recordUpdated,
+      webDataChangeTypes.recordDeleted,
+    ];
+    for (const change of changes) {
+      if (change.moduleAlias === options.moduleAlias && changeTypes.includes(change.type)) {
+        markExternalRecordChanged(change.recordId);
+      }
+    }
+  }
+
+  return {
+    externalChangedRecordId,
+    externallyChanged,
+    markExternalRecordChanged,
+    clearExternalChanged,
+    handleDataChanges,
+  };
 }
 
 export function useRealtimeRefreshQueue<TKey extends string>(
@@ -195,6 +273,6 @@ function matchesDataChange(change: WebDataChange, options: PageDataChangeOptions
   return options.predicate?.(change) ?? true;
 }
 
-function valueOf(value: string | (() => string | undefined) | undefined) {
-  return typeof value === 'function' ? value() : value;
+function valueOf<T>(value: T | (() => T | undefined) | undefined) {
+  return typeof value === 'function' ? (value as () => T | undefined)() : value;
 }
