@@ -130,6 +130,44 @@ class RealtimeWebSocketIT {
 
     @Test
     @SuppressWarnings("removal")
+    void shouldDeliverDataChangeEnvelopeToEverySessionOfSameUser() throws Exception {
+        CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
+        when(userSessionService.currentUser("token-admin-a")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentUser("token-admin-b")).thenReturn(Optional.of(admin));
+        WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+        BlockingQueue<JsonNode> adminAMessages = new LinkedBlockingQueue<>();
+        BlockingQueue<JsonNode> adminBMessages = new LinkedBlockingQueue<>();
+
+        StompSession adminASession = connect(stompClient, "token-admin-a");
+        StompSession adminBSession = connect(stompClient, "token-admin-b");
+        try {
+            adminASession.subscribe(userDataChangeDestination(), frameHandler(adminAMessages));
+            adminBSession.subscribe(userDataChangeDestination(), frameHandler(adminBMessages));
+            awaitServerSubscriptions(userDataChangeDestination(), 2);
+
+            try (CurrentUserContext.Scope ignored = CurrentUserContext.use(admin)) {
+                dataChangeRealtimePublisher.publish(new CommittedChangeSet("change-set-1",
+                        List.of(DataChange.recordUpdated("iam.employee", "employee-1"))));
+            }
+
+            assertDataChangeEnvelope(adminAMessages.poll(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS),
+                    "change-set-1", "iam.employee", "employee-1");
+            assertDataChangeEnvelope(adminBMessages.poll(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS),
+                    "change-set-1", "iam.employee", "employee-1");
+        } finally {
+            if (adminASession.isConnected()) {
+                adminASession.disconnect();
+            }
+            if (adminBSession.isConnected()) {
+                adminBSession.disconnect();
+            }
+            stompClient.stop();
+        }
+    }
+
+    @Test
+    @SuppressWarnings("removal")
     void shouldPublishUserSessionLifecycleEventToConnectedAuthorizedUser() throws Exception {
         CurrentUser admin = CurrentUser.systemUser("platform.user.super_admin", "Admin");
         when(userSessionService.currentUser("token-admin")).thenReturn(Optional.of(admin));
@@ -195,6 +233,17 @@ class RealtimeWebSocketIT {
 
     private String userBusinessEventDestination() {
         return "/user" + RealtimeDestinations.USER_BUSINESS_EVENTS.destination();
+    }
+
+    private void assertDataChangeEnvelope(JsonNode envelope, String changeSetId, String moduleAlias,
+                                          String recordId) {
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.path("type").asText()).isEqualTo(StompDataChangeRealtimePublisher.MESSAGE_TYPE);
+        assertThat(envelope.path("payload").path("changeSetId").asText()).isEqualTo(changeSetId);
+        assertThat(envelope.path("payload").path("changes").get(0).path("moduleAlias").asText())
+                .isEqualTo(moduleAlias);
+        assertThat(envelope.path("payload").path("changes").get(0).path("recordId").asText())
+                .isEqualTo(recordId);
     }
 
     private void awaitServerSubscriptions(String destination, int count) throws InterruptedException {

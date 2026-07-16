@@ -40,7 +40,7 @@ import type {
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
 import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { usePageRecordExternalChange } from '../app/pageRealtime';
+import { usePageDataChange, usePageRecordExternalChange, useRealtimeRefreshQueue } from '../app/pageRealtime';
 import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
@@ -101,6 +101,30 @@ const employeeExternalChange = usePageRecordExternalChange({
   recordId: () => selectedEmployee.value?.id,
   editing: () => employeeDetailMode.value === 'edit',
   saving: () => savingEmployee.value,
+});
+const employeeRealtimeRefreshQueue = useRealtimeRefreshQueue<string>({
+  delay: 80,
+  load: async (run) => {
+    employeeReloadKey.value += 1;
+    const currentDetailId = selectedEmployee.value?.id;
+    if (
+      employeeDetailOpen.value &&
+      employeeDetailMode.value === 'view' &&
+      currentDetailId &&
+      run.keys.includes(currentDetailId)
+    ) {
+      await openEmployeeDetail({ ...employeeDraft.value, id: currentDetailId } as QueryListRecord, 'view');
+    }
+  },
+});
+usePageDataChange({
+  moduleAlias: 'iam.employee',
+  handler: (_changeSet, changes) => {
+    const changedRecordIds = changes
+      .map((change) => change.recordId)
+      .filter((recordId): recordId is string => Boolean(recordId));
+    employeeRealtimeRefreshQueue.enqueue(changedRecordIds.length > 0 ? changedRecordIds : '__collection__');
+  },
 });
 
 const employeeListContext = computed(() => employeeContext as unknown as ModuleContext<QueryListRecord>);
