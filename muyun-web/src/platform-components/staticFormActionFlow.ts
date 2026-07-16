@@ -1,12 +1,22 @@
 import type { Ref } from 'vue';
-import type { StaticRecordMutationResult } from '@muyun/web-core';
+import { normalizeError, type AppError, type StaticRecordMutationResult } from '@muyun/web-core';
 import {
   handlePlatformActionSuccess,
   type PlatformActionResultReactionHandler,
 } from './platformActionResultFeedback';
-import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+import {
+  matchesPlatformActionErrorHandler,
+  presentPlatformError,
+  presentPlatformMessage,
+  type PlatformActionErrorHandler,
+} from './platformErrorFeedback';
 
 export type StaticFormSaveMode = 'create' | 'edit';
+
+export interface StaticFormActionErrorContext<TRecord> {
+  mode: StaticFormSaveMode;
+  record: TRecord;
+}
 
 export interface StaticFormSaveOptions<TRecord> {
   loading: Ref<boolean>;
@@ -21,7 +31,12 @@ export interface StaticFormSaveOptions<TRecord> {
   onSaved: (result: StaticRecordMutationResult<TRecord>) => void;
   successMessage?: string;
   reactionHandlers?: Record<string, PlatformActionResultReactionHandler | undefined>;
+  actionErrorHandlers?: StaticFormActionErrorHandler<TRecord>[];
 }
+
+export type StaticFormActionErrorHandler<TRecord> = PlatformActionErrorHandler<
+  StaticFormActionErrorContext<TRecord>
+>;
 
 export interface StaticRecordActionOptions<TRecord, TResult = unknown> {
   loading: Ref<boolean>;
@@ -69,11 +84,36 @@ export async function executeStaticFormSave<TRecord>(options: StaticFormSaveOpti
     });
     return result;
   } catch (cause) {
-    presentPlatformError(cause, { source, phase: 'action' });
+    handleStaticFormActionError(cause, { mode: options.mode, record }, options, source);
     return undefined;
   } finally {
     options.loading.value = false;
   }
+}
+
+function handleStaticFormActionError<TRecord>(
+  cause: unknown,
+  context: StaticFormActionErrorContext<TRecord>,
+  options: StaticFormSaveOptions<TRecord>,
+  source: string,
+) {
+  const error = normalizeError(cause);
+  if (tryHandleStaticFormActionError(error, context, options.actionErrorHandlers)) {
+    return;
+  }
+  presentPlatformError(error, { source, phase: 'action' });
+}
+
+function tryHandleStaticFormActionError<TRecord>(
+  error: AppError,
+  context: StaticFormActionErrorContext<TRecord>,
+  handlers: StaticFormActionErrorHandler<TRecord>[] | undefined,
+) {
+  const handler = handlers?.find((item) => matchesPlatformActionErrorHandler(error, item));
+  if (!handler) {
+    return false;
+  }
+  return handler.handle(error, context) !== false;
 }
 
 export async function executeStaticRecordAction<TRecord, TResult = unknown>(

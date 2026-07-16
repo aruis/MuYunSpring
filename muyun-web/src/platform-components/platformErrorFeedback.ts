@@ -36,7 +36,7 @@ export function presentPlatformSuccess(message: string, context: PlatformErrorFe
 export type PlatformActionErrorHandler<TContext> = {
   code?: string;
   marker?: string;
-  handle: (error: AppError, context: TContext) => void;
+  handle: (error: AppError, context: TContext) => void | boolean;
 };
 
 export function matchesPlatformActionErrorHandler<TContext>(

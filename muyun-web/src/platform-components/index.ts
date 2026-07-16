@@ -106,6 +106,8 @@ export { applyRecordExternalChange, createRecordEditorSessionState } from './rec
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
 export type {
+  StaticFormActionErrorContext,
+  StaticFormActionErrorHandler,
   StaticFormSaveMode,
   StaticFormSaveOptions,
   StaticRecordActionOptions,

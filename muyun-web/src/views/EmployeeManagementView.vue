@@ -39,7 +39,7 @@ import type {
   UserAccount,
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
-import { actionResultData, useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageRecordExternalChange } from '../app/pageRealtime';
 import {
   canSwitchEmployeeDetailContext,
@@ -519,6 +519,13 @@ async function saveEmployee() {
       mode === 'edit' && selectedEmployee.value?.id
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
         : employeeContext.crud.insert(draft),
+    actionErrorHandlers: [
+      {
+        code: platformErrorCodes.conflictVersion,
+        handle: (_error, { mode, record }) =>
+          mode === 'edit' && employeeExternalChange.markExternalRecordChanged(record.id),
+      },
+    ],
     onSaved: ({ record }) => {
       const requestSeq = commitEmployeeDetailRecord(record);
       employeeReloadKey.value += 1;

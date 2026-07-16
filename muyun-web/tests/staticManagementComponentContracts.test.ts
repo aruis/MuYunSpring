@@ -124,6 +124,8 @@ test('record mode drawer owns detail mode branch switching', () => {
     systemUserSource,
     /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedUser\.value\?\.id[\s\S]*editing: \(\) => detailMode\.value === 'edit'[\s\S]*saving: \(\) => savingUser\.value/,
   );
+  assert.match(systemUserSource, /code: platformErrorCodes\.conflictVersion/);
+  assert.match(systemUserSource, /userExternalChange\.markExternalRecordChanged\(record\.id\)/);
 
   const employeeSource = readSource('src/views/EmployeeManagementView.vue');
   assert.match(employeeSource, /RecordExternalChangeNotice/);
@@ -135,6 +137,8 @@ test('record mode drawer owns detail mode branch switching', () => {
     employeeSource,
     /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedEmployee\.value\?\.id[\s\S]*editing: \(\) => employeeDetailMode\.value === 'edit'[\s\S]*saving: \(\) => savingEmployee\.value/,
   );
+  assert.match(employeeSource, /code: platformErrorCodes\.conflictVersion/);
+  assert.match(employeeSource, /employeeExternalChange\.markExternalRecordChanged\(record\.id\)/);
 });
 
 test('record explorer panel focuses and closes search from keyboard', () => {

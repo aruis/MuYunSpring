@@ -29,7 +29,7 @@ import type {
   UserSessionView,
   WebQueryRequest,
 } from '@muyun/web-contracts';
-import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageBusinessEventHandler, usePageRecordExternalChange } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
@@ -339,6 +339,13 @@ async function saveUser() {
     createRecord: () => normalizedSystemUserDraft(userDraft.value),
     validateRecord: validateSystemUserDraft,
     save: (draft) => userContext.crud.update(selectedUser.value!.id!, draft),
+    actionErrorHandlers: [
+      {
+        code: platformErrorCodes.conflictVersion,
+        handle: (_error, { mode, record }) =>
+          mode === 'edit' && userExternalChange.markExternalRecordChanged(record.id),
+      },
+    ],
     onSaved: ({ record }) => {
       commitDetailRecord(record);
       reloadKey.value += 1;
