@@ -13,7 +13,7 @@ public class StompBusinessRealtimeNotifier implements BusinessRealtimeNotifier {
 
     @Override
     public void notifyUser(String userId, BusinessRealtimeEvent event) {
-        if (event == null) {
+        if (userId == null || userId.isBlank() || event == null) {
             return;
         }
         messagePublisher.sendToUser(userId, RealtimeDestinations.USER_BUSINESS_EVENTS,

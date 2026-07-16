@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -1099,8 +1099,18 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
   assert.match(appSource, /authClient\.changeOwnPassword/);
   assert.match(appSource, /onUserNotification: handleSecurityNotification/);
+  assert.match(pageRealtimeSource, /export interface PageRealtimeSubscription/);
+  assert.match(pageRealtimeSource, /export function usePageRealtimeSubscription/);
   assert.match(pageRealtimeSource, /usePageModuleDataChanges\(moduleAlias: string\)/);
   assert.match(pageRealtimeSource, /usePageBusinessEventHandler/);
+  assert.match(
+    pageRealtimeSource,
+    /usePageRealtimeSubscription\(\(\) => subscribeAppDataChanges\(handler\)\)/,
+  );
+  assert.match(
+    pageRealtimeSource,
+    /usePageRealtimeSubscription\(\(\) => subscribeAppBusinessEvents\(handler\)\)/,
+  );
   assert.match(pageRealtimeSource, /onMounted\(\(\) => \{/);
   assert.match(pageRealtimeSource, /onUnmounted\(\(\) => \{/);
   assert.match(realtimeSource, /connectRealtimeBusinessEvents/);
@@ -1123,6 +1133,22 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(authClientSource, /path: '\/iam\.auth\/changeOwnPassword'/);
   assert.doesNotMatch(appSource, /iam\.user\/changePassword/);
   assert.doesNotMatch(appSource, /iam\.user\/resetPassword/);
+});
+
+test('business views use page realtime lifecycle wrappers only', () => {
+  for (const [file, source] of viewSources()) {
+    assert.doesNotMatch(
+      source,
+      /from ['"]\.\.\/app\/realtime['"]/,
+      `${file} must not import app realtime directly`,
+    );
+    assert.doesNotMatch(
+      source,
+      /subscribeApp[A-Z]/,
+      `${file} must not call app realtime subscriptions directly`,
+    );
+    assert.doesNotMatch(source, /\.subscribe\(/, `${file} must not hold raw realtime subscriptions`);
+  }
 });
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
@@ -1183,6 +1209,13 @@ test('platform error feedback respects global error presentation slots', () => {
 
 function readSource(path: string) {
   return readFileSync(resolve(root, path), 'utf8');
+}
+
+function viewSources() {
+  const viewsDir = resolve(root, 'src/views');
+  return readdirSync(viewsDir)
+    .filter((file) => file.endsWith('.vue') || file.endsWith('.ts'))
+    .map((file) => [file, readFileSync(join(viewsDir, file), 'utf8')] as const);
 }
 
 function matchCount(source: string, pattern: RegExp) {
