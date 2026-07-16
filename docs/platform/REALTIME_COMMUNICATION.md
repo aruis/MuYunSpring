@@ -333,7 +333,13 @@ payload 表达稳定安全事实，例如 `platform.security.password-changed`�
 
 用户管理中的单个登录会话下线发送 `platform.security.session-revoked` 安全事实，payload 携带 `targetSessionId`。由于 STOMP user queue 仍按 `userId` fan-out，同一用户的其他会话可能收到该消息，但只有当前登录 `sessionId` 与 `targetSessionId` 相同的前端才执行本地退出；其他会话必须忽略。
 
-用户登录或登录会话被撤销时，不向无授权的模块级 topic 广播账号或 session 标识。用户管理页的在线状态和会话明细仍通过 `/iam.user/sessions/status`、`/iam.user/{id}/sessions` 等权限接口读取；管理员执行定点下线或批量下线后由动作结果触发本页刷新。跨页面、跨操作者的会话集合实时同步需要等待平台补齐 destination 订阅授权或受权限约束的 fan-out 机制后再接入。
+用户登录或登录会话被撤销时，不向无授权的模块级 topic 广播账号或 session 标识。后端将 `UserSessionLifecycleEvent` 转换为用户私有业务事件，只 fan-out 给当前在线且对目标用户通过 `iam.user.sessions` 记录权限判断的管理端用户：
+
+```text
+/user/queue/platform/business-events
+```
+
+payload 只表达低敏脏标记，例如 `type=iam.user.session.changed`、`moduleAlias=iam.user`、`recordId=userId` 和 `reason=LOGGED_IN/REVOKED`，不携带 `sessionId`、IP、User-Agent、token hash 或终端明细。用户管理页收到后只刷新当前可见用户的在线状态；如果目标用户子列表已展开，再通过 `/iam.user/{id}/sessions` 权限接口读取会话明细。
 
 前端业务页面需要订阅模块、记录或上下文 topic 时，必须通过应用层页面订阅封装接入，例如 `usePageModuleDataChanges` 和 `usePageDataChangeHandler`。页面只声明所需实时事实和处理函数，由封装负责挂载时订阅、卸载时反订阅，并在全局 realtime 连接重建时重新绑定。禁止在应用全局连接启动逻辑中订阅具体业务模块 topic，也禁止业务页面直接长期持有 STOMP subscription 变量。
 
@@ -499,6 +505,7 @@ export interface RealtimeClient {
 ```ts
 export const dataChangeChannel: RealtimeChannel<CommittedChangeSet>;
 export const userNotificationChannel: RealtimeChannel<UserNotification>;
+export const userBusinessEventChannel: RealtimeChannel<BusinessRealtimeEvent>;
 export const platformPingCommand: RealtimeCommand<PlatformPingRequest>;
 ```
 

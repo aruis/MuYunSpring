@@ -808,10 +808,18 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /<strong :title="sessionTitle\(session\)"/);
   assert.match(userViewSource, /<dd :title="sessionTerminalTitle\(session\)"/);
   assert.match(userViewSource, /useUserSessionRows\(\{ context: userContext, source: 'user-management' \}\)/);
+  assert.match(userViewSource, /usePageBusinessEventHandler\(handleUserSessionBusinessEvent\)/);
   assert.match(userViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
   assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
   assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
   assert.match(userSessionRowsSource, /function userOnlineStatusTitle\(record: \{ id\?: string \}\)/);
+  assert.match(
+    userSessionRowsSource,
+    /function handleUserSessionBusinessEvent\(event: WebBusinessRealtimeEvent\)/,
+  );
+  assert.match(userSessionRowsSource, /event\.type !== userSessionChangedEventType/);
+  assert.match(userSessionRowsSource, /visibleUserIds\.value\.includes\(userId\)/);
+  assert.match(userSessionRowsSource, /expandedUserKeys\.value\.includes\(userId\)/);
   assert.match(userSessionRowsSource, /loadUserSessions/);
   assert.match(userSessionRowsSource, /loadUserSessionActions/);
   assert.match(userSessionRowsSource, /options\.context\.recordActions\(userId\)/);
@@ -920,6 +928,7 @@ test('system user management is a separate root account entry', () => {
     systemUserViewSource,
     /useUserSessionRows\(\{ context: userContext, source: 'system-user-management' \}\)/,
   );
+  assert.match(systemUserViewSource, /usePageBusinessEventHandler\(handleUserSessionBusinessEvent\)/);
   assert.match(systemUserViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
   assert.match(userSessionRowsSource, /function handleUserListLoaded\(records: Array<\{ id\?: string \}>\)/);
   assert.match(userSessionRowsSource, /path: '\/iam\.user\/sessions\/status'/);
@@ -1004,8 +1013,11 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(appSource, /authClient\.changeOwnPassword/);
   assert.match(appSource, /onUserNotification: handleSecurityNotification/);
   assert.match(pageRealtimeSource, /usePageModuleDataChanges\(moduleAlias: string\)/);
+  assert.match(pageRealtimeSource, /usePageBusinessEventHandler/);
   assert.match(pageRealtimeSource, /onMounted\(\(\) => \{/);
   assert.match(pageRealtimeSource, /onUnmounted\(\(\) => \{/);
+  assert.match(realtimeSource, /connectRealtimeBusinessEvents/);
+  assert.match(realtimeSource, /subscribeAppBusinessEvents/);
   assert.match(realtimeSource, /subscribeAppModuleDataChanges\(moduleAlias: string\)/);
   assert.match(realtimeSource, /moduleDataChangeChannel\(moduleAlias\)/);
   assert.match(realtimeSource, /appDataChangeDispatcher\.dispatch\(changeSet\)/);

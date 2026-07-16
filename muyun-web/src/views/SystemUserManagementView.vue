@@ -29,6 +29,7 @@ import type {
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { usePageBusinessEventHandler } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
@@ -54,6 +55,7 @@ const {
   expandedUserKeys,
   handleUserListLoaded,
   handleUserRowExpand,
+  handleUserSessionBusinessEvent,
   loadUserSessions,
   userOnlineStatusTitle,
   userSessionState,
@@ -140,6 +142,8 @@ const formFieldNames = computed<SystemUserFormFieldName[]>(() => ['username', 'e
 onMounted(() => {
   void loadFormDefinition();
 });
+
+usePageBusinessEventHandler(handleUserSessionBusinessEvent);
 
 async function loadFormDefinition() {
   try {

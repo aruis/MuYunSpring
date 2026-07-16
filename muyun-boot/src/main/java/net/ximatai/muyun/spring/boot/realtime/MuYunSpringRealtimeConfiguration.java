@@ -1,15 +1,19 @@
 package net.ximatai.muyun.spring.boot.realtime;
 
+import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.boot.web.MuYunSpringCorsProperties;
 import net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher;
+import net.ximatai.muyun.spring.iam.user.UserSessionLifecycleEventPublisher;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -70,8 +74,25 @@ public class MuYunSpringRealtimeConfiguration implements WebSocketMessageBrokerC
     }
 
     @Bean
+    @ConditionalOnMissingBean(BusinessRealtimeNotifier.class)
+    public BusinessRealtimeNotifier businessRealtimeNotifier(RealtimeMessagePublisher messagePublisher) {
+        return new StompBusinessRealtimeNotifier(messagePublisher);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(UserSecurityEventPublisher.class)
     public UserSecurityEventPublisher userSecurityEventPublisher(SecurityRealtimeNotifier securityRealtimeNotifier) {
         return new UserSecurityRealtimeEventPublisher(securityRealtimeNotifier);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(UserSessionLifecycleEventPublisher.class)
+    @ConditionalOnBean(PlatformRecordActionAvailabilityService.class)
+    public UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher(
+            SimpUserRegistry userRegistry,
+            PlatformRecordActionAvailabilityService actionAvailabilityService,
+            BusinessRealtimeNotifier businessRealtimeNotifier) {
+        return new UserSessionManagementRealtimeEventPublisher(
+                userRegistry, actionAvailabilityService, businessRealtimeNotifier, userSessionService);
     }
 }

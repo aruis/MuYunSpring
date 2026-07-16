@@ -35,6 +35,7 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
+import { usePageBusinessEventHandler } from '../app/pageRealtime';
 import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'UserManagementView' });
@@ -65,6 +66,7 @@ const {
   expandedUserKeys,
   handleUserListLoaded,
   handleUserRowExpand,
+  handleUserSessionBusinessEvent,
   loadUserSessions,
   resetUserSessionRows,
   userOnlineStatusTitle,
@@ -194,6 +196,8 @@ const userFormFieldNames = computed<UserFormFieldName[]>(() => ['username', 'ena
 onMounted(() => {
   void loadUserFormDefinition();
 });
+
+usePageBusinessEventHandler(handleUserSessionBusinessEvent);
 
 watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
 

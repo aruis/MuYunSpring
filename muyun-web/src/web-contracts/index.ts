@@ -86,6 +86,13 @@ export interface WebUserNotification {
   targetSessionId?: string;
 }
 
+export interface WebBusinessRealtimeEvent {
+  type: string;
+  moduleAlias: string;
+  recordId: string;
+  reason?: string;
+}
+
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];
