@@ -34,4 +34,12 @@ public record ProjectionGraphNode(String nodeId,
         return new ProjectionGraphNode("root", ProjectionGraphNodeKind.ROOT, moduleAlias,
                 null, null, null, false, false);
     }
+
+    public static ProjectionGraphNode join(String moduleAlias, String tableAlias) {
+        if (tableAlias == null || tableAlias.isBlank()) {
+            throw new IllegalArgumentException("projection graph join table alias must not be blank");
+        }
+        return new ProjectionGraphNode("join:" + tableAlias.trim(), ProjectionGraphNodeKind.JOIN, moduleAlias,
+                null, null, null, false, false);
+    }
 }
