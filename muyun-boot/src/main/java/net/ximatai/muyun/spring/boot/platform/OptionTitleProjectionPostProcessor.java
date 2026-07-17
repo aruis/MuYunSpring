@@ -17,25 +17,30 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-final class RecordReadProjectionOptionTitleProjector {
-    private RecordReadProjectionOptionTitleProjector() {
+final class OptionTitleProjectionPostProcessor {
+    private OptionTitleProjectionPostProcessor() {
     }
 
-    static List<Map<String, Object>> project(Class<?> modelClass,
-                                             RecordReadProjection projection,
-                                             List<Map<String, Object>> records,
-                                             OptionSourceRegistry optionSourceRegistry) {
+    static List<Map<String, Object>> apply(Class<?> modelClass,
+                                           RecordReadProjection projection,
+                                           List<Map<String, Object>> records,
+                                           OptionSourceRegistry optionSourceRegistry) {
         if (modelClass == null || projection == null || records == null || records.isEmpty()
                 || optionSourceRegistry == null) {
             return records;
         }
-        Set<String> outputFieldNames = projection.outputFields().stream()
-                .filter(field -> field.relationCode() == null)
-                .map(ViewFieldRef::fieldName)
+        Set<String> optionTitleFields = projection.postReadTransforms().stream()
+                .map(RecordReadPostTransform::parse)
+                .flatMap(java.util.Optional::stream)
+                .filter(RecordReadPostTransform::isOptionTitle)
+                .map(RecordReadPostTransform::fieldName)
                 .collect(Collectors.toUnmodifiableSet());
+        if (optionTitleFields.isEmpty()) {
+            return records;
+        }
         List<OptionFieldDefinition> definitions = OptionFieldResolver.resolve(modelClass).stream()
                 .filter(OptionFieldDefinition::hasTitleOutput)
-                .filter(definition -> outputFieldNames.contains(definition.fieldName()))
+                .filter(definition -> optionTitleFields.contains(definition.fieldName()))
                 .toList();
         if (definitions.isEmpty()) {
             return records;

@@ -11,26 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-final class RelationProjectionOutputProtector {
-    private RelationProjectionOutputProtector() {
-    }
-
-    static List<Map<String, Object>> protect(List<StaticModuleDefinition> definitions,
-                                             StaticModuleDefinition definition,
-                                             RecordReadProjection projection,
-                                             List<Map<String, Object>> records,
-                                             FieldOutputContext context) {
-        if (records == null || records.isEmpty()) {
-            return records;
-        }
-        Map<String, FieldProtectionDefinition> protections = outputProtections(definitions, definition, projection);
-        if (protections.isEmpty()) {
-            return records;
-        }
-        FieldOutputContext outputContext = context == null ? FieldOutputContext.LIST : context;
-        return records.stream()
-                .map(record -> protect(record, protections, outputContext))
-                .toList();
+final class FieldProtectionProjectionPostProcessor {
+    private FieldProtectionProjectionPostProcessor() {
     }
 
     static boolean hasStorageProtectedOutput(List<StaticModuleDefinition> definitions,
@@ -40,9 +22,27 @@ final class RelationProjectionOutputProtector {
                 .anyMatch(FieldProtectionDefinition::hasStorageProtection);
     }
 
-    private static Map<String, Object> protect(Map<String, Object> record,
-                                               Map<String, FieldProtectionDefinition> protections,
-                                               FieldOutputContext context) {
+    static List<Map<String, Object>> applySqlOutput(List<StaticModuleDefinition> definitions,
+                                                    StaticModuleDefinition definition,
+                                                    RecordReadProjection projection,
+                                                    List<Map<String, Object>> records,
+                                                    FieldOutputContext context) {
+        if (records == null || records.isEmpty()) {
+            return records;
+        }
+        Map<String, FieldProtectionDefinition> protections = outputProtections(definitions, definition, projection);
+        if (protections.isEmpty()) {
+            return records;
+        }
+        FieldOutputContext outputContext = context == null ? FieldOutputContext.LIST : context;
+        return records.stream()
+                .map(record -> apply(record, protections, outputContext))
+                .toList();
+    }
+
+    private static Map<String, Object> apply(Map<String, Object> record,
+                                             Map<String, FieldProtectionDefinition> protections,
+                                             FieldOutputContext context) {
         Map<String, Object> output = new LinkedHashMap<>(record);
         for (Map.Entry<String, FieldProtectionDefinition> entry : protections.entrySet()) {
             FieldProtectionDefinition protection = entry.getValue();

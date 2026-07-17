@@ -123,6 +123,28 @@ class RelationProjectionReadServiceTest {
     }
 
     @Test
+    void shouldSupportOptionTitlePostReadTransformsOnSqlProjectionOutput() {
+        RelationProjectionReadService service = new RelationProjectionReadService(
+                mock(RelationProjectionQueryExecutor.class),
+                new RelationProjectionDatabaseTypeProvider()
+        );
+        RecordReadProjection projection = new RecordReadProjection(
+                "iam.user",
+                "defaultList",
+                List.of(ViewFieldRef.main("username"),
+                        ViewFieldRef.main("passwordStatus"),
+                        ViewFieldRef.relation("bound_employee", "employeeNo")),
+                List.of("id"),
+                List.of("optionTitle:passwordStatus")
+        );
+
+        ProjectionQueryDescriptor descriptor = service.describeListQuery(userRelationDefinition(), projection);
+
+        assertThat(descriptor.supported()).isTrue();
+        assertThat(descriptor.fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.NONE);
+    }
+
+    @Test
     void shouldApplyFieldProtectionPostReadTransformsOnSqlProjectionOutput() {
         NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
         RelationProjectionReadService service = new RelationProjectionReadService(

@@ -69,14 +69,14 @@ public class RelationProjectionReadService {
                     java.util.Set.of(), ProjectionQueryFallbackReason.MISSING_PROJECTION);
         }
         if (projection.postReadTransforms() != null && !projection.postReadTransforms().isEmpty()) {
-            if (!supportsPostReadTransforms(projection)) {
+            if (!RecordReadProjectionPostProcessor.supportsSqlOutput(projection)) {
                 return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.POST_READ_TRANSFORM);
             }
-            if (RelationProjectionOutputProtector.hasStorageProtectedOutput(definitions, definition, projection)) {
+            if (RecordReadProjectionPostProcessor.hasStorageProtectedOutput(definitions, definition, projection)) {
                 return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.PROTECTED_FIELD);
             }
         }
-        if (RelationProjectionOutputProtector.hasStorageProtectedOutput(definitions, definition, projection)) {
+        if (RecordReadProjectionPostProcessor.hasStorageProtectedOutput(definitions, definition, projection)) {
             return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.PROTECTED_FIELD);
         }
         if (!hasRelationProjectionCandidate(definition, projection)) {
@@ -173,20 +173,15 @@ public class RelationProjectionReadService {
             return Optional.empty();
         }
         PageResult<Map<String, Object>> page = executor.page(plan, criteria, pageRequest, additionalResponseFields, sorts);
-        List<Map<String, Object>> protectedRecords = RelationProjectionOutputProtector.protect(
+        List<Map<String, Object>> outputRecords = RecordReadProjectionPostProcessor.applySqlOutput(
                 definitions,
                 definition,
                 projection,
                 page.getRecords(),
                 FieldOutputContext.LIST
         );
-        return Optional.of(PageResult.of(protectedRecords, page.getTotal(),
+        return Optional.of(PageResult.of(outputRecords, page.getTotal(),
                 PageRequest.of(page.getPageNum(), page.getPageSize())));
-    }
-
-    private boolean supportsPostReadTransforms(RecordReadProjection projection) {
-        return projection.postReadTransforms().stream()
-                .allMatch(transform -> transform != null && transform.startsWith("fieldProtection:"));
     }
 
     private RelationProjectionQueryExecutor projectionQueryExecutor() {

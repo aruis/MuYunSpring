@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.FieldReadAbility;
 import net.ximatai.muyun.spring.ability.FieldReadPolicy;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -14,6 +15,7 @@ import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +143,67 @@ class RecordReadProjectionPlannerTest {
         assertThat(projection.outputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "mobile");
         assertThat(projection.postReadTransforms()).containsExactly("fieldProtection:mobile");
+    }
+
+    @Test
+    void shouldParseRecordReadPostTransformContract() {
+        RecordReadPostTransform transform = RecordReadPostTransform.fieldProtection("mobile");
+
+        assertThat(transform.serialize()).isEqualTo("fieldProtection:mobile");
+        assertThat(RecordReadPostTransform.parse(" fieldProtection:mobile "))
+                .hasValue(transform);
+        assertThat(RecordReadPostTransform.optionTitle("passwordStatus").serialize())
+                .isEqualTo("optionTitle:passwordStatus");
+        assertThat(RecordReadPostTransform.parse("optionTitle:passwordStatus"))
+                .hasValue(RecordReadPostTransform.optionTitle("passwordStatus"));
+        assertThat(RecordReadPostTransform.parse("fieldProtection"))
+                .isEmpty();
+        assertThat(RecordReadPostTransform.parse("fieldProtection:mobile:extra"))
+                .isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void shouldRecordOptionTitlePostReadTransformsForProjectedFields() {
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/users",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "user",
+                        "iam_user",
+                        "User",
+                        List.of(
+                                FieldDefinition.string("username", "账号"),
+                                FieldDefinition.string("passwordStatus", "密码状态")
+                        )
+                )),
+                ModuleUiDefinition.builder("iam.user")
+                        .listView(list -> list
+                                .field("username")
+                                .field("passwordStatus"))
+                        .build(),
+                List.of(),
+                List.of(),
+                UserAccount.class,
+                List.of()
+        ));
+        CrudAbility recordService = mock(CrudAbility.class);
+        when(recordService.modelClass()).thenReturn(UserAccount.class);
+
+        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+                compilation.uiDescriptor(),
+                compilation.readModel(),
+                recordService
+        );
+
+        assertThat(projection.postReadTransforms()).containsExactly("optionTitle:passwordStatus");
     }
 
     @Test
