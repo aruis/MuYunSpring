@@ -1084,15 +1084,27 @@ class IamWebControllerTest {
     void shouldExposeUserSelectorQuery() throws Exception {
         RoleService roleService = mock(RoleService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
         UserAccountWebController controller = new UserAccountWebController(provider(roleService));
         ReflectionTestUtils.setField(controller, "service", userAccountService);
+        controller.setStaticRecordReadProjectionService(projectionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addFilters(new CurrentUserWebFilter(() ->
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
-        UserAccount alice = user("user-2", "alice", "Alice");
         when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
-        userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
+        when(projectionService.queryExplicitList(
+                any(),
+                any(),
+                any(),
+                any(Criteria.class),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        )).thenReturn(java.util.Optional.of(WebPageResponse.from(PageResult.of(List.of(Map.of(
+                "id", "user-2",
+                "username", "alice"
+        )), 1, PageRequest.of(1, 20)))));
 
         mvc.perform(post("/iam.user/selector/query")
                         .contentType("application/json")
@@ -1112,45 +1124,63 @@ class IamWebControllerTest {
                 .extracting(ActionExecutionPolicy::actionCode)
                 .containsExactly("userSelector");
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
-        assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(projectionService).queryExplicitList(
+                any(),
+                any(),
+                any(),
+                criteriaCaptor.capture(),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        );
+        assertThat(compiledCriteria(criteriaCaptor.getValue()))
+                .contains("authUserId")
+                .contains("enabled")
+                .contains("id")
+                .contains("username");
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
     }
 
     @Test
-    void shouldExposeEmployeeFieldsInUserSelectorWithBatchLookup() throws Exception {
+    void shouldExposeEmployeeFieldsInUserSelectorWithProjectionQuery() throws Exception {
         RoleService roleService = mock(RoleService.class);
         EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
         EmployeeService employeeService = mock(EmployeeService.class);
-        OrganizationService organizationService = mock(OrganizationService.class);
-        DepartmentService departmentService = mock(DepartmentService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
         UserAccountWebController controller = new UserAccountWebController(
                 provider(roleService),
                 provider(employeeAccountService),
                 provider(employeeService),
-                provider(organizationService),
-                provider(departmentService),
                 null
         );
         ReflectionTestUtils.setField(controller, "service", userAccountService);
+        controller.setStaticRecordReadProjectionService(projectionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addFilters(new CurrentUserWebFilter(() ->
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
-        UserAccount alice = user("user-2", "alice", "Alice");
-        EmployeeAccount binding = new EmployeeAccount();
-        binding.setId("binding-1");
-        binding.setUserId("user-2");
-        binding.setEmployeeId("employee-1");
-        Employee employee = employee("employee-1", "org-1", "dept-1", "E001", "Alice Zhang");
-        Organization organization = organization("org-1", "ORG1", "研发中心");
-        Department department = department("dept-1", "org-1", "D1", "平台部");
         when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
-        when(employeeAccountService.accountsOfUsers(List.of("user-2"))).thenReturn(List.of(binding));
-        when(employeeService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(employee));
-        when(organizationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(organization));
-        when(departmentService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(department));
-        userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
+        when(projectionService.queryExplicitList(
+                any(),
+                any(),
+                any(),
+                any(Criteria.class),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        )).thenReturn(java.util.Optional.of(WebPageResponse.from(PageResult.of(List.of(Map.of(
+                "id", "user-2",
+                "username", "alice",
+                "employeeId", "employee-1",
+                "employeeNo", "E001",
+                "employeeTitle", "Alice Zhang",
+                "employeeOrganizationId", "org-1",
+                "organizationTitle", "研发中心",
+                "employeeDepartmentId", "dept-1",
+                "departmentTitle", "平台部"
+        )), 1, PageRequest.of(1, 20)))));
 
         mvc.perform(post("/iam.user/selector/query")
                         .contentType("application/json")
@@ -1170,9 +1200,54 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.records[0].departmentId").value("dept-1"))
                 .andExpect(jsonPath("$.records[0].departmentTitle").value("平台部"));
 
-        verify(employeeAccountService).accountsOfUsers(List.of("user-2"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> fieldsCaptor = ArgumentCaptor.captor();
+        verify(projectionService).queryExplicitList(
+                any(),
+                any(),
+                fieldsCaptor.capture(),
+                any(Criteria.class),
+                any(PageRequest.class),
+                any(),
+                any(Sort[].class)
+        );
+        assertThat(fieldsCaptor.getValue()).containsExactly(
+                "id",
+                "username",
+                "employeeId",
+                "employeeNo",
+                "employeeTitle",
+                "employeeOrganizationId",
+                "organizationTitle",
+                "employeeDepartmentId",
+                "departmentTitle"
+        );
+        verify(employeeAccountService, never()).accountsOfUsers(any());
         verify(employeeAccountService, never()).accountOfUser(any());
         verify(employeeService, never()).select(any());
+    }
+
+    @Test
+    void shouldFailUserSelectorWhenProjectionServiceIsUnavailable() throws Exception {
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        UserAccountWebController controller = new UserAccountWebController();
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+
+        mvc.perform(post("/iam.user/selector/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "keyword":"ali"
+                                }
+                                """))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test

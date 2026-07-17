@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 
 @Getter
@@ -29,6 +30,7 @@ public class Employee extends StandardEnabledSortableEntity {
 
     @Column(name = "department_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Department id")
+    @ModuleReference(target = DepartmentService.class)
     private String departmentId;
 
     @Column(name = "employee_no", type = ColumnType.VARCHAR, length = 64, nullable = false,
