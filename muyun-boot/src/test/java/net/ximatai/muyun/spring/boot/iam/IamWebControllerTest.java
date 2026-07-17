@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
@@ -1113,6 +1114,55 @@ class IamWebControllerTest {
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
         assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    @Test
+    void shouldExposeEmployeeFieldsInUserSelectorWithBatchLookup() throws Exception {
+        RoleService roleService = mock(RoleService.class);
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        UserAccountWebController controller = new UserAccountWebController(
+                provider(roleService),
+                provider(employeeAccountService),
+                provider(employeeService),
+                null
+        );
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        UserAccount alice = user("user-2", "alice", "Alice");
+        EmployeeAccount binding = new EmployeeAccount();
+        binding.setId("binding-1");
+        binding.setUserId("user-2");
+        binding.setEmployeeId("employee-1");
+        Employee employee = employee("employee-1", "org-1", "dept-1", "E001", "Alice Zhang");
+        when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
+        when(employeeAccountService.accountsOfUsers(List.of("user-2"))).thenReturn(List.of(binding));
+        when(employeeService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(employee));
+        userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
+
+        mvc.perform(post("/iam.user/selector/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "roleId":"role-1",
+                                  "keyword":"ali"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("user-2"))
+                .andExpect(jsonPath("$.records[0].employeeId").value("employee-1"))
+                .andExpect(jsonPath("$.records[0].employeeNo").value("E001"))
+                .andExpect(jsonPath("$.records[0].employeeTitle").value("Alice Zhang"))
+                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"))
+                .andExpect(jsonPath("$.records[0].departmentId").value("dept-1"));
+
+        verify(employeeAccountService).accountsOfUsers(List.of("user-2"));
+        verify(employeeAccountService, never()).accountOfUser(any());
+        verify(employeeService, never()).select(any());
     }
 
     @Test

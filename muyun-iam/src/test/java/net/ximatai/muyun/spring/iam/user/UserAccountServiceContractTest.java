@@ -274,6 +274,29 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldPreserveEnabledUsernameGrantWhenRepairingDuplicateUserIdGrant() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        UserAccount user = activeUser();
+        AccountRoleGrant usernameGrant = accountRoleGrant("grant-username", "role-1", "alice");
+        AccountRoleGrant userIdGrant = accountRoleGrant("grant-user-id", "role-1", "user-1");
+        userIdGrant.setEnabled(Boolean.FALSE);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(usernameGrant, userIdGrant));
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+
+        UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
+
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.deletedDuplicates()).isEqualTo(1);
+        assertThat(userIdGrant.getEnabled()).isTrue();
+        verify(accountRoleGrantDao).updateById(userIdGrant);
+        verify(accountRoleGrantDao).deleteById("grant-username");
+    }
+
+    @Test
     void shouldApplyRecordDataScopeWhenChangingPassword() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccount user = activeUser();

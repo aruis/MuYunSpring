@@ -331,6 +331,12 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             }
             AccountRoleGrant duplicate = findDuplicateAccountRoleGrant(grants, grant, user.getId());
             if (duplicate != null) {
+                if (Boolean.TRUE.equals(grant.getEnabled()) && !Boolean.TRUE.equals(duplicate.getEnabled())) {
+                    duplicate.setEnabled(Boolean.TRUE);
+                    EntityLifecycle.prepareUpdate(duplicate, Instant.now());
+                    accountRoleGrantDao.updateById(duplicate);
+                    updated++;
+                }
                 accountRoleGrantDao.deleteById(grant.getId());
                 deletedDuplicates++;
                 continue;

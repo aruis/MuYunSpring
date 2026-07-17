@@ -50,7 +50,6 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
-import RoleAccountGrantPanel from './RoleAccountGrantPanel.vue';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
 import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
 
@@ -185,15 +184,6 @@ const canSaveRole = computed(() => {
     Boolean(selectedRole.value?.id) &&
     roleContext.can('update') === true &&
     !selectedRole.value?.systemManaged
-  );
-});
-const showAccountGrantPanel = computed(() => {
-  const role = selectedRole.value;
-  return (
-    Boolean(role?.id) &&
-    role?.assignmentType === 'account' &&
-    role.roleKind !== 'group' &&
-    role.roleKind !== 'dataGrant'
   );
 });
 const roleDetailActions = computed<RecordActionItem[]>(() => {
@@ -496,6 +486,13 @@ function roleRowActionsOf(record: QueryListRecord): RecordActionItem[] {
       disabled: systemManaged,
     },
     {
+      key: 'toggle',
+      actionCode: roleToggleActionCode(record),
+      title: roleToggleTitle(record),
+      iconName: 'power',
+      disabled: systemManaged,
+    },
+    {
       key: 'delete',
       actionCode: 'delete',
       title: '删除',
@@ -520,6 +517,10 @@ function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryList
   }
   if (action.key === 'bind') {
     void openRoleBinding(record);
+    return;
+  }
+  if (action.key === 'toggle') {
+    void toggleRoleEnabled(record);
     return;
   }
   if (action.key === 'delete') {
@@ -718,6 +719,29 @@ async function removeRole(record: Partial<Role> | QueryListRecord | undefined) {
         loadingRoleDetail.value = false;
         roleDetailLoadFailed.value = false;
         roleDetailRequestSeq.value += 1;
+      }
+      roleReloadKey.value += 1;
+      void loadMemberRoleCandidates();
+    },
+  });
+}
+
+async function toggleRoleEnabled(record: Partial<Role> | QueryListRecord | undefined) {
+  await executeStaticRecordAction({
+    loading: savingRole,
+    source: 'role-management',
+    record: () => (record?.id ? record : undefined),
+    canExecute: (target) =>
+      roleContext.can(roleToggleActionCode(target)) === true && (target as Role).systemManaged !== true,
+    deniedMessage: '当前用户无权变更角色启停状态',
+    execute: (target) =>
+      target.enabled === false
+        ? roleContext.crud.enable(String(target.id))
+        : roleContext.crud.disable(String(target.id)),
+    onExecuted: async (_, target) => {
+      if (selectedRoleKey.value === String(target.id)) {
+        const refreshed = await roleContext.crud.view(String(target.id));
+        commitRoleDetailRecord(refreshed);
       }
       roleReloadKey.value += 1;
       void loadMemberRoleCandidates();
@@ -937,6 +961,14 @@ function canBindAccountRoleRecord(record: Partial<Role> | QueryListRecord | unde
     record.roleKind !== 'group' &&
     record.roleKind !== 'dataGrant'
   );
+}
+
+function roleToggleActionCode(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.enabled === false ? 'enable' : 'disable';
+}
+
+function roleToggleTitle(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.enabled === false ? '启用' : '停用';
 }
 
 function roleTitle(record: Partial<Role> | QueryListRecord | undefined) {
@@ -1202,12 +1234,6 @@ function parseRoleIds(value: unknown) {
             @update:field="updateRoleDraftField"
           />
         </form>
-        <RoleAccountGrantPanel
-          v-if="roleDetailMode === 'view' && showAccountGrantPanel && selectedRole"
-          :context="roleContext"
-          :role="selectedRole"
-          :editable="false"
-        />
         <RecordMetaSection v-if="roleDetailMode !== 'create'" :record="roleDraft" show-sort-order />
       </template>
     </RecordDetailDrawer>

@@ -54,8 +54,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
@@ -289,7 +291,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             PageResult<UserAccount> result = selectorPageQuery(criteria,
                     PageRequest.of(page.pageNum(), page.pageSize()), Sort.asc("username"));
             return WebPageResponse.from(PageResult.of(
-                    result.getRecords().stream().map(this::userSelectorItem).toList(),
+                    userSelectorItems(result.getRecords()),
                     result.getTotal(),
                     PageRequest.of(result.getPageNum(), result.getPageSize())
             ));
@@ -360,10 +362,39 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         }
     }
 
-    private UserSelectorItem userSelectorItem(UserAccount user) {
-        EmployeeAccount binding = employeeAccountService == null ? null : employeeAccountService.accountOfUser(user.getId());
-        Employee employee = binding == null || employeeService == null ? null : employeeService.select(binding.getEmployeeId());
-        return UserSelectorItem.from(user, binding, employee);
+    private List<UserSelectorItem> userSelectorItems(List<UserAccount> users) {
+        if (users == null || users.isEmpty()) {
+            return List.of();
+        }
+        if (employeeAccountService == null || employeeService == null) {
+            return users.stream().map(user -> UserSelectorItem.from(user, null, null)).toList();
+        }
+        List<String> userIds = users.stream()
+                .map(UserAccount::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        List<EmployeeAccount> bindings = employeeAccountService.accountsOfUsers(userIds);
+        Map<String, EmployeeAccount> bindingByUserId = bindings.stream()
+                .filter(binding -> binding.getUserId() != null)
+                .collect(Collectors.toMap(EmployeeAccount::getUserId, Function.identity(), (first, ignored) -> first));
+        List<String> employeeIds = bindings.stream()
+                .map(EmployeeAccount::getEmployeeId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        Map<String, Employee> employeeById = employeeIds.isEmpty()
+                ? Map.of()
+                : employeeService.list(Criteria.of().in("id", employeeIds), new PageRequest(0, employeeIds.size()))
+                .stream()
+                .collect(Collectors.toMap(Employee::getId, Function.identity(), (first, ignored) -> first));
+        return users.stream()
+                .map(user -> {
+                    EmployeeAccount binding = bindingByUserId.get(user.getId());
+                    Employee employee = binding == null ? null : employeeById.get(binding.getEmployeeId());
+                    return UserSelectorItem.from(user, binding, employee);
+                })
+                .toList();
     }
 
     public record UserEmployeeBindingView(
