@@ -2,8 +2,11 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.FieldReadAbility;
 import net.ximatai.muyun.spring.ability.FieldReadPolicy;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
+import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
+import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
@@ -203,24 +206,41 @@ public final class RecordReadProjectionPlanner {
 
     @SuppressWarnings("rawtypes")
     private static List<String> postReadTransforms(Object recordService, Set<ViewFieldRef> outputFields) {
-        if (!(recordService instanceof FieldProtectionAbility fieldProtectionAbility)) {
-            return List.of();
-        }
         Set<String> outputFieldNames = outputFields.stream()
+                .filter(field -> field.relationCode() == null)
                 .map(ViewFieldRef::fieldName)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         LinkedHashSet<String> transforms = new LinkedHashSet<>();
-        for (Object item : fieldProtectionAbility.fieldProtectionPlan().fields()) {
-            ProtectedFieldAccessor<?> field = (ProtectedFieldAccessor<?>) item;
-            if (outputFieldNames.contains(field.fieldName()) && field.protection().hasOutputProtection()) {
-                transforms.add(fieldProtectionTransform(field));
+        if (recordService instanceof FieldProtectionAbility fieldProtectionAbility) {
+            for (Object item : fieldProtectionAbility.fieldProtectionPlan().fields()) {
+                ProtectedFieldAccessor<?> field = (ProtectedFieldAccessor<?>) item;
+                if (outputFieldNames.contains(field.fieldName()) && field.protection().hasOutputProtection()) {
+                    transforms.add(fieldProtectionTransform(field));
+                }
             }
+        }
+        Class<?> modelClass = modelClass(recordService);
+        if (modelClass != null) {
+            OptionFieldResolver.resolve(modelClass).stream()
+                    .filter(OptionFieldDefinition::hasTitleOutput)
+                    .map(OptionFieldDefinition::fieldName)
+                    .filter(outputFieldNames::contains)
+                    .map(RecordReadPostTransform::optionTitle)
+                    .map(RecordReadPostTransform::serialize)
+                    .forEach(transforms::add);
         }
         return List.copyOf(transforms);
     }
 
     private static String fieldProtectionTransform(ProtectedFieldAccessor<?> field) {
-        return "fieldProtection:" + field.fieldName();
+        return RecordReadPostTransform.fieldProtection(field.fieldName()).serialize();
+    }
+
+    private static Class<?> modelClass(Object recordService) {
+        if (recordService instanceof CrudAbility<?> crudAbility) {
+            return crudAbility.modelClass();
+        }
+        return null;
     }
 
     private static ResolvedViewDescriptor view(ResolvedModuleUiDescriptor descriptor, String viewCode) {

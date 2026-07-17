@@ -387,7 +387,7 @@ UI 配置 -> SQL columns / SQL fragment
 | `referenceTitleFields` | 引用标题或投影输出字段 |
 | `protectedFields` | 输出前需要脱敏或签名验证的字段 |
 
-`ResolvedModuleReadModel` 是模块级事实，`RecordReadProjection` 是 view/request 级执行计划。只有 `RecordReadProjection` 可以包含本次请求的 `outputFields`、`selectColumns` 和 `postReadTransforms`。
+`ResolvedModuleReadModel` 是模块级事实，`RecordReadProjection` 是 view/request 级执行计划。只有 `RecordReadProjection` 可以包含本次请求的 `outputFields`、`selectColumns` 和 `postReadTransforms`。`postReadTransforms` 使用平台统一编码契约表达后处理类型和字段，SQL 投影路径只能执行已明确声明支持 Map 输出的后处理，不能由调用点临时硬编码字符串判断。
 
 例如列表只声明输出：
 

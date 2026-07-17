@@ -9,6 +9,10 @@ import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
+import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.iam.employee.Employee;
@@ -182,6 +186,41 @@ class StaticRecordReadProjectionServiceTest {
         assertThat(dataSql.substring(0, dataSql.indexOf(" from (")))
                 .contains("\"id\"", "\"username\"", "\"employeeTitle\"")
                 .doesNotContain("\"employeeNo\"");
+    }
+
+    @Test
+    void shouldMaskRelationProjectionSqlResponseFields() {
+        NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
+        StaticRecordReadProjectionService service = new StaticRecordReadProjectionService(
+                new StaticModuleDefinitionCatalog(List.of(
+                        userReferenceProjectionDefinition(),
+                        employeeAccountReferenceDefinition(),
+                        protectedEmployeeReferenceDefinition()
+                )),
+                new RelationProjectionQueryExecutor(jdbcOperations),
+                new RelationProjectionDatabaseTypeProvider()
+        );
+        when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
+                .thenReturn(List.of(Map.of(
+                        "id", "user-1",
+                        "username", "alice",
+                        "employeeTitle", "Sensitive"
+                )));
+        when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
+                .thenReturn(1L);
+
+        WebPageResponse<?> response = service.queryExplicitList(
+                "iam.user",
+                "user_selector",
+                List.of("id", "username", "employeeTitle"),
+                Criteria.of(),
+                PageRequest.of(1, 20),
+                null
+        ).orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> output = (Map<String, Object>) response.records().getFirst();
+        assertThat(output).containsEntry("employeeTitle", "S*******e");
     }
 
     @Test
@@ -410,6 +449,14 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition() {
+        return employeeReferenceDefinition(FieldProtectionDefinition.NONE);
+    }
+
+    private static StaticModuleDefinition protectedEmployeeReferenceDefinition() {
+        return employeeReferenceDefinition(masked());
+    }
+
+    private static StaticModuleDefinition employeeReferenceDefinition(FieldProtectionDefinition protection) {
         return new StaticModuleDefinition(
                 "iam",
                 "iam.employee",
@@ -424,13 +471,22 @@ class StaticRecordReadProjectionServiceTest {
                         "employee",
                         "iam_employee",
                         "Employee",
-                        List.of(FieldDefinition.string("title", "职员姓名").column("title"))
+                        List.of(FieldDefinition.string("title", "职员姓名").column("title")
+                                .protection(protection))
                 )),
                 null,
                 List.of(),
                 List.of(),
                 Employee.class,
                 List.of()
+        );
+    }
+
+    private static FieldProtectionDefinition masked() {
+        return new FieldProtectionDefinition(
+                FieldEncryptionMode.NONE,
+                FieldSignatureMode.NONE,
+                FieldMaskingPolicy.MIDDLE
         );
     }
 

@@ -146,7 +146,7 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = RecordReadProjectionOptionTitleProjector.project(
+        List<Map<String, Object>> records = RecordReadProjectionPostProcessor.applyStaticOutput(
                 modelClass(recordService),
                 projection,
                 page.getRecords(),
@@ -209,7 +209,7 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = RecordReadProjectionOptionTitleProjector.project(
+        List<Map<String, Object>> records = RecordReadProjectionPostProcessor.applyStaticOutput(
                 modelClass(recordService),
                 projection,
                 page.getRecords(),

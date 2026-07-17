@@ -84,24 +84,46 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     @Test
-    void shouldFallbackWhenDynamicProjectionTouchesProtectedFields() {
+    void shouldMaskDynamicReferenceProjectionOutputFields() {
+        NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
         DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
                 new RelationProjectionReadService(
-                        new RelationProjectionQueryExecutor(mock(NamedParameterJdbcOperations.class)),
+                        new RelationProjectionQueryExecutor(jdbcOperations),
                         new RelationProjectionDatabaseTypeProvider()
                 )
         );
+        when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
+                .thenReturn(List.of(Map.of(
+                        "id", "order-1",
+                        "tenantId", "tenant_a",
+                        "version", 7,
+                        "orderNo", "O-001",
+                        "customerTitle", "Sensitive"
+                )));
+        when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
+                .thenReturn(1L);
 
         assertThat(service.supportsListQuery(
                 "crm.order",
                 protectedDynamicRecordService(),
                 Set.of("orderNo", "customerTitle")
-        )).isFalse();
+        )).isTrue();
         assertThat(service.describeListQuery(
                 "crm.order",
                 protectedDynamicRecordService(),
                 Set.of("orderNo", "customerTitle")
-        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.NONE);
+
+        PageResult<DynamicRecord> page = service.queryList(
+                "crm.order",
+                protectedDynamicRecordService(),
+                Set.of("orderNo", "customerTitle"),
+                Criteria.of(),
+                PageRequest.of(1, 20)
+        ).orElseThrow();
+
+        assertThat(page.getRecords()).singleElement()
+                .satisfies(record -> assertThat(record.getValue("customerTitle")).isEqualTo("S*******e"));
     }
 
     @Test
@@ -123,6 +145,48 @@ class DynamicRelationProjectionReadServiceTest {
                 dynamicRecordService(),
                 Set.of("orderNo", "customerTitle", "displayCode")
         ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.UNSUPPORTED_OUTPUT_FIELD);
+    }
+
+    @Test
+    void shouldFallbackWhenDynamicProjectionTouchesStorageProtectedFields() {
+        DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
+                new RelationProjectionReadService(
+                        new RelationProjectionQueryExecutor(mock(NamedParameterJdbcOperations.class)),
+                        new RelationProjectionDatabaseTypeProvider()
+                )
+        );
+
+        assertThat(service.supportsListQuery(
+                "crm.order",
+                storageProtectedDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        )).isFalse();
+        assertThat(service.describeListQuery(
+                "crm.order",
+                storageProtectedDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
+    }
+
+    @Test
+    void shouldFallbackWhenDynamicMainProjectionTouchesOutputProtectedFields() {
+        DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
+                new RelationProjectionReadService(
+                        new RelationProjectionQueryExecutor(mock(NamedParameterJdbcOperations.class)),
+                        new RelationProjectionDatabaseTypeProvider()
+                )
+        );
+
+        assertThat(service.supportsListQuery(
+                "crm.order",
+                protectedMainDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        )).isFalse();
+        assertThat(service.describeListQuery(
+                "crm.order",
+                protectedMainDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
     }
 
     @Test
@@ -187,6 +251,20 @@ class DynamicRelationProjectionReadServiceTest {
         return new DynamicRecordService(runtime);
     }
 
+    private DynamicRecordService protectedMainDynamicRecordService() {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(mock(IDatabaseOperations.class));
+        runtime.register(protectedOrderModule());
+        runtime.register(customerModule());
+        return new DynamicRecordService(runtime);
+    }
+
+    private DynamicRecordService storageProtectedDynamicRecordService() {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(mock(IDatabaseOperations.class));
+        runtime.register(orderModule());
+        runtime.register(storageProtectedCustomerModule());
+        return new DynamicRecordService(runtime);
+    }
+
     private static final class TenantRestrictedDataScopeCriteriaService implements DataScopeCriteriaService {
         @Override
         public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
@@ -206,6 +284,14 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     private ModuleDefinition orderModule() {
+        return orderModule(FieldProtectionDefinition.NONE);
+    }
+
+    private ModuleDefinition protectedOrderModule() {
+        return orderModule(masked());
+    }
+
+    private ModuleDefinition orderModule(FieldProtectionDefinition orderNoProtection) {
         return new ModuleDefinition(
                 "crm.order",
                 "订单",
@@ -216,6 +302,7 @@ class DynamicRelationProjectionReadServiceTest {
                         List.of(
                                 FieldDefinition.string("customerId", "客户").column("customer_id"),
                                 FieldDefinition.string("orderNo", "订单号").column("order_no")
+                                        .protection(orderNoProtection)
                         )
                 )),
                 List.of(),
@@ -255,6 +342,25 @@ class DynamicRelationProjectionReadServiceTest {
                         List.of(FieldDefinition.string("title", "客户名称")
                                 .column("title")
                                 .protection(masked()))
+                ))
+        );
+    }
+
+    private ModuleDefinition storageProtectedCustomerModule() {
+        return new ModuleDefinition(
+                "crm.customer",
+                "客户",
+                List.of(new EntityDefinition(
+                        "customer",
+                        "crm_customer",
+                        "Customer",
+                        List.of(FieldDefinition.string("title", "客户名称")
+                                .column("title")
+                                .protection(new FieldProtectionDefinition(
+                                        FieldEncryptionMode.ENCRYPTED,
+                                        FieldSignatureMode.SIGNED,
+                                        FieldMaskingPolicy.MIDDLE
+                                )))
                 ))
         );
     }
