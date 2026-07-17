@@ -71,11 +71,9 @@ public final class RecordReadProjectionGraphPlanner {
                     join.tableAlias()
             ));
             if (!hasReferenceJoinEdge(edges, previousNodeId, joinNodeId)) {
-                edges.add(new ProjectionGraphEdge(
+                edges.add(ProjectionGraphEdge.referenceJoin(
                         previousNodeId,
                         joinNodeId,
-                        ProjectionGraphEdgeKind.REFERENCE_JOIN,
-                        join.tableAlias(),
                         join.tableAlias(),
                         join.cardinality(),
                         join.conditions()
@@ -86,11 +84,12 @@ public final class RecordReadProjectionGraphPlanner {
         String outputNodeId = field.relationCode() == null
                 ? mainNodeId(field.fieldName())
                 : relationNodeId(field.relationCode(), field.fieldName());
-        edges.add(new ProjectionGraphEdge(
+        edges.add(ProjectionGraphEdge.referenceOutput(
                 previousNodeId,
                 outputNodeId,
-                ProjectionGraphEdgeKind.REFERENCE_OUTPUT_FIELD,
-                output.existsProjection() ? "exists:" + output.targetFieldName() : output.targetFieldName()
+                field.fieldName(),
+                output.targetFieldName(),
+                output.existsProjection()
         ));
     }
 
