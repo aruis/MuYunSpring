@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -15,7 +16,7 @@ public final class RecordReadProjectionGraphAdapter {
         }
         LinkedHashMap<String, MutableNode> nodes = new LinkedHashMap<>();
         nodes.put(ROOT_NODE_ID, MutableNode.root(projection.moduleAlias()));
-        List<ProjectionGraphEdge> edges = new java.util.ArrayList<>();
+        List<ProjectionGraphEdge> edges = new ArrayList<>();
 
         for (String fieldName : projection.internalReadFields()) {
             String nodeId = mainNodeId(fieldName);
@@ -35,6 +36,7 @@ public final class RecordReadProjectionGraphAdapter {
                     field.fieldName(),
                     field.fieldId()
             ));
+            node.mergeFieldId(field.fieldId());
             node.markResponse();
             ProjectionGraphEdgeKind edgeKind = field.relationCode() == null
                     ? ProjectionGraphEdgeKind.MAIN_OUTPUT_FIELD
@@ -75,7 +77,7 @@ public final class RecordReadProjectionGraphAdapter {
         private final String moduleAlias;
         private final String relationCode;
         private final String fieldName;
-        private final String fieldId;
+        private String fieldId;
         private boolean responseField;
         private boolean internalReadField;
 
@@ -105,6 +107,12 @@ public final class RecordReadProjectionGraphAdapter {
 
         private void markResponse() {
             responseField = true;
+        }
+
+        private void mergeFieldId(String value) {
+            if (value != null && !value.isBlank() && fieldId == null) {
+                fieldId = value.trim();
+            }
         }
 
         private void markInternalRead() {

@@ -31,6 +31,8 @@ class RecordReadProjectionGraphAdapterTest {
                 .containsExactly("root", "main:id", "main:username", "relation:employee:employeeNo");
         assertThat(graph.responseFieldNodes()).extracting(ProjectionGraphNode::fieldName)
                 .containsExactly("username", "employeeNo");
+        assertThat(graph.responseFieldNodes()).extracting(ProjectionGraphNode::fieldId)
+                .containsExactly("username-field", null);
         assertThat(graph.internalReadFieldNodes()).extracting(ProjectionGraphNode::fieldName)
                 .containsExactly("id", "username");
         assertThat(graph.edges()).extracting(ProjectionGraphEdge::edgeKind)
