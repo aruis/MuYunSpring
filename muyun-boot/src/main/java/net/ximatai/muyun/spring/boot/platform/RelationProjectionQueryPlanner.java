@@ -192,19 +192,14 @@ public final class RelationProjectionQueryPlanner {
                 .forEach(responseFields::add);
 
         Map<String, ProjectionGraphNode> nodes = graphNodes(projectionGraph);
-        LinkedHashMap<String, GraphJoin> joins = referenceJoinEdges(
-                projectionGraph,
-                nodes,
-                modules,
-                options,
-                definition.moduleAlias()
-        );
         Map<String, ProjectionGraphEdge> outputEdges = referenceOutputEdges(projectionGraph);
+        List<ProjectionGraphEdge> selectedOutputEdges = new ArrayList<>();
         for (ViewFieldRef field : relationFields) {
             ProjectionGraphEdge output = outputEdges.get(outputNodeId(field));
             if (output == null) {
                 return null;
             }
+            selectedOutputEdges.add(output);
             ProjectionGraphNode source = nodes.get(output.sourceNodeId());
             EntityDefinition targetEntity = graphNodeEntity(modules, source);
             String targetColumn = columnName(targetEntity, output.targetFieldName());
@@ -232,6 +227,14 @@ public final class RelationProjectionQueryPlanner {
                 }
             }
         }
+        LinkedHashMap<String, GraphJoin> joins = referenceJoinEdges(
+                projectionGraph,
+                nodes,
+                modules,
+                selectedOutputEdges,
+                options,
+                definition.moduleAlias()
+        );
         if (joins.isEmpty()) {
             return null;
         }
@@ -265,14 +268,19 @@ public final class RelationProjectionQueryPlanner {
     private static LinkedHashMap<String, GraphJoin> referenceJoinEdges(ProjectionGraph graph,
                                                                        Map<String, ProjectionGraphNode> nodes,
                                                                        Map<String, StaticModuleDefinition> modules,
+                                                                       List<ProjectionGraphEdge> outputEdges,
                                                                        RelationProjectionPlanningOptions options,
                                                                        String moduleAlias) {
         LinkedHashMap<String, GraphJoin> joins = new LinkedHashMap<>();
-        if (graph == null) {
+        if (graph == null || outputEdges == null || outputEdges.isEmpty()) {
             return joins;
         }
+        java.util.Set<String> requiredJoinNodeIds = requiredJoinNodeIds(graph, outputEdges);
         for (ProjectionGraphEdge edge : graph.edges()) {
             if (edge.edgeKind() != ProjectionGraphEdgeKind.REFERENCE_JOIN) {
+                continue;
+            }
+            if (!requiredJoinNodeIds.contains(edge.targetNodeId())) {
                 continue;
             }
             ProjectionGraphNode target = nodes.get(edge.targetNodeId());
@@ -280,6 +288,36 @@ public final class RelationProjectionQueryPlanner {
             validateJoinCount(joins.size(), options.maxJoinCount(), moduleAlias);
         }
         return joins;
+    }
+
+    private static java.util.Set<String> requiredJoinNodeIds(ProjectionGraph graph,
+                                                             List<ProjectionGraphEdge> outputEdges) {
+        Map<String, ProjectionGraphEdge> joinByTarget = referenceJoinEdgesByTarget(graph);
+        LinkedHashSet<String> required = new LinkedHashSet<>();
+        for (ProjectionGraphEdge output : outputEdges) {
+            String currentNodeId = output.sourceNodeId();
+            while (currentNodeId != null) {
+                ProjectionGraphEdge join = joinByTarget.get(currentNodeId);
+                if (join == null) {
+                    break;
+                }
+                required.add(join.targetNodeId());
+                currentNodeId = join.sourceNodeId();
+            }
+        }
+        return java.util.Collections.unmodifiableSet(required);
+    }
+
+    private static Map<String, ProjectionGraphEdge> referenceJoinEdgesByTarget(ProjectionGraph graph) {
+        LinkedHashMap<String, ProjectionGraphEdge> joins = new LinkedHashMap<>();
+        if (graph != null) {
+            for (ProjectionGraphEdge edge : graph.edges()) {
+                if (edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN) {
+                    joins.putIfAbsent(edge.targetNodeId(), edge);
+                }
+            }
+        }
+        return java.util.Collections.unmodifiableMap(joins);
     }
 
     private static Map<String, ProjectionGraphNode> graphNodes(ProjectionGraph graph) {
