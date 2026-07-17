@@ -92,6 +92,23 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.projectionGraph().edges())
                 .filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
                 .hasSize(2);
+        assertThat(plan.projectionGraph().edges())
+                .filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_OUTPUT_FIELD)
+                .filteredOn(edge -> edge.outputFieldName().equals("employeeNo"))
+                .singleElement()
+                .satisfies(edge -> {
+                    assertThat(edge.sourceNodeId()).isEqualTo("join:user_id_employee_id");
+                    assertThat(edge.targetFieldName()).isEqualTo("employeeNo");
+                    assertThat(edge.existsProjection()).isFalse();
+                });
+        assertThat(plan.projectionGraph().nodes())
+                .filteredOn(node -> node.nodeId().equals("join:user_id_employee_id"))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.moduleAlias()).isEqualTo("iam.employee");
+                    assertThat(node.entityAlias()).isEqualTo("employee");
+                    assertThat(node.tableAlias()).isEqualTo("user_id_employee_id");
+                });
         assertThat(plan.queryableFields()).contains("id", "username", "employeeNo");
         assertThat(plan.queryableFields()).doesNotContain("employeeTitle");
         assertThat(plan.sortableFields()).contains("id", "username", "employeeNo", "employeeTitle");
