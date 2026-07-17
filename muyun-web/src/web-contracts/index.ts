@@ -569,7 +569,9 @@ export interface UserEmployeeBindingView {
   employeeNo?: string;
   employeeTitle?: string;
   organizationId?: string;
+  organizationTitle?: string;
   departmentId?: string;
+  departmentTitle?: string;
 }
 
 export interface UserSessionView {
@@ -622,7 +624,9 @@ export interface UserSelectorItem {
   employeeNo?: string;
   employeeTitle?: string;
   organizationId?: string;
+  organizationTitle?: string;
   departmentId?: string;
+  departmentTitle?: string;
 }
 
 export type RoleAssignmentType = 'account' | 'employment';

@@ -35,7 +35,8 @@ interface UserRow extends RecordData {
   username: string;
   employeeNo: string;
   employeeTitle: string;
-  employeeId: string;
+  organizationTitle: string;
+  departmentTitle: string;
   boundTitle: string;
 }
 
@@ -86,7 +87,8 @@ const rows = computed<UserRow[]>(() =>
       username: userTitle(user),
       employeeNo: user.employeeNo ?? '',
       employeeTitle: user.employeeTitle ?? '',
-      employeeId: user.employeeId ?? '',
+      organizationTitle: user.organizationTitle ?? user.organizationId ?? '',
+      departmentTitle: user.departmentTitle ?? user.departmentId ?? '',
       boundTitle: originalUserIds.value.has(user.id) ? '已绑定' : '未绑定',
     })),
 );
@@ -109,7 +111,8 @@ const userTableContract: TableContract = {
     { title: '用户账号', key: 'username', width: 140 },
     { title: '职员姓名', key: 'employeeTitle', width: 120 },
     { title: '职员工号', key: 'employeeNo', width: 120 },
-    { title: '职员 ID', key: 'employeeId', width: 160 },
+    { title: '所属机构', key: 'organizationTitle', width: 140 },
+    { title: '所属部门', key: 'departmentTitle', width: 140 },
     { title: '状态', key: 'boundTitle', width: 90 },
   ],
 };
