@@ -65,7 +65,11 @@ public final class RecordReadProjectionGraphPlanner {
         String previousNodeId = ROOT_NODE_ID;
         for (StaticModuleReferencePathResolver.JoinStep join : output.traversal().joins()) {
             String joinNodeId = joinNodeId(join.tableAlias());
-            nodes.putIfAbsent(joinNodeId, ProjectionGraphNode.join(moduleAlias, join.tableAlias()));
+            nodes.putIfAbsent(joinNodeId, ProjectionGraphNode.join(
+                    join.moduleAlias(),
+                    join.entity().alias(),
+                    join.tableAlias()
+            ));
             if (!hasReferenceJoinEdge(edges, previousNodeId, joinNodeId)) {
                 edges.add(new ProjectionGraphEdge(
                         previousNodeId,

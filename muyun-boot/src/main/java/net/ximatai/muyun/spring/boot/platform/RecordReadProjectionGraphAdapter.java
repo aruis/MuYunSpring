@@ -120,7 +120,7 @@ public final class RecordReadProjectionGraphAdapter {
         }
 
         private ProjectionGraphNode toNode() {
-            return new ProjectionGraphNode(nodeId, nodeKind, moduleAlias, relationCode,
+            return new ProjectionGraphNode(nodeId, nodeKind, moduleAlias, null, relationCode,
                     fieldName, fieldId, responseField, internalReadField);
         }
     }

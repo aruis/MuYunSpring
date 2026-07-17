@@ -126,6 +126,7 @@ final class StaticModuleReferencePathResolver {
             EntityDefinition targetEntity = target.entities().getFirst();
             String tableAlias = joinAlias(pathAlias, segment);
             return new ResolvedStep(target, new JoinStep(
+                    target.moduleAlias(),
                     targetEntity,
                     tableAlias,
                     RelationProjectionCardinality.MANY_TO_ONE,
@@ -162,6 +163,7 @@ final class StaticModuleReferencePathResolver {
             EntityDefinition targetEntity = target.entities().getFirst();
             String tableAlias = joinAlias(pathAlias, referenceField.fieldName());
             return new ResolvedStep(target, new JoinStep(
+                    target.moduleAlias(),
                     targetEntity,
                     tableAlias,
                     RelationProjectionCardinality.MANY_TO_ONE,
@@ -198,6 +200,7 @@ final class StaticModuleReferencePathResolver {
                 EntityDefinition currentEntity = current.entities().getFirst();
                 String tableAlias = joinAlias(pathAlias, segment);
                 return new ResolvedStep(candidate, new JoinStep(
+                        candidate.moduleAlias(),
                         candidateEntity,
                         tableAlias,
                         RelationProjectionCardinality.ONE_TO_MANY,
@@ -234,6 +237,7 @@ final class StaticModuleReferencePathResolver {
                 EntityDefinition currentEntity = current.entities().getFirst();
                 String tableAlias = joinAlias(pathAlias, referenceField.fieldName());
                 return new ResolvedStep(candidate, new JoinStep(
+                        candidate.moduleAlias(),
                         candidateEntity,
                         tableAlias,
                         segment.safeForPageJoin()
@@ -284,7 +288,8 @@ final class StaticModuleReferencePathResolver {
         return result.toString();
     }
 
-    record JoinStep(EntityDefinition entity,
+    record JoinStep(String moduleAlias,
+                    EntityDefinition entity,
                     String tableAlias,
                     RelationProjectionCardinality cardinality,
                     List<RelationProjectionJoinCondition> conditions) {
