@@ -25,10 +25,19 @@ final class DynamicWebQueryFieldSupport {
     }
 
     static void validatePhysicalSorts(DynamicEntityOperations operations, List<WebSort> sorts) {
+        validatePhysicalSorts(operations, sorts, Set.of());
+    }
+
+    static void validatePhysicalSorts(DynamicEntityOperations operations,
+                                      List<WebSort> sorts,
+                                      Set<String> additionalSortableFields) {
         if (sorts == null || sorts.isEmpty()) {
             return;
         }
         Set<String> fields = queryableSqlFields(operations.newRecord().getEntity());
+        if (additionalSortableFields != null) {
+            fields.addAll(additionalSortableFields);
+        }
         for (WebSort sort : sorts) {
             String fieldName = sort == null ? null : trim(sort.field());
             if (fieldName == null || !fields.contains(fieldName)) {

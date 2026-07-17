@@ -62,6 +62,7 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
+import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
@@ -1490,6 +1491,91 @@ class DynamicRecordWebControllerTest {
                         .value("Sort field is not a physical dynamic field: displayCode"));
 
         verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
+    void shouldAllowProjectionFieldSortsWhenDynamicSqlProjectionIsSupported() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        DynamicRelationProjectionReadService projectionReadService = mock(DynamicRelationProjectionReadService.class);
+        MockMvc lowCodeMvc = projectionMvc(snapshotService, moduleFieldService, projectionReadService);
+        publishedListUiConfig(snapshotService,
+                uiField("ui-list", "module-field-code"),
+                uiField("ui-list", "module-field-customer-title"));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-customer-title")).thenReturn(resolvedModuleField(
+                "module-field-customer-title", "customerTitle", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
+        when(projectionReadService.supportsListQuery(eq(MODULE), eq(service), any()))
+                .thenReturn(true);
+        DynamicRecord record = new DynamicRecord(entity())
+                .setValue("code", "C-001")
+                .putProjectedValue("customerTitle", "Acme");
+        record.setId("contract-1");
+        when(projectionReadService.queryList(eq(MODULE), eq(service), any(), any(Criteria.class),
+                any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(java.util.Optional.of(PageResult.of(List.of(record), 1, PageRequest.of(1, 20))));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "sorts": [
+                                    {"field": "customerTitle", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].values.code").value("C-001"))
+                .andExpect(jsonPath("$.records[0].values.customerTitle").value("Acme"));
+
+        ArgumentCaptor<Sort[]> sorts = ArgumentCaptor.forClass(Sort[].class);
+        verify(projectionReadService).queryList(eq(MODULE), eq(service), any(), any(Criteria.class),
+                any(PageRequest.class), sorts.capture());
+        assertThat(sorts.getValue()).hasSize(1);
+        assertThat(sorts.getValue()[0].getField()).isEqualTo("customerTitle");
+        verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
+    void shouldFallbackWhenDynamicSqlProjectionDoesNotSupportAllUiFields() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        DynamicRelationProjectionReadService projectionReadService = mock(DynamicRelationProjectionReadService.class);
+        MockMvc lowCodeMvc = projectionMvc(snapshotService, moduleFieldService, projectionReadService);
+        publishedListUiConfig(snapshotService,
+                uiField("ui-list", "module-field-code"),
+                uiField("ui-list", "module-field-display-code"));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
+                "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
+        when(projectionReadService.supportsListQuery(eq(MODULE), eq(service), any()))
+                .thenReturn(false);
+        DynamicRecord record = new DynamicRecord(entity())
+                .setValue("code", "C-001")
+                .putDisplayValue("displayCode", "C-001 / Customer");
+        record.setId("contract-1");
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].values.code").value("C-001"))
+                .andExpect(jsonPath("$.records[0].values.displayCode").value("C-001 / Customer"));
+
+        verify(projectionReadService, never()).queryList(anyString(), any(), any(), any(Criteria.class),
+                any(PageRequest.class), any(Sort[].class));
+        verify(mainEntity).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 
     @Test
@@ -3297,6 +3383,43 @@ class DynamicRecordWebControllerTest {
                 fieldTypeAlias,
                 fieldForm
         );
+    }
+
+    private void publishedListUiConfig(PlatformPageConfigSnapshotService snapshotService,
+                                       PlatformUiConfigField... fields) {
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(fields),
+                List.of(),
+                List.of()
+        ));
+    }
+
+    private MockMvc projectionMvc(PlatformPageConfigSnapshotService snapshotService,
+                                  ModuleMetadataFieldService moduleFieldService,
+                                  DynamicRelationProjectionReadService projectionReadService) {
+        return MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService,
+                        null, null, null, null, projectionReadService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
     }
 
     private PlatformUiConfigField uiField(String uiConfigId, String moduleFieldId) {

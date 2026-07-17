@@ -16,10 +16,21 @@ final class StaticModuleReferencePathResolver {
     static Traversal resolve(Map<String, StaticModuleDefinition> modules,
                              StaticModuleDefinition start,
                              String relationPath) {
+        return resolve(modules, start, relationPath, RelationProjectionPlanningOptions.defaults());
+    }
+
+    static Traversal resolve(Map<String, StaticModuleDefinition> modules,
+                             StaticModuleDefinition start,
+                             String relationPath,
+                             RelationProjectionPlanningOptions options) {
         if (relationPath == null || relationPath.isBlank()) {
             return null;
         }
+        RelationProjectionPlanningOptions planningOptions = options == null
+                ? RelationProjectionPlanningOptions.defaults()
+                : options;
         String[] segments = relationPath.split("\\.");
+        validateDepth(segments.length, planningOptions.maxJoinDepth(), start, relationPath);
         StaticModuleDefinition current = start;
         String currentAlias = RelationProjectionSqlNames.MAIN_ALIAS;
         List<JoinStep> joins = new ArrayList<>();
@@ -46,9 +57,20 @@ final class StaticModuleReferencePathResolver {
     static Traversal resolve(Map<String, StaticModuleDefinition> modules,
                              StaticModuleDefinition start,
                              ModuleReferencePath referencePath) {
+        return resolve(modules, start, referencePath, RelationProjectionPlanningOptions.defaults());
+    }
+
+    static Traversal resolve(Map<String, StaticModuleDefinition> modules,
+                             StaticModuleDefinition start,
+                             ModuleReferencePath referencePath,
+                             RelationProjectionPlanningOptions options) {
         if (referencePath == null) {
             return null;
         }
+        RelationProjectionPlanningOptions planningOptions = options == null
+                ? RelationProjectionPlanningOptions.defaults()
+                : options;
+        validateDepth(referencePath.steps().size(), planningOptions.maxJoinDepth(), start, referencePath.toString());
         StaticModuleDefinition current = start;
         String currentAlias = RelationProjectionSqlNames.MAIN_ALIAS;
         List<JoinStep> joins = new ArrayList<>();
@@ -75,6 +97,16 @@ final class StaticModuleReferencePathResolver {
             return null;
         }
         return new Traversal(current.entities().getFirst(), currentAlias, List.copyOf(joins));
+    }
+
+    private static void validateDepth(int depth,
+                                      int maxDepth,
+                                      StaticModuleDefinition start,
+                                      String path) {
+        if (depth > maxDepth) {
+            throw new IllegalArgumentException("relation projection reference path depth exceeds limit: "
+                    + start.moduleAlias() + "." + path + "." + depth + " > " + maxDepth);
+        }
     }
 
     private static ResolvedStep resolveDirectReference(Map<String, StaticModuleDefinition> modules,

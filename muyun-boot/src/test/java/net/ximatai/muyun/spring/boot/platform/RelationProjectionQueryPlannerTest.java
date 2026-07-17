@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -9,7 +10,9 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
@@ -221,6 +224,68 @@ class RelationProjectionQueryPlannerTest {
     }
 
     @Test
+    void shouldPlanDynamicReferenceProjectionThroughUnifiedRelationDefinitions() {
+        ModuleDefinition order = new ModuleDefinition(
+                "crm.order",
+                "订单",
+                List.of(new EntityDefinition(
+                        "order",
+                        "crm_order",
+                        "Order",
+                        List.of(
+                                FieldDefinition.string("customerId", "客户").column("customer_id"),
+                                FieldDefinition.string("orderNo", "订单号").column("order_no")
+                        )
+                )),
+                List.of(),
+                List.of(new EntityReferenceDefinition(
+                        "order",
+                        "customerId",
+                        "crm.customer.customer"
+                ).withProjection("title", "customerTitle"))
+        );
+        ModuleDefinition customer = new ModuleDefinition(
+                "crm.customer",
+                "客户",
+                List.of(new EntityDefinition(
+                        "customer",
+                        "crm_customer",
+                        "Customer",
+                        List.of(FieldDefinition.string("title", "客户名称").column("title"))
+                ))
+        );
+        List<StaticModuleDefinition> definitions = DynamicRelationProjectionDefinitionAdapter.adapt(
+                List.of(order, customer));
+        StaticModuleDefinition orderDefinition = definitions.stream()
+                .filter(definition -> definition.moduleAlias().equals("crm.order"))
+                .findFirst()
+                .orElseThrow();
+        RecordReadProjection projection = new RecordReadProjection(
+                "crm.order",
+                "dynamic_list",
+                List.of(ViewFieldRef.main("orderNo"), ViewFieldRef.main("customerTitle")),
+                List.of("id", "tenantId", "version"),
+                List.of()
+        );
+
+        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                definitions,
+                orderDefinition,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of()
+        );
+
+        assertThat(plan.hasRelationProjection()).isTrue();
+        assertThat(plan.responseFields()).containsExactlyInAnyOrder("id", "orderNo", "customerTitle");
+        assertThat(plan.baseSql())
+                .contains("from \"public\".\"crm_order\" \"main\"")
+                .contains("left join \"public\".\"crm_customer\" \"customer_id\"")
+                .contains("\"main\".\"customer_id\" = \"customer_id\".\"id\"")
+                .contains("\"customer_id\".\"title\" as \"customerTitle\"");
+    }
+
+    @Test
     void shouldRejectReadProjectionOutputConflictWithMainField() {
         assertThatThrownBy(() -> userReferenceDefinitionWithOutput("employee_account.employee.title", "username"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -311,6 +376,61 @@ class RelationProjectionQueryPlannerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("projection reference path cardinality is not safe for page join")
                 .hasMessageContaining("ONE_TO_MANY");
+    }
+
+    @Test
+    void shouldRejectReferenceProjectionPathExceedingDepthLimit() {
+        StaticModuleDefinition user = userSelectorReferenceDefinition();
+        StaticModuleDefinition binding = employeeAccountReferenceDefinition();
+        StaticModuleDefinition employee = employeeWithOrganizationAndDepartmentDefinition();
+        StaticModuleDefinition organization = organizationReferenceDefinition();
+        StaticModuleDefinition department = departmentReferenceDefinition();
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(user);
+        RecordReadProjection projection = RecordReadProjectionPlanner.explicit(
+                "iam.user",
+                compilation.readModel(),
+                "user_selector",
+                List.of("id", "username", "organizationTitle"),
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> RelationProjectionQueryPlanner.plan(
+                List.of(user, binding, employee, organization, department),
+                user,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of(),
+                new RelationProjectionPlanningOptions(2, 24)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("relation projection reference path depth exceeds limit")
+                .hasMessageContaining("3 > 2");
+    }
+
+    @Test
+    void shouldAllowFiniteReferenceProjectionPathReturningToVisitedModule() {
+        StaticModuleDefinition a = cyclicDefinitionA();
+        StaticModuleDefinition b = cyclicDefinitionB();
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(a);
+        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+                compilation.uiDescriptor(),
+                compilation.readModel()
+        );
+
+        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                List.of(a, b),
+                a,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of()
+        );
+
+        assertThat(plan.hasRelationProjection()).isTrue();
+        assertThat(plan.baseSql())
+                .contains("left join \"public\".\"test_b\" \"b\"")
+                .contains("left join \"public\".\"test_a\" \"b_a\"")
+                .contains("\"b_a\".\"title\" as \"bTitle\"");
     }
 
     @Test
@@ -739,6 +859,57 @@ class RelationProjectionQueryPlannerTest {
                         new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id"),
                         new StaticModuleReferenceDefinition("organization", "departmentId", "iam.department", "id")
                 ),
+                List.of()
+        );
+    }
+
+    private StaticModuleDefinition cyclicDefinitionA() {
+        return new StaticModuleDefinition(
+                "test",
+                "test.a",
+                "Cycle A",
+                null,
+                ModuleEntryType.ROUTE,
+                "/test/a",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "a",
+                        "test_a",
+                        "Cycle A",
+                        List.of(
+                                FieldDefinition.string("bId", "B").column("b_id"),
+                                FieldDefinition.string("title", "Title").column("title")
+                        )
+                )),
+                ModuleUiDefinition.builder("test.a")
+                        .listView(list -> list.field("bTitle"))
+                        .build(),
+                List.of(new StaticModuleReferenceDefinition("b", "bId", "test.b", "id")),
+                List.of(new StaticModuleReadProjectionDefinition("b.a.title", "bTitle"))
+        );
+    }
+
+    private StaticModuleDefinition cyclicDefinitionB() {
+        return new StaticModuleDefinition(
+                "test",
+                "test.b",
+                "Cycle B",
+                null,
+                ModuleEntryType.ROUTE,
+                "/test/b",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "b",
+                        "test_b",
+                        "Cycle B",
+                        List.of(FieldDefinition.string("aId", "A").column("a_id"))
+                )),
+                null,
+                List.of(new StaticModuleReferenceDefinition("a", "aId", "test.a", "id")),
                 List.of()
         );
     }

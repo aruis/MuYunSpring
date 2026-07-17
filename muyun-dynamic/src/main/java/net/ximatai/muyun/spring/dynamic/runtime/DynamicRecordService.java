@@ -43,6 +43,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewRootQueryMapping
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
@@ -59,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.Optional;
 
@@ -116,6 +118,10 @@ public class DynamicRecordService {
 
     public DynamicModuleDescriptor describe(String moduleAlias) {
         return runtime.describe(moduleAlias);
+    }
+
+    public List<ModuleDefinition> moduleDefinitions() {
+        return runtime.registry().modules();
     }
 
     public DynamicOpenApiDocument openApi(String moduleAlias) {
@@ -951,6 +957,12 @@ public class DynamicRecordService {
         DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).pageQuery(scope.criteria(),
                 pageRequest, sorts));
+    }
+
+    public <R> R withQueryReadScope(String moduleAlias, Criteria criteria, Function<Criteria, R> action) {
+        Objects.requireNonNull(action, "action must not be null");
+        DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
+        return withTenantScope(scope, () -> action.apply(scope.criteria()));
     }
 
     public PageResult<DynamicRecord> pageForAction(String moduleAlias,

@@ -19,9 +19,11 @@ import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
 import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -139,6 +141,7 @@ public class DynamicRecordWebController implements
     private final RecordAttachmentAccessService recordAttachmentAccessService;
     private final RecordDuplicateCheckService duplicateCheckService;
     private final PlatformRecordNavigationService navigationService;
+    private final DynamicRelationProjectionReadService dynamicRelationProjectionReadService;
     private final PlatformDynamicModuleScopeService dynamicModuleScopeService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -161,7 +164,8 @@ public class DynamicRecordWebController implements
                                       ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider,
                                       ObjectProvider<RecordAttachmentAccessService> recordAttachmentAccessServiceProvider,
                                       ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider,
-                                      ObjectProvider<PlatformRecordNavigationService> navigationServiceProvider) {
+                                      ObjectProvider<PlatformRecordNavigationService> navigationServiceProvider,
+                                      ObjectProvider<DynamicRelationProjectionReadService> dynamicRelationProjectionReadServiceProvider) {
         this(recordService, activeTenantVerifier,
                 codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
                 referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
@@ -171,7 +175,10 @@ public class DynamicRecordWebController implements
                 recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable(),
                 recordAttachmentAccessServiceProvider == null ? null : recordAttachmentAccessServiceProvider.getIfAvailable(),
                 duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable(),
-                navigationServiceProvider == null ? null : navigationServiceProvider.getIfAvailable());
+                navigationServiceProvider == null ? null : navigationServiceProvider.getIfAvailable(),
+                dynamicRelationProjectionReadServiceProvider == null
+                        ? null
+                        : dynamicRelationProjectionReadServiceProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -252,6 +259,23 @@ public class DynamicRecordWebController implements
                                       RecordAttachmentAccessService recordAttachmentAccessService,
                                       RecordDuplicateCheckService duplicateCheckService,
                                       PlatformRecordNavigationService navigationService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
+                recordAttachmentAccessService, duplicateCheckService, navigationService, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      RecordAttachmentService recordAttachmentService,
+                                      RecordAttachmentAccessService recordAttachmentAccessService,
+                                      RecordDuplicateCheckService duplicateCheckService,
+                                      PlatformRecordNavigationService navigationService,
+                                      DynamicRelationProjectionReadService dynamicRelationProjectionReadService) {
         this.recordService = recordService;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
         this.referenceRecordGenerationFacade = referenceRecordGenerationFacade;
@@ -262,6 +286,9 @@ public class DynamicRecordWebController implements
         this.recordAttachmentAccessService = recordAttachmentAccessService;
         this.duplicateCheckService = duplicateCheckService;
         this.navigationService = navigationService;
+        this.dynamicRelationProjectionReadService = dynamicRelationProjectionReadService == null
+                ? new DynamicRelationProjectionReadService()
+                : dynamicRelationProjectionReadService;
         this.dynamicModuleScopeService = new PlatformDynamicModuleScopeService(activeTenantVerifier);
     }
 
@@ -338,15 +365,59 @@ public class DynamicRecordWebController implements
 
     @Override
     public PageResult<DynamicRecord> queryRecords(WebQueryRequest request) {
-        PageResult<DynamicRecord> page = CrudWeb.super.queryRecords(request);
         if (request == null || !hasText(request.uiConfigId())) {
-            return page;
+            return CrudWeb.super.queryRecords(request);
         }
+        WebPageRequest webPage = request.pageOrDefault();
+        PageRequest pageRequest = PageRequest.of(webPage.pageNum(), webPage.pageSize());
+        Criteria criteria = queryCriteria(request);
         Set<String> projectionFields = projectionFields(DynamicWebRequest.moduleAlias(), request);
+        boolean projectionSupported = supportsProjectionListQuery(projectionFields);
+        Sort[] sorts = querySorts(request, projectionSupported ? projectionFields : Set.of());
+        PageResult<DynamicRecord> projectedPage = projectionSupported
+                ? queryProjectionRecords(projectionFields, criteria, pageRequest, sorts)
+                : null;
+        if (projectedPage != null) {
+            return projectedPage;
+        }
+        PageResult<DynamicRecord> page = service().pageQuery(criteria, pageRequest, sorts);
+        Set<String> fields = projectionFields;
         List<DynamicRecord> records = page.getRecords().stream()
-                .map(record -> project(record, projectionFields))
+                .map(record -> project(record, fields))
                 .toList();
         return PageResult.of(records, page.getTotal(), PageRequest.of(page.getPageNum(), page.getPageSize()));
+    }
+
+    private Sort[] querySorts(WebQueryRequest request, Set<String> additionalSortableFields) {
+        if (request == null || request.sorts().isEmpty()) {
+            return new Sort[0];
+        }
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(service(), request.sorts(), additionalSortableFields);
+        return DynamicWebQueryMapper.sorts(request.sorts());
+    }
+
+    private boolean supportsProjectionListQuery(Set<String> projectionFields) {
+        if (projectionFields == null || projectionFields.isEmpty()) {
+            return false;
+        }
+        return dynamicRelationProjectionReadService.supportsListQuery(
+                DynamicWebRequest.moduleAlias(),
+                recordService,
+                projectionFields);
+    }
+
+    private PageResult<DynamicRecord> queryProjectionRecords(Set<String> projectionFields,
+                                                             Criteria criteria,
+                                                             PageRequest pageRequest,
+                                                             Sort... sorts) {
+        return dynamicRelationProjectionReadService.queryList(
+                DynamicWebRequest.moduleAlias(),
+                recordService,
+                projectionFields,
+                criteria,
+                pageRequest,
+                sorts
+        ).orElse(null);
     }
 
     @Override

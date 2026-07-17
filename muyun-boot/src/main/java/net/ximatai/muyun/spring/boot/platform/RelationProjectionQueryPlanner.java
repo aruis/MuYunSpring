@@ -21,7 +21,8 @@ public final class RelationProjectionQueryPlanner {
                                                  RecordReadProjection projection,
                                                  DBInfo.Type databaseType,
                                                  java.util.Set<String> requiredMainFields) {
-        return plan(List.of(definition), definition, projection, databaseType, requiredMainFields);
+        return plan(List.of(definition), definition, projection, databaseType, requiredMainFields,
+                RelationProjectionPlanningOptions.defaults());
     }
 
     public static RelationProjectionSqlPlan plan(List<StaticModuleDefinition> definitions,
@@ -29,6 +30,16 @@ public final class RelationProjectionQueryPlanner {
                                                  RecordReadProjection projection,
                                                  DBInfo.Type databaseType,
                                                  java.util.Set<String> requiredMainFields) {
+        return plan(definitions, definition, projection, databaseType, requiredMainFields,
+                RelationProjectionPlanningOptions.defaults());
+    }
+
+    public static RelationProjectionSqlPlan plan(List<StaticModuleDefinition> definitions,
+                                                 StaticModuleDefinition definition,
+                                                 RecordReadProjection projection,
+                                                 DBInfo.Type databaseType,
+                                                 java.util.Set<String> requiredMainFields,
+                                                 RelationProjectionPlanningOptions options) {
         if (definition == null) {
             throw new IllegalArgumentException("static module definition must not be null");
         }
@@ -40,6 +51,9 @@ public final class RelationProjectionQueryPlanner {
                     + definition.moduleAlias() + " != " + projection.moduleAlias());
         }
         DBInfo.Type dbType = databaseType == null ? DBInfo.Type.POSTGRESQL : databaseType;
+        RelationProjectionPlanningOptions planningOptions = options == null
+                ? RelationProjectionPlanningOptions.defaults()
+                : options;
         if (definition.entities().isEmpty()) {
             return emptyPlan(definition, dbType);
         }
@@ -65,7 +79,8 @@ public final class RelationProjectionQueryPlanner {
                 projection,
                 referenceFields,
                 dbType,
-                requiredFields
+                requiredFields,
+                planningOptions
         );
         if (referencePlan != null) {
             return referencePlan;
@@ -112,6 +127,7 @@ public final class RelationProjectionQueryPlanner {
                     targetField.fieldName()
             ));
             requiredRelations.add(field.relationCode());
+            validateJoinCount(requiredRelations.size(), planningOptions.maxJoinCount(), definition.moduleAlias());
         }
 
         LinkedHashMap<String, Object> params = new LinkedHashMap<>();
@@ -150,7 +166,8 @@ public final class RelationProjectionQueryPlanner {
                                                            RecordReadProjection projection,
                                                            LinkedHashSet<ViewFieldRef> relationFields,
                                                            DBInfo.Type dbType,
-                                                           java.util.Set<String> requiredFields) {
+                                                           java.util.Set<String> requiredFields,
+                                                           RelationProjectionPlanningOptions options) {
         Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions);
         if (!modules.containsKey(definition.moduleAlias())) {
             LinkedHashMap<String, StaticModuleDefinition> merged = new LinkedHashMap<>(modules);
@@ -179,7 +196,8 @@ public final class RelationProjectionQueryPlanner {
             String targetFieldName;
             String unresolvedPath;
             if (readProjection != null && readProjection.referencePath() != null) {
-                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, readProjection.referencePath());
+                traversal = StaticModuleReferencePathResolver.resolve(modules, definition,
+                        readProjection.referencePath(), options);
                 targetFieldName = readProjection.referencePath().targetField().fieldName();
                 unresolvedPath = readProjection.referencePath().toString();
             } else {
@@ -196,7 +214,7 @@ public final class RelationProjectionQueryPlanner {
                 }
                 String relationPath = path.substring(0, lastSeparator);
                 targetFieldName = path.substring(lastSeparator + 1);
-                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath);
+                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath, options);
                 unresolvedPath = relationPath;
             }
             if (traversal == null) {
@@ -213,6 +231,7 @@ public final class RelationProjectionQueryPlanner {
                             + join.tableAlias() + "." + join.cardinality());
                 }
                 joins.putIfAbsent(join.tableAlias(), join);
+                validateJoinCount(joins.size(), options.maxJoinCount(), definition.moduleAlias());
             }
             String targetColumn = columnName(traversal.entity(), targetFieldName);
             if (readProjection != null && readProjection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS) {
@@ -263,6 +282,13 @@ public final class RelationProjectionQueryPlanner {
                 List.copyOf(relationFields),
                 dbType
         );
+    }
+
+    private static void validateJoinCount(int joinCount, int maxJoinCount, String moduleAlias) {
+        if (joinCount > maxJoinCount) {
+            throw new IllegalArgumentException("relation projection join count exceeds limit: "
+                    + moduleAlias + "." + joinCount + " > " + maxJoinCount);
+        }
     }
 
     private static void appendReferenceJoin(StringBuilder sql,
