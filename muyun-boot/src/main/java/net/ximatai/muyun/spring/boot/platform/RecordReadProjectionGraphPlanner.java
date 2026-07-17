@@ -71,15 +71,17 @@ public final class RecordReadProjectionGraphPlanner {
         for (StaticModuleReferencePathResolver.JoinStep join : output.traversal().joins()) {
             String joinNodeId = joinNodeId(join.tableAlias());
             nodes.putIfAbsent(joinNodeId, ProjectionGraphNode.join(moduleAlias, join.tableAlias()));
-            edges.add(new ProjectionGraphEdge(
-                    previousNodeId,
-                    joinNodeId,
-                    ProjectionGraphEdgeKind.REFERENCE_JOIN,
-                    join.tableAlias(),
-                    join.tableAlias(),
-                    join.cardinality(),
-                    join.conditions()
-            ));
+            if (!hasReferenceJoinEdge(edges, previousNodeId, joinNodeId)) {
+                edges.add(new ProjectionGraphEdge(
+                        previousNodeId,
+                        joinNodeId,
+                        ProjectionGraphEdgeKind.REFERENCE_JOIN,
+                        join.tableAlias(),
+                        join.tableAlias(),
+                        join.cardinality(),
+                        join.conditions()
+                ));
+            }
             previousNodeId = joinNodeId;
         }
         String outputNodeId = field.relationCode() == null
@@ -91,6 +93,15 @@ public final class RecordReadProjectionGraphPlanner {
                 ProjectionGraphEdgeKind.REFERENCE_OUTPUT_FIELD,
                 output.targetFieldName()
         ));
+    }
+
+    private static boolean hasReferenceJoinEdge(List<ProjectionGraphEdge> edges,
+                                                String sourceNodeId,
+                                                String targetNodeId) {
+        return edges.stream()
+                .anyMatch(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN
+                        && edge.sourceNodeId().equals(sourceNodeId)
+                        && edge.targetNodeId().equals(targetNodeId));
     }
 
     private static ResolvedReferenceOutput resolveReferenceOutput(Map<String, StaticModuleDefinition> modules,

@@ -88,6 +88,10 @@ class RelationProjectionQueryPlannerTest {
         );
 
         assertThat(plan.hasRelationProjection()).isTrue();
+        assertThat(plan.projectionGraph()).isNotNull();
+        assertThat(plan.projectionGraph().edges())
+                .filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
+                .hasSize(2);
         assertThat(plan.queryableFields()).contains("id", "username", "employeeNo");
         assertThat(plan.queryableFields()).doesNotContain("employeeTitle");
         assertThat(plan.sortableFields()).contains("id", "username", "employeeNo", "employeeTitle");
@@ -277,6 +281,11 @@ class RelationProjectionQueryPlannerTest {
         );
 
         assertThat(plan.hasRelationProjection()).isTrue();
+        assertThat(plan.projectionGraph()).isNotNull();
+        assertThat(plan.projectionGraph().edges())
+                .filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
+                .singleElement()
+                .satisfies(edge -> assertThat(edge.tableAlias()).isEqualTo("customer_id"));
         assertThat(plan.responseFields()).containsExactlyInAnyOrder("id", "orderNo", "customerTitle");
         assertThat(plan.baseSql())
                 .contains("from \"public\".\"crm_order\" \"main\"")

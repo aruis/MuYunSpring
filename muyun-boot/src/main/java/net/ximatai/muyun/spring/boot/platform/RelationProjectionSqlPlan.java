@@ -10,14 +10,27 @@ public record RelationProjectionSqlPlan(String baseSql,
                                         Set<String> sortableFields,
                                         Set<String> responseFields,
                                         List<ViewFieldRef> relationOutputFields,
-                                        net.ximatai.muyun.database.core.metadata.DBInfo.Type databaseType) {
+                                        net.ximatai.muyun.database.core.metadata.DBInfo.Type databaseType,
+                                        ProjectionGraph projectionGraph) {
     public RelationProjectionSqlPlan(String baseSql,
                                      Map<String, Object> baseParams,
                                      Set<String> queryableFields,
                                      Set<String> responseFields,
                                      List<ViewFieldRef> relationOutputFields,
                                      net.ximatai.muyun.database.core.metadata.DBInfo.Type databaseType) {
-        this(baseSql, baseParams, queryableFields, queryableFields, responseFields, relationOutputFields, databaseType);
+        this(baseSql, baseParams, queryableFields, queryableFields, responseFields, relationOutputFields, databaseType,
+                null);
+    }
+
+    public RelationProjectionSqlPlan(String baseSql,
+                                     Map<String, Object> baseParams,
+                                     Set<String> queryableFields,
+                                     Set<String> sortableFields,
+                                     Set<String> responseFields,
+                                     List<ViewFieldRef> relationOutputFields,
+                                     net.ximatai.muyun.database.core.metadata.DBInfo.Type databaseType) {
+        this(baseSql, baseParams, queryableFields, sortableFields, responseFields, relationOutputFields, databaseType,
+                null);
     }
 
     public RelationProjectionSqlPlan {

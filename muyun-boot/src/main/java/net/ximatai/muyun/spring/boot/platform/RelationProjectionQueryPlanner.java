@@ -55,10 +55,16 @@ public final class RelationProjectionQueryPlanner {
                 ? RelationProjectionPlanningOptions.defaults()
                 : options;
         if (definition.entities().isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, RecordReadProjectionGraphAdapter.adapt(projection), dbType);
         }
         java.util.Set<String> requiredFields = requiredMainFields == null ? java.util.Set.of()
                 : java.util.Set.copyOf(requiredMainFields);
+        ProjectionGraph projectionGraph = RecordReadProjectionGraphPlanner.plan(
+                definitions == null || definitions.isEmpty() ? List.of(definition) : definitions,
+                definition,
+                projection,
+                planningOptions
+        );
 
         EntityDefinition mainEntity = definition.entities().getFirst();
         LinkedHashSet<ViewFieldRef> relationFields = projection.outputFields().stream()
@@ -69,7 +75,7 @@ public final class RelationProjectionQueryPlanner {
                 .filter(field -> readProjection(definition, field.fieldName()) != null)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (relationFields.isEmpty() && readProjectionFields.isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, projectionGraph, dbType);
         }
         LinkedHashSet<ViewFieldRef> referenceFields = new LinkedHashSet<>(relationFields);
         referenceFields.addAll(readProjectionFields);
@@ -80,13 +86,14 @@ public final class RelationProjectionQueryPlanner {
                 referenceFields,
                 dbType,
                 requiredFields,
-                planningOptions
+                planningOptions,
+                projectionGraph
         );
         if (referencePlan != null) {
             return referencePlan;
         }
         if (definition.projectionJoins().isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, projectionGraph, dbType);
         }
 
         Map<String, EntityDefinition> entities = entitiesByAlias(definition.entities());
@@ -151,7 +158,8 @@ public final class RelationProjectionQueryPlanner {
                 sortableFields,
                 responseFields,
                 List.copyOf(relationFields),
-                dbType
+                dbType,
+                projectionGraph
         );
     }
 
@@ -167,7 +175,8 @@ public final class RelationProjectionQueryPlanner {
                                                            LinkedHashSet<ViewFieldRef> relationFields,
                                                            DBInfo.Type dbType,
                                                            java.util.Set<String> requiredFields,
-                                                           RelationProjectionPlanningOptions options) {
+                                                           RelationProjectionPlanningOptions options,
+                                                           ProjectionGraph projectionGraph) {
         Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions);
         if (!modules.containsKey(definition.moduleAlias())) {
             LinkedHashMap<String, StaticModuleDefinition> merged = new LinkedHashMap<>(modules);
@@ -280,7 +289,8 @@ public final class RelationProjectionQueryPlanner {
                 sortableFields,
                 responseFields,
                 List.copyOf(relationFields),
-                dbType
+                dbType,
+                projectionGraph
         );
     }
 
@@ -312,9 +322,12 @@ public final class RelationProjectionQueryPlanner {
         sql.append(String.join(" and ", predicates));
     }
 
-    private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition, DBInfo.Type databaseType) {
+    private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition,
+                                                       ProjectionGraph projectionGraph,
+                                                       DBInfo.Type databaseType) {
         return new RelationProjectionSqlPlan("select * from " + qualifiedTable(definition.entities().getFirst(), databaseType),
-                Map.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType);
+                Map.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType,
+                projectionGraph);
     }
 
     private static void addMainProjectionFields(LinkedHashMap<String, SelectField> selectFields,
