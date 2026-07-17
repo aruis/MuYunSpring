@@ -30,6 +30,7 @@ import {
   realtimeDestinations,
   resourceDataChangeChannel,
   resourceRecordDataChangeChannel,
+  sessionActivityCommand,
   tenantPublicDataChangeChannel,
   tenantPublicNotificationChannel,
   userBusinessEventChannel,
@@ -517,6 +518,7 @@ test('realtime channel factories build standard destinations', () => {
     type: 'platform.business-event',
   });
   assert.equal(userImMessageChannel.destination, '/user/queue/platform/im/messages');
+  assert.equal(sessionActivityCommand.destination, '/app/platform/session/activity');
   assert.equal(imMessageSendCommand.destination, '/app/platform/im/messages/send');
   assert.deepEqual(tenantPublicDataChangeChannel('tenant-a'), {
     destination: '/topic/platform/tenants/tenant-a/public/data-changes',

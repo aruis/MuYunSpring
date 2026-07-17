@@ -31,9 +31,29 @@ public record UserSessionLifecycleEvent(
         return new UserSessionLifecycleEvent(Type.LOGGED_OUT, userId, sessionId);
     }
 
+    public static UserSessionLifecycleEvent presenceConnected(String userId, String sessionId) {
+        return new UserSessionLifecycleEvent(Type.PRESENCE_CONNECTED, userId, sessionId);
+    }
+
+    public static UserSessionLifecycleEvent presenceDisconnected(String userId, String sessionId) {
+        return new UserSessionLifecycleEvent(Type.PRESENCE_DISCONNECTED, userId, sessionId);
+    }
+
+    public static UserSessionLifecycleEvent presenceIdle(String userId, String sessionId) {
+        return new UserSessionLifecycleEvent(Type.PRESENCE_IDLE, userId, sessionId);
+    }
+
+    public static UserSessionLifecycleEvent presenceActive(String userId, String sessionId) {
+        return new UserSessionLifecycleEvent(Type.PRESENCE_ACTIVE, userId, sessionId);
+    }
+
     public enum Type {
         LOGGED_IN,
         LOGGED_OUT,
-        REVOKED
+        REVOKED,
+        PRESENCE_CONNECTED,
+        PRESENCE_DISCONNECTED,
+        PRESENCE_IDLE,
+        PRESENCE_ACTIVE
     }
 }

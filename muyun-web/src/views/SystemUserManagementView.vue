@@ -32,7 +32,7 @@ import type {
 } from '@muyun/web-contracts';
 import { platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageBusinessEventHandler, usePageRecordExternalChange } from '../app/pageRealtime';
-import { useUserSessionRows } from './useUserSessionRows';
+import { useUserSessionRows, userSessionPresenceTitle } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
 
@@ -521,6 +521,12 @@ function sessionTerminalTitle(session: UserSessionView) {
   return platform ? `${terminal} / ${platform}` : terminal;
 }
 
+function sessionPresenceTitle(session: UserSessionView) {
+  const status = userSessionPresenceTitle(session);
+  const count = session.connectionCount ?? 0;
+  return `${status}，实时连接数 ${count}`;
+}
+
 function createSystemUserDraft(): Partial<UserAccount> {
   return {
     enabled: true,
@@ -643,6 +649,13 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
             >
               <div class="system-user-session-main">
                 <strong :title="sessionTitle(session)">{{ sessionTitle(session) }}</strong>
+                <span
+                  class="system-user-session-presence"
+                  :class="{ 'is-present': session.present, 'is-idle': session.presenceStatus === 'idle' }"
+                  :title="sessionPresenceTitle(session)"
+                >
+                  {{ userSessionPresenceTitle(session) }}
+                </span>
                 <span v-if="session.current" class="system-user-session-badge">当前会话</span>
               </div>
               <dl class="system-user-session-meta">
@@ -651,8 +664,12 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
                   <dd><DateTimeText :value="session.issuedAt" /></dd>
                 </div>
                 <div>
-                  <dt>活跃</dt>
+                  <dt>最近请求</dt>
                   <dd><DateTimeText :value="session.lastSeenAt" /></dd>
+                </div>
+                <div>
+                  <dt>连接</dt>
+                  <dd :title="sessionPresenceTitle(session)">{{ session.connectionCount ?? 0 }}</dd>
                 </div>
                 <div>
                   <dt>IP</dt>
@@ -866,7 +883,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
 
 .system-user-session-item {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) minmax(360px, 2fr) auto;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(460px, 2fr) auto;
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -903,9 +920,28 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
   font-size: 12px;
 }
 
+.system-user-session-presence {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 12px;
+}
+
+.system-user-session-presence.is-present {
+  background: rgba(22, 163, 74, 0.1);
+  color: #047857;
+}
+
+.system-user-session-presence.is-idle {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+}
+
 .system-user-session-meta {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }

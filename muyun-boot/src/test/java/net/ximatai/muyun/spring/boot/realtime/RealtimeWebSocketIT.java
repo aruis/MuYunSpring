@@ -92,6 +92,8 @@ class RealtimeWebSocketIT {
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User 1", "tenant-a")));
         when(userSessionService.currentUser("token-2"))
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-2", "User 2", "tenant-b")));
+        when(userSessionService.currentSessionId("token-1")).thenReturn(Optional.of("session-1"));
+        when(userSessionService.currentSessionId("token-2")).thenReturn(Optional.of("session-2"));
         WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
         BlockingQueue<JsonNode> user1Messages = new LinkedBlockingQueue<>();
@@ -134,6 +136,8 @@ class RealtimeWebSocketIT {
         CurrentUser admin = CurrentUser.systemUser("admin-1", "Admin");
         when(userSessionService.currentUser("token-admin-a")).thenReturn(Optional.of(admin));
         when(userSessionService.currentUser("token-admin-b")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentSessionId("token-admin-a")).thenReturn(Optional.of("admin-session-a"));
+        when(userSessionService.currentSessionId("token-admin-b")).thenReturn(Optional.of("admin-session-b"));
         WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
         BlockingQueue<JsonNode> adminAMessages = new LinkedBlockingQueue<>();
@@ -171,6 +175,7 @@ class RealtimeWebSocketIT {
     void shouldPublishUserSessionLifecycleEventToConnectedAuthorizedUser() throws Exception {
         CurrentUser admin = CurrentUser.systemUser("platform.user.super_admin", "Admin");
         when(userSessionService.currentUser("token-admin")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentSessionId("token-admin")).thenReturn(Optional.of("admin-session"));
         when(userSessionService.currentUserSnapshot("token-admin")).thenReturn(Optional.of(admin));
         when(actionAvailabilityService.recordActions("iam.user", "user-1")).thenReturn(
                 new PlatformRecordActionAvailability("user-1",
@@ -194,6 +199,49 @@ class RealtimeWebSocketIT {
             assertThat(envelope.path("payload").path("recordId").asText()).isEqualTo("user-1");
             assertThat(envelope.path("payload").path("reason").asText()).isEqualTo("LOGGED_IN");
         } finally {
+            if (adminSession.isConnected()) {
+                adminSession.disconnect();
+            }
+            stompClient.stop();
+        }
+    }
+
+    @Test
+    @SuppressWarnings("removal")
+    void shouldPublishPresenceLifecycleEventsThroughStompConnection() throws Exception {
+        CurrentUser admin = CurrentUser.systemUser("platform.user.super_admin", "Admin");
+        CurrentUser user = CurrentUser.tenantUser("user-1", "User 1", "tenant-a");
+        when(userSessionService.currentUser("token-admin")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentSessionId("token-admin")).thenReturn(Optional.of("admin-session"));
+        when(userSessionService.currentUserSnapshot("token-admin")).thenReturn(Optional.of(admin));
+        when(userSessionService.currentUser("token-user")).thenReturn(Optional.of(user));
+        when(userSessionService.currentSessionId("token-user")).thenReturn(Optional.of("user-session-1"));
+        when(actionAvailabilityService.recordActions("iam.user", "user-1")).thenReturn(
+                new PlatformRecordActionAvailability("user-1",
+                        List.of(new PlatformRecordActionAvailability.Action("sessions", true, null))));
+        WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+        BlockingQueue<JsonNode> messages = new LinkedBlockingQueue<>();
+
+        StompSession adminSession = connect(stompClient, "token-admin");
+        StompSession userSession = null;
+        try {
+            adminSession.subscribe(userBusinessEventDestination(), frameHandler(messages));
+            awaitServerSubscriptions(userBusinessEventDestination(), 1);
+
+            userSession = connect(stompClient, "token-user");
+            assertUserSessionBusinessEvent(messages.poll(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS),
+                    "user-1", "PRESENCE_CONNECTED");
+
+            userSession.disconnect();
+            userSession = null;
+
+            assertUserSessionBusinessEvent(messages.poll(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS),
+                    "user-1", "PRESENCE_DISCONNECTED");
+        } finally {
+            if (userSession != null && userSession.isConnected()) {
+                userSession.disconnect();
+            }
             if (adminSession.isConnected()) {
                 adminSession.disconnect();
             }
@@ -244,6 +292,15 @@ class RealtimeWebSocketIT {
                 .isEqualTo(moduleAlias);
         assertThat(envelope.path("payload").path("changes").get(0).path("recordId").asText())
                 .isEqualTo(recordId);
+    }
+
+    private void assertUserSessionBusinessEvent(JsonNode envelope, String userId, String reason) {
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.path("type").asText()).isEqualTo(StompBusinessRealtimeNotifier.MESSAGE_TYPE);
+        assertThat(envelope.path("payload").path("type").asText())
+                .isEqualTo("iam.user.session.collectionChanged");
+        assertThat(envelope.path("payload").path("recordId").asText()).isEqualTo(userId);
+        assertThat(envelope.path("payload").path("reason").asText()).isEqualTo(reason);
     }
 
     private void awaitServerSubscriptions(String destination, int count) throws InterruptedException {

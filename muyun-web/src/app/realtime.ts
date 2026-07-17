@@ -5,6 +5,7 @@ import {
   connectRealtimeDataChanges,
   connectRealtimeUserNotifications,
   moduleDataChangeChannel,
+  sessionActivityCommand,
   type RealtimeClient,
   type RealtimeSubscription,
 } from '@muyun/web-core';
@@ -19,6 +20,7 @@ export const appDataChangeDispatcher = createDataChangeDispatcher();
 const moduleDataChangeSubscriptions = new Map<string, DataChangeTopicSubscription>();
 const businessEventHandlers = new Set<(event: WebBusinessRealtimeEvent) => void | Promise<void>>();
 let activeRealtime: RealtimeClient | undefined;
+const ACTIVITY_REPORT_INTERVAL_MS = 30_000;
 
 export interface AppRealtimeOptions {
   onUnauthorized?: () => void;
@@ -55,6 +57,8 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
       void handler(event);
     }
   });
+  const activityReporter = createSessionActivityReporter(realtime);
+  activityReporter.start();
   bindPageRealtimeSubscriptions(realtime);
   void realtime.connect();
   return {
@@ -63,6 +67,7 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
       dataChangeSubscription.unsubscribe();
       userNotificationSubscription.unsubscribe();
       businessEventSubscription.unsubscribe();
+      activityReporter.stop();
       unbindPageRealtimeSubscriptions();
       if (activeRealtime === realtime) {
         activeRealtime = undefined;
@@ -70,6 +75,53 @@ export function connectAppRealtime(options: AppRealtimeOptions = {}) {
       await realtime.disconnect();
     },
   };
+}
+
+function createSessionActivityReporter(realtime: RealtimeClient) {
+  let lastReportedAt = 0;
+  const activityEvents = ['pointermove', 'pointerdown', 'keydown', 'scroll'] as const;
+  const handleActivity = () => reportActivity(false);
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      reportActivity(true);
+    }
+  };
+  return {
+    start() {
+      if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return;
+      }
+      for (const event of activityEvents) {
+        window.addEventListener(event, handleActivity, { passive: true });
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    },
+    stop() {
+      if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return;
+      }
+      for (const event of activityEvents) {
+        window.removeEventListener(event, handleActivity);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    },
+  };
+
+  function reportActivity(force: boolean) {
+    if (realtime.state() !== 'connected') {
+      return;
+    }
+    const now = Date.now();
+    if (!force && now - lastReportedAt < ACTIVITY_REPORT_INTERVAL_MS) {
+      return;
+    }
+    lastReportedAt = now;
+    try {
+      realtime.publish(sessionActivityCommand, { timestamp: new Date(now).toISOString() });
+    } catch {
+      // Activity reporting is best-effort; normal realtime state handling covers connection failures.
+    }
+  }
 }
 
 export function subscribeAppModuleDataChanges(moduleAlias: string) {

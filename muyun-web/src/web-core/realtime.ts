@@ -103,6 +103,7 @@ export const realtimeDestinations = {
   userBusinessEvents: '/user/queue/platform/business-events',
   userImMessages: '/user/queue/platform/im/messages',
   platformPing: '/app/platform/ping',
+  sessionActivity: '/app/platform/session/activity',
   imMessagesSend: '/app/platform/im/messages/send',
 } as const;
 
@@ -127,6 +128,10 @@ export const userImMessageChannel: RealtimeChannel<unknown> = {
 
 export const platformPingCommand: RealtimeCommand<{ timestamp: string }> = {
   destination: realtimeDestinations.platformPing,
+};
+
+export const sessionActivityCommand: RealtimeCommand<{ timestamp: string }> = {
+  destination: realtimeDestinations.sessionActivity,
 };
 
 export const imMessageSendCommand: RealtimeCommand<unknown> = {

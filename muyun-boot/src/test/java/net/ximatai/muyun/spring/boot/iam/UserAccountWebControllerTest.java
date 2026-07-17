@@ -104,10 +104,11 @@ class UserAccountWebControllerTest {
                 "org-1", Instant.parse("2026-07-15T00:00:00Z"),
                 Instant.parse("2026-07-15T12:00:00Z"), Instant.parse("2026-07-22T00:00:00Z"),
                 Instant.parse("2026-07-15T01:00:00Z"), false, "127.0.0.1", "Chrome",
-                "desktopWeb", "Web 桌面端", "macos", "macOS", false);
+                "desktopWeb", "Web 桌面端", "macos", "macOS", false,
+                false, "offline", "离线", 0, null, null);
         when(userSessionService.activeSessionsOfUser("user-1", "token-1")).thenReturn(List.of(session));
         when(userSessionService.activeSessionStatuses(List.of("user-1")))
-                .thenReturn(List.of(new UserSessionStatusView("user-1", true, 1)));
+                .thenReturn(List.of(new UserSessionStatusView("user-1", true, 1, true, 1, 0)));
         when(userAccountService.listForAction(eq(net.ximatai.muyun.spring.common.platform.PlatformAction.QUERY),
                 any(net.ximatai.muyun.database.core.orm.Criteria.class)))
                 .thenReturn(List.of(user("user-1", "alice", "tenant-a")));
@@ -122,7 +123,7 @@ class UserAccountWebControllerTest {
              TenantContext.Scope ignoredTenant = TenantContext.use("tenant-a")) {
             assertThat(controller.activeSessions("user-1", request)).containsExactly(session);
             assertThat(controller.sessionStatuses(new UserAccountWebController.SessionStatusRequest(List.of("user-1"))))
-                    .containsExactly(new UserSessionStatusView("user-1", true, 1));
+                    .containsExactly(new UserSessionStatusView("user-1", true, 1, true, 1, 0));
             assertThat(controller.revokeSession("user-1", "session-1", request)).isEqualTo(1);
             assertThat(controller.revokeSessions("user-1",
                     new UserAccountWebController.RevokeSessionsRequest(List.of("session-1")), request)).isEqualTo(1);
@@ -146,15 +147,15 @@ class UserAccountWebControllerTest {
                 any(net.ximatai.muyun.database.core.orm.Criteria.class)))
                 .thenReturn(List.of(user("system-user", "admin", null), user("tenant-user", "demo-admin", "demo")));
         when(userSessionService.activeSessionStatuses(userIds)).thenReturn(List.of(
-                new UserSessionStatusView("system-user", true, 2),
-                new UserSessionStatusView("tenant-user", true, 1)
+                new UserSessionStatusView("system-user", true, 2, true, 1, 0),
+                new UserSessionStatusView("tenant-user", true, 1, false, 0, 0)
         ));
 
         try (TenantContext.Scope ignored = TenantContext.system("test system session status")) {
             assertThat(controller.sessionStatuses(new UserAccountWebController.SessionStatusRequest(userIds)))
                     .containsExactly(
-                            new UserSessionStatusView("system-user", true, 2),
-                            new UserSessionStatusView("tenant-user", true, 1)
+                            new UserSessionStatusView("system-user", true, 2, true, 1, 0),
+                            new UserSessionStatusView("tenant-user", true, 1, false, 0, 0)
                     );
         }
 
@@ -179,7 +180,8 @@ class UserAccountWebControllerTest {
                         "org-1", Instant.parse("2026-07-15T00:00:00Z"),
                         Instant.parse("2026-07-15T12:00:00Z"), Instant.parse("2026-07-22T00:00:00Z"),
                         Instant.parse("2026-07-15T01:00:00Z"), false, "127.0.0.1", "Chrome",
-                        "desktopWeb", "Web 桌面端", "macos", "macOS", false)
+                        "desktopWeb", "Web 桌面端", "macos", "macOS", false,
+                        false, "offline", "离线", 0, null, null)
         ));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)

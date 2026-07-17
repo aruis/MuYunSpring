@@ -876,6 +876,7 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(userViewSource, /userFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
   assert.match(userViewSource, /<RecordFormFields/);
+  assert.match(userViewSource, /<form v-if="userDetailMode !== 'view'" class="user-form"/);
   assert.match(userViewSource, /:fields="userFormFieldDefinitions"/);
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
