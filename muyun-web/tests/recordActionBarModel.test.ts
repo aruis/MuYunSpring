@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRecordActions } from '../src/platform-components/recordActionBarModel.ts';
+import { mergeRecordActions, resolveRecordActions } from '../src/platform-components/recordActionBarModel.ts';
 
 test('resolveRecordActions filters invisible actions and applies authorization', () => {
   const actions = resolveRecordActions(
@@ -76,4 +76,24 @@ test('resolveRecordActions passes record id into authorization check', () => {
   assert.equal(actions[0].disabled, false);
   assert.equal(actions[1].disabled, true);
   assert.equal(actions[1].reason, 'cannot reset current user');
+});
+
+test('mergeRecordActions inserts extension actions around standard anchors', () => {
+  const actions = mergeRecordActions(
+    [
+      { key: 'view', title: '查看' },
+      { key: 'edit', actionCode: 'update', title: '修改' },
+      { key: 'delete', actionCode: 'delete', title: '删除' },
+    ],
+    [
+      { key: 'bind', title: '绑定', after: 'update' },
+      { key: 'toggle', title: '停用', before: 'delete' },
+      { key: 'audit', title: '审计', after: 'missing' },
+    ],
+  );
+
+  assert.deepEqual(
+    actions.map((action) => action.key),
+    ['view', 'edit', 'bind', 'toggle', 'delete', 'audit'],
+  );
 });

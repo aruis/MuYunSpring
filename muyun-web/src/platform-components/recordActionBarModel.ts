@@ -5,6 +5,8 @@ export interface RecordActionItem {
   key?: string;
   actionCode?: string;
   title: string;
+  before?: string;
+  after?: string;
   visible?: boolean;
   disabled?: boolean;
   loading?: boolean;
@@ -68,4 +70,29 @@ function defaultActionIcon(action: RecordActionItem): UiIconName | undefined {
     return 'close';
   }
   return undefined;
+}
+
+export function mergeRecordActions(
+  baseActions: RecordActionItem[],
+  extraActions: RecordActionItem[],
+): RecordActionItem[] {
+  const merged = [...baseActions];
+  for (const action of extraActions) {
+    const beforeIndex = action.before ? findActionIndex(merged, action.before) : -1;
+    if (beforeIndex >= 0) {
+      merged.splice(beforeIndex, 0, action);
+      continue;
+    }
+    const afterIndex = action.after ? findActionIndex(merged, action.after) : -1;
+    if (afterIndex >= 0) {
+      merged.splice(afterIndex + 1, 0, action);
+      continue;
+    }
+    merged.push(action);
+  }
+  return merged;
+}
+
+function findActionIndex(actions: RecordActionItem[], key: string) {
+  return actions.findIndex((action) => action.key === key || action.actionCode === key);
 }
