@@ -20,6 +20,7 @@ import DateTimeText from './DateTimeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 import {
+  mergeRecordActions,
   resolveRecordActions,
   type RecordActionItem,
   type ResolvedRecordActionItem,
@@ -65,6 +66,11 @@ const props = withDefaults(
     createTitle?: string;
     standardCrudRowActions?: boolean;
     rowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
+    extraRowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
+    rowActionStateOf?: (
+      record: QueryListRecord,
+      action: RecordActionItem,
+    ) => Partial<RecordActionItem> | undefined;
     rowActionsTitle?: string;
     cellRenderers?: Record<string, (record: QueryListRecord) => string>;
     rowKey?: string;
@@ -89,6 +95,8 @@ const props = withDefaults(
     createTitle: undefined,
     standardCrudRowActions: false,
     rowActionsOf: undefined,
+    extraRowActionsOf: undefined,
+    rowActionStateOf: undefined,
     rowActionsTitle: '操作',
     cellRenderers: () => ({}),
     selectedKey: undefined,
@@ -166,10 +174,10 @@ const panelActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
-const rowActionsProvider = computed(
-  () => props.rowActionsOf ?? (props.standardCrudRowActions ? standardCrudRowActionsOf : undefined),
+const hasRowActions = computed(
+  () =>
+    props.rowActionsOf !== undefined || props.standardCrudRowActions || props.extraRowActionsOf !== undefined,
 );
-const hasRowActions = computed(() => rowActionsProvider.value !== undefined);
 const hasExpandedRow = computed(() => props.expandedRowKeys.length > 0 || Boolean(slots.expandedRow));
 const rows = computed<QueryListRow[]>(() => records.value.map(resolveRow));
 const tableColumns = computed<RecordQueryListColumn[]>(() => {
@@ -377,7 +385,8 @@ function handleAction(action: RecordActionItem, event: MouseEvent) {
 }
 
 function resolveRow(record: QueryListRecord): QueryListRow {
-  const actions = resolveRecordActions(props.context, rowActionsProvider.value?.(record) ?? []);
+  const configuredActions = rowActions(record).map((action) => rowActionWithState(record, action));
+  const actions = resolveRecordActions(props.context, configuredActions);
   const secondaryActions = actions.slice(1);
   return {
     key: recordKey(record),
@@ -386,6 +395,20 @@ function resolveRow(record: QueryListRecord): QueryListRow {
     secondaryActions,
     dropdownItems: secondaryActions.map(rowActionDropdownItem),
   };
+}
+
+function rowActions(record: QueryListRecord): RecordActionItem[] {
+  const baseActions = props.rowActionsOf
+    ? props.rowActionsOf(record)
+    : props.standardCrudRowActions
+      ? standardCrudRowActionsOf()
+      : [];
+  return mergeRecordActions(baseActions, props.extraRowActionsOf?.(record) ?? []);
+}
+
+function rowActionWithState(record: QueryListRecord, action: RecordActionItem): RecordActionItem {
+  const state = props.rowActionStateOf?.(record, action);
+  return state ? { ...action, ...state } : action;
 }
 
 function standardCrudRowActionsOf(): RecordActionItem[] {

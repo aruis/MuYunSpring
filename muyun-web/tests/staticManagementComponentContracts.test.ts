@@ -515,10 +515,18 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /standardCrudRowActions\?: boolean/);
   assert.match(panelSource, /function standardCrudRowActionsOf/);
   assert.match(panelSource, /rowActionsOf\?: \(record: QueryListRecord\) => RecordActionItem\[\]/);
+  assert.match(panelSource, /extraRowActionsOf\?: \(record: QueryListRecord\) => RecordActionItem\[\]/);
+  assert.match(panelSource, /rowActionStateOf\?:/);
+  assert.match(panelSource, /mergeRecordActions/);
   assert.match(panelSource, /type\?: 'text' \| 'enabledStatus'/);
   assert.match(panelSource, /interface QueryListRow/);
   assert.match(panelSource, /const rows = computed<QueryListRow/);
   assert.match(panelSource, /function resolveRow/);
+  assert.match(panelSource, /resolveRecordActions\(props\.context, configuredActions\)/);
+  assert.doesNotMatch(
+    panelSource,
+    /resolveRecordActions\(props\.context, configuredActions, false, recordId/,
+  );
   assert.match(panelSource, /<RecordActionBar/);
   assert.match(panelSource, /<RecordStatusTag/);
   assert.match(panelSource, /<UiDropdown/);
@@ -828,7 +836,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /commitRoleDetailRecord\(fullRecord, mode\)/);
   assert.match(roleViewSource, /nextMode === 'edit' && record\.systemManaged !== true \? 'edit' : 'view'/);
   assert.match(roleViewSource, /standard-crud-actions/);
-  assert.match(roleViewSource, /:row-actions-of="roleRowActionsOf"/);
+  assert.match(roleViewSource, /standard-crud-row-actions/);
+  assert.match(roleViewSource, /:extra-row-actions-of="roleExtraRowActionsOf"/);
+  assert.match(roleViewSource, /:row-action-state-of="roleRowActionStateOf"/);
   assert.match(roleViewSource, /actionCode: 'accountRoleGrants'/);
   assert.match(roleViewSource, /<RoleAccountGrantDrawer/);
   assert.doesNotMatch(roleViewSource, /account-grants/);

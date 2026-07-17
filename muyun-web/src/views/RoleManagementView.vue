@@ -474,41 +474,38 @@ function handleRoleListAction(action: RecordActionItem) {
   }
 }
 
-function roleRowActionsOf(record: QueryListRecord): RecordActionItem[] {
-  const systemManaged = record.systemManaged === true;
+function roleExtraRowActionsOf(record: QueryListRecord): RecordActionItem[] {
   return [
-    { key: 'view', title: '查看' },
-    {
-      key: 'edit',
-      actionCode: 'update',
-      title: '修改',
-      iconName: 'edit',
-      disabled: systemManaged,
-    },
     {
       key: 'bind',
       actionCode: 'accountRoleGrants',
       title: '绑定',
       iconName: 'lock',
+      after: 'edit',
       visible: canBindAccountRoleRecord(record),
-      disabled: systemManaged,
     },
     {
       key: 'toggle',
       actionCode: roleToggleActionCode(record),
       title: roleToggleTitle(record),
       iconName: 'power',
-      disabled: systemManaged,
-    },
-    {
-      key: 'delete',
-      actionCode: 'delete',
-      title: '删除',
-      iconName: 'delete',
-      danger: true,
-      disabled: systemManaged,
+      before: 'delete',
     },
   ];
+}
+
+function roleRowActionStateOf(record: QueryListRecord, action: RecordActionItem) {
+  if (record.systemManaged !== true) {
+    return undefined;
+  }
+  const actionKey = action.key ?? action.actionCode;
+  return actionKey === 'edit' ||
+    actionKey === 'update' ||
+    actionKey === 'bind' ||
+    actionKey === 'toggle' ||
+    actionKey === 'delete'
+    ? { disabled: true }
+    : undefined;
 }
 
 function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
@@ -1161,7 +1158,9 @@ function parseRoleIds(value: unknown) {
       :title="selectedScope ? `角色列表 - ${selectedScope.title}` : '角色列表'"
       :columns="roleListColumns"
       standard-crud-actions
-      :row-actions-of="roleRowActionsOf"
+      standard-crud-row-actions
+      :extra-row-actions-of="roleExtraRowActionsOf"
+      :row-action-state-of="roleRowActionStateOf"
       create-title="新建角色"
       :selected-key="selectedRoleKey"
       :reload-key="roleReloadKey"
