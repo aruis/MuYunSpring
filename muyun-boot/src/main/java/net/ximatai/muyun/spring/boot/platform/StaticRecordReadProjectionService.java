@@ -87,7 +87,9 @@ public class StaticRecordReadProjectionService {
             return false;
         }
         return defaultListProjection(moduleAlias, recordService)
-                .filter(projection -> relationProjectionReadService.supportsListQuery(definition, projection))
+                .filter(projection -> relationProjectionReadService
+                        .describeListQuery(staticModuleDefinitionCatalog.definitions(), definition, projection)
+                        .supported())
                 .isPresent();
     }
 
