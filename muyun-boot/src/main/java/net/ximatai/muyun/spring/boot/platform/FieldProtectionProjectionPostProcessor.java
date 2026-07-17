@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.security.FieldOutputRenderer;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
@@ -10,6 +9,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 final class FieldProtectionProjectionPostProcessor {
     private FieldProtectionProjectionPostProcessor() {
@@ -92,34 +92,14 @@ final class FieldProtectionProjectionPostProcessor {
             return false;
         }
         for (ViewFieldRef field : projection.outputFields()) {
-            StaticModuleReferencePathResolver.Traversal traversal = referenceTraversal(modules, definition, field);
+            StaticModuleReferencePathResolver.Traversal traversal = referenceOutput(modules, definition, field)
+                    .map(RecordReadProjectionReferenceResolver.ResolvedOutput::traversal)
+                    .orElse(null);
             if (traversal != null && hasStorageProtectedJoinField(definition, traversal)) {
                 return true;
             }
         }
         return false;
-    }
-
-    private static StaticModuleReferencePathResolver.Traversal referenceTraversal(
-            Map<String, StaticModuleDefinition> modules,
-            StaticModuleDefinition definition,
-            ViewFieldRef field) {
-        if (field.relationCode() != null) {
-            return StaticModuleReferencePathResolver.resolve(modules, definition, field.relationCode());
-        }
-        StaticModuleReadProjectionDefinition readProjection = readProjection(definition, field.fieldName());
-        if (readProjection == null) {
-            return null;
-        }
-        if (readProjection.referencePath() != null) {
-            return StaticModuleReferencePathResolver.resolve(modules, definition, readProjection.referencePath());
-        }
-        String path = readProjection.path();
-        int lastSeparator = path == null ? -1 : path.lastIndexOf('.');
-        if (lastSeparator < 0) {
-            return null;
-        }
-        return StaticModuleReferencePathResolver.resolve(modules, definition, path.substring(0, lastSeparator));
     }
 
     private static boolean hasStorageProtectedJoinField(StaticModuleDefinition definition,
@@ -158,7 +138,7 @@ final class FieldProtectionProjectionPostProcessor {
         }
         StaticModuleReadProjectionDefinition readProjection = readProjection(definition, field.fieldName());
         if (readProjection != null) {
-            return readProjectionField(modules, definition, readProjection);
+            return readProjectionField(modules, definition, field);
         }
         return field(definition.entities().getFirst(), field.fieldName());
     }
@@ -176,34 +156,33 @@ final class FieldProtectionProjectionPostProcessor {
             return localRelationField;
         }
         StaticModuleReferencePathResolver.Traversal traversal =
-                StaticModuleReferencePathResolver.resolve(modules, definition, relationCode);
+                referenceOutput(modules, definition, ViewFieldRef.relation(relationCode, fieldName))
+                        .map(RecordReadProjectionReferenceResolver.ResolvedOutput::traversal)
+                        .orElse(null);
         return traversal == null ? null : field(traversal.entity(), fieldName);
     }
 
     private static FieldDefinition readProjectionField(Map<String, StaticModuleDefinition> modules,
                                                        StaticModuleDefinition definition,
-                                                       StaticModuleReadProjectionDefinition projection) {
-        if (projection.projectionType() != ModuleReadProjection.ProjectionType.FIELD) {
+                                                       ViewFieldRef field) {
+        Optional<RecordReadProjectionReferenceResolver.ResolvedOutput> output = referenceOutput(modules, definition, field);
+        if (output.isEmpty() || output.get().existsProjection()) {
             return null;
         }
-        StaticModuleReferencePathResolver.Traversal traversal;
-        String targetFieldName;
-        if (projection.referencePath() != null) {
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition, projection.referencePath());
-            targetFieldName = projection.referencePath().targetField().fieldName();
-        } else {
-            String path = projection.path();
-            int lastSeparator = path == null ? -1 : path.lastIndexOf('.');
-            if (lastSeparator < 0) {
-                return null;
-            }
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition, path.substring(0, lastSeparator));
-            targetFieldName = path.substring(lastSeparator + 1);
-        }
-        if (traversal == null) {
-            return null;
-        }
-        return field(traversal.entity(), targetFieldName);
+        RecordReadProjectionReferenceResolver.ResolvedOutput resolved = output.get();
+        return field(resolved.traversal().entity(), resolved.targetFieldName());
+    }
+
+    private static Optional<RecordReadProjectionReferenceResolver.ResolvedOutput> referenceOutput(
+            Map<String, StaticModuleDefinition> modules,
+            StaticModuleDefinition definition,
+            ViewFieldRef field) {
+        return Optional.ofNullable(RecordReadProjectionReferenceResolver.resolve(
+                modules,
+                definition,
+                field,
+                RelationProjectionPlanningOptions.defaults()
+        ));
     }
 
     private static FieldDefinition field(EntityDefinition entity, String fieldName) {
@@ -223,13 +202,6 @@ final class FieldProtectionProjectionPostProcessor {
 
     private static Map<String, StaticModuleDefinition> modulesByAlias(List<StaticModuleDefinition> definitions,
                                                                       StaticModuleDefinition definition) {
-        Map<String, StaticModuleDefinition> modules = new LinkedHashMap<>();
-        if (definitions != null) {
-            definitions.stream()
-                    .filter(item -> item != null)
-                    .forEach(item -> modules.put(item.moduleAlias(), item));
-        }
-        modules.putIfAbsent(definition.moduleAlias(), definition);
-        return modules;
+        return RecordReadProjectionReferenceResolver.modulesByAlias(definitions, definition);
     }
 }
