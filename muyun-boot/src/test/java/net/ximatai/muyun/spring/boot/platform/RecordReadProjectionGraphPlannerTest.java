@@ -66,6 +66,7 @@ class RecordReadProjectionGraphPlannerTest {
                 .satisfies(node -> {
                     assertThat(node.moduleAlias()).isEqualTo("crm.customer");
                     assertThat(node.entityAlias()).isEqualTo("customer");
+                    assertThat(node.tableAlias()).isEqualTo("customer_id");
                 });
         assertThat(graph.edges()).filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
                 .singleElement()
@@ -81,6 +82,9 @@ class RecordReadProjectionGraphPlannerTest {
                 .satisfies(edge -> {
                     assertThat(edge.sourceNodeId()).isEqualTo("join:customer_id");
                     assertThat(edge.targetNodeId()).isEqualTo("main:customerTitle");
+                    assertThat(edge.outputFieldName()).isEqualTo("customerTitle");
+                    assertThat(edge.targetFieldName()).isEqualTo("title");
+                    assertThat(edge.existsProjection()).isFalse();
                     assertThat(edge.path()).isEqualTo("title");
                 });
     }
