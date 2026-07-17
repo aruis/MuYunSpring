@@ -2,9 +2,15 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.organization.Organization;
@@ -93,6 +99,94 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.baseParams())
                 .containsEntry("__join_user_id_deleted", Boolean.FALSE)
                 .containsEntry("__join_user_id_employee_id_deleted", Boolean.FALSE);
+    }
+
+    @Test
+    void shouldPlanExplicitUserSelectorProjectionWithOrganizationAndDepartmentFields() {
+        StaticModuleDefinition user = userSelectorReferenceDefinition();
+        StaticModuleDefinition binding = employeeAccountReferenceDefinition();
+        StaticModuleDefinition employee = employeeWithOrganizationAndDepartmentDefinition();
+        StaticModuleDefinition organization = organizationReferenceDefinition();
+        StaticModuleDefinition department = departmentReferenceDefinition();
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(user);
+        RecordReadProjection projection = RecordReadProjectionPlanner.explicit(
+                "iam.user",
+                compilation.readModel(),
+                "user_selector",
+                List.of(
+                        "id",
+                        "username",
+                        "employeeId",
+                        "employeeNo",
+                        "employeeTitle",
+                        "employeeOrganizationId",
+                        "organizationTitle",
+                        "employeeDepartmentId",
+                        "departmentTitle"
+                ),
+                null,
+                null
+        );
+
+        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                List.of(user, binding, employee, organization, department),
+                user,
+                projection,
+                DBInfo.Type.POSTGRESQL,
+                Set.of()
+        );
+
+        assertThat(plan.hasRelationProjection()).isTrue();
+        assertThat(plan.responseFields()).containsExactlyInAnyOrder(
+                "id",
+                "username",
+                "employeeId",
+                "employeeNo",
+                "employeeTitle",
+                "employeeOrganizationId",
+                "organizationTitle",
+                "employeeDepartmentId",
+                "departmentTitle"
+        );
+        assertThat(plan.baseSql())
+                .contains("left join \"public\".\"iam_employee_account\" \"user_id\"")
+                .contains("left join \"public\".\"iam_employee\" \"user_id_employee_id\"")
+                .contains("left join \"public\".\"iam_organization\" \"user_id_employee_id_organization_id\"")
+                .contains("left join \"public\".\"iam_department\" \"user_id_employee_id_department_id\"")
+                .contains("\"user_id\".\"employee_id\" as \"employeeId\"")
+                .contains("\"user_id_employee_id\".\"employee_no\" as \"employeeNo\"")
+                .contains("\"user_id_employee_id\".\"title\" as \"employeeTitle\"")
+                .contains("\"user_id_employee_id\".\"organization_id\" as \"employeeOrganizationId\"")
+                .contains("\"user_id_employee_id_organization_id\".\"title\" as \"organizationTitle\"")
+                .contains("\"user_id_employee_id\".\"department_id\" as \"employeeDepartmentId\"")
+                .contains("\"user_id_employee_id_department_id\".\"title\" as \"departmentTitle\"");
+    }
+
+    @Test
+    void shouldRejectExplicitProjectionForNonListActionContext() {
+        StaticModuleDefinition user = userSelectorReferenceDefinition();
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(user);
+        ActionExecutionPolicy policy = new ActionExecutionPolicy(
+                "resetPassword",
+                PlatformActionLevel.RECORD,
+                ActionAccessMode.AUTH_REQUIRED,
+                true,
+                true,
+                ActionDefaultGrantPolicy.NONE,
+                null
+        );
+
+        assertThatThrownBy(() -> RecordReadProjectionPlanner.explicit(
+                "iam.user",
+                compilation.readModel(),
+                "user_selector",
+                List.of("id", "username"),
+                null,
+                ActionExecutionContext.ofPolicy("iam.user", policy, Set.of("user-1"), java.util.Optional.empty())
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("explicit record read projection requires list action context: "
+                        + "iam.user.resetPassword");
     }
 
     @Test
@@ -252,6 +346,77 @@ class RelationProjectionQueryPlannerTest {
                 "employeeTitle");
     }
 
+    private StaticModuleDefinition userSelectorReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/users",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "user",
+                        "iam_user",
+                        "User",
+                        List.of(FieldDefinition.string("username", "账号").column("username"))
+                )),
+                ModuleUiDefinition.builder("iam.user")
+                        .listView(list -> list.field("username"))
+                        .build(),
+                List.of(),
+                List.of(
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .select(EmployeeAccount::getEmployeeId),
+                                "employeeId"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getEmployeeNo),
+                                "employeeNo"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getTitle),
+                                "employeeTitle"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getOrganizationId),
+                                "employeeOrganizationId"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .then(Employee::getOrganizationId)
+                                        .select(Organization::getTitle),
+                                "organizationTitle"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .select(Employee::getDepartmentId),
+                                "employeeDepartmentId"
+                        ),
+                        new StaticModuleReadProjectionDefinition(
+                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                        .then(EmployeeAccount::getEmployeeId)
+                                        .then(Employee::getDepartmentId)
+                                        .select(Department::getTitle),
+                                "departmentTitle"
+                        )
+                ),
+                UserAccount.class,
+                List.of()
+        );
+    }
+
     private StaticModuleDefinition userReferenceDefinitionWithOutput(String readProjectionPath, String outputField) {
         return new StaticModuleDefinition(
                 "iam",
@@ -402,6 +567,39 @@ class RelationProjectionQueryPlannerTest {
         );
     }
 
+    private StaticModuleDefinition employeeWithOrganizationAndDepartmentDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.employee",
+                "职员管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/employees",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "employee",
+                        "iam_employee",
+                        "Employee",
+                        List.of(
+                                FieldDefinition.string("organizationId", "所属机构").column("organization_id"),
+                                FieldDefinition.string("departmentId", "所属部门").column("department_id"),
+                                FieldDefinition.string("employeeNo", "职员编号").column("employee_no"),
+                                FieldDefinition.string("title", "职员姓名").column("title")
+                        )
+                )),
+                null,
+                List.of(
+                        new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id"),
+                        new StaticModuleReferenceDefinition("department", "departmentId", "iam.department", "id")
+                ),
+                List.of(),
+                Employee.class,
+                List.of()
+        );
+    }
+
     private StaticModuleDefinition employeeWithOrganizationProjectionDefinition() {
         return employeeWithReadProjectionDefinition("organization.title", "organizationTitle");
     }
@@ -461,6 +659,31 @@ class RelationProjectionQueryPlannerTest {
                 List.of(),
                 List.of(),
                 Organization.class,
+                List.of()
+        );
+    }
+
+    private StaticModuleDefinition departmentReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.department",
+                "部门管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/departments",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "department",
+                        "iam_department",
+                        "Department",
+                        List.of(FieldDefinition.string("title", "部门名称").column("title"))
+                )),
+                null,
+                List.of(),
+                List.of(),
+                Department.class,
                 List.of()
         );
     }

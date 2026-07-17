@@ -164,9 +164,9 @@ class StaticModuleDefinitionScannerTest {
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
                 assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::code)
-                        .containsExactly("organization");
+                        .containsExactly("organization", "department");
                 assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::targetModuleAlias)
-                        .containsExactly("iam.organization");
+                        .containsExactly("iam.organization", "iam.department");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
                         .containsOnlyNulls();
                 assertThat(definition.readProjections()).extracting(projection ->
@@ -358,16 +358,26 @@ class StaticModuleDefinitionScannerTest {
                         projection.referencePath().steps().stream()
                                 .map(step -> step.referenceField().fieldName())
                                 .toList())
-                        .containsExactly(List.of("userId", "employeeId"), List.of("userId", "employeeId"));
+                        .containsExactly(
+                                List.of("userId", "employeeId"),
+                                List.of("userId", "employeeId"),
+                                List.of("userId"),
+                                List.of("userId", "employeeId"),
+                                List.of("userId", "employeeId", "organizationId"),
+                                List.of("userId", "employeeId"),
+                                List.of("userId", "employeeId", "departmentId")
+                        );
                 assertThat(definition.readProjections()).extracting(projection ->
                         projection.referencePath().targetField().fieldName())
-                        .containsExactly("employeeNo", "title");
+                        .containsExactly("employeeNo", "title", "employeeId", "organizationId", "title",
+                                "departmentId", "title");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::outputField)
-                        .containsExactly("employeeNo", "employeeTitle");
+                        .containsExactly("employeeNo", "employeeTitle", "employeeId", "employeeOrganizationId",
+                                "organizationTitle", "employeeDepartmentId", "departmentTitle");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::filterable)
-                        .containsExactly(true, false);
+                        .containsExactly(true, false, false, false, false, false, false);
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::sortable)
-                        .containsExactly(true, true);
+                        .containsExactly(true, true, true, true, true, true, true);
                 assertThat(definition.uiDefinition()).isNotNull();
                 assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
                         .singleElement()

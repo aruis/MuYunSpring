@@ -202,8 +202,8 @@ class MuYunSpringApplicationContextIT {
         @SuppressWarnings("unchecked")
         Map<String, Object> alice = (Map<String, Object>) firstPage.records().get(0);
         assertThat(alice)
-                .containsEntry("id", "projection_user_alice")
-                .containsEntry("username", "alice_projection")
+                .containsEntry("id", projectionUserId(tenantId, "alice"))
+                .containsEntry("username", projectionUsername(tenantId, "alice"))
                 .containsEntry("employeeNo", "E-PROJ-001")
                 .containsEntry("employeeTitle", "Alice Employee");
         assertThat(alice).containsEntry("passwordStatus", "ACTIVE");
@@ -211,8 +211,8 @@ class MuYunSpringApplicationContextIT {
         @SuppressWarnings("unchecked")
         Map<String, Object> bob = (Map<String, Object>) firstPage.records().get(1);
         assertThat(bob)
-                .containsEntry("id", "projection_user_bob")
-                .containsEntry("username", "bob_projection");
+                .containsEntry("id", projectionUserId(tenantId, "bob"))
+                .containsEntry("username", projectionUsername(tenantId, "bob"));
         assertThat(bob.get("employeeNo")).isNull();
         assertThat(bob.get("employeeTitle")).isNull();
 
@@ -228,11 +228,11 @@ class MuYunSpringApplicationContextIT {
         assertThat(secondPage.records()).hasSize(2);
         @SuppressWarnings("unchecked")
         Map<String, Object> charlie = (Map<String, Object>) secondPage.records().get(0);
-        assertThat(charlie).containsEntry("username", "charlie_projection");
+        assertThat(charlie).containsEntry("username", projectionUsername(tenantId, "charlie"));
         assertThat(charlie.get("employeeNo")).isNull();
         @SuppressWarnings("unchecked")
         Map<String, Object> dave = (Map<String, Object>) secondPage.records().get(1);
-        assertThat(dave).containsEntry("username", "dave_projection");
+        assertThat(dave).containsEntry("username", projectionUsername(tenantId, "dave"));
         assertThat(dave.get("employeeNo")).isNull();
 
         WebPageResponse<?> sortedByEmployeeTitle = staticRecordReadProjectionService.queryDefaultList(
@@ -247,7 +247,7 @@ class MuYunSpringApplicationContextIT {
         @SuppressWarnings("unchecked")
         Map<String, Object> firstByEmployeeTitle = (Map<String, Object>) sortedByEmployeeTitle.records().getFirst();
         assertThat(firstByEmployeeTitle)
-                .containsEntry("username", "alice_projection")
+                .containsEntry("username", projectionUsername(tenantId, "alice"))
                 .containsEntry("employeeTitle", "Alice Employee");
 
         WebPageResponse<?> filteredByEmployeeNo = staticRecordReadProjectionService.queryDefaultList(
@@ -266,7 +266,7 @@ class MuYunSpringApplicationContextIT {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> output = (Map<String, Object>) record;
                     assertThat(output)
-                            .containsEntry("username", "alice_projection")
+                            .containsEntry("username", projectionUsername(tenantId, "alice"))
                             .containsEntry("employeeNo", "E-PROJ-001");
                 });
         assertThatThrownBy(() -> staticRecordReadProjectionService.queryDefaultList(
@@ -298,7 +298,7 @@ class MuYunSpringApplicationContextIT {
         assertThat(httpFiltered.getBody()).isNotNull();
         assertThat(httpFiltered.getBody().path("records")).hasSize(1);
         JsonNode httpAlice = httpFiltered.getBody().path("records").get(0);
-        assertThat(httpAlice.path("username").asText()).isEqualTo("alice_projection");
+        assertThat(httpAlice.path("username").asText()).isEqualTo(projectionUsername(tenantId, "alice"));
         assertThat(httpAlice.path("employeeNo").asText()).isEqualTo("E-PROJ-001");
         assertThat(httpAlice.path("employeeTitle").asText()).isEqualTo("Alice Employee");
 
@@ -328,7 +328,7 @@ class MuYunSpringApplicationContextIT {
         Map<String, Object> employeeAlice = (Map<String, Object>) employeePage.records().get(0);
         assertThat(employeeAlice)
                 .containsEntry("employeeNo", "E-PROJ-001")
-                .containsEntry("username", "alice_projection")
+                .containsEntry("username", projectionUsername(tenantId, "alice"))
                 .containsEntry("accountBound", true);
         @SuppressWarnings("unchecked")
         Map<String, Object> employeeCharlie = (Map<String, Object>) employeePage.records().get(1);
@@ -384,6 +384,39 @@ class MuYunSpringApplicationContextIT {
         assertThat(httpRejected.getBody()).isNotNull();
         assertThat(httpRejected.getBody().path("message").asText())
                 .contains("query operator is not supported by iam.user: employeeTitle.EQ");
+    }
+
+    @Test
+    void shouldQueryUserSelectorWithEmployeeOrganizationAndDepartmentProjectionThroughRealDatabase() {
+        String tenantId = "tenant_selector_projection_it";
+        seedUserEmployeeProjectionRecords(tenantId);
+        String token = issueSuperAdminSessionToken();
+        HttpHeaders headers = bearerHeaders(token);
+
+        ResponseEntity<JsonNode> response = restTemplate.exchange(
+                "/iam.user/selector/query",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of(
+                        "keyword", projectionUsername(tenantId, "alice"),
+                        "page", Map.of("pageNum", 1, "pageSize", 20)
+                ), headers),
+                JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().path("total").asLong()).isEqualTo(1);
+        JsonNode records = response.getBody().path("records");
+        assertThat(records).hasSize(1);
+        JsonNode alice = records.get(0);
+        assertThat(alice.path("id").asText()).isEqualTo(projectionUserId(tenantId, "alice"));
+        assertThat(alice.path("username").asText()).isEqualTo(projectionUsername(tenantId, "alice"));
+        assertThat(alice.path("employeeId").asText()).isEqualTo(projectionEmployeeId(tenantId, "alice"));
+        assertThat(alice.path("employeeNo").asText()).isEqualTo("E-PROJ-001");
+        assertThat(alice.path("employeeTitle").asText()).isEqualTo("Alice Employee");
+        assertThat(alice.path("organizationId").asText()).isEqualTo(projectionOrganizationId(tenantId));
+        assertThat(alice.path("organizationTitle").asText()).isEqualTo("Projection Organization");
+        assertThat(alice.path("departmentId").asText()).isEqualTo(projectionDepartmentId(tenantId));
+        assertThat(alice.path("departmentTitle").asText()).isEqualTo("Projection Department");
     }
 
     private JsonNode fieldSchema(JsonNode fields, String name) {
@@ -457,20 +490,29 @@ class MuYunSpringApplicationContextIT {
     private void seedUserEmployeeProjectionRecords(String tenantId) {
         jdbcTemplate.update("delete from iam_employee_account where tenant_id = ?", tenantId);
         jdbcTemplate.update("delete from iam_employee where tenant_id = ?", tenantId);
+        jdbcTemplate.update("delete from iam_department where tenant_id = ?", tenantId);
+        jdbcTemplate.update("delete from iam_organization where tenant_id = ?", tenantId);
         jdbcTemplate.update("delete from iam_user where tenant_id = ?", tenantId);
-        insertUser(tenantId, "projection_user_alice", "alice_projection");
-        insertUser(tenantId, "projection_user_bob", "bob_projection");
-        insertUser(tenantId, "projection_user_charlie", "charlie_projection");
-        insertUser(tenantId, "projection_user_dave", "dave_projection");
-        insertEmployee(tenantId, "projection_emp_alice", "E-PROJ-001", "Alice Employee", false);
-        insertEmployee(tenantId, "projection_emp_charlie", "E-PROJ-003", "Charlie Employee", false);
-        insertEmployee(tenantId, "projection_emp_dave", "E-PROJ-004", "Dave Employee", true);
-        insertEmployeeAccount(tenantId, "projection_bind_alice", "projection_emp_alice",
-                "projection_user_alice", false);
-        insertEmployeeAccount(tenantId, "projection_bind_charlie", "projection_emp_charlie",
-                "projection_user_charlie", true);
-        insertEmployeeAccount(tenantId, "projection_bind_dave", "projection_emp_dave",
-                "projection_user_dave", false);
+        String organizationId = projectionOrganizationId(tenantId);
+        String departmentId = projectionDepartmentId(tenantId);
+        insertOrganization(tenantId, organizationId, "PROJ-ORG", "Projection Organization");
+        insertDepartment(tenantId, departmentId, organizationId, "PROJ-DEPT", "Projection Department");
+        insertUser(tenantId, projectionUserId(tenantId, "alice"), projectionUsername(tenantId, "alice"));
+        insertUser(tenantId, projectionUserId(tenantId, "bob"), projectionUsername(tenantId, "bob"));
+        insertUser(tenantId, projectionUserId(tenantId, "charlie"), projectionUsername(tenantId, "charlie"));
+        insertUser(tenantId, projectionUserId(tenantId, "dave"), projectionUsername(tenantId, "dave"));
+        insertEmployee(tenantId, projectionEmployeeId(tenantId, "alice"), organizationId, departmentId,
+                "E-PROJ-001", "Alice Employee", false);
+        insertEmployee(tenantId, projectionEmployeeId(tenantId, "charlie"), organizationId, departmentId,
+                "E-PROJ-003", "Charlie Employee", false);
+        insertEmployee(tenantId, projectionEmployeeId(tenantId, "dave"), organizationId, departmentId,
+                "E-PROJ-004", "Dave Employee", true);
+        insertEmployeeAccount(tenantId, projectionEmployeeAccountId(tenantId, "alice"),
+                projectionEmployeeId(tenantId, "alice"), projectionUserId(tenantId, "alice"), false);
+        insertEmployeeAccount(tenantId, projectionEmployeeAccountId(tenantId, "charlie"),
+                projectionEmployeeId(tenantId, "charlie"), projectionUserId(tenantId, "charlie"), true);
+        insertEmployeeAccount(tenantId, projectionEmployeeAccountId(tenantId, "dave"),
+                projectionEmployeeId(tenantId, "dave"), projectionUserId(tenantId, "dave"), false);
     }
 
     private void insertUser(String tenantId, String id, String username) {
@@ -484,14 +526,70 @@ class MuYunSpringApplicationContextIT {
                 Boolean.TRUE, Boolean.FALSE, id, UserAccountService.MODULE_ALIAS);
     }
 
-    private void insertEmployee(String tenantId, String id, String employeeNo, String title, boolean deleted) {
+    private void insertOrganization(String tenantId, String id, String code, String title) {
+        jdbcTemplate.update("""
+                        insert into iam_organization (
+                            id, tenant_id, title, code, enabled, deleted
+                        ) values (?, ?, ?, ?, ?, ?)
+                        """,
+                id, tenantId, title, code, Boolean.TRUE, Boolean.FALSE);
+    }
+
+    private void insertDepartment(String tenantId, String id, String organizationId, String code, String title) {
+        jdbcTemplate.update("""
+                        insert into iam_department (
+                            id, tenant_id, title, organization_id, code, enabled, deleted
+                        ) values (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                id, tenantId, title, organizationId, code, Boolean.TRUE, Boolean.FALSE);
+    }
+
+    private String projectionOrganizationId(String tenantId) {
+        return projectionId("org", tenantId, "main");
+    }
+
+    private String projectionDepartmentId(String tenantId) {
+        return projectionId("dept", tenantId, "main");
+    }
+
+    private String projectionUserId(String tenantId, String code) {
+        return projectionId("user", tenantId, code);
+    }
+
+    private String projectionEmployeeId(String tenantId, String code) {
+        return projectionId("emp", tenantId, code);
+    }
+
+    private String projectionEmployeeAccountId(String tenantId, String code) {
+        return projectionId("bind", tenantId, code);
+    }
+
+    private String projectionUsername(String tenantId, String code) {
+        return code + "_projection_" + projectionTenantSuffix(tenantId);
+    }
+
+    private String projectionId(String prefix, String tenantId, String code) {
+        return "projection_" + prefix + "_" + projectionTenantSuffix(tenantId) + "_" + code;
+    }
+
+    private String projectionTenantSuffix(String tenantId) {
+        return Integer.toUnsignedString(tenantId.hashCode(), 36);
+    }
+
+    private void insertEmployee(String tenantId,
+                                String id,
+                                String organizationId,
+                                String departmentId,
+                                String employeeNo,
+                                String title,
+                                boolean deleted) {
         jdbcTemplate.update("""
                         insert into iam_employee (
                             id, tenant_id, title, organization_id, department_id, employee_no,
                             enabled, deleted
                         ) values (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                id, tenantId, title, "projection_org", "projection_dept", employeeNo,
+                id, tenantId, title, organizationId, departmentId, employeeNo,
                 Boolean.TRUE, deleted);
     }
 

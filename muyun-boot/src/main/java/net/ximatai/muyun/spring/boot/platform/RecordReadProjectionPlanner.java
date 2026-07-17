@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.LinkedHashSet;
@@ -38,6 +39,59 @@ public final class RecordReadProjectionPlanner {
                                                    Object recordService,
                                                    ActionExecutionContext actionContext) {
         return plan(descriptor, readModel, "default_list", recordService, actionContext);
+    }
+
+    public static RecordReadProjection explicit(String moduleAlias,
+                                                ResolvedModuleReadModel readModel,
+                                                String viewCode,
+                                                List<String> outputFieldNames,
+                                                Object recordService,
+                                                ActionExecutionContext actionContext) {
+        if (readModel == null) {
+            throw new IllegalArgumentException("resolved module read model must not be null");
+        }
+        if (moduleAlias == null || moduleAlias.isBlank()) {
+            throw new IllegalArgumentException("record read projection module alias must not be blank");
+        }
+        if (!moduleAlias.equals(readModel.moduleAlias())) {
+            throw new IllegalArgumentException("record read projection module alias mismatch: "
+                    + moduleAlias + " != " + readModel.moduleAlias());
+        }
+        if (viewCode == null || viewCode.isBlank()) {
+            throw new IllegalArgumentException("record read projection view code must not be blank");
+        }
+        if (outputFieldNames == null || outputFieldNames.isEmpty()) {
+            throw new IllegalArgumentException("record read projection output fields must not be empty");
+        }
+        validateActionContext(moduleAlias, actionContext);
+        Set<String> readableFields = readableFields(readModel);
+        FieldReadPolicy fieldReadPolicy = fieldReadPolicy(recordService, actionContext);
+        LinkedHashSet<ViewFieldRef> outputFields = new LinkedHashSet<>();
+        for (String outputFieldName : outputFieldNames) {
+            if (outputFieldName == null || outputFieldName.isBlank()) {
+                throw new IllegalArgumentException("record read projection output field must not be blank");
+            }
+            String fieldName = outputFieldName.trim();
+            if (!readableFields.contains(fieldName)) {
+                throw new IllegalArgumentException("record read projection field is not readable: "
+                        + moduleAlias + "." + viewCode.trim() + "." + fieldName);
+            }
+            if (!fieldReadPolicy.allows(fieldName)) {
+                continue;
+            }
+            outputFields.add(ViewFieldRef.main(fieldName));
+        }
+        return new RecordReadProjection(
+                moduleAlias,
+                viewCode,
+                actionContext == null ? null : actionContext.actionCode(),
+                actionContext == null ? null : actionContext.permissionCode(),
+                actionContext == null ? null : actionContext.actionPolicy().permissionActionCode(),
+                fieldReadPolicies(fieldReadPolicy),
+                List.copyOf(outputFields),
+                INTERNAL_READ_FIELDS,
+                postReadTransforms(recordService, outputFields)
+        );
     }
 
     public static RecordReadProjection plan(ResolvedModuleUiDescriptor descriptor,
@@ -113,6 +167,21 @@ public final class RecordReadProjectionPlanner {
         if (!PlatformAction.QUERY.matches(actionContext.actionCode())) {
             throw new IllegalArgumentException("record read projection requires query action context: "
                     + descriptor.moduleAlias() + "." + actionContext.actionCode());
+        }
+    }
+
+    private static void validateActionContext(String moduleAlias,
+                                              ActionExecutionContext actionContext) {
+        if (actionContext == null) {
+            return;
+        }
+        if (!moduleAlias.equals(actionContext.moduleAlias())) {
+            throw new IllegalArgumentException("record read projection action module alias mismatch: "
+                    + moduleAlias + " != " + actionContext.moduleAlias());
+        }
+        if (actionContext.actionPolicy().level() != PlatformActionLevel.LIST) {
+            throw new IllegalArgumentException("explicit record read projection requires list action context: "
+                    + moduleAlias + "." + actionContext.actionCode());
         }
     }
 

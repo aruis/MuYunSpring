@@ -4,12 +4,15 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
@@ -134,6 +137,51 @@ class StaticRecordReadProjectionServiceTest {
         assertThat(paramsCaptor.getValue()).containsKeys("__limit", "__offset",
                 "__join_bound_employee_bound_employee_account_0",
                 "__join_bound_employee_bound_employee_0");
+    }
+
+    @Test
+    void shouldExecuteExplicitRelationProjectionSqlWithoutDefaultListFields() {
+        NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
+        StaticRecordReadProjectionService service = new StaticRecordReadProjectionService(
+                new StaticModuleDefinitionCatalog(List.of(
+                        userReferenceProjectionDefinition(),
+                        employeeAccountReferenceDefinition(),
+                        employeeReferenceDefinition()
+                )),
+                new RelationProjectionQueryExecutor(jdbcOperations),
+                new RelationProjectionDatabaseTypeProvider()
+        );
+        when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
+                .thenReturn(List.of(Map.of(
+                        "id", "user-1",
+                        "username", "alice",
+                        "employeeTitle", "Alice"
+                )));
+        when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
+                .thenReturn(1L);
+
+        WebPageResponse<?> response = service.queryExplicitList(
+                "iam.user",
+                "user_selector",
+                List.of("id", "username", "employeeTitle"),
+                Criteria.of(),
+                PageRequest.of(1, 20),
+                null
+        ).orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> output = (Map<String, Object>) response.records().getFirst();
+        assertThat(output)
+                .containsEntry("id", "user-1")
+                .containsEntry("username", "alice")
+                .containsEntry("employeeTitle", "Alice")
+                .doesNotContainKey("employeeNo");
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.captor();
+        org.mockito.Mockito.verify(jdbcOperations).queryForList(sqlCaptor.capture(), any(Map.class));
+        String dataSql = sqlCaptor.getValue();
+        assertThat(dataSql.substring(0, dataSql.indexOf(" from (")))
+                .contains("\"id\"", "\"username\"", "\"employeeTitle\"")
+                .doesNotContain("\"employeeNo\"");
     }
 
     @Test
@@ -295,6 +343,94 @@ class StaticRecordReadProjectionServiceTest {
                                 )
                         )
                 ))
+        );
+    }
+
+    private static StaticModuleDefinition userReferenceProjectionDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.user",
+                "用户管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/users",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "user",
+                        "iam_user",
+                        "User",
+                        List.of(FieldDefinition.string("username", "账号").column("username"))
+                )),
+                ModuleUiDefinition.builder("iam.user")
+                        .listView(list -> list.field("username"))
+                        .build(),
+                List.of(),
+                List.of(new StaticModuleReadProjectionDefinition(
+                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                .then(EmployeeAccount::getEmployeeId)
+                                .select(Employee::getTitle),
+                        "employeeTitle"
+                )),
+                UserAccount.class,
+                List.of()
+        );
+    }
+
+    private static StaticModuleDefinition employeeAccountReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.employee_account",
+                "职员账号绑定",
+                null,
+                ModuleEntryType.MODULE,
+                null,
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "employee_account",
+                        "iam_employee_account",
+                        "Employee Account",
+                        List.of(
+                                FieldDefinition.string("employeeId", "职员").column("employee_id"),
+                                FieldDefinition.string("userId", "用户").column("user_id")
+                        )
+                )),
+                null,
+                List.of(
+                        new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
+                        new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
+                ),
+                List.of(),
+                EmployeeAccount.class,
+                List.of()
+        );
+    }
+
+    private static StaticModuleDefinition employeeReferenceDefinition() {
+        return new StaticModuleDefinition(
+                "iam",
+                "iam.employee",
+                "职员管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/employees",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new EntityDefinition(
+                        "employee",
+                        "iam_employee",
+                        "Employee",
+                        List.of(FieldDefinition.string("title", "职员姓名").column("title"))
+                )),
+                null,
+                List.of(),
+                List.of(),
+                Employee.class,
+                List.of()
         );
     }
 

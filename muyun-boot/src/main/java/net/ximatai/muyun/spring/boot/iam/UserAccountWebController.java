@@ -34,14 +34,10 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
-import net.ximatai.muyun.spring.iam.department.Department;
-import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
-import net.ximatai.muyun.spring.iam.organization.Organization;
-import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -61,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
@@ -82,42 +77,40 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             ActionDefaultGrantPolicy.NONE,
             null
     );
+    private static final List<String> USER_SELECTOR_OUTPUT_FIELDS = List.of(
+            "id",
+            "username",
+            "employeeId",
+            "employeeNo",
+            "employeeTitle",
+            "employeeOrganizationId",
+            "organizationTitle",
+            "employeeDepartmentId",
+            "departmentTitle"
+    );
 
     private final RoleService roleService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeService employeeService;
-    private final OrganizationService organizationService;
-    private final DepartmentService departmentService;
     private final UserSessionService userSessionService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
     public UserAccountWebController() {
-        this(null, null, null, null, null, null);
+        this(null, null, null, null);
     }
 
     public UserAccountWebController(ObjectProvider<RoleService> roleService) {
-        this(roleService, null, null, null, null, null);
-    }
-
-    public UserAccountWebController(ObjectProvider<RoleService> roleService,
-                                    ObjectProvider<EmployeeAccountService> employeeAccountService,
-                                    ObjectProvider<EmployeeService> employeeService,
-                                    ObjectProvider<UserSessionService> userSessionService) {
-        this(roleService, employeeAccountService, employeeService, null, null, userSessionService);
+        this(roleService, null, null, null);
     }
 
     @Autowired
     public UserAccountWebController(ObjectProvider<RoleService> roleService,
                                     ObjectProvider<EmployeeAccountService> employeeAccountService,
                                     ObjectProvider<EmployeeService> employeeService,
-                                    ObjectProvider<OrganizationService> organizationService,
-                                    ObjectProvider<DepartmentService> departmentService,
                                     ObjectProvider<UserSessionService> userSessionService) {
         this.roleService = roleService == null ? null : roleService.getIfAvailable();
         this.employeeAccountService = employeeAccountService == null ? null : employeeAccountService.getIfAvailable();
         this.employeeService = employeeService == null ? null : employeeService.getIfAvailable();
-        this.organizationService = organizationService == null ? null : organizationService.getIfAvailable();
-        this.departmentService = departmentService == null ? null : departmentService.getIfAvailable();
         this.userSessionService = userSessionService == null ? null : userSessionService.getIfAvailable();
     }
 
@@ -305,13 +298,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             UserSelectorRequest normalized = request == null ? UserSelectorRequest.EMPTY : request;
             Criteria criteria = selectorCriteria(normalized);
             WebPageRequest page = normalized.pageOrDefault();
-            PageResult<UserAccount> result = selectorPageQuery(criteria,
-                    PageRequest.of(page.pageNum(), page.pageSize()), Sort.asc("username"));
-            return WebPageResponse.from(PageResult.of(
-                    userSelectorItems(result.getRecords()),
-                    result.getTotal(),
-                    PageRequest.of(result.getPageNum(), result.getPageSize())
-            ));
+            PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
+            return selectorProjectedPageQuery(criteria, pageRequest, Sort.asc("username"));
         });
     }
 
@@ -368,88 +356,37 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             String departmentId,
             String departmentTitle
     ) {
-        static UserSelectorItem from(UserAccount user,
-                                     EmployeeAccount binding,
-                                     Employee employee,
-                                     Organization organization,
-                                     Department department) {
+        static UserSelectorItem from(UserAccount user) {
             return new UserSelectorItem(
                     user.getId(),
                     user.getUsername(),
-                    binding == null ? null : binding.getEmployeeId(),
-                    employee == null ? null : employee.getEmployeeNo(),
-                    employee == null ? null : employee.getTitle(),
-                    employee == null ? null : employee.getOrganizationId(),
-                    organization == null ? null : organization.getTitle(),
-                    employee == null ? null : employee.getDepartmentId(),
-                    department == null ? null : department.getTitle()
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
             );
         }
-    }
 
-    private List<UserSelectorItem> userSelectorItems(List<UserAccount> users) {
-        if (users == null || users.isEmpty()) {
-            return List.of();
+        static UserSelectorItem from(Map<String, Object> record) {
+            return new UserSelectorItem(
+                    text(record.get("id")),
+                    text(record.get("username")),
+                    text(record.get("employeeId")),
+                    text(record.get("employeeNo")),
+                    text(record.get("employeeTitle")),
+                    text(record.get("employeeOrganizationId")),
+                    text(record.get("organizationTitle")),
+                    text(record.get("employeeDepartmentId")),
+                    text(record.get("departmentTitle"))
+            );
         }
-        if (employeeAccountService == null || employeeService == null) {
-            return users.stream().map(user -> UserSelectorItem.from(user, null, null, null, null)).toList();
-        }
-        List<String> userIds = users.stream()
-                .map(UserAccount::getId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList();
-        List<EmployeeAccount> bindings = employeeAccountService.accountsOfUsers(userIds);
-        Map<String, EmployeeAccount> bindingByUserId = bindings.stream()
-                .filter(binding -> binding.getUserId() != null)
-                .collect(Collectors.toMap(EmployeeAccount::getUserId, Function.identity(), (first, ignored) -> first));
-        List<String> employeeIds = bindings.stream()
-                .map(EmployeeAccount::getEmployeeId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList();
-        Map<String, Employee> employeeById = employeeIds.isEmpty()
-                ? Map.of()
-                : employeeService.list(Criteria.of().in("id", employeeIds), new PageRequest(0, employeeIds.size()))
-                .stream()
-                .collect(Collectors.toMap(Employee::getId, Function.identity(), (first, ignored) -> first));
-        Map<String, Organization> organizationById = organizationMap(employeeById.values().stream()
-                .map(Employee::getOrganizationId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList());
-        Map<String, Department> departmentById = departmentMap(employeeById.values().stream()
-                .map(Employee::getDepartmentId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList());
-        return users.stream()
-                .map(user -> {
-                    EmployeeAccount binding = bindingByUserId.get(user.getId());
-                    Employee employee = binding == null ? null : employeeById.get(binding.getEmployeeId());
-                    Organization organization = employee == null ? null : organizationById.get(employee.getOrganizationId());
-                    Department department = employee == null ? null : departmentById.get(employee.getDepartmentId());
-                    return UserSelectorItem.from(user, binding, employee, organization, department);
-                })
-                .toList();
-    }
 
-    private Map<String, Organization> organizationMap(List<String> organizationIds) {
-        if (organizationService == null || organizationIds.isEmpty()) {
-            return Map.of();
+        private static String text(Object value) {
+            return value == null ? null : value.toString();
         }
-        return organizationService.list(Criteria.of().in("id", organizationIds), new PageRequest(0, organizationIds.size()))
-                .stream()
-                .collect(Collectors.toMap(Organization::getId, Function.identity(), (first, ignored) -> first));
-    }
-
-    private Map<String, Department> departmentMap(List<String> departmentIds) {
-        if (departmentService == null || departmentIds.isEmpty()) {
-            return Map.of();
-        }
-        return departmentService.list(Criteria.of().in("id", departmentIds), new PageRequest(0, departmentIds.size()))
-                .stream()
-                .collect(Collectors.toMap(Department::getId, Function.identity(), (first, ignored) -> first));
     }
 
     public record UserEmployeeBindingView(
@@ -501,14 +438,55 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
         return criteria;
     }
 
-    private PageResult<UserAccount> selectorPageQuery(Criteria criteria, PageRequest pageRequest, Sort sort) {
+    private WebPageResponse<UserSelectorItem> selectorProjectedPageQuery(Criteria criteria,
+                                                                         PageRequest pageRequest,
+                                                                         Sort sort) {
+        if (staticRecordReadProjectionService == null) {
+            throw new IllegalStateException("user selector projection is not available");
+        }
         if (service() instanceof DataScopeAbility<?>) {
             DataScopeAbility<UserAccount> dataScopeAbility = DataScopeAbility.cast(service());
             DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(selectorPolicy(), criteria);
-            return dataScopeAbility.withDataScopeTenant(scope,
-                    () -> service().pageQuery(scope.criteria(), pageRequest, sort));
+            return dataScopeAbility.withDataScopeTenant(scope, () -> staticRecordReadProjectionService
+                    .<Map<String, Object>>queryExplicitList(
+                            UserAccountService.MODULE_ALIAS,
+                            "user_selector",
+                            USER_SELECTOR_OUTPUT_FIELDS,
+                            service().activeCriteria(scope.criteria()),
+                            pageRequest,
+                            service(),
+                            sort
+                    )
+                    .map(this::selectorItems)
+                    .orElseThrow(this::unavailableUserSelectorProjection));
         }
-        return service().pageQuery(criteria, pageRequest, sort);
+        return staticRecordReadProjectionService.<Map<String, Object>>queryExplicitList(
+                        UserAccountService.MODULE_ALIAS,
+                        "user_selector",
+                        USER_SELECTOR_OUTPUT_FIELDS,
+                        service().activeCriteria(criteria),
+                        pageRequest,
+                        service(),
+                        sort
+                )
+                .map(this::selectorItems)
+                .orElseThrow(this::unavailableUserSelectorProjection);
+    }
+
+    private IllegalStateException unavailableUserSelectorProjection() {
+        return new IllegalStateException("user selector projection is not available");
+    }
+
+    private WebPageResponse<UserSelectorItem> selectorItems(WebPageResponse<Map<String, Object>> response) {
+        return new WebPageResponse<>(
+                response.records().stream().map(UserSelectorItem::from).toList(),
+                response.total(),
+                response.pageNum(),
+                response.pageSize(),
+                response.pages(),
+                response.totalKnown(),
+                response.navigation()
+        );
     }
 
     private ActionExecutionPolicy selectorPolicy() {

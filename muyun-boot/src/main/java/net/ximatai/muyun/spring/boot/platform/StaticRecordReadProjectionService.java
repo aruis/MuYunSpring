@@ -162,6 +162,69 @@ public class StaticRecordReadProjectionService {
         return Optional.of(response);
     }
 
+    public <T> Optional<WebPageResponse<T>> queryExplicitList(String moduleAlias,
+                                                             List<String> outputFields,
+                                                             Criteria criteria,
+                                                             PageRequest pageRequest,
+                                                             Object recordService,
+                                                             Sort... sorts) {
+        return queryExplicitList(moduleAlias, "explicit_list", outputFields, criteria, pageRequest, recordService,
+                sorts);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T> Optional<WebPageResponse<T>> queryExplicitList(String moduleAlias,
+                                                             String viewCode,
+                                                             List<String> outputFields,
+                                                             Criteria criteria,
+                                                             PageRequest pageRequest,
+                                                             Object recordService,
+                                                             Sort... sorts) {
+        StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
+        if (definition == null) {
+            return Optional.empty();
+        }
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(definition);
+        if (compilation == null || compilation.readModel() == null) {
+            return Optional.empty();
+        }
+        RecordReadProjection projection = RecordReadProjectionPlanner.explicit(
+                moduleAlias,
+                compilation.readModel(),
+                viewCode,
+                outputFields,
+                recordService,
+                ActionExecutionContextHolder.current().orElse(null)
+        );
+        PageResult<Map<String, Object>> page = relationProjectionReadService.queryList(
+                staticModuleDefinitionCatalog.definitions(),
+                definition,
+                projection,
+                criteria,
+                pageRequest,
+                sorts
+        ).orElse(null);
+        if (page == null) {
+            return Optional.empty();
+        }
+        List<Map<String, Object>> records = RecordReadProjectionOptionTitleProjector.project(
+                modelClass(recordService),
+                projection,
+                page.getRecords(),
+                optionSourceRegistry
+        );
+        WebPageResponse response = new WebPageResponse(
+                records,
+                page.getTotal(),
+                page.getPageNum(),
+                page.getPageSize(),
+                page.getPages(),
+                page.isTotalKnown(),
+                null
+        );
+        return Optional.of(response);
+    }
+
     private Class<?> modelClass(Object recordService) {
         if (recordService instanceof CrudAbility<?> crudAbility) {
             return crudAbility.modelClass();
