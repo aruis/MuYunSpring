@@ -97,6 +97,11 @@ class DynamicRelationProjectionReadServiceTest {
                 protectedDynamicRecordService(),
                 Set.of("orderNo", "customerTitle")
         )).isFalse();
+        assertThat(service.describeListQuery(
+                "crm.order",
+                protectedDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
     }
 
     @Test
@@ -113,6 +118,11 @@ class DynamicRelationProjectionReadServiceTest {
                 dynamicRecordService(),
                 Set.of("orderNo", "customerTitle", "displayCode")
         )).isFalse();
+        assertThat(service.describeListQuery(
+                "crm.order",
+                dynamicRecordService(),
+                Set.of("orderNo", "customerTitle", "displayCode")
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.UNSUPPORTED_OUTPUT_FIELD);
     }
 
     @Test

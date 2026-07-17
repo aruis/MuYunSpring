@@ -44,25 +44,35 @@ public class DynamicRelationProjectionReadService {
     public boolean supportsListQuery(String moduleAlias,
                                      DynamicRecordService recordService,
                                      Set<String> outputFields) {
+        return describeListQuery(moduleAlias, recordService, outputFields).supported();
+    }
+
+    public ProjectionQueryDescriptor describeListQuery(String moduleAlias,
+                                                       DynamicRecordService recordService,
+                                                       Set<String> outputFields) {
         if (moduleAlias == null || moduleAlias.isBlank()
                 || recordService == null
                 || outputFields == null
                 || outputFields.isEmpty()) {
-            return false;
+            return ProjectionQueryDescriptor.unsupported(moduleAlias, "dynamic_ui_config_list",
+                    outputFields, ProjectionQueryFallbackReason.MISSING_PROJECTION);
         }
+        RecordReadProjection projection = projection(moduleAlias, outputFields);
         List<ModuleDefinition> dynamicDefinitions = recordService.moduleDefinitions();
         if (hasProtectedProjectionFields(dynamicDefinitions, moduleAlias, outputFields)) {
-            return false;
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.PROTECTED_FIELD);
         }
         if (!supportsOutputFields(dynamicDefinitions, moduleAlias, outputFields)) {
-            return false;
+            return ProjectionQueryDescriptor.unsupported(projection,
+                    ProjectionQueryFallbackReason.UNSUPPORTED_OUTPUT_FIELD);
         }
         List<StaticModuleDefinition> definitions = DynamicRelationProjectionDefinitionAdapter.adapt(dynamicDefinitions);
         StaticModuleDefinition definition = staticDefinition(definitions, moduleAlias);
-        return definition != null && relationProjectionReadService.supportsListQuery(
-                definition,
-                projection(moduleAlias, outputFields)
-        );
+        if (definition == null) {
+            return ProjectionQueryDescriptor.unsupported(projection,
+                    ProjectionQueryFallbackReason.MISSING_DEFINITION);
+        }
+        return relationProjectionReadService.describeListQuery(definitions, definition, projection);
     }
 
     public Optional<PageResult<DynamicRecord>> queryList(String moduleAlias,

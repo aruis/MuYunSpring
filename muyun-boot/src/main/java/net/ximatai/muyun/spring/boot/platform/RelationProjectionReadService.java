@@ -46,16 +46,54 @@ public class RelationProjectionReadService {
     }
 
     public boolean supportsListQuery(StaticModuleDefinition definition, RecordReadProjection projection) {
-        return projectionQueryExecutor() != null
-                && definition != null
-                && projection != null
-                && (!definition.projectionJoins().isEmpty()
+        return describeListQuery(definition, projection).supported();
+    }
+
+    public ProjectionQueryDescriptor describeListQuery(StaticModuleDefinition definition,
+                                                       RecordReadProjection projection) {
+        return describeListQuery(definition == null ? List.of() : List.of(definition), definition, projection);
+    }
+
+    public ProjectionQueryDescriptor describeListQuery(java.util.List<StaticModuleDefinition> definitions,
+                                                       StaticModuleDefinition definition,
+                                                       RecordReadProjection projection) {
+        if (projectionQueryExecutor() == null) {
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.MISSING_EXECUTOR);
+        }
+        if (definition == null) {
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.MISSING_DEFINITION);
+        }
+        if (projection == null) {
+            return ProjectionQueryDescriptor.unsupported(definition.moduleAlias(), null,
+                    java.util.Set.of(), ProjectionQueryFallbackReason.MISSING_PROJECTION);
+        }
+        if (projection.postReadTransforms() != null && !projection.postReadTransforms().isEmpty()) {
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.POST_READ_TRANSFORM);
+        }
+        if (!hasRelationProjectionCandidate(definition, projection)) {
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.NO_RELATION_OUTPUT);
+        }
+        RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(
+                definitions == null || definitions.isEmpty() ? List.of(definition) : definitions,
+                definition,
+                projection,
+                databaseTypeProvider.databaseType(),
+                java.util.Set.of()
+        );
+        if (!plan.hasRelationProjection()) {
+            return ProjectionQueryDescriptor.unsupported(projection,
+                    ProjectionQueryFallbackReason.PLAN_HAS_NO_RELATION_PROJECTION);
+        }
+        return ProjectionQueryDescriptor.supported(projection, plan);
+    }
+
+    private boolean hasRelationProjectionCandidate(StaticModuleDefinition definition, RecordReadProjection projection) {
+        return (!definition.projectionJoins().isEmpty()
                 || !definition.references().isEmpty()
                 || hasReadProjectionOutput(definition, projection)
                 || projection.outputFields().stream()
-                        .filter(field -> field.relationCode() != null)
-                        .anyMatch(field -> field.relationCode().contains(".")))
-                && projection.postReadTransforms().isEmpty()
+                .filter(field -> field.relationCode() != null)
+                .anyMatch(field -> field.relationCode().contains(".")))
                 && (hasReadProjectionOutput(definition, projection)
                 || projection.outputFields().stream().anyMatch(field -> field.relationCode() != null));
     }
@@ -111,7 +149,8 @@ public class RelationProjectionReadService {
             java.util.Set<String> additionalResponseFields,
             Sort... sorts) {
         RelationProjectionQueryExecutor executor = projectionQueryExecutor();
-        if (executor == null || !supportsListQuery(definition, projection)) {
+        ProjectionQueryDescriptor descriptor = describeListQuery(definitions, definition, projection);
+        if (executor == null || !descriptor.supported()) {
             return Optional.empty();
         }
         RelationProjectionSqlPlan plan = RelationProjectionQueryPlanner.plan(

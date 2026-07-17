@@ -25,6 +25,8 @@ import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
 import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
+import net.ximatai.muyun.spring.boot.platform.ProjectionQueryDescriptor;
+import net.ximatai.muyun.spring.boot.platform.ProjectionQueryFallbackReason;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -372,9 +374,9 @@ public class DynamicRecordWebController implements
         PageRequest pageRequest = PageRequest.of(webPage.pageNum(), webPage.pageSize());
         Criteria criteria = queryCriteria(request);
         Set<String> projectionFields = projectionFields(DynamicWebRequest.moduleAlias(), request);
-        boolean projectionSupported = supportsProjectionListQuery(projectionFields);
-        Sort[] sorts = querySorts(request, projectionSupported ? projectionFields : Set.of());
-        PageResult<DynamicRecord> projectedPage = projectionSupported
+        ProjectionQueryDescriptor projectionDescriptor = projectionListQueryDescriptor(projectionFields);
+        Sort[] sorts = querySorts(request, projectionDescriptor.sortableFields());
+        PageResult<DynamicRecord> projectedPage = projectionDescriptor.supported()
                 ? queryProjectionRecords(projectionFields, criteria, pageRequest, sorts)
                 : null;
         if (projectedPage != null) {
@@ -396,11 +398,13 @@ public class DynamicRecordWebController implements
         return DynamicWebQueryMapper.sorts(request.sorts());
     }
 
-    private boolean supportsProjectionListQuery(Set<String> projectionFields) {
+    private ProjectionQueryDescriptor projectionListQueryDescriptor(Set<String> projectionFields) {
         if (projectionFields == null || projectionFields.isEmpty()) {
-            return false;
+            return ProjectionQueryDescriptor.unsupported(DynamicWebRequest.moduleAlias(),
+                    "dynamic_ui_config_list", Set.of(),
+                    ProjectionQueryFallbackReason.MISSING_PROJECTION);
         }
-        return dynamicRelationProjectionReadService.supportsListQuery(
+        return dynamicRelationProjectionReadService.describeListQuery(
                 DynamicWebRequest.moduleAlias(),
                 recordService,
                 projectionFields);

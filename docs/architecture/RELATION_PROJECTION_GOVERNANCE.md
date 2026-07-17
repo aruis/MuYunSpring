@@ -18,6 +18,8 @@
 
 当前运行态已沉淀 `RelationProjectionReadService` 作为读投影门面，统一编排必需字段收集、SQL plan 构建、分页执行和响应字段边界。静态列表入口只负责把静态模块编译成 `RecordReadProjection` 后调用该门面；动态列表入口通过 `DynamicRelationProjectionReadService` 把 `uiConfigId` 字段和运行态模块定义编译到同一组 definition/projection 后复用该门面。
 
+`ProjectionQueryDescriptor` 是 SQL 投影路径的能力描述契约，用于表达当前投影是否支持 SQL 查询、回退原因、输出字段、内部读取字段、可查询字段、可排序字段和响应字段边界。Web 层应消费 descriptor 做排序/筛选准入和回退判断，而不是自行推断某个字段是否能进入投影 SQL。
+
 推荐长期抽象：
 
 ```text
@@ -70,12 +72,13 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 2. 静态 `RelationProjectionJoinContributor` 保持轻量业务声明，动态侧通过运行态 `ModuleDefinition` 适配为相同 relation 定义。
 3. 动态主实体 `ONE` 引用字段的显式投影已具备最小适配入口，并已接入动态列表 `uiConfigId` 查询；模块关系、子实体引用、`MANY` 聚合和字典标题继续编译为同一种 `RelationProjectionDefinition`。
 4. `RecordReadProjectionPlanner` 统一决定输出字段、内部读取字段、强制投影字段和 post-read transform。
-5. `ProjectionQueryPlanner` 统一负责 select、from、join、where 外层包装、排序、分页和参数绑定。
-6. join depth 和 join count 已进入 planner 基础约束；显式有限回环路径允许规划，后续继续补自引用裁剪、诊断响应和可配置治理。
-7. projection plan 可以缓存，但必须按静态模块定义版本、动态元数据运行态版本、UI 配置版本或查询模板版本失效。
-8. relation 字段的筛选和排序纳入 `QueryDescriptor` 或后续 `ProjectionQueryDescriptor`，避免“投影了就能查”的隐式扩权。
-9. 数据权限策略进入 relation 定义，区分“源记录可见即可展示有限摘要”和“目标模块也必须满足数据权限”。
-10. 标准租户、软删和启停等 join 过滤应由平台根据 relation 目标实体能力生成，业务 contributor 只声明关系路径和业务过滤事实。
+5. `ProjectionQueryDescriptor` 统一描述 SQL 投影路径的字段能力和回退原因。
+6. `ProjectionQueryPlanner` 统一负责 select、from、join、where 外层包装、排序、分页和参数绑定。
+7. join depth 和 join count 已进入 planner 基础约束；显式有限回环路径允许规划，后续继续补自引用裁剪、诊断响应和可配置治理。
+8. projection plan 可以缓存，但必须按静态模块定义版本、动态元数据运行态版本、UI 配置版本或查询模板版本失效。
+9. relation 字段的筛选和排序纳入 `QueryDescriptor` 和 `ProjectionQueryDescriptor` 的统一字段能力边界，避免“投影了就能查”的隐式扩权。
+10. 数据权限策略进入 relation 定义，区分“源记录可见即可展示有限摘要”和“目标模块也必须满足数据权限”。
+11. 标准租户、软删和启停等 join 过滤应由平台根据 relation 目标实体能力生成，业务 contributor 只声明关系路径和业务过滤事实。
 
 ## 长期统一
 
