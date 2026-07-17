@@ -16,6 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
 @Service
 public class EmployeeAccountService extends TenantStandardBusinessService<EmployeeAccount> {
     public static final String MODULE_ALIAS = "iam.employee_account";
@@ -135,6 +138,20 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
                 .stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    public List<EmployeeAccount> accountsOfUsers(Collection<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = userIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return list(Criteria.of().in("userId", ids), new PageRequest(0, ids.size()));
     }
 
     private Criteria employeeCriteria(String employeeId) {

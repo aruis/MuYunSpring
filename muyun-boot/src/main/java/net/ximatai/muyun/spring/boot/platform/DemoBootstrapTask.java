@@ -109,6 +109,7 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
                 if (!isActive(role)) {
                     return;
                 }
+                userAccountService.repairAccountRoleGrantUserIds();
             }
         }
     }

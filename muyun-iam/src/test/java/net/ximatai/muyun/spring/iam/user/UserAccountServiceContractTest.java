@@ -234,6 +234,69 @@ class UserAccountServiceContractTest {
     }
 
     @Test
+    void shouldRepairAccountRoleGrantUsernameReferencesToUserIds() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        UserAccount user = activeUser();
+        AccountRoleGrant grant = accountRoleGrant("grant-1", "role-1", "alice");
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(grant));
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+
+        UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
+
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.deletedDuplicates()).isZero();
+        assertThat(grant.getUserId()).isEqualTo("user-1");
+        verify(accountRoleGrantDao).updateById(grant);
+    }
+
+    @Test
+    void shouldDeleteDuplicateUsernameAccountRoleGrantWhenRepairingUserIds() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        UserAccount user = activeUser();
+        AccountRoleGrant usernameGrant = accountRoleGrant("grant-username", "role-1", "alice");
+        AccountRoleGrant userIdGrant = accountRoleGrant("grant-user-id", "role-1", "user-1");
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(usernameGrant, userIdGrant));
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+
+        UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
+
+        assertThat(result.updated()).isZero();
+        assertThat(result.deletedDuplicates()).isEqualTo(1);
+        verify(accountRoleGrantDao).deleteById("grant-username");
+        verify(accountRoleGrantDao, never()).updateById(any(AccountRoleGrant.class));
+    }
+
+    @Test
+    void shouldPreserveEnabledUsernameGrantWhenRepairingDuplicateUserIdGrant() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        UserAccount user = activeUser();
+        AccountRoleGrant usernameGrant = accountRoleGrant("grant-username", "role-1", "alice");
+        AccountRoleGrant userIdGrant = accountRoleGrant("grant-user-id", "role-1", "user-1");
+        userIdGrant.setEnabled(Boolean.FALSE);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
+        when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(usernameGrant, userIdGrant));
+        UserAccountService service = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+
+        UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
+
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.deletedDuplicates()).isEqualTo(1);
+        assertThat(userIdGrant.getEnabled()).isTrue();
+        verify(accountRoleGrantDao).updateById(userIdGrant);
+        verify(accountRoleGrantDao).deleteById("grant-username");
+    }
+
+    @Test
     void shouldApplyRecordDataScopeWhenChangingPassword() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccount user = activeUser();
@@ -518,6 +581,16 @@ class UserAccountServiceContractTest {
         user.setEnabled(Boolean.TRUE);
         user.setPasswordHash(passwordHashingService.hash("secret1"));
         return user;
+    }
+
+    private AccountRoleGrant accountRoleGrant(String id, String roleId, String userId) {
+        AccountRoleGrant grant = new AccountRoleGrant();
+        grant.setId(id);
+        grant.setTenantId("tenant-a");
+        grant.setRoleId(roleId);
+        grant.setUserId(userId);
+        grant.setEnabled(Boolean.TRUE);
+        return grant;
     }
 
     private QuerySchema.Field field(QuerySchema schema, String fieldName) {

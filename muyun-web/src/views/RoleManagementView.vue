@@ -50,6 +50,8 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
+import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
+import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
 
 defineOptions({ name: 'RoleManagementView' });
 
@@ -94,9 +96,12 @@ const roleDetailMode = ref<RoleDetailMode>('view');
 const loadingRoleDetail = ref(false);
 const roleDetailLoadFailed = ref(false);
 const savingRole = ref(false);
+const bindingRole = ref<Role>();
+const bindingDrawerOpen = ref(false);
 const roleDetailRequestSeq = ref(0);
 const roleDraft = ref<Partial<Role>>(createRoleDraft(undefined));
 const roleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const memberRoleCandidates = ref<Role[]>([]);
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const selectedTenantId = computed(() => selectedTenant.value?.id);
@@ -181,12 +186,6 @@ const canSaveRole = computed(() => {
     !selectedRole.value?.systemManaged
   );
 });
-const canToggleRole = computed(() => {
-  if (!selectedRole.value?.id || loadingRoleDetail.value || selectedRole.value.systemManaged) {
-    return false;
-  }
-  return roleContext.can(roleToggleActionCode(selectedRole.value)) === true;
-});
 const roleDetailActions = computed<RecordActionItem[]>(() => {
   if (roleDetailMode.value === 'view') {
     if (!selectedRole.value?.id) {
@@ -198,6 +197,14 @@ const roleDetailActions = computed<RecordActionItem[]>(() => {
         actionCode: 'update',
         title: '编辑',
         iconName: 'edit',
+        disabled: savingRole.value || selectedRole.value.systemManaged === true,
+      },
+      {
+        key: 'bind',
+        actionCode: 'accountRoleGrants',
+        title: '绑定',
+        iconName: 'lock',
+        visible: canBindAccountRoleRecord(selectedRole.value),
         disabled: savingRole.value || selectedRole.value.systemManaged === true,
       },
       {
@@ -230,27 +237,18 @@ const roleFormFieldFallback = computed<Record<RoleFormFieldName, RecordFormField
     required: true,
     visible: true,
     controlType: 'select',
-    options: [
-      { label: '账号角色', value: 'account' },
-      { label: '任职角色', value: 'employment' },
-    ],
+    options: assignmentTypeOptions(roleDraft.value.roleKind),
   },
   roleKind: {
     label: '角色类型',
     required: true,
     visible: true,
     controlType: 'select',
-    options: [
-      { label: '标准角色', value: 'standard' },
-      { label: '角色组', value: 'group' },
-      { label: '数据授权角色', value: 'dataGrant' },
-      { label: '系统角色', value: 'system' },
-    ],
+    options: roleKindOptions(roleDraft.value.assignmentType),
   },
   memberRoleIds: {
     label: '成员角色',
     visible: roleDraft.value.roleKind === 'group',
-    placeholder: '多个角色 ID 用逗号分隔',
   },
   ownerScopeType: {
     label: '归属范围',
@@ -276,18 +274,23 @@ const roleFormFieldFallback = computed<Record<RoleFormFieldName, RecordFormField
   enabled: { label: '启用状态', visible: true, controlType: 'enabledStatus' },
   sortOrder: { label: '排序号', visible: true, placeholder: '请输入排序号' },
 }));
-const roleFormFieldNames = computed<RoleFormFieldName[]>(() => [
-  'title',
-  'assignmentType',
-  'roleKind',
-  'memberRoleIds',
+const rolePrimaryFormFieldNames: RoleFormFieldName[] = ['title', 'assignmentType', 'roleKind'];
+const roleSecondaryFormFieldNames: RoleFormFieldName[] = [
   'ownerScopeType',
   'ownerScopeId',
   'sharePolicy',
   'description',
   'enabled',
   'sortOrder',
-]);
+];
+const roleDetailFieldNames = computed<RoleFormFieldName[]>(() => {
+  const names: RoleFormFieldName[] = ['title', 'assignmentType', 'roleKind'];
+  if (roleDraft.value.roleKind === 'group') {
+    names.push('memberRoleIds');
+  }
+  names.push('ownerScopeType', 'ownerScopeId', 'sharePolicy', 'description', 'enabled', 'sortOrder');
+  return names;
+});
 
 onMounted(loadRoleFormDefinition);
 
@@ -299,6 +302,7 @@ watch(selectedScope, () => {
   roleDraft.value = createRoleDraft(selectedScope.value);
   closeRoleDetail();
   roleReloadKey.value += 1;
+  void loadMemberRoleCandidates();
 });
 
 async function loadRoleFormDefinition() {
@@ -306,6 +310,33 @@ async function loadRoleFormDefinition() {
     const runtimeContext = await roleContext.runtime.ready;
     roleFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
   } catch (cause) {
+    presentPlatformError(cause, { source: 'role-management', phase: 'load' });
+  }
+}
+
+async function loadMemberRoleCandidates(scope = selectedScope.value) {
+  if (!scope) {
+    memberRoleCandidates.value = [];
+    return;
+  }
+  try {
+    const response = await roleContext.crud.query(
+      scopedRoleQuery(
+        {
+          page: { pageNum: 0, pageSize: 500 },
+          conditions: [
+            { fieldName: 'assignmentType', operator: 'EQ', values: ['employment'] },
+            { fieldName: 'roleKind', operator: 'IN', values: ['standard', 'dataGrant'] },
+            { fieldName: 'enabled', operator: 'EQ', values: [true] },
+          ],
+          sorts: [{ field: 'sortOrder' }, { field: 'title' }],
+        },
+        scope,
+      ),
+    );
+    memberRoleCandidates.value = response.records;
+  } catch (cause) {
+    memberRoleCandidates.value = [];
     presentPlatformError(cause, { source: 'role-management', phase: 'load' });
   }
 }
@@ -357,13 +388,12 @@ function updateRoleDraftField(fieldName: string, value: string | number | boolea
   if (fieldName === 'roleKind' && (value === 'group' || value === 'dataGrant')) {
     next.assignmentType = 'employment';
   }
-  if (
-    fieldName === 'assignmentType' &&
-    next.roleKind &&
-    next.roleKind !== 'standard' &&
-    value !== 'employment'
-  ) {
-    next.assignmentType = 'employment';
+  if (fieldName === 'roleKind' && value !== 'group') {
+    next.memberRoleIds = undefined;
+  }
+  if (fieldName === 'assignmentType' && value === 'account' && roleKindRequiresEmployment(next.roleKind)) {
+    next.roleKind = 'standard';
+    next.memberRoleIds = undefined;
   }
   roleDraft.value = next;
 }
@@ -444,6 +474,43 @@ function handleRoleListAction(action: RecordActionItem) {
   }
 }
 
+function roleRowActionsOf(record: QueryListRecord): RecordActionItem[] {
+  const systemManaged = record.systemManaged === true;
+  return [
+    { key: 'view', title: '查看' },
+    {
+      key: 'edit',
+      actionCode: 'update',
+      title: '修改',
+      iconName: 'edit',
+      disabled: systemManaged,
+    },
+    {
+      key: 'bind',
+      actionCode: 'accountRoleGrants',
+      title: '绑定',
+      iconName: 'lock',
+      visible: canBindAccountRoleRecord(record),
+      disabled: systemManaged,
+    },
+    {
+      key: 'toggle',
+      actionCode: roleToggleActionCode(record),
+      title: roleToggleTitle(record),
+      iconName: 'power',
+      disabled: systemManaged,
+    },
+    {
+      key: 'delete',
+      actionCode: 'delete',
+      title: '删除',
+      iconName: 'delete',
+      danger: true,
+      disabled: systemManaged,
+    },
+  ];
+}
+
 function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
   if (!canLeaveRoleDetailContext()) {
     return;
@@ -456,6 +523,14 @@ function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryList
     void openRoleDetail(record, 'edit');
     return;
   }
+  if (action.key === 'bind') {
+    void openRoleBinding(record);
+    return;
+  }
+  if (action.key === 'toggle') {
+    void toggleRoleEnabled(record);
+    return;
+  }
   if (action.key === 'delete') {
     void removeRole(record);
   }
@@ -466,6 +541,33 @@ function handleRoleRowDblclick(record: QueryListRecord) {
     return;
   }
   void openRoleDetail(record, 'view');
+}
+
+async function openRoleBinding(record: QueryListRecord) {
+  if (!canLeaveRoleDetailContext()) {
+    return;
+  }
+  const id = String(record.id ?? '');
+  if (!id) {
+    return;
+  }
+  bindingDrawerOpen.value = true;
+  bindingRole.value = copyRole(record as Role);
+  try {
+    bindingRole.value = await roleContext.crud.view(id);
+  } catch (cause) {
+    bindingDrawerOpen.value = false;
+    bindingRole.value = undefined;
+    presentPlatformError(cause, { source: 'role-management', phase: 'load' });
+  }
+}
+
+function closeRoleBinding() {
+  if (savingRole.value) {
+    return;
+  }
+  bindingDrawerOpen.value = false;
+  bindingRole.value = undefined;
 }
 
 function startCreateRole() {
@@ -564,6 +666,10 @@ function handleRoleDetailAction(action: RecordActionItem) {
     roleDetailMode.value = 'edit';
     return;
   }
+  if (action.key === 'bind' && selectedRole.value) {
+    void openRoleBinding(selectedRole.value as QueryListRecord);
+    return;
+  }
   if (action.key === 'delete') {
     void removeRole(selectedRole.value);
   }
@@ -595,23 +701,7 @@ async function saveRole() {
     onSaved: ({ record }) => {
       commitRoleDetailRecord(record);
       roleReloadKey.value += 1;
-    },
-  });
-}
-
-async function toggleRoleEnabled() {
-  await executeStaticRecordAction({
-    loading: savingRole,
-    source: 'role-management',
-    record: () => (selectedRole.value?.id ? selectedRole.value : undefined),
-    canExecute: () => canToggleRole.value,
-    deniedMessage: '当前用户无权变更角色启停状态',
-    execute: (role) =>
-      role.enabled === false ? roleContext.crud.enable(role.id!) : roleContext.crud.disable(role.id!),
-    onExecuted: async (_, role) => {
-      const refreshed = await roleContext.crud.view(role.id!);
-      commitRoleDetailRecord(refreshed);
-      roleReloadKey.value += 1;
+      void loadMemberRoleCandidates();
     },
   });
 }
@@ -643,6 +733,30 @@ async function removeRole(record: Partial<Role> | QueryListRecord | undefined) {
         roleDetailRequestSeq.value += 1;
       }
       roleReloadKey.value += 1;
+      void loadMemberRoleCandidates();
+    },
+  });
+}
+
+async function toggleRoleEnabled(record: Partial<Role> | QueryListRecord | undefined) {
+  await executeStaticRecordAction({
+    loading: savingRole,
+    source: 'role-management',
+    record: () => (record?.id ? record : undefined),
+    canExecute: (target) =>
+      roleContext.can(roleToggleActionCode(target)) === true && (target as Role).systemManaged !== true,
+    deniedMessage: '当前用户无权变更角色启停状态',
+    execute: (target) =>
+      target.enabled === false
+        ? roleContext.crud.enable(String(target.id))
+        : roleContext.crud.disable(String(target.id)),
+    onExecuted: async (_, target) => {
+      if (selectedRoleKey.value === String(target.id)) {
+        const refreshed = await roleContext.crud.view(String(target.id));
+        commitRoleDetailRecord(refreshed);
+      }
+      roleReloadKey.value += 1;
+      void loadMemberRoleCandidates();
     },
   });
 }
@@ -686,7 +800,7 @@ function copyRole(record: Partial<Role>): Partial<Role> {
 function normalizedRoleDraft(draft: Partial<Role>, scope: RoleScope): Role {
   const roleKind = normalizedRoleKind(draft.roleKind);
   const sharePolicy = normalizedSharePolicy(draft.sharePolicy, scope.kind);
-  return normalizeRecordDraft<Role>(draft, {
+  const normalized = normalizeRecordDraft<Role>(draft, {
     title: draft.title?.trim(),
     assignmentType: normalizedAssignmentType(draft.assignmentType, roleKind),
     roleKind,
@@ -700,6 +814,10 @@ function normalizedRoleDraft(draft: Partial<Role>, scope: RoleScope): Role {
     enabled: draft.enabled !== false,
     sortOrder: normalizeSortOrder(draft.sortOrder),
   });
+  if (roleKind !== 'group') {
+    normalized.memberRoleIds = undefined;
+  }
+  return normalized;
 }
 
 function scopeTenantId(scope: RoleScope | undefined) {
@@ -744,6 +862,36 @@ function normalizedAssignmentType(
 
 function normalizedRoleKind(value: RoleKind | undefined): RoleKind {
   return value === 'group' || value === 'dataGrant' || value === 'system' ? value : 'standard';
+}
+
+function roleKindRequiresEmployment(value: RoleKind | undefined) {
+  return value === 'group' || value === 'dataGrant';
+}
+
+function assignmentTypeOptions(roleKind: RoleKind | undefined) {
+  if (roleKindRequiresEmployment(roleKind)) {
+    return [{ label: '任职角色', value: 'employment' }];
+  }
+  return [
+    { label: '账号角色', value: 'account' },
+    { label: '任职角色', value: 'employment' },
+  ];
+}
+
+function roleKindOptions(assignmentType: RoleAssignmentType | undefined) {
+  const standardOptions = [
+    { label: '标准角色', value: 'standard' },
+    { label: '系统角色', value: 'system' },
+  ];
+  if (assignmentType === 'account') {
+    return standardOptions;
+  }
+  return [
+    standardOptions[0],
+    { label: '角色组', value: 'group' },
+    { label: '数据授权角色', value: 'dataGrant' },
+    standardOptions[1],
+  ];
 }
 
 function normalizedSharePolicy(
@@ -818,8 +966,21 @@ function optionTitle(record: QueryListRecord, fieldName: string, fallback: strin
   return typeof title === 'string' && title.trim() ? title : fallback;
 }
 
-function roleToggleActionCode(record: Partial<Role>) {
-  return record.enabled === false ? 'enable' : 'disable';
+function canBindAccountRoleRecord(record: Partial<Role> | QueryListRecord | undefined) {
+  return (
+    Boolean(record?.id) &&
+    record?.assignmentType === 'account' &&
+    record.roleKind !== 'group' &&
+    record.roleKind !== 'dataGrant'
+  );
+}
+
+function roleToggleActionCode(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.enabled === false ? 'enable' : 'disable';
+}
+
+function roleToggleTitle(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.enabled === false ? '启用' : '停用';
 }
 
 function roleTitle(record: Partial<Role> | QueryListRecord | undefined) {
@@ -841,7 +1002,23 @@ function scopeDisplayValue(fieldName: string, value: unknown) {
   if (fieldName === 'ownerScopeId') {
     return selectedScope.value?.title ?? String(value ?? '');
   }
+  if (fieldName === 'memberRoleIds') {
+    return memberRoleIdsTitle(value);
+  }
   return undefined;
+}
+
+function memberRoleIdsTitle(value: unknown) {
+  const roleIds = parseRoleIds(value);
+  if (roleIds.length === 0) {
+    return '-';
+  }
+  return roleIds
+    .map((roleId) => {
+      const role = memberRoleCandidates.value.find((candidate) => candidate.id === roleId);
+      return role ? roleTitle(role) : roleId;
+    })
+    .join('，');
 }
 
 function ownerScopeTypeTitle(value: RoleOwnerScopeType | undefined) {
@@ -868,6 +1045,19 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
     secondary: record.code ?? record.id,
     muted: record.enabled === false,
   };
+}
+
+function parseRoleIds(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value !== 'string') {
+    return [];
+  }
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 </script>
 
@@ -971,7 +1161,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
       :title="selectedScope ? `角色列表 - ${selectedScope.title}` : '角色列表'"
       :columns="roleListColumns"
       standard-crud-actions
-      standard-crud-row-actions
+      :row-actions-of="roleRowActionsOf"
       create-title="新建角色"
       :selected-key="selectedRoleKey"
       :reload-key="roleReloadKey"
@@ -995,10 +1185,9 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
         <RecordStatusSwitch
           v-if="roleDetailMode === 'view' && selectedRole"
           :enabled="selectedRole.enabled !== false"
-          :disabled="savingRole || !canToggleRole"
+          :disabled="true"
           :loading="savingRole"
           :show-label="false"
-          @change="toggleRoleEnabled"
         />
       </template>
       <template #actions>
@@ -1019,6 +1208,7 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
         <RecordDetailFields
           v-if="roleDetailMode === 'view'"
           :record="roleDraft as RecordFormRecord"
+          :field-names="roleDetailFieldNames"
           :fields="roleFormFieldDefinitions"
           :fallback="roleFormFieldFallback"
           :display-of="scopeDisplayValue"
@@ -1031,7 +1221,24 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
           </label>
           <RecordFormFields
             :record="roleDraft as RecordFormRecord"
-            :field-names="roleFormFieldNames"
+            :field-names="rolePrimaryFormFieldNames"
+            :fields="roleFormFieldDefinitions"
+            :fallback="roleFormFieldFallback"
+            :disabled="roleFormDisabled"
+            :disabled-of="roleFormFieldDisabled"
+            @update:field="updateRoleDraftField"
+          />
+          <RoleGroupMemberSelector
+            v-if="roleDraft.roleKind === 'group'"
+            :value="roleDraft.memberRoleIds"
+            :candidates="memberRoleCandidates"
+            :current-role-id="selectedRole?.id"
+            :disabled="roleFormDisabled || selectedRole?.systemManaged === true"
+            @update:value="updateRoleDraftField('memberRoleIds', $event)"
+          />
+          <RecordFormFields
+            :record="roleDraft as RecordFormRecord"
+            :field-names="roleSecondaryFormFieldNames"
             :fields="roleFormFieldDefinitions"
             :fallback="roleFormFieldFallback"
             :disabled="roleFormDisabled"
@@ -1042,6 +1249,14 @@ function organizationItemOf(record: TreeRecordBase): RecordExplorerItemDescripto
         <RecordMetaSection v-if="roleDetailMode !== 'create'" :record="roleDraft" show-sort-order />
       </template>
     </RecordDetailDrawer>
+
+    <RoleAccountGrantDrawer
+      :open="bindingDrawerOpen"
+      :context="roleContext"
+      :role="bindingRole"
+      @close="closeRoleBinding"
+      @saved="roleReloadKey += 1"
+    />
   </section>
 </template>
 

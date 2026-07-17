@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
@@ -1113,6 +1114,65 @@ class IamWebControllerTest {
         assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
         assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
         assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    @Test
+    void shouldExposeEmployeeFieldsInUserSelectorWithBatchLookup() throws Exception {
+        RoleService roleService = mock(RoleService.class);
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        OrganizationService organizationService = mock(OrganizationService.class);
+        DepartmentService departmentService = mock(DepartmentService.class);
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        UserAccountWebController controller = new UserAccountWebController(
+                provider(roleService),
+                provider(employeeAccountService),
+                provider(employeeService),
+                provider(organizationService),
+                provider(departmentService),
+                null
+        );
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        UserAccount alice = user("user-2", "alice", "Alice");
+        EmployeeAccount binding = new EmployeeAccount();
+        binding.setId("binding-1");
+        binding.setUserId("user-2");
+        binding.setEmployeeId("employee-1");
+        Employee employee = employee("employee-1", "org-1", "dept-1", "E001", "Alice Zhang");
+        Organization organization = organization("org-1", "ORG1", "研发中心");
+        Department department = department("dept-1", "org-1", "D1", "平台部");
+        when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
+        when(employeeAccountService.accountsOfUsers(List.of("user-2"))).thenReturn(List.of(binding));
+        when(employeeService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(employee));
+        when(organizationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(organization));
+        when(departmentService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(department));
+        userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
+
+        mvc.perform(post("/iam.user/selector/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "roleId":"role-1",
+                                  "keyword":"ali"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("user-2"))
+                .andExpect(jsonPath("$.records[0].employeeId").value("employee-1"))
+                .andExpect(jsonPath("$.records[0].employeeNo").value("E001"))
+                .andExpect(jsonPath("$.records[0].employeeTitle").value("Alice Zhang"))
+                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"))
+                .andExpect(jsonPath("$.records[0].organizationTitle").value("研发中心"))
+                .andExpect(jsonPath("$.records[0].departmentId").value("dept-1"))
+                .andExpect(jsonPath("$.records[0].departmentTitle").value("平台部"));
+
+        verify(employeeAccountService).accountsOfUsers(List.of("user-2"));
+        verify(employeeAccountService, never()).accountOfUser(any());
+        verify(employeeService, never()).select(any());
     }
 
     @Test
