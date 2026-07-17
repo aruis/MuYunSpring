@@ -181,7 +181,7 @@ public class DynamicRelationProjectionReadService {
                 continue;
             }
             FieldDefinition sourceField = mainFields.get(reference.sourceField());
-            if (protectedField(sourceField)) {
+            if (storageProtectedField(sourceField)) {
                 return true;
             }
             ReferenceProjection projection = reference.projections().stream()
@@ -196,7 +196,7 @@ public class DynamicRelationProjectionReadService {
                 continue;
             }
             FieldDefinition targetField = fields(mainEntity(targetDefinition)).get(projection.targetField());
-            if (protectedField(targetField)) {
+            if (storageProtectedField(targetField)) {
                 return true;
             }
         }
@@ -215,6 +215,10 @@ public class DynamicRelationProjectionReadService {
 
     private boolean protectedField(FieldDefinition field) {
         return field != null && field.protection().enabled();
+    }
+
+    private boolean storageProtectedField(FieldDefinition field) {
+        return field != null && field.protection().hasStorageProtection();
     }
 
     private Map<String, FieldDefinition> fields(EntityDefinition entity) {

@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -68,7 +69,15 @@ public class RelationProjectionReadService {
                     java.util.Set.of(), ProjectionQueryFallbackReason.MISSING_PROJECTION);
         }
         if (projection.postReadTransforms() != null && !projection.postReadTransforms().isEmpty()) {
-            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.POST_READ_TRANSFORM);
+            if (!supportsPostReadTransforms(projection)) {
+                return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.POST_READ_TRANSFORM);
+            }
+            if (RelationProjectionOutputProtector.hasStorageProtectedOutput(definitions, definition, projection)) {
+                return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.PROTECTED_FIELD);
+            }
+        }
+        if (RelationProjectionOutputProtector.hasStorageProtectedOutput(definitions, definition, projection)) {
+            return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.PROTECTED_FIELD);
         }
         if (!hasRelationProjectionCandidate(definition, projection)) {
             return ProjectionQueryDescriptor.unsupported(projection, ProjectionQueryFallbackReason.NO_RELATION_OUTPUT);
@@ -163,7 +172,21 @@ public class RelationProjectionReadService {
         if (!plan.hasRelationProjection()) {
             return Optional.empty();
         }
-        return Optional.of(executor.page(plan, criteria, pageRequest, additionalResponseFields, sorts));
+        PageResult<Map<String, Object>> page = executor.page(plan, criteria, pageRequest, additionalResponseFields, sorts);
+        List<Map<String, Object>> protectedRecords = RelationProjectionOutputProtector.protect(
+                definitions,
+                definition,
+                projection,
+                page.getRecords(),
+                FieldOutputContext.LIST
+        );
+        return Optional.of(PageResult.of(protectedRecords, page.getTotal(),
+                PageRequest.of(page.getPageNum(), page.getPageSize())));
+    }
+
+    private boolean supportsPostReadTransforms(RecordReadProjection projection) {
+        return projection.postReadTransforms().stream()
+                .allMatch(transform -> transform != null && transform.startsWith("fieldProtection:"));
     }
 
     private RelationProjectionQueryExecutor projectionQueryExecutor() {
