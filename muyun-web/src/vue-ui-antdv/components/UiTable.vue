@@ -3,12 +3,17 @@ import { computed } from 'vue';
 import { Table as ATable } from 'ant-design-vue';
 import { resolveDictionaryOptions } from '../dictionaries';
 import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
+import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
 defineOptions({ name: 'UiTable' });
 
 const props = defineProps<{
   contract: TableContract;
   rows: RecordData[];
+  loading?: boolean;
+  pagination?: false | TablePaginationConfig;
+  rowSelection?: TableProps['rowSelection'];
+  size?: 'small' | 'middle' | 'large';
 }>();
 
 function renderCell(column: TableColumn, value: unknown) {
@@ -36,7 +41,9 @@ const columns = computed(() =>
     :columns="columns"
     :data-source="rows"
     :row-key="contract.rowKey ?? 'id'"
-    :pagination="{ pageSize: 5, showSizeChanger: false }"
-    size="middle"
+    :loading="loading"
+    :pagination="pagination ?? { pageSize: 5, showSizeChanger: false }"
+    :row-selection="rowSelection"
+    :size="size ?? 'middle'"
   />
 </template>

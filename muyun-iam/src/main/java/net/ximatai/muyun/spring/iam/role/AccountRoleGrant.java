@@ -25,7 +25,8 @@ public class AccountRoleGrant extends StandardEntity {
     @Column(name = "role_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role id")
     private String roleId;
 
-    @Column(name = "user_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "User account id")
+    @Column(name = "user_id", type = ColumnType.VARCHAR, length = 64, nullable = false,
+            comment = "User account id (iam_user.id)")
     private String userId;
 
     @Column(name = "management_scope_type", type = ColumnType.VARCHAR, length = 32,

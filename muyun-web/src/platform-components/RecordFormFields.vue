@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { UiInput, UiSelect } from '@muyun/vue-ui-antdv';
+import type { OptionValue, OptionValueList } from '@muyun/web-contracts';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordPicker from './RecordPicker.vue';
 import {
@@ -78,6 +79,14 @@ function fieldDisabled(field: RecordFormFieldState) {
 function updateField(fieldName: string, value: string | number | boolean | undefined) {
   emit('update:field', fieldName, value);
 }
+
+function updateSelectField(fieldName: string, value: OptionValue | OptionValueList | null) {
+  if (Array.isArray(value)) {
+    emit('update:field', fieldName, undefined);
+    return;
+  }
+  emit('update:field', fieldName, value ?? undefined);
+}
 </script>
 
 <template>
@@ -115,7 +124,7 @@ function updateField(fieldName: string, value: string | number | boolean | undef
       :placeholder="field.placeholder"
       :disabled="fieldDisabled(field)"
       :allow-clear="!field.required"
-      @update:value="updateField(field.fieldName, $event ?? undefined)"
+      @update:value="updateSelectField(field.fieldName, $event)"
     />
     <UiInput
       v-else

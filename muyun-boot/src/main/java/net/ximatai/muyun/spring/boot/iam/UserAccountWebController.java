@@ -289,7 +289,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             PageResult<UserAccount> result = selectorPageQuery(criteria,
                     PageRequest.of(page.pageNum(), page.pageSize()), Sort.asc("username"));
             return WebPageResponse.from(PageResult.of(
-                    result.getRecords().stream().map(UserSelectorItem::from).toList(),
+                    result.getRecords().stream().map(this::userSelectorItem).toList(),
                     result.getTotal(),
                     PageRequest.of(result.getPageNum(), result.getPageSize())
             ));
@@ -340,14 +340,30 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
 
     public record UserSelectorItem(
             String id,
-            String username
+            String username,
+            String employeeId,
+            String employeeNo,
+            String employeeTitle,
+            String organizationId,
+            String departmentId
     ) {
-        static UserSelectorItem from(UserAccount user) {
+        static UserSelectorItem from(UserAccount user, EmployeeAccount binding, Employee employee) {
             return new UserSelectorItem(
                     user.getId(),
-                    user.getUsername()
+                    user.getUsername(),
+                    binding == null ? null : binding.getEmployeeId(),
+                    employee == null ? null : employee.getEmployeeNo(),
+                    employee == null ? null : employee.getTitle(),
+                    employee == null ? null : employee.getOrganizationId(),
+                    employee == null ? null : employee.getDepartmentId()
             );
         }
+    }
+
+    private UserSelectorItem userSelectorItem(UserAccount user) {
+        EmployeeAccount binding = employeeAccountService == null ? null : employeeAccountService.accountOfUser(user.getId());
+        Employee employee = binding == null || employeeService == null ? null : employeeService.select(binding.getEmployeeId());
+        return UserSelectorItem.from(user, binding, employee);
     }
 
     public record UserEmployeeBindingView(

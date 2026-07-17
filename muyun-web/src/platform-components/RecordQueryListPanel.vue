@@ -5,6 +5,7 @@ import type { UiDropdownItem } from '@muyun/vue-ui-antdv';
 import type {
   Option,
   OptionValue,
+  OptionValueList,
   QueryOperator,
   QuerySchema,
   QuerySchemaField,
@@ -505,16 +506,20 @@ function createConditionDraft(): ConditionDraft {
   };
 }
 
-function handleFieldChange(draft: ConditionDraft, fieldName: OptionValue | null) {
-  const field = fieldByName(String(fieldName ?? ''));
+function handleFieldChange(draft: ConditionDraft, fieldName: OptionValue | OptionValueList | null) {
+  const field = fieldByName(String(singleOptionValue(fieldName) ?? ''));
   draft.fieldName = field?.name;
   draft.operator = field?.defaultOperator ?? field?.operators[0];
   draft.rawValue = '';
   draft.booleanValue = null;
 }
 
-function handleOperatorChange(draft: ConditionDraft, operator: OptionValue | null) {
-  draft.operator = String(operator ?? '') as QueryOperator;
+function handleOperatorChange(draft: ConditionDraft, operator: OptionValue | OptionValueList | null) {
+  draft.operator = String(singleOptionValue(operator) ?? '') as QueryOperator;
+}
+
+function handleBooleanValueChange(draft: ConditionDraft, value: OptionValue | OptionValueList | null) {
+  draft.booleanValue = singleOptionValue(value) ?? null;
 }
 
 function conditionOfDraft(draft: ConditionDraft): WebQueryCondition[] {
@@ -680,10 +685,16 @@ function goPage(nextPage: number) {
   void loadRecords();
 }
 
-function handlePageSizeChange(value: OptionValue | null) {
-  pageSize.value = typeof value === 'number' ? value : Number(value ?? props.pageSize);
+function handlePageSizeChange(value: OptionValue | OptionValueList | null) {
+  const pageSizeValue = singleOptionValue(value);
+  pageSize.value =
+    typeof pageSizeValue === 'number' ? pageSizeValue : Number(pageSizeValue ?? props.pageSize);
   pageNum.value = 1;
   void loadRecords();
+}
+
+function singleOptionValue(value: OptionValue | OptionValueList | null) {
+  return Array.isArray(value) ? undefined : value;
 }
 
 defineExpose({ refresh });
@@ -750,7 +761,7 @@ defineExpose({ refresh });
           :value="draft.booleanValue"
           :options="booleanOptions"
           placeholder="选择"
-          @update:value="draft.booleanValue = $event"
+          @update:value="handleBooleanValueChange(draft, $event)"
         />
         <UiInput
           v-else-if="!valueLessOperator(draft.operator!)"

@@ -30,9 +30,11 @@ import net.ximatai.muyun.spring.common.platform.RecordActionAvailabilityDecision
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
+import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
+import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
@@ -43,7 +45,10 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -295,6 +300,47 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         accountRoleGrantDao.query(activeCriteria(Criteria.of().eq("userId", validUserId)),
                         new PageRequest(0, Integer.MAX_VALUE))
                 .forEach(grant -> accountRoleGrantDao.deleteById(grant.getId()));
+    }
+
+    public AccountRoleGrantUserIdRepairResult repairAccountRoleGrantUserIds() {
+        if (accountRoleGrantDao == null) {
+            return AccountRoleGrantUserIdRepairResult.empty();
+        }
+        List<UserAccount> users = getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE));
+        List<AccountRoleGrant> grants = accountRoleGrantDao.query(activeCriteria(Criteria.of()),
+                new PageRequest(0, Integer.MAX_VALUE));
+        Map<String, UserAccount> usersByTenantAndId = new HashMap<>();
+        Map<String, UserAccount> usersByTenantAndUsername = new HashMap<>();
+        for (UserAccount user : users) {
+            usersByTenantAndId.put(tenantKey(user.getTenantId(), user.getId()), user);
+            usersByTenantAndUsername.put(tenantKey(user.getTenantId(), user.getUsername()), user);
+        }
+
+        int updated = 0;
+        int deletedDuplicates = 0;
+        int skipped = 0;
+        for (AccountRoleGrant grant : grants) {
+            String grantUserId = grant.getUserId();
+            if (grantUserId == null || usersByTenantAndId.containsKey(tenantKey(grant.getTenantId(), grantUserId))) {
+                continue;
+            }
+            UserAccount user = usersByTenantAndUsername.get(tenantKey(grant.getTenantId(), grantUserId));
+            if (user == null) {
+                skipped++;
+                continue;
+            }
+            AccountRoleGrant duplicate = findDuplicateAccountRoleGrant(grants, grant, user.getId());
+            if (duplicate != null) {
+                accountRoleGrantDao.deleteById(grant.getId());
+                deletedDuplicates++;
+                continue;
+            }
+            grant.setUserId(user.getId());
+            EntityLifecycle.prepareUpdate(grant, Instant.now());
+            accountRoleGrantDao.updateById(grant);
+            updated++;
+        }
+        return new AccountRoleGrantUserIdRepairResult(updated, deletedDuplicates, skipped);
     }
 
     public String createUser(UserAccount user, String password) {
@@ -614,6 +660,29 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         return normalized.substring(0, maxLength);
     }
 
+    private AccountRoleGrant findDuplicateAccountRoleGrant(List<AccountRoleGrant> grants,
+                                                           AccountRoleGrant source,
+                                                           String normalizedUserId) {
+        return grants.stream()
+                .filter(candidate -> !Objects.equals(candidate.getId(), source.getId()))
+                .filter(candidate -> Objects.equals(candidate.getRoleId(), source.getRoleId()))
+                .filter(candidate -> Objects.equals(candidate.getUserId(), normalizedUserId))
+                .filter(candidate -> candidate.getManagementScopeType() == source.getManagementScopeType())
+                .filter(candidate -> Objects.equals(candidate.getManagementScopeId(), source.getManagementScopeId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String tenantKey(String tenantId, String value) {
+        return String.valueOf(tenantId) + "\u0000" + value;
+    }
+
     public record PasswordResetResult(int count, String temporaryPassword, Instant expiresAt) {
+    }
+
+    public record AccountRoleGrantUserIdRepairResult(int updated, int deletedDuplicates, int skipped) {
+        static AccountRoleGrantUserIdRepairResult empty() {
+            return new AccountRoleGrantUserIdRepairResult(0, 0, 0);
+        }
     }
 }

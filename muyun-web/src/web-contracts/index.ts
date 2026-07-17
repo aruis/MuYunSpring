@@ -2,6 +2,8 @@ export type Primitive = string | number | boolean | null | undefined;
 
 export type OptionValue = string | number;
 
+export type OptionValueList = OptionValue[];
+
 export interface Option {
   label: string;
   value: OptionValue;
@@ -613,6 +615,16 @@ export interface ResetPasswordResponse {
   expiresAt?: string;
 }
 
+export interface UserSelectorItem {
+  id: string;
+  username?: string;
+  employeeId?: string;
+  employeeNo?: string;
+  employeeTitle?: string;
+  organizationId?: string;
+  departmentId?: string;
+}
+
 export type RoleAssignmentType = 'account' | 'employment';
 
 export type RoleKind = 'standard' | 'group' | 'dataGrant' | 'system';
@@ -620,6 +632,8 @@ export type RoleKind = 'standard' | 'group' | 'dataGrant' | 'system';
 export type RoleOwnerScopeType = 'platform' | 'tenant' | 'organization';
 
 export type RoleSharePolicy = 'private' | 'ownerAndChildren' | 'tenant' | 'platform';
+
+export type ManagementScopeType = 'platform' | 'tenant' | 'organization';
 
 export interface Role extends StandardEnabledSortableEntity {
   assignmentType?: RoleAssignmentType;
@@ -636,6 +650,15 @@ export interface Role extends StandardEnabledSortableEntity {
   builtIn?: boolean;
   systemManaged?: boolean;
   description?: string;
+}
+
+export interface AccountRoleGrant extends StandardEntity {
+  roleId?: string;
+  /** User account primary key, not username. */
+  userId?: string;
+  managementScopeType?: ManagementScopeType;
+  managementScopeId?: string;
+  enabled?: boolean;
 }
 
 export type PasswordPolicyScopeType = 'global' | 'tenant';
