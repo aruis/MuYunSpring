@@ -63,6 +63,8 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
+import net.ximatai.muyun.spring.boot.platform.ProjectionQueryDescriptor;
+import net.ximatai.muyun.spring.boot.platform.ProjectionQueryFallbackReason;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
@@ -1507,8 +1509,19 @@ class DynamicRecordWebControllerTest {
         when(moduleFieldService.resolve("module-field-customer-title")).thenReturn(resolvedModuleField(
                 "module-field-customer-title", "customerTitle", RelationRole.MAIN, "main", "string",
                 MetadataFieldForm.VIRTUAL));
-        when(projectionReadService.supportsListQuery(eq(MODULE), eq(service), any()))
-                .thenReturn(true);
+        when(projectionReadService.describeListQuery(eq(MODULE), eq(service), any()))
+                .thenReturn(new ProjectionQueryDescriptor(
+                        MODULE,
+                        "dynamic_ui_config_list",
+                        true,
+                        ProjectionQueryFallbackReason.NONE,
+                        Set.of("code", "customerTitle"),
+                        Set.of("id", "tenantId", "version"),
+                        Set.of("code", "customerTitle"),
+                        Set.of("code", "customerTitle"),
+                        Set.of("id", "code", "customerTitle"),
+                        List.of()
+                ));
         DynamicRecord record = new DynamicRecord(entity())
                 .setValue("code", "C-001")
                 .putProjectedValue("customerTitle", "Acme");
@@ -1553,8 +1566,13 @@ class DynamicRecordWebControllerTest {
         when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
                 "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
                 MetadataFieldForm.VIRTUAL));
-        when(projectionReadService.supportsListQuery(eq(MODULE), eq(service), any()))
-                .thenReturn(false);
+        when(projectionReadService.describeListQuery(eq(MODULE), eq(service), any()))
+                .thenReturn(ProjectionQueryDescriptor.unsupported(
+                        MODULE,
+                        "dynamic_ui_config_list",
+                        Set.of("code", "displayCode"),
+                        ProjectionQueryFallbackReason.UNSUPPORTED_OUTPUT_FIELD
+                ));
         DynamicRecord record = new DynamicRecord(entity())
                 .setValue("code", "C-001")
                 .putDisplayValue("displayCode", "C-001 / Customer");

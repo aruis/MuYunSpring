@@ -95,6 +95,8 @@ class RelationProjectionReadServiceTest {
         );
 
         assertThat(service.supportsListQuery(userRelationDefinition(), projection)).isFalse();
+        assertThat(service.describeListQuery(userRelationDefinition(), projection).fallbackReason())
+                .isEqualTo(ProjectionQueryFallbackReason.NO_RELATION_OUTPUT);
     }
 
     @Test
@@ -112,6 +114,8 @@ class RelationProjectionReadServiceTest {
         );
 
         assertThat(service.supportsListQuery(userRelationDefinition(), projection)).isFalse();
+        assertThat(service.describeListQuery(userRelationDefinition(), projection).fallbackReason())
+                .isEqualTo(ProjectionQueryFallbackReason.POST_READ_TRANSFORM);
     }
 
     @Test
@@ -125,6 +129,12 @@ class RelationProjectionReadServiceTest {
         StaticModuleDefinition binding = employeeAccountReferenceDefinition();
         StaticModuleDefinition employee = employeeReferenceDefinition();
         RecordReadProjection projection = defaultListProjection(user);
+        ProjectionQueryDescriptor descriptor = service.describeListQuery(List.of(user, binding, employee),
+                user, projection);
+        assertThat(descriptor.supported()).isTrue();
+        assertThat(descriptor.queryableFields()).contains("employeeNo");
+        assertThat(descriptor.sortableFields()).contains("employeeTitle");
+        assertThat(descriptor.responseFields()).contains("id", "username", "employeeNo", "employeeTitle");
         when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
                 .thenReturn(List.of(Map.of(
                         "id", "user-1",
