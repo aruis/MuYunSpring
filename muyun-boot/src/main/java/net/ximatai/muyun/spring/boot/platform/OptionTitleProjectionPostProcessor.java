@@ -25,13 +25,19 @@ final class OptionTitleProjectionPostProcessor {
                                            RecordReadProjection projection,
                                            List<Map<String, Object>> records,
                                            OptionSourceRegistry optionSourceRegistry) {
-        if (modelClass == null || projection == null || records == null || records.isEmpty()
+        ProjectionGraph graph = projection == null ? null : RecordReadProjectionGraphAdapter.adapt(projection);
+        return apply(modelClass, graph, records, optionSourceRegistry);
+    }
+
+    static List<Map<String, Object>> apply(Class<?> modelClass,
+                                           ProjectionGraph graph,
+                                           List<Map<String, Object>> records,
+                                           OptionSourceRegistry optionSourceRegistry) {
+        if (modelClass == null || graph == null || records == null || records.isEmpty()
                 || optionSourceRegistry == null) {
             return records;
         }
-        Set<String> optionTitleFields = projection.postReadTransforms().stream()
-                .map(RecordReadPostTransform::parse)
-                .flatMap(java.util.Optional::stream)
+        Set<String> optionTitleFields = graph.parsedTransforms().stream()
                 .filter(RecordReadPostTransform::isOptionTitle)
                 .map(RecordReadPostTransform::fieldName)
                 .collect(Collectors.toUnmodifiableSet());

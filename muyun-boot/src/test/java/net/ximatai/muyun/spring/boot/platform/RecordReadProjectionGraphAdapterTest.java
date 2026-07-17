@@ -48,5 +48,29 @@ class RecordReadProjectionGraphAdapterTest {
                 .containsExactly(true, true);
         assertThat(graph.transforms()).extracting(ProjectionGraphTransform::transformType)
                 .containsExactly(RecordReadPostTransform.FIELD_PROTECTION, "unknown");
+        assertThat(graph.parsedTransforms())
+                .containsExactly(
+                        RecordReadPostTransform.fieldProtection("username"),
+                        new RecordReadPostTransform("unknown", "employeeNo")
+                );
+        assertThat(RecordReadProjectionPostProcessor.supportsSqlOutput(graph)).isFalse();
+    }
+
+    @Test
+    void shouldUseGraphTransformsToCheckSupportedSqlOutputPostProcessors() {
+        RecordReadProjection projection = new RecordReadProjection(
+                "iam.user",
+                "list",
+                List.of(ViewFieldRef.main("username")),
+                List.of("id"),
+                List.of(
+                        RecordReadPostTransform.fieldProtection("username").serialize(),
+                        RecordReadPostTransform.optionTitle("passwordStatus").serialize()
+                )
+        );
+
+        ProjectionGraph graph = RecordReadProjectionGraphAdapter.adapt(projection);
+
+        assertThat(RecordReadProjectionPostProcessor.supportsSqlOutput(graph)).isTrue();
     }
 }

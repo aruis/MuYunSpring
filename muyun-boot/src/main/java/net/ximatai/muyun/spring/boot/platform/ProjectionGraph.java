@@ -49,4 +49,11 @@ public record ProjectionGraph(String moduleAlias,
                 .filter(ProjectionGraphNode::internalReadField)
                 .toList();
     }
+
+    public List<RecordReadPostTransform> parsedTransforms() {
+        return transforms.stream()
+                .map(ProjectionGraphTransform::transform)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
 }

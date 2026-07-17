@@ -14,11 +14,16 @@ final class RecordReadProjectionPostProcessor {
         if (projection == null || projection.postReadTransforms().isEmpty()) {
             return true;
         }
-        return projection.postReadTransforms().stream()
-                .map(RecordReadPostTransform::parse)
-                .allMatch(transform -> transform
-                        .map(item -> item.isFieldProtection() || item.isOptionTitle())
-                        .orElse(false));
+        return supportsSqlOutput(RecordReadProjectionGraphAdapter.adapt(projection));
+    }
+
+    static boolean supportsSqlOutput(ProjectionGraph graph) {
+        if (graph == null || graph.transforms().isEmpty()) {
+            return true;
+        }
+        return graph.transforms().stream()
+                .allMatch(transform -> transform.parsed()
+                        && (transform.transform().isFieldProtection() || transform.transform().isOptionTitle()));
     }
 
     static boolean hasStorageProtectedOutput(List<StaticModuleDefinition> definitions,
@@ -45,6 +50,7 @@ final class RecordReadProjectionPostProcessor {
                                                        RecordReadProjection projection,
                                                        List<Map<String, Object>> records,
                                                        OptionSourceRegistry optionSourceRegistry) {
-        return OptionTitleProjectionPostProcessor.apply(modelClass, projection, records, optionSourceRegistry);
+        ProjectionGraph graph = projection == null ? null : RecordReadProjectionGraphAdapter.adapt(projection);
+        return OptionTitleProjectionPostProcessor.apply(modelClass, graph, records, optionSourceRegistry);
     }
 }
