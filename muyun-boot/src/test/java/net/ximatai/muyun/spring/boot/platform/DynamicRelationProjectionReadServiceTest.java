@@ -100,6 +100,22 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     @Test
+    void shouldFallbackWhenDynamicProjectionCannotProduceAllOutputFields() {
+        DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
+                new RelationProjectionReadService(
+                        new RelationProjectionQueryExecutor(mock(NamedParameterJdbcOperations.class)),
+                        new RelationProjectionDatabaseTypeProvider()
+                )
+        );
+
+        assertThat(service.supportsListQuery(
+                "crm.order",
+                dynamicRecordService(),
+                Set.of("orderNo", "customerTitle", "displayCode")
+        )).isFalse();
+    }
+
+    @Test
     void shouldApplyDynamicReadScopeBeforeRelationProjectionSqlExecution() {
         NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
         DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(

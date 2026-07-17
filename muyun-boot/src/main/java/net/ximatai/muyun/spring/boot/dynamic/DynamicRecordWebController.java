@@ -371,9 +371,12 @@ public class DynamicRecordWebController implements
         WebPageRequest webPage = request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(webPage.pageNum(), webPage.pageSize());
         Criteria criteria = queryCriteria(request);
-        Sort[] sorts = querySorts(request);
         Set<String> projectionFields = projectionFields(DynamicWebRequest.moduleAlias(), request);
-        PageResult<DynamicRecord> projectedPage = queryProjectionRecords(projectionFields, criteria, pageRequest, sorts);
+        boolean projectionSupported = supportsProjectionListQuery(projectionFields);
+        Sort[] sorts = querySorts(request, projectionSupported ? projectionFields : Set.of());
+        PageResult<DynamicRecord> projectedPage = projectionSupported
+                ? queryProjectionRecords(projectionFields, criteria, pageRequest, sorts)
+                : null;
         if (projectedPage != null) {
             return projectedPage;
         }
@@ -385,19 +388,28 @@ public class DynamicRecordWebController implements
         return PageResult.of(records, page.getTotal(), PageRequest.of(page.getPageNum(), page.getPageSize()));
     }
 
+    private Sort[] querySorts(WebQueryRequest request, Set<String> additionalSortableFields) {
+        if (request == null || request.sorts().isEmpty()) {
+            return new Sort[0];
+        }
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(service(), request.sorts(), additionalSortableFields);
+        return DynamicWebQueryMapper.sorts(request.sorts());
+    }
+
+    private boolean supportsProjectionListQuery(Set<String> projectionFields) {
+        if (projectionFields == null || projectionFields.isEmpty()) {
+            return false;
+        }
+        return dynamicRelationProjectionReadService.supportsListQuery(
+                DynamicWebRequest.moduleAlias(),
+                recordService,
+                projectionFields);
+    }
+
     private PageResult<DynamicRecord> queryProjectionRecords(Set<String> projectionFields,
                                                              Criteria criteria,
                                                              PageRequest pageRequest,
                                                              Sort... sorts) {
-        if (projectionFields == null || projectionFields.isEmpty()) {
-            return null;
-        }
-        if (!dynamicRelationProjectionReadService.supportsListQuery(
-                DynamicWebRequest.moduleAlias(),
-                recordService,
-                projectionFields)) {
-            return null;
-        }
         return dynamicRelationProjectionReadService.queryList(
                 DynamicWebRequest.moduleAlias(),
                 recordService,

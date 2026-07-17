@@ -54,6 +54,9 @@ public class DynamicRelationProjectionReadService {
         if (hasProtectedProjectionFields(dynamicDefinitions, moduleAlias, outputFields)) {
             return false;
         }
+        if (!supportsOutputFields(dynamicDefinitions, moduleAlias, outputFields)) {
+            return false;
+        }
         List<StaticModuleDefinition> definitions = DynamicRelationProjectionDefinitionAdapter.adapt(dynamicDefinitions);
         StaticModuleDefinition definition = staticDefinition(definitions, moduleAlias);
         return definition != null && relationProjectionReadService.supportsListQuery(
@@ -76,6 +79,9 @@ public class DynamicRelationProjectionReadService {
         }
         List<ModuleDefinition> dynamicDefinitions = recordService.moduleDefinitions();
         if (hasProtectedProjectionFields(dynamicDefinitions, moduleAlias, outputFields)) {
+            return Optional.empty();
+        }
+        if (!supportsOutputFields(dynamicDefinitions, moduleAlias, outputFields)) {
             return Optional.empty();
         }
         List<StaticModuleDefinition> definitions = DynamicRelationProjectionDefinitionAdapter.adapt(dynamicDefinitions);
@@ -101,6 +107,28 @@ public class DynamicRelationProjectionReadService {
                 .map(row -> record(entity, row))
                 .toList();
         return Optional.of(PageResult.of(records, page.getTotal(), pageRequest));
+    }
+
+    private boolean supportsOutputFields(List<ModuleDefinition> definitions,
+                                         String moduleAlias,
+                                         Set<String> outputFields) {
+        ModuleDefinition definition = dynamicDefinition(definitions, moduleAlias);
+        if (definition == null) {
+            return false;
+        }
+        EntityDefinition mainEntity = mainEntity(definition);
+        Set<String> supportedFields = new java.util.LinkedHashSet<>();
+        fields(mainEntity).values().stream()
+                .filter(FieldDefinition::isPhysical)
+                .map(FieldDefinition::fieldName)
+                .forEach(supportedFields::add);
+        definition.references().stream()
+                .filter(reference -> mainEntity.alias().equals(reference.sourceEntityAlias()))
+                .filter(reference -> reference.cardinality() == ReferenceCardinality.ONE)
+                .flatMap(reference -> reference.projections().stream())
+                .map(ReferenceProjection::outputField)
+                .forEach(supportedFields::add);
+        return supportedFields.containsAll(outputFields);
     }
 
     private StaticModuleDefinition staticDefinition(List<StaticModuleDefinition> definitions, String moduleAlias) {
