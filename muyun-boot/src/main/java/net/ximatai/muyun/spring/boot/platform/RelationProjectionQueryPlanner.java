@@ -191,31 +191,38 @@ public final class RelationProjectionQueryPlanner {
                 .map(ViewFieldRef::fieldName)
                 .forEach(responseFields::add);
 
-        LinkedHashMap<String, StaticModuleReferencePathResolver.JoinStep> joins = new LinkedHashMap<>();
+        Map<String, ProjectionGraphNode> nodes = graphNodes(projectionGraph);
+        LinkedHashMap<String, GraphJoin> joins = referenceJoinEdges(
+                projectionGraph,
+                nodes,
+                modules,
+                options,
+                definition.moduleAlias()
+        );
+        Map<String, ProjectionGraphEdge> outputEdges = referenceOutputEdges(projectionGraph);
         for (ViewFieldRef field : relationFields) {
-            RecordReadProjectionReferenceResolver.ResolvedOutput output =
-                    RecordReadProjectionReferenceResolver.resolve(modules, definition, field, options);
+            ProjectionGraphEdge output = outputEdges.get(outputNodeId(field));
             if (output == null) {
                 return null;
             }
-            for (StaticModuleReferencePathResolver.JoinStep join : output.traversal().joins()) {
-                joins.putIfAbsent(join.tableAlias(), join);
-                validateJoinCount(joins.size(), options.maxJoinCount(), definition.moduleAlias());
-            }
-            String targetColumn = columnName(output.traversal().entity(), output.targetFieldName());
+            ProjectionGraphNode source = nodes.get(output.sourceNodeId());
+            EntityDefinition targetEntity = graphNodeEntity(modules, source);
+            String targetColumn = columnName(targetEntity, output.targetFieldName());
             if (output.existsProjection()) {
                 addSelectField(selectFields, SelectField.expression(
-                        qualified(output.traversal().tableAlias(), targetColumn, dbType) + " is not null",
+                        qualified(source.tableAlias(), targetColumn, dbType) + " is not null",
                         field.fieldName()
                 ));
             } else {
                 addSelectField(selectFields, new SelectField(
-                        output.traversal().tableAlias(),
+                        source.tableAlias(),
                         targetColumn,
                         field.fieldName()
                 ));
             }
-            StaticModuleReadProjectionDefinition readProjection = output.readProjection();
+            StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
+                    ? readProjection(definition, field.fieldName())
+                    : null;
             if (readProjection != null) {
                 if (readProjection.filterable()) {
                     queryableFields.add(field.fieldName());
@@ -240,7 +247,7 @@ public final class RelationProjectionQueryPlanner {
                 .append(qualifiedTable(definition.entities().getFirst(), dbType))
                 .append(" ")
                 .append(quote(RelationProjectionSqlNames.MAIN_ALIAS, dbType));
-        for (StaticModuleReferencePathResolver.JoinStep join : joins.values()) {
+        for (GraphJoin join : joins.values()) {
             appendReferenceJoin(sql, params, join, dbType);
         }
         return new RelationProjectionSqlPlan(
@@ -255,6 +262,71 @@ public final class RelationProjectionQueryPlanner {
         );
     }
 
+    private static LinkedHashMap<String, GraphJoin> referenceJoinEdges(ProjectionGraph graph,
+                                                                       Map<String, ProjectionGraphNode> nodes,
+                                                                       Map<String, StaticModuleDefinition> modules,
+                                                                       RelationProjectionPlanningOptions options,
+                                                                       String moduleAlias) {
+        LinkedHashMap<String, GraphJoin> joins = new LinkedHashMap<>();
+        if (graph == null) {
+            return joins;
+        }
+        for (ProjectionGraphEdge edge : graph.edges()) {
+            if (edge.edgeKind() != ProjectionGraphEdgeKind.REFERENCE_JOIN) {
+                continue;
+            }
+            ProjectionGraphNode target = nodes.get(edge.targetNodeId());
+            joins.putIfAbsent(edge.targetNodeId(), new GraphJoin(edge, graphNodeEntity(modules, target)));
+            validateJoinCount(joins.size(), options.maxJoinCount(), moduleAlias);
+        }
+        return joins;
+    }
+
+    private static Map<String, ProjectionGraphNode> graphNodes(ProjectionGraph graph) {
+        LinkedHashMap<String, ProjectionGraphNode> nodes = new LinkedHashMap<>();
+        if (graph != null) {
+            for (ProjectionGraphNode node : graph.nodes()) {
+                nodes.putIfAbsent(node.nodeId(), node);
+            }
+        }
+        return java.util.Collections.unmodifiableMap(nodes);
+    }
+
+    private static Map<String, ProjectionGraphEdge> referenceOutputEdges(ProjectionGraph graph) {
+        LinkedHashMap<String, ProjectionGraphEdge> outputEdges = new LinkedHashMap<>();
+        if (graph != null) {
+            for (ProjectionGraphEdge edge : graph.edges()) {
+                if (edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_OUTPUT_FIELD) {
+                    outputEdges.putIfAbsent(edge.targetNodeId(), edge);
+                }
+            }
+        }
+        return java.util.Collections.unmodifiableMap(outputEdges);
+    }
+
+    private static EntityDefinition graphNodeEntity(Map<String, StaticModuleDefinition> modules,
+                                                    ProjectionGraphNode node) {
+        if (node == null || node.moduleAlias() == null || node.entityAlias() == null) {
+            throw new IllegalArgumentException("projection graph reference output source node is invalid: "
+                    + (node == null ? null : node.nodeId()));
+        }
+        StaticModuleDefinition definition = modules.get(node.moduleAlias());
+        if (definition == null) {
+            throw new IllegalArgumentException("projection graph node module is not declared: " + node.moduleAlias());
+        }
+        return definition.entities().stream()
+                .filter(entity -> node.entityAlias().equals(entity.alias()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("projection graph node entity is not declared: "
+                        + node.moduleAlias() + "." + node.entityAlias()));
+    }
+
+    private static String outputNodeId(ViewFieldRef field) {
+        return field.relationCode() == null
+                ? "main:" + field.fieldName()
+                : "relation:" + field.relationCode() + ":" + field.fieldName();
+    }
+
     private static void validateJoinCount(int joinCount, int maxJoinCount, String moduleAlias) {
         if (joinCount > maxJoinCount) {
             throw new IllegalArgumentException("relation projection join count exceeds limit: "
@@ -264,23 +336,27 @@ public final class RelationProjectionQueryPlanner {
 
     private static void appendReferenceJoin(StringBuilder sql,
                                             Map<String, Object> params,
-                                            StaticModuleReferencePathResolver.JoinStep join,
+                                            GraphJoin join,
                                             DBInfo.Type databaseType) {
         sql.append(" left join ")
                 .append(qualifiedTable(join.entity(), databaseType))
                 .append(" ")
-                .append(quote(join.tableAlias(), databaseType))
+                .append(quote(join.edge().tableAlias(), databaseType))
                 .append(" on ");
         List<String> predicates = new ArrayList<>();
-        for (RelationProjectionJoinCondition condition : join.conditions()) {
+        for (RelationProjectionJoinCondition condition : join.edge().joinConditions()) {
             predicates.add(qualified(condition.leftAlias(), condition.leftColumn(), databaseType)
                     + " = "
                     + qualified(condition.rightAlias(), condition.rightColumn(), databaseType));
         }
-        String paramName = "__join_" + join.tableAlias() + "_deleted";
-        predicates.add(qualified(join.tableAlias(), StandardEntitySchema.DELETED_COLUMN, databaseType) + " = :" + paramName);
+        String paramName = "__join_" + join.edge().tableAlias() + "_deleted";
+        predicates.add(qualified(join.edge().tableAlias(), StandardEntitySchema.DELETED_COLUMN, databaseType)
+                + " = :" + paramName);
         params.put(paramName, Boolean.FALSE);
         sql.append(String.join(" and ", predicates));
+    }
+
+    private record GraphJoin(ProjectionGraphEdge edge, EntityDefinition entity) {
     }
 
     private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition,

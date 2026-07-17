@@ -66,6 +66,7 @@ class RecordReadProjectionGraphPlannerTest {
                 .satisfies(node -> {
                     assertThat(node.moduleAlias()).isEqualTo("crm.customer");
                     assertThat(node.entityAlias()).isEqualTo("customer");
+                    assertThat(node.tableAlias()).isEqualTo("customer_id");
                 });
         assertThat(graph.edges()).filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
                 .singleElement()

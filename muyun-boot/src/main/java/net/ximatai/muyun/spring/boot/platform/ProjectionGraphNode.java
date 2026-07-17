@@ -6,6 +6,7 @@ public record ProjectionGraphNode(String nodeId,
                                   ProjectionGraphNodeKind nodeKind,
                                   String moduleAlias,
                                   String entityAlias,
+                                  String tableAlias,
                                   String relationCode,
                                   String fieldName,
                                   String fieldId,
@@ -21,6 +22,9 @@ public record ProjectionGraphNode(String nodeId,
         entityAlias = entityAlias == null || entityAlias.isBlank()
                 ? null
                 : PlatformNameRules.requireIdentifier(entityAlias, "projectionGraphEntityAlias");
+        tableAlias = tableAlias == null || tableAlias.isBlank()
+                ? null
+                : RelationProjectionSqlNames.requireAlias(tableAlias, "projectionGraphTableAlias");
         relationCode = relationCode == null || relationCode.isBlank() ? null : relationCode.trim();
         fieldName = fieldName == null || fieldName.isBlank()
                 ? null
@@ -30,13 +34,17 @@ public record ProjectionGraphNode(String nodeId,
             throw new IllegalArgumentException("projection graph field node requires field name: " + nodeId);
         }
         if (nodeKind == ProjectionGraphNodeKind.ROOT
-                && (entityAlias != null || relationCode != null || fieldName != null || fieldId != null)) {
+                && (entityAlias != null || tableAlias != null || relationCode != null
+                || fieldName != null || fieldId != null)) {
             throw new IllegalArgumentException("projection graph root node must not bind field metadata: " + nodeId);
+        }
+        if (nodeKind == ProjectionGraphNodeKind.JOIN && tableAlias == null) {
+            throw new IllegalArgumentException("projection graph join node requires table alias: " + nodeId);
         }
     }
 
     public static ProjectionGraphNode root(String moduleAlias) {
-        return new ProjectionGraphNode("root", ProjectionGraphNodeKind.ROOT, moduleAlias, null,
+        return new ProjectionGraphNode("root", ProjectionGraphNodeKind.ROOT, moduleAlias, null, null,
                 null, null, null, false, false);
     }
 
@@ -46,6 +54,7 @@ public record ProjectionGraphNode(String nodeId,
         }
         return new ProjectionGraphNode("join:" + tableAlias.trim(), ProjectionGraphNodeKind.JOIN, moduleAlias,
                 entityAlias,
+                tableAlias,
                 null, null, null, false, false);
     }
 }
