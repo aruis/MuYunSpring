@@ -87,6 +87,29 @@ public class RelationProjectionReadService {
                                                               Criteria criteria,
                                                               PageRequest pageRequest,
                                                               Sort... sorts) {
+        return queryList(definitions, definition, projection, criteria, pageRequest, java.util.Set.of(), sorts);
+    }
+
+    public Optional<PageResult<Map<String, Object>>> queryListWithInternalFields(
+            java.util.List<StaticModuleDefinition> definitions,
+            StaticModuleDefinition definition,
+            RecordReadProjection projection,
+            Criteria criteria,
+            PageRequest pageRequest,
+            Sort... sorts) {
+        return queryList(definitions, definition, projection, criteria, pageRequest,
+                projection == null ? java.util.Set.of() : java.util.Set.copyOf(projection.internalReadFields()),
+                sorts);
+    }
+
+    private Optional<PageResult<Map<String, Object>>> queryList(
+            java.util.List<StaticModuleDefinition> definitions,
+            StaticModuleDefinition definition,
+            RecordReadProjection projection,
+            Criteria criteria,
+            PageRequest pageRequest,
+            java.util.Set<String> additionalResponseFields,
+            Sort... sorts) {
         RelationProjectionQueryExecutor executor = projectionQueryExecutor();
         if (executor == null || !supportsListQuery(definition, projection)) {
             return Optional.empty();
@@ -101,7 +124,7 @@ public class RelationProjectionReadService {
         if (!plan.hasRelationProjection()) {
             return Optional.empty();
         }
-        return Optional.of(executor.page(plan, criteria, pageRequest, sorts));
+        return Optional.of(executor.page(plan, criteria, pageRequest, additionalResponseFields, sorts));
     }
 
     private RelationProjectionQueryExecutor projectionQueryExecutor() {

@@ -14,9 +14,9 @@
 
 ## 设计口径
 
-当前已以 `RelationProjectionJoinDefinition` 作为来源无关的关联投影定义雏形。静态侧先通过 Java contributor 接入；动态侧未来应把元数据引用、模块关系和字典标题编译到同一种定义，而不是另起动态专用 planner。
+当前已以 `RelationProjectionJoinDefinition` 作为来源无关的关联投影定义雏形。静态侧通过 Java contributor 接入；动态主实体 `ONE` 引用投影已通过元数据 adapter 编译到同一种定义，而不是另起动态专用 planner。
 
-当前运行态已沉淀 `RelationProjectionReadService` 作为读投影门面，统一编排必需字段收集、SQL plan 构建、分页执行和响应字段边界。静态列表入口只负责把静态模块编译成 `RecordReadProjection` 后调用该门面；动态侧未来不应复制静态 service 的编排，而应把动态元数据编译到同一组 definition/projection 后复用该门面。
+当前运行态已沉淀 `RelationProjectionReadService` 作为读投影门面，统一编排必需字段收集、SQL plan 构建、分页执行和响应字段边界。静态列表入口只负责把静态模块编译成 `RecordReadProjection` 后调用该门面；动态列表入口通过 `DynamicRelationProjectionReadService` 把 `uiConfigId` 字段和运行态模块定义编译到同一组 definition/projection 后复用该门面。
 
 推荐长期抽象：
 
@@ -39,7 +39,7 @@
 1. UI 和配置驱动投影字段选择。
 2. 引用标题字段和 plus field 的稳定别名策略。
 3. 先生成投影子查询，再在外层执行条件、排序和分页。
-4. 递归引用时的深度限制、循环检测和自引用处理。
+4. 递归引用时的深度限制、join 数量限制和自引用处理。
 5. 强制投影字段机制，确保查询条件、排序和内部能力需要的字段不会被裁剪掉。
 
 不宜照搬：
@@ -67,11 +67,11 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 中期目标是把静态侧验证过的能力沉淀为动静共享的平台查询能力。
 
 1. 继续把 `RelationProjection*` 从静态列表专用能力推进为来源无关的读投影平台能力，运行态入口以 `RelationProjectionReadService` 为准。
-2. 静态 `RelationProjectionJoinContributor` 保持轻量业务声明，动态侧后续编译为相同 relation 定义。
-3. 动态引用字段、模块关系和字典标题也编译为同一种 `RelationProjectionDefinition`。
+2. 静态 `RelationProjectionJoinContributor` 保持轻量业务声明，动态侧通过运行态 `ModuleDefinition` 适配为相同 relation 定义。
+3. 动态主实体 `ONE` 引用字段的显式投影已具备最小适配入口，并已接入动态列表 `uiConfigId` 查询；模块关系、子实体引用、`MANY` 聚合和字典标题继续编译为同一种 `RelationProjectionDefinition`。
 4. `RecordReadProjectionPlanner` 统一决定输出字段、内部读取字段、强制投影字段和 post-read transform。
 5. `ProjectionQueryPlanner` 统一负责 select、from、join、where 外层包装、排序、分页和参数绑定。
-6. 引入 join depth、join count 和 cycle path 校验，禁止无界递归展开。
+6. join depth 和 join count 已进入 planner 基础约束；显式有限回环路径允许规划，后续继续补自引用裁剪、诊断响应和可配置治理。
 7. projection plan 可以缓存，但必须按静态模块定义版本、动态元数据运行态版本、UI 配置版本或查询模板版本失效。
 8. relation 字段的筛选和排序纳入 `QueryDescriptor` 或后续 `ProjectionQueryDescriptor`，避免“投影了就能查”的隐式扩权。
 9. 数据权限策略进入 relation 定义，区分“源记录可见即可展示有限摘要”和“目标模块也必须满足数据权限”。
@@ -91,8 +91,8 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 
 ## 当前边界
 
-1. 当前能力先服务静态用户列表展示绑定职员信息，动态侧尚未接入同一 planner。
+1. 当前能力先服务静态用户列表展示绑定职员信息，并已让动态列表 `uiConfigId` 查询在主实体 `ONE` 引用投影字段存在时复用同一 planner；没有可 SQL 化投影时仍回退原实体查询和内存裁剪路径。
 2. 当前 SQL 关联投影只适合 `1:1` 或 `N:1` 摘要展示，不承诺一对多展开。
 3. 字段别名策略仍处于早期阶段。多个 relation 投影同名字段时，应优先使用稳定 relation 前缀或路径别名，避免响应字段冲突。
-4. SQL 路径返回 Map 时必须谨慎处理字段保护。没有统一保护执行器前，遇到需要 post-read transform 的场景应回退实体查询。
+4. SQL 路径返回 Map 时必须谨慎处理字段保护。没有统一保护执行器前，动态受保护字段和需要 post-read transform 的场景应回退实体查询。
 5. 当前文档记录治理方向，不表示所有列出的长期能力已经实现。

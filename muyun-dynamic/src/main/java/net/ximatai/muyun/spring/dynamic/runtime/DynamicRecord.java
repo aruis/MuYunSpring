@@ -473,6 +473,16 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         }
     }
 
+    public DynamicRecord putProjectedValue(String fieldCode, Object value) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field != null && field.isPhysical()) {
+            putLoadedValue(fieldCode, value);
+        } else {
+            putVirtualValue(fieldCode, value);
+        }
+        return this;
+    }
+
     void putVirtualValue(String fieldCode, Object value) {
         if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);

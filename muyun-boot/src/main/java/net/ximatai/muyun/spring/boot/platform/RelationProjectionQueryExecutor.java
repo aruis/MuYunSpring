@@ -27,6 +27,14 @@ public class RelationProjectionQueryExecutor {
                                                 Criteria criteria,
                                                 PageRequest pageRequest,
                                                 Sort... sorts) {
+        return page(plan, criteria, pageRequest, java.util.Set.of(), sorts);
+    }
+
+    public PageResult<Map<String, Object>> page(RelationProjectionSqlPlan plan,
+                                                Criteria criteria,
+                                                PageRequest pageRequest,
+                                                java.util.Set<String> additionalResponseFields,
+                                                Sort... sorts) {
         if (plan == null || !plan.hasRelationProjection()) {
             throw new IllegalArgumentException("projection SQL plan must contain relation projections");
         }
@@ -36,7 +44,7 @@ public class RelationProjectionQueryExecutor {
         params.putAll(compiled.getParams());
         String where = where(compiled);
         String orderBy = orderBy(plan, sorts);
-        String dataSql = "select " + responseSelect(plan) + " from (" + plan.baseSql() + ") q"
+        String dataSql = "select " + responseSelect(plan, additionalResponseFields) + " from (" + plan.baseSql() + ") q"
                 + where
                 + orderBy
                 + " limit :__limit offset :__offset";
@@ -86,11 +94,17 @@ public class RelationProjectionQueryExecutor {
                 .collect(java.util.stream.Collectors.joining(", "));
     }
 
-    private String responseSelect(RelationProjectionSqlPlan plan) {
-        if (plan.responseFields().isEmpty()) {
+    private String responseSelect(RelationProjectionSqlPlan plan, java.util.Set<String> additionalResponseFields) {
+        java.util.LinkedHashSet<String> fields = new java.util.LinkedHashSet<>(plan.responseFields());
+        if (additionalResponseFields != null) {
+            additionalResponseFields.stream()
+                    .filter(plan.queryableFields()::contains)
+                    .forEach(fields::add);
+        }
+        if (fields.isEmpty()) {
             return "*";
         }
-        return plan.responseFields().stream()
+        return fields.stream()
                 .map(field -> RelationProjectionQueryPlanner.quote(field, plan.databaseType()))
                 .collect(java.util.stream.Collectors.joining(", "));
     }
