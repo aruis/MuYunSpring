@@ -18,8 +18,10 @@ final class FieldProtectionProjectionPostProcessor {
     static boolean hasStorageProtectedOutput(List<StaticModuleDefinition> definitions,
                                              StaticModuleDefinition definition,
                                              RecordReadProjection projection) {
-        return outputProtections(definitions, definition, projection).values().stream()
-                .anyMatch(FieldProtectionDefinition::hasStorageProtection);
+        Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions, definition);
+        return outputProtections(modules, definition, projection).values().stream()
+                .anyMatch(FieldProtectionDefinition::hasStorageProtection)
+                || hasStorageProtectedJoinField(modules, definition, projection);
     }
 
     static List<Map<String, Object>> applySqlOutput(List<StaticModuleDefinition> definitions,
@@ -30,7 +32,11 @@ final class FieldProtectionProjectionPostProcessor {
         if (records == null || records.isEmpty()) {
             return records;
         }
-        Map<String, FieldProtectionDefinition> protections = outputProtections(definitions, definition, projection);
+        Map<String, FieldProtectionDefinition> protections = outputProtections(
+                modulesByAlias(definitions, definition),
+                definition,
+                projection
+        );
         if (protections.isEmpty()) {
             return records;
         }
@@ -63,13 +69,12 @@ final class FieldProtectionProjectionPostProcessor {
     }
 
     private static Map<String, FieldProtectionDefinition> outputProtections(
-            List<StaticModuleDefinition> definitions,
+            Map<String, StaticModuleDefinition> modules,
             StaticModuleDefinition definition,
             RecordReadProjection projection) {
         if (definition == null || projection == null || definition.entities().isEmpty()) {
             return Map.of();
         }
-        Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions, definition);
         Map<String, FieldProtectionDefinition> protections = new LinkedHashMap<>();
         for (ViewFieldRef field : projection.outputFields()) {
             FieldDefinition resolved = resolveOutputField(modules, definition, field);
@@ -78,6 +83,71 @@ final class FieldProtectionProjectionPostProcessor {
             }
         }
         return protections;
+    }
+
+    private static boolean hasStorageProtectedJoinField(Map<String, StaticModuleDefinition> modules,
+                                                        StaticModuleDefinition definition,
+                                                        RecordReadProjection projection) {
+        if (definition == null || projection == null || definition.entities().isEmpty()) {
+            return false;
+        }
+        for (ViewFieldRef field : projection.outputFields()) {
+            StaticModuleReferencePathResolver.Traversal traversal = referenceTraversal(modules, definition, field);
+            if (traversal != null && hasStorageProtectedJoinField(definition, traversal)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static StaticModuleReferencePathResolver.Traversal referenceTraversal(
+            Map<String, StaticModuleDefinition> modules,
+            StaticModuleDefinition definition,
+            ViewFieldRef field) {
+        if (field.relationCode() != null) {
+            return StaticModuleReferencePathResolver.resolve(modules, definition, field.relationCode());
+        }
+        StaticModuleReadProjectionDefinition readProjection = readProjection(definition, field.fieldName());
+        if (readProjection == null) {
+            return null;
+        }
+        if (readProjection.referencePath() != null) {
+            return StaticModuleReferencePathResolver.resolve(modules, definition, readProjection.referencePath());
+        }
+        String path = readProjection.path();
+        int lastSeparator = path == null ? -1 : path.lastIndexOf('.');
+        if (lastSeparator < 0) {
+            return null;
+        }
+        return StaticModuleReferencePathResolver.resolve(modules, definition, path.substring(0, lastSeparator));
+    }
+
+    private static boolean hasStorageProtectedJoinField(StaticModuleDefinition definition,
+                                                        StaticModuleReferencePathResolver.Traversal traversal) {
+        Map<String, EntityDefinition> entitiesByAlias = new LinkedHashMap<>();
+        entitiesByAlias.put(RelationProjectionSqlNames.MAIN_ALIAS, definition.entities().getFirst());
+        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+            entitiesByAlias.put(join.tableAlias(), join.entity());
+        }
+        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+            for (RelationProjectionJoinCondition condition : join.conditions()) {
+                if (storageProtectedColumn(entitiesByAlias.get(condition.leftAlias()), condition.leftColumn())
+                        || storageProtectedColumn(entitiesByAlias.get(condition.rightAlias()), condition.rightColumn())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean storageProtectedColumn(EntityDefinition entity, String columnName) {
+        if (entity == null || columnName == null || columnName.isBlank()) {
+            return false;
+        }
+        return entity.fields().stream()
+                .filter(field -> columnName.equals(field.columnName()))
+                .map(FieldDefinition::protection)
+                .anyMatch(FieldProtectionDefinition::hasStorageProtection);
     }
 
     private static FieldDefinition resolveOutputField(Map<String, StaticModuleDefinition> modules,

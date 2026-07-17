@@ -248,6 +248,28 @@ class RelationProjectionReadServiceTest {
     }
 
     @Test
+    void shouldRejectStorageProtectedReferenceJoinFields() {
+        RelationProjectionReadService service = new RelationProjectionReadService(
+                mock(RelationProjectionQueryExecutor.class),
+                new RelationProjectionDatabaseTypeProvider()
+        );
+        StaticModuleDefinition user = userWithEmployeeReferenceDefinition(storageProtected());
+        StaticModuleDefinition employee = employeeReferenceDefinition();
+        RecordReadProjection projection = new RecordReadProjection(
+                "iam.user",
+                "defaultList",
+                List.of(ViewFieldRef.main("username"), ViewFieldRef.relation("employee", "title")),
+                List.of("id"),
+                List.of()
+        );
+
+        ProjectionQueryDescriptor descriptor = service.describeListQuery(List.of(user, employee), user, projection);
+
+        assertThat(descriptor.supported()).isFalse();
+        assertThat(descriptor.fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
+    }
+
+    @Test
     void shouldSortByServiceReadProjectionOutputWithoutAllowingCriteriaOnIt() {
         NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
         RelationProjectionReadService service = new RelationProjectionReadService(
@@ -447,6 +469,11 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition userWithEmployeeReferenceDefinition() {
+        return userWithEmployeeReferenceDefinition(FieldProtectionDefinition.NONE);
+    }
+
+    private static StaticModuleDefinition userWithEmployeeReferenceDefinition(
+            FieldProtectionDefinition employeeIdProtection) {
         return new StaticModuleDefinition(
                 "iam",
                 "iam.user",
@@ -464,6 +491,7 @@ class RelationProjectionReadServiceTest {
                         List.of(
                                 FieldDefinition.string("username", "账号").column("username"),
                                 FieldDefinition.string("employeeId", "职员").column("employee_id")
+                                        .protection(employeeIdProtection)
                         )
                 )),
                 null,

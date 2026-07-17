@@ -169,6 +169,27 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     @Test
+    void shouldFallbackWhenDynamicMainProjectionTouchesOutputProtectedFields() {
+        DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
+                new RelationProjectionReadService(
+                        new RelationProjectionQueryExecutor(mock(NamedParameterJdbcOperations.class)),
+                        new RelationProjectionDatabaseTypeProvider()
+                )
+        );
+
+        assertThat(service.supportsListQuery(
+                "crm.order",
+                protectedMainDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        )).isFalse();
+        assertThat(service.describeListQuery(
+                "crm.order",
+                protectedMainDynamicRecordService(),
+                Set.of("orderNo", "customerTitle")
+        ).fallbackReason()).isEqualTo(ProjectionQueryFallbackReason.PROTECTED_FIELD);
+    }
+
+    @Test
     void shouldApplyDynamicReadScopeBeforeRelationProjectionSqlExecution() {
         NamedParameterJdbcOperations jdbcOperations = mock(NamedParameterJdbcOperations.class);
         DynamicRelationProjectionReadService service = new DynamicRelationProjectionReadService(
@@ -230,6 +251,13 @@ class DynamicRelationProjectionReadServiceTest {
         return new DynamicRecordService(runtime);
     }
 
+    private DynamicRecordService protectedMainDynamicRecordService() {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(mock(IDatabaseOperations.class));
+        runtime.register(protectedOrderModule());
+        runtime.register(customerModule());
+        return new DynamicRecordService(runtime);
+    }
+
     private DynamicRecordService storageProtectedDynamicRecordService() {
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(mock(IDatabaseOperations.class));
         runtime.register(orderModule());
@@ -256,6 +284,14 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     private ModuleDefinition orderModule() {
+        return orderModule(FieldProtectionDefinition.NONE);
+    }
+
+    private ModuleDefinition protectedOrderModule() {
+        return orderModule(masked());
+    }
+
+    private ModuleDefinition orderModule(FieldProtectionDefinition orderNoProtection) {
         return new ModuleDefinition(
                 "crm.order",
                 "订单",
@@ -266,6 +302,7 @@ class DynamicRelationProjectionReadServiceTest {
                         List.of(
                                 FieldDefinition.string("customerId", "客户").column("customer_id"),
                                 FieldDefinition.string("orderNo", "订单号").column("order_no")
+                                        .protection(orderNoProtection)
                         )
                 )),
                 List.of(),
