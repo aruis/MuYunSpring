@@ -20,6 +20,8 @@
 
 `ProjectionQueryDescriptor` 是 SQL 投影路径的能力描述契约，用于表达当前投影是否支持 SQL 查询、回退原因、输出字段、内部读取字段、可查询字段、可排序字段和响应字段边界。Web 层应消费 descriptor 做排序/筛选准入和回退判断，而不是自行推断某个字段是否能进入投影 SQL。
 
+当前 SQL plan 已携带 `ProjectionGraph`。静态引用、动态 `ONE` 引用投影和 post-read transform 会先进入 graph；现阶段 SQL select/join 生成仍复用原 planner，后续再逐步把字段选择、join 组装、字段保护和字典标题执行迁移为 graph transform 执行。
+
 推荐长期抽象：
 
 ```text

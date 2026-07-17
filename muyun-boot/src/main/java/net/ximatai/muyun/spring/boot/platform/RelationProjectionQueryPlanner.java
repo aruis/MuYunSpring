@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
-import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -55,10 +54,16 @@ public final class RelationProjectionQueryPlanner {
                 ? RelationProjectionPlanningOptions.defaults()
                 : options;
         if (definition.entities().isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, RecordReadProjectionGraphAdapter.adapt(projection), dbType);
         }
         java.util.Set<String> requiredFields = requiredMainFields == null ? java.util.Set.of()
                 : java.util.Set.copyOf(requiredMainFields);
+        ProjectionGraph projectionGraph = RecordReadProjectionGraphPlanner.plan(
+                definitions == null || definitions.isEmpty() ? List.of(definition) : definitions,
+                definition,
+                projection,
+                planningOptions
+        );
 
         EntityDefinition mainEntity = definition.entities().getFirst();
         LinkedHashSet<ViewFieldRef> relationFields = projection.outputFields().stream()
@@ -69,7 +74,7 @@ public final class RelationProjectionQueryPlanner {
                 .filter(field -> readProjection(definition, field.fieldName()) != null)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (relationFields.isEmpty() && readProjectionFields.isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, projectionGraph, dbType);
         }
         LinkedHashSet<ViewFieldRef> referenceFields = new LinkedHashSet<>(relationFields);
         referenceFields.addAll(readProjectionFields);
@@ -80,13 +85,14 @@ public final class RelationProjectionQueryPlanner {
                 referenceFields,
                 dbType,
                 requiredFields,
-                planningOptions
+                planningOptions,
+                projectionGraph
         );
         if (referencePlan != null) {
             return referencePlan;
         }
         if (definition.projectionJoins().isEmpty()) {
-            return emptyPlan(definition, dbType);
+            return emptyPlan(definition, projectionGraph, dbType);
         }
 
         Map<String, EntityDefinition> entities = entitiesByAlias(definition.entities());
@@ -151,7 +157,8 @@ public final class RelationProjectionQueryPlanner {
                 sortableFields,
                 responseFields,
                 List.copyOf(relationFields),
-                dbType
+                dbType,
+                projectionGraph
         );
     }
 
@@ -167,13 +174,10 @@ public final class RelationProjectionQueryPlanner {
                                                            LinkedHashSet<ViewFieldRef> relationFields,
                                                            DBInfo.Type dbType,
                                                            java.util.Set<String> requiredFields,
-                                                           RelationProjectionPlanningOptions options) {
-        Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions);
-        if (!modules.containsKey(definition.moduleAlias())) {
-            LinkedHashMap<String, StaticModuleDefinition> merged = new LinkedHashMap<>(modules);
-            merged.put(definition.moduleAlias(), definition);
-            modules = java.util.Collections.unmodifiableMap(merged);
-        }
+                                                           RelationProjectionPlanningOptions options,
+                                                           ProjectionGraph projectionGraph) {
+        Map<String, StaticModuleDefinition> modules =
+                RecordReadProjectionReferenceResolver.modulesByAlias(definitions, definition);
         Map<String, FieldDefinition> mainFields = fieldsByName(definition.entities().getFirst());
         LinkedHashMap<String, SelectField> selectFields = new LinkedHashMap<>();
         addMainProjectionFields(selectFields, mainFields, projection, requiredFields);
@@ -189,63 +193,29 @@ public final class RelationProjectionQueryPlanner {
 
         LinkedHashMap<String, StaticModuleReferencePathResolver.JoinStep> joins = new LinkedHashMap<>();
         for (ViewFieldRef field : relationFields) {
-            StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
-                    ? readProjection(definition, field.fieldName())
-                    : null;
-            StaticModuleReferencePathResolver.Traversal traversal;
-            String targetFieldName;
-            String unresolvedPath;
-            if (readProjection != null && readProjection.referencePath() != null) {
-                traversal = StaticModuleReferencePathResolver.resolve(modules, definition,
-                        readProjection.referencePath(), options);
-                targetFieldName = readProjection.referencePath().targetField().fieldName();
-                unresolvedPath = readProjection.referencePath().toString();
-            } else {
-                String path = readProjection == null
-                        ? field.relationCode() + "." + field.fieldName()
-                        : readProjection.path();
-                int lastSeparator = path.lastIndexOf('.');
-                if (lastSeparator < 0) {
-                    if (readProjection != null) {
-                        throw new IllegalArgumentException("projection reference path is invalid: "
-                                + definition.moduleAlias() + "." + readProjection.outputField() + "." + path);
-                    }
-                    return null;
-                }
-                String relationPath = path.substring(0, lastSeparator);
-                targetFieldName = path.substring(lastSeparator + 1);
-                traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath, options);
-                unresolvedPath = relationPath;
-            }
-            if (traversal == null) {
-                if (readProjection != null) {
-                    throw new IllegalArgumentException("projection reference path is not declared: "
-                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + unresolvedPath);
-                }
+            RecordReadProjectionReferenceResolver.ResolvedOutput output =
+                    RecordReadProjectionReferenceResolver.resolve(modules, definition, field, options);
+            if (output == null) {
                 return null;
             }
-            for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
-                if (!join.cardinality().safeForPageJoin()) {
-                    throw new IllegalArgumentException("projection reference path cardinality is not safe for page join: "
-                            + definition.moduleAlias() + "." + field.fieldName() + "."
-                            + join.tableAlias() + "." + join.cardinality());
-                }
+            for (StaticModuleReferencePathResolver.JoinStep join : output.traversal().joins()) {
                 joins.putIfAbsent(join.tableAlias(), join);
                 validateJoinCount(joins.size(), options.maxJoinCount(), definition.moduleAlias());
             }
-            String targetColumn = columnName(traversal.entity(), targetFieldName);
-            if (readProjection != null && readProjection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS) {
+            String targetColumn = columnName(output.traversal().entity(), output.targetFieldName());
+            if (output.existsProjection()) {
                 addSelectField(selectFields, SelectField.expression(
-                        qualified(traversal.tableAlias(), targetColumn, dbType) + " is not null",
+                        qualified(output.traversal().tableAlias(), targetColumn, dbType) + " is not null",
                         field.fieldName()
                 ));
             } else {
                 addSelectField(selectFields, new SelectField(
-                        traversal.tableAlias(),
+                        output.traversal().tableAlias(),
                         targetColumn,
                         field.fieldName()
                 ));
             }
+            StaticModuleReadProjectionDefinition readProjection = output.readProjection();
             if (readProjection != null) {
                 if (readProjection.filterable()) {
                     queryableFields.add(field.fieldName());
@@ -280,7 +250,8 @@ public final class RelationProjectionQueryPlanner {
                 sortableFields,
                 responseFields,
                 List.copyOf(relationFields),
-                dbType
+                dbType,
+                projectionGraph
         );
     }
 
@@ -312,9 +283,12 @@ public final class RelationProjectionQueryPlanner {
         sql.append(String.join(" and ", predicates));
     }
 
-    private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition, DBInfo.Type databaseType) {
+    private static RelationProjectionSqlPlan emptyPlan(StaticModuleDefinition definition,
+                                                       ProjectionGraph projectionGraph,
+                                                       DBInfo.Type databaseType) {
         return new RelationProjectionSqlPlan("select * from " + qualifiedTable(definition.entities().getFirst(), databaseType),
-                Map.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType);
+                Map.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), List.of(), databaseType,
+                projectionGraph);
     }
 
     private static void addMainProjectionFields(LinkedHashMap<String, SelectField> selectFields,
