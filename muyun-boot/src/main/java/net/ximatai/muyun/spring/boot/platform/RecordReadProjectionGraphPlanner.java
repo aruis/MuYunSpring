@@ -1,7 +1,5 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,15 +37,12 @@ public final class RecordReadProjectionGraphPlanner {
             nodes.put(node.nodeId(), node);
         }
         List<ProjectionGraphEdge> edges = new ArrayList<>(base.edges());
-        Map<String, StaticModuleDefinition> modules = modulesByAlias(definitions);
-        if (!modules.containsKey(definition.moduleAlias())) {
-            LinkedHashMap<String, StaticModuleDefinition> merged = new LinkedHashMap<>(modules);
-            merged.put(definition.moduleAlias(), definition);
-            modules = java.util.Collections.unmodifiableMap(merged);
-        }
+        Map<String, StaticModuleDefinition> modules =
+                RecordReadProjectionReferenceResolver.modulesByAlias(definitions, definition);
 
         for (ViewFieldRef field : projection.outputFields()) {
-            ResolvedReferenceOutput output = resolveReferenceOutput(modules, definition, field, options);
+            RecordReadProjectionReferenceResolver.ResolvedOutput output =
+                    RecordReadProjectionReferenceResolver.resolve(modules, definition, field, options);
             if (output == null) {
                 continue;
             }
@@ -66,7 +61,7 @@ public final class RecordReadProjectionGraphPlanner {
                                              List<ProjectionGraphEdge> edges,
                                              String moduleAlias,
                                              ViewFieldRef field,
-                                             ResolvedReferenceOutput output) {
+                                             RecordReadProjectionReferenceResolver.ResolvedOutput output) {
         String previousNodeId = ROOT_NODE_ID;
         for (StaticModuleReferencePathResolver.JoinStep join : output.traversal().joins()) {
             String joinNodeId = joinNodeId(join.tableAlias());
@@ -91,7 +86,7 @@ public final class RecordReadProjectionGraphPlanner {
                 previousNodeId,
                 outputNodeId,
                 ProjectionGraphEdgeKind.REFERENCE_OUTPUT_FIELD,
-                output.targetFieldName()
+                output.existsProjection() ? "exists:" + output.targetFieldName() : output.targetFieldName()
         ));
     }
 
@@ -102,85 +97,6 @@ public final class RecordReadProjectionGraphPlanner {
                 .anyMatch(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN
                         && edge.sourceNodeId().equals(sourceNodeId)
                         && edge.targetNodeId().equals(targetNodeId));
-    }
-
-    private static ResolvedReferenceOutput resolveReferenceOutput(Map<String, StaticModuleDefinition> modules,
-                                                                  StaticModuleDefinition definition,
-                                                                  ViewFieldRef field,
-                                                                  RelationProjectionPlanningOptions options) {
-        StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
-                ? readProjection(definition, field.fieldName())
-                : null;
-        StaticModuleReferencePathResolver.Traversal traversal;
-        String targetFieldName;
-        String unresolvedPath;
-        if (readProjection != null && readProjection.referencePath() != null) {
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition,
-                    readProjection.referencePath(), options);
-            targetFieldName = readProjection.referencePath().targetField().fieldName();
-            unresolvedPath = readProjection.referencePath().toString();
-        } else {
-            String path = readProjection == null
-                    ? relationFieldPath(field)
-                    : readProjection.path();
-            int lastSeparator = path == null ? -1 : path.lastIndexOf('.');
-            if (lastSeparator < 0) {
-                if (readProjection != null) {
-                    throw new IllegalArgumentException("projection reference path is invalid: "
-                            + definition.moduleAlias() + "." + readProjection.outputField() + "." + path);
-                }
-                return null;
-            }
-            String relationPath = path.substring(0, lastSeparator);
-            targetFieldName = path.substring(lastSeparator + 1);
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath, options);
-            unresolvedPath = relationPath;
-        }
-        if (traversal == null) {
-            if (readProjection != null) {
-                throw new IllegalArgumentException("projection reference path is not declared: "
-                        + definition.moduleAlias() + "." + readProjection.outputField() + "." + unresolvedPath);
-            }
-            return null;
-        }
-        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
-            if (!join.cardinality().safeForPageJoin()) {
-                throw new IllegalArgumentException("projection reference path cardinality is not safe for page join: "
-                        + definition.moduleAlias() + "." + field.fieldName() + "."
-                        + join.tableAlias() + "." + join.cardinality());
-            }
-        }
-        if (readProjection != null && readProjection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS) {
-            targetFieldName = "exists:" + targetFieldName;
-        }
-        return new ResolvedReferenceOutput(traversal, targetFieldName);
-    }
-
-    private static String relationFieldPath(ViewFieldRef field) {
-        return field.relationCode() == null ? null : field.relationCode() + "." + field.fieldName();
-    }
-
-    private static Map<String, StaticModuleDefinition> modulesByAlias(List<StaticModuleDefinition> definitions) {
-        LinkedHashMap<String, StaticModuleDefinition> byAlias = new LinkedHashMap<>();
-        if (definitions != null) {
-            for (StaticModuleDefinition definition : definitions) {
-                if (definition != null) {
-                    byAlias.putIfAbsent(definition.moduleAlias(), definition);
-                }
-            }
-        }
-        return java.util.Collections.unmodifiableMap(byAlias);
-    }
-
-    private static StaticModuleReadProjectionDefinition readProjection(StaticModuleDefinition definition,
-                                                                       String outputField) {
-        if (definition == null || outputField == null || outputField.isBlank()) {
-            return null;
-        }
-        return definition.readProjections().stream()
-                .filter(projection -> projection.outputField().equals(outputField))
-                .findFirst()
-                .orElse(null);
     }
 
     private static String mainNodeId(String fieldName) {
@@ -195,7 +111,4 @@ public final class RecordReadProjectionGraphPlanner {
         return "join:" + tableAlias;
     }
 
-    private record ResolvedReferenceOutput(StaticModuleReferencePathResolver.Traversal traversal,
-                                           String targetFieldName) {
-    }
 }
