@@ -200,6 +200,14 @@ const roleDetailActions = computed<RecordActionItem[]>(() => {
         disabled: savingRole.value || selectedRole.value.systemManaged === true,
       },
       {
+        key: 'bind',
+        actionCode: 'accountRoleGrants',
+        title: '绑定',
+        iconName: 'lock',
+        visible: canBindAccountRoleRecord(selectedRole.value),
+        disabled: savingRole.value || selectedRole.value.systemManaged === true,
+      },
+      {
         key: 'delete',
         actionCode: 'delete',
         title: '删除',
@@ -656,6 +664,10 @@ function handleRoleDetailAction(action: RecordActionItem) {
   if (action.key === 'edit' && selectedRole.value && !selectedRole.value.systemManaged) {
     roleDraft.value = copyRole(selectedRole.value);
     roleDetailMode.value = 'edit';
+    return;
+  }
+  if (action.key === 'bind' && selectedRole.value) {
+    void openRoleBinding(selectedRole.value as QueryListRecord);
     return;
   }
   if (action.key === 'delete') {
