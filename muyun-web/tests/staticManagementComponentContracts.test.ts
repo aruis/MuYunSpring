@@ -828,7 +828,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /commitRoleDetailRecord\(fullRecord, mode\)/);
   assert.match(roleViewSource, /nextMode === 'edit' && record\.systemManaged !== true \? 'edit' : 'view'/);
   assert.match(roleViewSource, /standard-crud-actions/);
-  assert.match(roleViewSource, /standard-crud-row-actions/);
+  assert.match(roleViewSource, /:row-actions-of="roleRowActionsOf"/);
+  assert.match(roleViewSource, /actionCode: 'accountRoleGrants'/);
+  assert.match(roleViewSource, /<RoleAccountGrantDrawer/);
   assert.doesNotMatch(roleViewSource, /account-grants/);
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
