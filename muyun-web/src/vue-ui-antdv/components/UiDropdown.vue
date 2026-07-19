@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import UiIcon from './UiIcon.vue';
 import type { UiDropdownItem } from '../types';
 
@@ -29,7 +29,23 @@ const emit = defineEmits<{
 
 const open = ref(false);
 const root = ref<HTMLElement>();
+const popup = ref<HTMLElement>();
+const popupPosition = ref({ top: 0, left: 0, minWidth: 112 });
 let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+const popupStyle = computed(() => ({
+  top: `${popupPosition.value.top}px`,
+  left: `${popupPosition.value.left}px`,
+  minWidth: `${popupPosition.value.minWidth}px`,
+}));
+
+watch(open, async (visible) => {
+  if (!visible) {
+    return;
+  }
+  await nextTick();
+  updatePopupPosition();
+});
 
 function toggle() {
   clearCloseTimer();
@@ -39,6 +55,7 @@ function toggle() {
 function openDropdown() {
   clearCloseTimer();
   open.value = true;
+  void nextTick(updatePopupPosition);
 }
 
 function closeDropdown() {
@@ -91,7 +108,8 @@ function select(item: UiDropdownItem) {
 }
 
 function handleDocumentClick(event: MouseEvent) {
-  if (!root.value?.contains(event.target as Node)) {
+  const target = event.target as Node;
+  if (!root.value?.contains(target) && !popup.value?.contains(target)) {
     closeDropdown();
   }
 }
@@ -105,13 +123,32 @@ function handleDocumentKeydown(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', handleDocumentKeydown);
+  window.addEventListener('resize', updatePopupPosition);
+  window.addEventListener('scroll', updatePopupPosition, true);
 });
 
 onBeforeUnmount(() => {
   clearCloseTimer();
   document.removeEventListener('click', handleDocumentClick);
   document.removeEventListener('keydown', handleDocumentKeydown);
+  window.removeEventListener('resize', updatePopupPosition);
+  window.removeEventListener('scroll', updatePopupPosition, true);
 });
+
+function updatePopupPosition() {
+  if (!open.value || !root.value) {
+    return;
+  }
+  const rect = root.value.getBoundingClientRect();
+  const popupWidth = popup.value?.offsetWidth ?? Math.max(rect.width, 112);
+  const minWidth = Math.max(rect.width, 112);
+  const left = props.align === 'start' ? rect.left : rect.right - popupWidth;
+  popupPosition.value = {
+    top: rect.bottom + 6,
+    left: Math.max(8, left),
+    minWidth,
+  };
+}
 </script>
 
 <template>
@@ -119,7 +156,17 @@ onBeforeUnmount(() => {
     <span class="ui-dropdown-trigger" @click.stop="handleTriggerClick">
       <slot :toggle="toggle" />
     </span>
-    <div v-if="open" class="ui-dropdown-popup" :class="`align-${align}`" role="menu">
+  </div>
+  <Teleport to="body">
+    <div
+      v-if="open"
+      ref="popup"
+      class="ui-dropdown-popup"
+      role="menu"
+      :style="popupStyle"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
+    >
       <button
         v-for="item in items"
         :key="item.key"
@@ -134,7 +181,7 @@ onBeforeUnmount(() => {
         <UiIcon v-if="item.key === selectedKey" name="check" class="ui-dropdown-item-check" />
       </button>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -148,23 +195,14 @@ onBeforeUnmount(() => {
 }
 
 .ui-dropdown-popup {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 50;
-  min-width: max(100%, 112px);
+  position: fixed;
+  z-index: 3000;
   padding: 5px;
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
-}
-
-.ui-dropdown-popup.align-start {
-  left: 0;
-}
-
-.ui-dropdown-popup.align-end {
-  right: 0;
+  box-sizing: border-box;
 }
 
 .ui-dropdown-item {

@@ -470,8 +470,11 @@ test('department management uses organization as read-only scope and department 
 
 test('employee management uses organization scope and platform query list panel', () => {
   const indexSource = readSource('src/platform-components/index.ts');
+  const uiIndexSource = readSource('src/vue-ui-antdv/index.ts');
   const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+  const dataTableSource = readSource('src/vue-ui-antdv/components/UiDataTable.vue');
+  const uiTableSource = readSource('src/vue-ui-antdv/components/UiTable.vue');
   const formFieldsSource = readSource('src/platform-components/RecordFormFields.vue');
   const formFieldModelSource = readSource('src/platform-components/recordFormFieldModel.ts');
   const runtimeContextSource = readSource('src/web-core/module/runtimeContext.ts');
@@ -481,6 +484,8 @@ test('employee management uses organization scope and platform query list panel'
 
   assert.match(indexSource, /RecordQueryListPanel/);
   assert.match(indexSource, /RecordFormFields/);
+  assert.match(uiIndexSource, /UiDataTable/);
+  assert.match(uiIndexSource, /UiDataTableColumn/);
   assert.match(indexSource, /resolveRecordFormFieldNames/);
   assert.match(indexSource, /resolveRecordFormFieldState/);
   assert.match(formFieldsSource, /RecordStatusSwitch/);
@@ -505,6 +510,27 @@ test('employee management uses organization scope and platform query list panel'
     /'update:field': \[fieldName: string, value: string \| number \| boolean \| undefined\]/,
   );
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
+  assert.match(dataTableSource, /defineOptions\(\{ name: 'UiDataTable' \}\)/);
+  assert.match(dataTableSource, /Table as ATable/);
+  assert.match(dataTableSource, /clickableRows\?: boolean/);
+  assert.match(dataTableSource, /fillHeight\?: boolean/);
+  assert.match(dataTableSource, /if \(!props\.clickableRows\)/);
+  assert.match(
+    dataTableSource,
+    /onClick: \(event: MouseEvent\) => \{\s*if \(isExpandTriggerEvent\(event\)\)/,
+  );
+  assert.match(dataTableSource, /showActionColumn\?: boolean/);
+  assert.match(dataTableSource, /fixed: 'right' as const/);
+  assert.match(dataTableSource, /className: 'ui-data-table-action-cell'/);
+  assert.match(dataTableSource, /th\.ui-data-table-action-cell/);
+  assert.match(dataTableSource, /expandedRowRender/);
+  assert.match(dataTableSource, /scroll\.y === undefined && props\.fillHeight/);
+  assert.match(dataTableSource, /\.ant-table-body/);
+  assert.match(dataTableSource, /\.ant-table-expanded-row-fixed/);
+  assert.match(uiTableSource, /<UiDataTable/);
+  assert.doesNotMatch(uiTableSource, /Table as ATable/);
+  assert.match(panelSource, /<UiDataTable/);
+  assert.doesNotMatch(panelSource, /<table/);
   assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
   assert.match(panelSource, /emptyQuerySchema/);
   assert.match(panelSource, /isUnsupportedQuerySchemaError/);
@@ -531,7 +557,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /<RecordStatusTag/);
   assert.match(panelSource, /<UiDropdown/);
   assert.match(panelSource, /emit\('action', action, event\)/);
-  assert.match(panelSource, /emit\('rowDblclick', row\.record, \$event\)/);
+  assert.match(panelSource, /function handleTableRowDblclick/);
+  assert.match(panelSource, /emit\('rowDblclick', row\.record, event\)/);
   assert.match(panelSource, /emit\('rowAction', action, row\.record/);
   assert.doesNotMatch(panelSource, /primaryRowAction\(record\)/);
   assert.match(panelSource, /allow-clear/);
@@ -556,11 +583,15 @@ test('employee management uses organization scope and platform query list panel'
     /presentPlatformError\(cause, \{ source: 'record-query-list-panel', phase: 'load' \}\)/,
   );
   assert.match(panelSource, /tableColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(panelSource, /dataTableColumns = computed<UiDataTableColumn\[\]>/);
+  assert.match(panelSource, /clickable-rows/);
+  assert.match(panelSource, /fill-height/);
   assert.match(panelSource, /cellRenderers\?: Record<string, \(record: QueryListRecord\) => string>/);
   assert.match(panelSource, /props\.cellRenderers\[column\.key\]/);
   assert.match(panelSource, /@dblclick\.stop/);
   assert.match(panelSource, /class="record-query-list-row-actions" @click\.stop @dblclick\.stop/);
-  assert.match(panelSource, /toggleRowExpanded\(row, \$event\)/);
+  assert.match(panelSource, /show-action-column="hasRowActions"/);
+  assert.match(panelSource, /@row-expand="\(row, expanded\) => handleTableRowExpand/);
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
@@ -1113,6 +1144,9 @@ test('workbench exposes own password change through auth boundary', () => {
 
   assert.match(workbenchSource, /key: 'changePassword'/);
   assert.match(workbenchSource, /title: '修改密码'/);
+  assert.match(workbenchSource, /\.workbench \{[\s\S]*height: 100dvh;[\s\S]*overflow: hidden;/);
+  assert.match(workbenchSource, /\.app-main \{[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/);
+  assert.match(workbenchSource, /\.app-content \{[\s\S]*min-height: 0;[\s\S]*overflow: auto;/);
   assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
   assert.match(appSource, /authClient\.changeOwnPassword/);
   assert.match(appSource, /onUserNotification: handleSecurityNotification/);

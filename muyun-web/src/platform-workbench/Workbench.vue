@@ -190,7 +190,11 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
 .workbench {
   display: grid;
   grid-template-columns: 252px minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #f5f7fa;
 }
 
@@ -198,6 +202,9 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .app-topbar {
@@ -390,13 +397,16 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
 
 .app-content {
   min-width: 0;
+  min-height: 0;
   padding: 14px;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 980px) {
   .workbench {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .app-topbar {

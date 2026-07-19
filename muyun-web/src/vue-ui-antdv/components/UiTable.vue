@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Table as ATable } from 'ant-design-vue';
 import { resolveDictionaryOptions } from '../dictionaries';
+import UiDataTable, { type UiDataTableColumn } from './UiDataTable.vue';
 import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
 import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
@@ -25,25 +25,38 @@ function renderCell(column: TableColumn, value: unknown) {
   return option?.label ?? String(value ?? '');
 }
 
+function contractColumnOf(column: UiDataTableColumn): TableColumn {
+  return (
+    props.contract.columns.find((item) => item.key === column.key) ?? {
+      key: column.key,
+      title: column.title,
+      width: typeof column.width === 'number' ? column.width : undefined,
+    }
+  );
+}
+
 const columns = computed(() =>
-  props.contract.columns.map((column) => ({
+  props.contract.columns.map<UiDataTableColumn>((column) => ({
     title: column.title,
-    dataIndex: column.key,
     key: column.key,
+    dataIndex: column.key,
     width: column.width,
-    customRender: ({ text }: { text: unknown }) => renderCell(column, text),
   })),
 );
 </script>
 
 <template>
-  <ATable
+  <UiDataTable
     :columns="columns"
-    :data-source="rows"
+    :rows="rows"
     :row-key="contract.rowKey ?? 'id'"
     :loading="loading"
     :pagination="pagination ?? { pageSize: 5, showSizeChanger: false }"
     :row-selection="rowSelection"
     :size="size ?? 'middle'"
-  />
+  >
+    <template #cell="{ column, value }">
+      {{ renderCell(contractColumnOf(column), value) }}
+    </template>
+  </UiDataTable>
 </template>
