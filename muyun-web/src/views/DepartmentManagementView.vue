@@ -151,7 +151,10 @@ function departmentFormVisible(fieldName: DepartmentFormFieldName) {
   return departmentFormField(fieldName).visible;
 }
 
-function updateDepartmentDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateDepartmentDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   draft.value = {
     ...draft.value,
     [fieldName]: value,

@@ -267,7 +267,10 @@ function canLeaveEmployeeDetailContext() {
   return canSwitchEmployeeDetailContext({ saving: savingEmployee.value });
 }
 
-function updateEmployeeDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateEmployeeDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   employeeDraft.value = {
     ...employeeDraft.value,
     [fieldName]: value,
@@ -1140,6 +1143,7 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
               :fallback="employeeFormFieldFallback"
               :picker-configs="employeeFormPickerConfigs"
               :disabled="employeeFormDisabled"
+              :option-context="employeeContext"
               @update:field="updateEmployeeDraftField"
             />
           </form>

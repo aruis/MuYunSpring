@@ -64,7 +64,10 @@ function selectRecord(record: QueryListRecord) {
   selectedRecord.value = record;
 }
 
-function updateDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   if (!selectedRecord.value) {
     return;
   }
@@ -107,6 +110,7 @@ function recordTitle(record: QueryListRecord | undefined) {
         class="dynamic-form"
         :record="selectedRecord as RecordFormRecord"
         :fields="formFields"
+        :option-context="context"
         :disabled="true"
         @update:field="updateDraftField"
       />

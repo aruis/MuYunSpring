@@ -1,6 +1,6 @@
 # 页面交付 Web API
 
-本文只按当前 `DynamicPageBootstrapWebController`、`DynamicRecordWebController` 和 `PlatformPagePreferenceWebController` 能确认的 URL 梳理页面交付接口。
+本文按当前动态页面、静态模块运行时与页面偏好 controller 能确认的 URL 梳理页面交付接口。
 
 ## 页面初始化
 
@@ -33,6 +33,14 @@ bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descri
 页面保存仍走动态记录保存链路，不直接写配置表，也不绕过动作权限、数据权限、字段保护和动态事件。
 
 标准保存入口拒绝请求显式写入虚拟字段。虚拟字段可随页面配置展示，但不作为表单输入值保存；读取记录时已经由引用标题、引用投影等平台读链路注入的虚拟值会随列表、详情和 LIST UI 投影输出。页面需要展示当前表单公式派生结果时，使用 `/{moduleAlias}/formula/preview` 获取后端计算值。
+
+## 字段选项
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `GET` | `/platform.module/{moduleAlias}/fields/{fieldName}/options` | 按 resolved 模块字段读取选项。 |
+
+该入口供静态和动态模块共用的表单运行器使用：后端从字段 option binding 解析来源，并在当前租户上下文读取。请求需要模块 `MENU` 权限；`enabledOnly` 默认为 `true`，设为 `false` 时会连同停用项返回，以便已有历史值可回显但前端不可重新选择；`parentCode` 可用于读取树形选项的直接子项。响应项包含稳定 `code`、展示 `title`、`enabled`、`sortOrder` 与可选 `parentCode`。前端保存 code，详情优先消费读投影返回的 title 字段。
 
 ## 列表排序
 

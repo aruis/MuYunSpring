@@ -243,7 +243,10 @@ async function loadPositionFormDefinition() {
   }
 }
 
-function updatePositionDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updatePositionDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   positionDraft.value = {
     ...positionDraft.value,
     [fieldName]: value,

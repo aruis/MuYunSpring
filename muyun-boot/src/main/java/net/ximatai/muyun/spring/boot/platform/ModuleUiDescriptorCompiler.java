@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
+import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
@@ -32,7 +35,8 @@ public final class ModuleUiDescriptorCompiler {
         }
         validateFields(definition);
         return new ModuleUiCompilationResult(
-                compile(definition.uiDefinition(), ModuleKind.STATIC, definition.title()),
+                compile(definition.uiDefinition(), ModuleKind.STATIC, definition.title(),
+                        staticOptionFields(definition.modelClass())),
                 readModel(definition)
         );
     }
@@ -47,22 +51,30 @@ public final class ModuleUiDescriptorCompiler {
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
                                                      ModuleKind moduleKind,
                                                      String title) {
+        return compile(definition, moduleKind, title, Map.of());
+    }
+
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields) {
         if (definition == null) {
             return null;
         }
-        return compileResolved(definition, moduleKind, title);
+        return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields);
     }
 
     private static ResolvedModuleUiDescriptor compileResolved(ModuleUiDefinition definition,
                                                               ModuleKind moduleKind,
-                                                              String title) {
+                                                              String title,
+                                                              Map<String, ResolvedOptionFieldDescriptor> optionFields) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
                 moduleKind,
                 title,
                 definition.views().stream()
-                        .map(ModuleUiDescriptorCompiler::compileView)
+                        .map(view -> compileView(view, optionFields))
                         .toList()
         );
     }
@@ -74,19 +86,21 @@ public final class ModuleUiDescriptorCompiler {
         validateFields(definition, entities);
     }
 
-    private static ResolvedViewDescriptor compileView(ViewDefinition view) {
+    private static ResolvedViewDescriptor compileView(ViewDefinition view,
+                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields) {
         return new ResolvedViewDescriptor(
                 view.viewCode(),
                 view.viewKind(),
                 view.clientType(),
                 view.title(),
                 view.fields().stream()
-                        .map(ModuleUiDescriptorCompiler::compileField)
+                        .map(field -> compileField(field, optionFields))
                         .toList()
         );
     }
 
-    private static ResolvedViewFieldDescriptor compileField(ViewFieldDefinition field) {
+    private static ResolvedViewFieldDescriptor compileField(ViewFieldDefinition field,
+                                                            Map<String, ResolvedOptionFieldDescriptor> optionFields) {
         return new ResolvedViewFieldDescriptor(
                 field.fieldRef(),
                 field.label(),
@@ -96,8 +110,22 @@ public final class ModuleUiDescriptorCompiler {
                 field.uiType(),
                 field.width(),
                 field.align(),
-                field.fixed()
+                field.fixed(),
+                field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null
         );
+    }
+
+    private static Map<String, ResolvedOptionFieldDescriptor> staticOptionFields(Class<?> modelClass) {
+        if (modelClass == null) {
+            return Map.of();
+        }
+        return OptionFieldResolver.resolve(modelClass).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        OptionFieldDefinition::fieldName,
+                        definition -> new ResolvedOptionFieldDescriptor(definition.binding(), definition.selectionMode(),
+                                definition.hasTitleOutput() ? definition.titleOutputField() : null),
+                        (left, right) -> left
+                ));
     }
 
     private static void validateFields(StaticModuleDefinition definition) {

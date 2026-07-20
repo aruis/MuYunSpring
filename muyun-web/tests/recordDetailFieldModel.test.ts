@@ -29,6 +29,16 @@ test('record detail display keeps default rules when custom resolver does not ha
   );
 });
 
+test('record detail display prefers the server-projected option title', () => {
+  const field = formField('gender', {
+    controlType: 'select',
+    hasOption: true,
+    optionTitleField: 'genderTitle',
+  });
+
+  assert.equal(resolveRecordDetailDisplayValue(field, { gender: '1', genderTitle: '男' }), '男');
+});
+
 test('record detail display resolves record picker object with configured title', () => {
   const field = formField('department', {
     controlType: 'recordPicker',

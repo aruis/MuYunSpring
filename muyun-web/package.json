@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.23.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:backend": "vite --host 127.0.0.1 --mode backend",
@@ -11,7 +14,7 @@
     "check": "npm run lint && npm run format:check && npm run test && npm run build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "npm run test:workbench",
-    "test:workbench": "node --experimental-strip-types --import ./scripts/register-workbench-test-loader.mjs --test tests/authSession.test.ts tests/workbenchStartup.test.ts tests/navigationDescriptor.test.ts tests/loginTenant.test.ts tests/pageHostRegistry.test.ts tests/menuTreeModel.test.ts tests/treeRecordModel.test.ts tests/businessRoutes.test.ts tests/applicationManagementState.test.ts tests/tenantManagementState.test.ts tests/organizationManagementState.test.ts tests/departmentManagementState.test.ts tests/employeeDetailStateModel.test.ts tests/positionManagementState.test.ts tests/dictionaryManagementState.test.ts tests/menuManagementState.test.ts tests/recordActionBarModel.test.ts tests/recordEditorSessionState.test.ts tests/recordFormFieldModel.test.ts tests/recordDetailFieldModel.test.ts tests/recordPickerConstraints.test.ts tests/recordPickerModel.test.ts tests/scopedTreeModuleContext.test.ts tests/scopedResourceTreeModuleContext.test.ts tests/staticTreeResourceModuleContext.test.ts tests/staticFormActionFlow.test.ts tests/platformErrorFeedback.test.ts tests/staticManagementComponentContracts.test.ts tests/uiAdapterModels.test.ts tests/confirmAction.test.ts tests/dynamicActionReactions.test.ts tests/pageRealtime.test.ts tests/platformDateTime.test.ts tests/userSessionRows.test.ts tests/webCore.test.ts",
+    "test:workbench": "node scripts/verify-node-version.mjs && node --experimental-strip-types --import ./scripts/register-workbench-test-loader.mjs --test tests/authSession.test.ts tests/workbenchStartup.test.ts tests/navigationDescriptor.test.ts tests/loginTenant.test.ts tests/pageHostRegistry.test.ts tests/menuTreeModel.test.ts tests/treeRecordModel.test.ts tests/businessRoutes.test.ts tests/applicationManagementState.test.ts tests/tenantManagementState.test.ts tests/organizationManagementState.test.ts tests/departmentManagementState.test.ts tests/employeeDetailStateModel.test.ts tests/positionManagementState.test.ts tests/dictionaryManagementState.test.ts tests/menuManagementState.test.ts tests/recordActionBarModel.test.ts tests/recordEditorSessionState.test.ts tests/recordFormFieldModel.test.ts tests/recordDetailFieldModel.test.ts tests/recordPickerConstraints.test.ts tests/recordPickerModel.test.ts tests/scopedTreeModuleContext.test.ts tests/scopedResourceTreeModuleContext.test.ts tests/staticTreeResourceModuleContext.test.ts tests/staticFormActionFlow.test.ts tests/platformErrorFeedback.test.ts tests/staticManagementComponentContracts.test.ts tests/uiAdapterModels.test.ts tests/confirmAction.test.ts tests/dynamicActionReactions.test.ts tests/pageRealtime.test.ts tests/platformDateTime.test.ts tests/userSessionRows.test.ts tests/webCore.test.ts",
     "lint": "eslint . && npm run check:boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

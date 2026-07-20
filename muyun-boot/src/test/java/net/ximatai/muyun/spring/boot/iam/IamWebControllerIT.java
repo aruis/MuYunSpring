@@ -324,6 +324,8 @@ class IamWebControllerIT {
         employee.setDepartmentId("dept-1");
         employee.setEmployeeNo("E001");
         employee.setTitle("Alice");
+        employee.setGender("1");
+        employee.setGenderTitle("男");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
         when(employeeService.selectForAction(PlatformAction.VIEW, "employee-1")).thenReturn(employee);
@@ -331,7 +333,9 @@ class IamWebControllerIT {
         mvc.perform(get("/iam.employee/view/employee-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("employee-1"))
-                .andExpect(jsonPath("$.departmentId").value("dept-1"));
+                .andExpect(jsonPath("$.departmentId").value("dept-1"))
+                .andExpect(jsonPath("$.gender").value("1"))
+                .andExpect(jsonPath("$.genderTitle").value("男"));
     }
 
     @Test

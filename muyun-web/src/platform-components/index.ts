@@ -52,6 +52,7 @@ export type {
   RecordFormFieldFallback,
   RecordFormFieldPickerConfig,
   RecordFormFieldState,
+  RecordFormFieldValue,
   RecordFormRecord,
 } from './recordFormFieldModel';
 export type { CrudRecordListBase } from './crudRecordListModel';

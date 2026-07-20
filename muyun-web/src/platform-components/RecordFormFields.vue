@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { UiInput, UiSelect } from '@muyun/vue-ui-antdv';
-import type { OptionValue, OptionValueList } from '@muyun/web-contracts';
+import { computed, onMounted, ref, watch } from 'vue';
+import { UiButton, UiInput, UiSelect, UiTreeSelect } from '@muyun/vue-ui-antdv';
+import type { OptionItemDescriptor, OptionValue, OptionValueList } from '@muyun/web-contracts';
+import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordPicker from './RecordPicker.vue';
 import {
@@ -11,8 +12,10 @@ import {
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordFormFieldState,
+  type RecordFormFieldValue,
   type RecordFormRecord,
 } from './recordFormFieldModel';
+import { hasOptionHierarchy, optionItemsToOptions, optionItemsToTree } from './optionFieldOptions';
 
 defineOptions({ name: 'RecordFormFields' });
 
@@ -24,6 +27,7 @@ const props = withDefaults(
     fields?: Map<string, RecordFormFieldDescriptor>;
     fallback?: Record<string, RecordFormFieldFallback>;
     pickerConfigs?: Record<string, RecordFormFieldPickerConfig>;
+    optionContext?: ModuleContext<unknown>;
     disabled?: boolean;
     disabledOf?: (fieldName: string, field: RecordFormFieldState) => boolean;
     placeholderOf?: (fieldName: string, field: RecordFormFieldState) => string | undefined;
@@ -34,6 +38,7 @@ const props = withDefaults(
     excludeFieldNames: () => [],
     fallback: () => ({}),
     pickerConfigs: () => ({}),
+    optionContext: undefined,
     disabled: false,
     disabledOf: undefined,
     placeholderOf: undefined,
@@ -41,7 +46,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  'update:field': [fieldName: string, value: string | number | boolean | undefined];
+  'update:field': [fieldName: string, value: RecordFormFieldValue];
 }>();
 
 const resolvedFieldNames = computed(
@@ -53,6 +58,12 @@ const resolvedFieldNames = computed(
 const fieldStates = computed<RecordFormFieldState[]>(() =>
   resolvedFieldNames.value.map(fieldState).filter((field) => field.visible),
 );
+const optionItems = ref<Record<string, OptionItemDescriptor[]>>({});
+const loadingOptionFields = ref(new Set<string>());
+const optionFieldErrors = ref<Record<string, string>>({});
+
+onMounted(loadOptionFields);
+watch(() => props.fields, loadOptionFields);
 
 function fieldState(fieldName: string): RecordFormFieldState {
   return resolveRecordFormFieldState(fieldName, {
@@ -63,9 +74,88 @@ function fieldState(fieldName: string): RecordFormFieldState {
   });
 }
 
-function fieldValue(fieldName: string) {
+function optionFieldValue(fieldName: string) {
+  const value = props.record[fieldName];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is OptionValue => typeof item === 'string' || typeof item === 'number');
+  }
+  return value === undefined || value === null ? undefined : String(value);
+}
+
+function scalarFieldValue(fieldName: string) {
   const value = props.record[fieldName];
   return value === undefined || value === null ? undefined : String(value);
+}
+
+function optionFieldItems(field: RecordFormFieldState) {
+  return optionItems.value[field.fieldName] ?? [];
+}
+
+function optionFieldOptions(field: RecordFormFieldState) {
+  return field.options ?? optionItemsToOptions(optionFieldItems(field));
+}
+
+function optionFieldTree(field: RecordFormFieldState) {
+  return optionItemsToTree(optionFieldItems(field));
+}
+
+function optionFieldIsTree(field: RecordFormFieldState) {
+  return hasOptionHierarchy(optionFieldItems(field));
+}
+
+function optionFieldLoading(field: RecordFormFieldState) {
+  return loadingOptionFields.value.has(field.fieldName);
+}
+
+function optionFieldError(field: RecordFormFieldState) {
+  return optionFieldErrors.value[field.fieldName];
+}
+
+function retryOptionField(field: RecordFormFieldState) {
+  const descriptor = props.fields?.get(field.fieldName);
+  if (descriptor) {
+    void loadOptionField(descriptor);
+  }
+}
+
+function optionFieldMultiple(field: RecordFormFieldState) {
+  return field.optionSelectionMode === 'MULTIPLE';
+}
+
+async function loadOptionFields() {
+  if (!props.optionContext || !props.fields) {
+    return;
+  }
+  for (const field of props.fields.values()) {
+    if (!field.option) {
+      continue;
+    }
+    await loadOptionField(field);
+  }
+}
+
+async function loadOptionField(field: RecordFormFieldDescriptor) {
+  if (!props.optionContext || !field.option) {
+    return;
+  }
+  const fieldName = field.fieldRef.fieldName;
+  loadingOptionFields.value = new Set(loadingOptionFields.value).add(fieldName);
+  try {
+    const items = await props.optionContext.http.request<OptionItemDescriptor[]>({
+      path: `/platform.module/${encodeURIComponent(props.optionContext.moduleAlias)}/fields/${encodeURIComponent(fieldName)}/options`,
+      query: { enabledOnly: false },
+    });
+    optionItems.value = { ...optionItems.value, [fieldName]: items };
+    const errors = { ...optionFieldErrors.value };
+    delete errors[fieldName];
+    optionFieldErrors.value = errors;
+  } catch {
+    optionFieldErrors.value = { ...optionFieldErrors.value, [fieldName]: '选项加载失败，请重试' };
+  } finally {
+    const next = new Set(loadingOptionFields.value);
+    next.delete(fieldName);
+    loadingOptionFields.value = next;
+  }
 }
 
 function booleanFieldValue(fieldName: string) {
@@ -76,16 +166,16 @@ function fieldDisabled(field: RecordFormFieldState) {
   return props.disabled || field.readOnly || props.disabledOf?.(field.fieldName, field) === true;
 }
 
-function updateField(fieldName: string, value: string | number | boolean | undefined) {
+function updateField(fieldName: string, value: RecordFormFieldValue) {
   emit('update:field', fieldName, value);
 }
 
-function updateSelectField(fieldName: string, value: OptionValue | OptionValueList | null) {
+function updateSelectField(field: RecordFormFieldState, value: OptionValue | OptionValueList | null) {
   if (Array.isArray(value)) {
-    emit('update:field', fieldName, undefined);
+    emit('update:field', field.fieldName, value);
     return;
   }
-  emit('update:field', fieldName, value ?? undefined);
+  emit('update:field', field.fieldName, value ?? undefined);
 }
 </script>
 
@@ -104,7 +194,7 @@ function updateSelectField(fieldName: string, value: OptionValue | OptionValueLi
     />
     <RecordPicker
       v-else-if="field.controlType === 'recordPicker' && field.pickerConfig"
-      :value="fieldValue(field.fieldName)"
+      :value="scalarFieldValue(field.fieldName)"
       :context="field.pickerConfig.context"
       :reload-key="field.pickerConfig.reloadKey"
       :mode="field.pickerConfig.mode"
@@ -117,22 +207,41 @@ function updateSelectField(fieldName: string, value: OptionValue | OptionValueLi
       :filter-option="field.pickerConfig.filterOption"
       @update:value="updateField(field.fieldName, $event)"
     />
-    <UiSelect
-      v-else-if="field.controlType === 'select' && field.options"
-      :value="fieldValue(field.fieldName)"
-      :options="field.options"
+    <UiTreeSelect
+      v-else-if="field.controlType === 'select' && optionFieldIsTree(field)"
+      :value="optionFieldValue(field.fieldName)"
+      :tree-data="optionFieldTree(field)"
+      :mode="optionFieldMultiple(field) ? 'multiple' : undefined"
       :placeholder="field.placeholder"
       :disabled="fieldDisabled(field)"
       :allow-clear="!field.required"
-      @update:value="updateSelectField(field.fieldName, $event)"
+      :loading="optionFieldLoading(field)"
+      @update:value="updateSelectField(field, $event)"
+    />
+    <UiSelect
+      v-else-if="field.controlType === 'select' && (field.hasOption || optionFieldOptions(field).length > 0)"
+      :value="optionFieldValue(field.fieldName)"
+      :options="optionFieldOptions(field)"
+      :mode="optionFieldMultiple(field) ? 'multiple' : undefined"
+      :placeholder="field.placeholder"
+      :disabled="fieldDisabled(field)"
+      :allow-clear="!field.required"
+      :loading="optionFieldLoading(field)"
+      @update:value="updateSelectField(field, $event)"
     />
     <UiInput
       v-else
-      :value="fieldValue(field.fieldName)"
+      :value="scalarFieldValue(field.fieldName)"
       :disabled="fieldDisabled(field)"
       :placeholder="field.placeholder"
       @update:value="updateField(field.fieldName, $event)"
     />
+    <div v-if="optionFieldError(field)" class="record-form-field-error">
+      <span>{{ optionFieldError(field) }}</span>
+      <UiButton type="link" :disabled="optionFieldLoading(field)" @click="retryOptionField(field)">
+        重试
+      </UiButton>
+    </div>
   </label>
 </template>
 
@@ -153,5 +262,13 @@ function updateSelectField(fieldName: string, value: OptionValue | OptionValueLi
 .record-form-field-label strong {
   color: #d92d20;
   font-weight: 600;
+}
+
+.record-form-field-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #d92d20;
+  font-size: 12px;
 }
 </style>

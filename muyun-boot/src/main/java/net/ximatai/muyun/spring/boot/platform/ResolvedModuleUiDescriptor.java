@@ -10,7 +10,7 @@ public record ResolvedModuleUiDescriptor(String schemaVersion,
                                          ModuleKind moduleKind,
                                          String title,
                                          List<ResolvedViewDescriptor> views) {
-    public static final String SCHEMA_VERSION = "module-ui.v1";
+    public static final String SCHEMA_VERSION = "module-ui.v2";
 
     public ResolvedModuleUiDescriptor {
         schemaVersion = schemaVersion == null || schemaVersion.isBlank() ? SCHEMA_VERSION : schemaVersion.trim();

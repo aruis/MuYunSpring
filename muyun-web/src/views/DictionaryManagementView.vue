@@ -436,14 +436,20 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
   }
 }
 
-function updateCategoryDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateCategoryDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   categoryDraft.value = {
     ...categoryDraft.value,
     [fieldName]: value,
   };
 }
 
-function updateItemDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateItemDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   if (fieldName === 'categoryTitle') {
     return;
   }
