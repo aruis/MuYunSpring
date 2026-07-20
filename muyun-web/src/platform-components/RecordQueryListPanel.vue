@@ -51,7 +51,6 @@ interface ConditionDraft {
 interface QueryListRow {
   [key: string]: unknown;
   key: string;
-  muted?: boolean;
   record: QueryListRecord;
   primaryAction?: ResolvedRecordActionItem;
   secondaryActions: ResolvedRecordActionItem[];
@@ -400,7 +399,6 @@ function resolveRow(record: QueryListRecord): QueryListRow {
   const secondaryActions = actions.slice(1);
   return {
     key: recordKey(record),
-    muted: record.enabled === false,
     record,
     primaryAction: actions[0],
     secondaryActions,
@@ -830,6 +828,8 @@ defineExpose({ refresh });
         :expanded-row-keys="expandedRowKeys"
         clickable-rows
         fill-height
+        horizontal-scroll
+        :row-muted="(row) => (row as QueryListRow).record.enabled === false"
         :show-action-column="hasRowActions"
         :action-column-title="rowActionsTitle"
         :action-column-width="92"

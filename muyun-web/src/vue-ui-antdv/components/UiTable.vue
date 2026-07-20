@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { resolveDictionaryOptions } from '../dictionaries';
-import UiDataTable, { type UiDataTableColumn } from './UiDataTable.vue';
+import UiDataTable from './UiDataTable.vue';
+import type { UiDataTableColumn, UiDataTablePagination, UiDataTableSelection } from '../types';
 import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
-import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
 defineOptions({ name: 'UiTable' });
 
@@ -11,8 +11,8 @@ const props = defineProps<{
   contract: TableContract;
   rows: RecordData[];
   loading?: boolean;
-  pagination?: false | TablePaginationConfig;
-  rowSelection?: TableProps['rowSelection'];
+  pagination?: false | UiDataTablePagination;
+  selection?: UiDataTableSelection;
   size?: 'small' | 'middle' | 'large';
 }>();
 
@@ -52,8 +52,9 @@ const columns = computed(() =>
     :row-key="contract.rowKey ?? 'id'"
     :loading="loading"
     :pagination="pagination ?? { pageSize: 5, showSizeChanger: false }"
-    :row-selection="rowSelection"
+    :selection="selection"
     :size="size ?? 'middle'"
+    horizontal-scroll
   >
     <template #cell="{ column, value }">
       {{ renderCell(contractColumnOf(column), value) }}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import UiIcon from './UiIcon.vue';
+import { resolveDropdownPopupLayout } from '../dropdownPosition';
 import type { UiDropdownItem } from '../types';
 
 defineOptions({ name: 'UiDropdown' });
@@ -30,13 +31,15 @@ const emit = defineEmits<{
 const open = ref(false);
 const root = ref<HTMLElement>();
 const popup = ref<HTMLElement>();
-const popupPosition = ref({ top: 0, left: 0, minWidth: 112 });
+const popupPosition = ref({ top: 0, left: 0, minWidth: 112, maxWidth: 0, maxHeight: 0 });
 let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const popupStyle = computed(() => ({
   top: `${popupPosition.value.top}px`,
   left: `${popupPosition.value.left}px`,
   minWidth: `${popupPosition.value.minWidth}px`,
+  maxWidth: popupPosition.value.maxWidth > 0 ? `${popupPosition.value.maxWidth}px` : undefined,
+  maxHeight: popupPosition.value.maxHeight > 0 ? `${popupPosition.value.maxHeight}px` : undefined,
 }));
 
 watch(open, async (visible) => {
@@ -55,7 +58,6 @@ function toggle() {
 function openDropdown() {
   clearCloseTimer();
   open.value = true;
-  void nextTick(updatePopupPosition);
 }
 
 function closeDropdown() {
@@ -140,14 +142,15 @@ function updatePopupPosition() {
     return;
   }
   const rect = root.value.getBoundingClientRect();
-  const popupWidth = popup.value?.offsetWidth ?? Math.max(rect.width, 112);
-  const minWidth = Math.max(rect.width, 112);
-  const left = props.align === 'start' ? rect.left : rect.right - popupWidth;
-  popupPosition.value = {
-    top: rect.bottom + 6,
-    left: Math.max(8, left),
-    minWidth,
-  };
+  const layout = resolveDropdownPopupLayout({
+    trigger: rect,
+    popupWidth: Math.max(popup.value?.offsetWidth ?? 0, popup.value?.scrollWidth ?? 0),
+    popupHeight: popup.value?.scrollHeight ?? 0,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    align: props.align,
+  });
+  popupPosition.value = layout;
 }
 </script>
 
@@ -203,6 +206,8 @@ function updatePopupPosition() {
   background: #fff;
   box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
   box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .ui-dropdown-item {

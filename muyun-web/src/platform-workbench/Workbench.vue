@@ -406,7 +406,23 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
 @media (max-width: 980px) {
   .workbench {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-main {
+    min-height: 100vh;
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-content {
+    overflow: visible;
+    overscroll-behavior: auto;
   }
 
   .app-topbar {

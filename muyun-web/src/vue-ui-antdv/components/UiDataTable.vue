@@ -2,20 +2,17 @@
 import { computed } from 'vue';
 import { Table as ATable } from 'ant-design-vue';
 import UiEmpty from './UiEmpty.vue';
+import { resolveUiDataTableScroll } from '../dataTableModel';
+import type {
+  UiDataTableColumn,
+  UiDataTableKey,
+  UiDataTablePagination,
+  UiDataTableRecord,
+  UiDataTableSelection,
+} from '../types';
 import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
 defineOptions({ name: 'UiDataTable' });
-
-export type UiDataTableRecord = Record<string, unknown>;
-
-export interface UiDataTableColumn {
-  key: string;
-  title: string;
-  dataIndex?: string;
-  width?: string | number;
-  align?: 'left' | 'center' | 'right';
-  fixed?: 'left' | 'right' | boolean;
-}
 
 const props = withDefaults(
   defineProps<{
@@ -23,34 +20,36 @@ const props = withDefaults(
     rows: UiDataTableRecord[];
     rowKey?: string | ((record: UiDataTableRecord) => string);
     loading?: boolean;
-    pagination?: false | TablePaginationConfig;
-    rowSelection?: TableProps['rowSelection'];
+    pagination?: false | UiDataTablePagination;
+    selection?: UiDataTableSelection;
     size?: 'small' | 'middle' | 'large';
     selectedRowKey?: string;
     expandedRowKeys?: string[];
     clickableRows?: boolean;
     fillHeight?: boolean;
+    horizontalScroll?: boolean;
+    rowMuted?: (record: UiDataTableRecord) => boolean;
     showActionColumn?: boolean;
     actionColumnTitle?: string;
     actionColumnWidth?: string | number;
     emptyDescription?: string;
-    scroll?: TableProps['scroll'];
   }>(),
   {
     rowKey: 'id',
     loading: false,
     pagination: false,
-    rowSelection: undefined,
+    selection: undefined,
     size: 'middle',
     selectedRowKey: undefined,
     expandedRowKeys: () => [],
     clickableRows: false,
     fillHeight: false,
+    horizontalScroll: false,
+    rowMuted: undefined,
     showActionColumn: false,
     actionColumnTitle: '操作',
     actionColumnWidth: 92,
     emptyDescription: '暂无记录',
-    scroll: undefined,
   },
 );
 
@@ -95,16 +94,29 @@ const tableColumns = computed(() => {
   ];
 });
 
-const tableScroll = computed<TableProps['scroll']>(() => {
-  const scroll = props.scroll ? { ...props.scroll } : {};
-  if (scroll.x === undefined && tableColumns.value.some((column) => column.fixed)) {
-    scroll.x = 'max-content';
+const tablePagination = computed<TablePaginationConfig | false>(() =>
+  props.pagination === false ? false : { ...props.pagination },
+);
+
+const tableSelection = computed<TableProps['rowSelection']>(() => {
+  if (!props.selection) {
+    return undefined;
   }
-  if (scroll.y === undefined && props.fillHeight) {
-    scroll.y = '100%';
-  }
-  return Object.keys(scroll).length > 0 ? scroll : undefined;
+  return {
+    selectedRowKeys: props.selection.selectedRowKeys,
+    preserveSelectedRowKeys: props.selection.preserveSelectedRowKeys,
+    getCheckboxProps: (record: UiDataTableRecord) => ({ disabled: props.selection?.disabledOf?.(record) }),
+    onChange: (keys) => props.selection?.onChange?.(keys as UiDataTableKey[]),
+  };
 });
+
+const tableScroll = computed<TableProps['scroll']>(() =>
+  resolveUiDataTableScroll({
+    horizontal: props.horizontalScroll,
+    fillHeight: props.fillHeight,
+    hasFixedColumn: tableColumns.value.some((column) => Boolean(column.fixed)),
+  }),
+);
 
 function normalizedFixed(fixed: UiDataTableColumn['fixed']) {
   return fixed === true ? 'left' : fixed || undefined;
@@ -122,7 +134,7 @@ function rowClassName(record: UiDataTableRecord) {
   if (props.selectedRowKey && resolveRowKey(record) === props.selectedRowKey) {
     classes.push('selected');
   }
-  if (record.muted === true) {
+  if (props.rowMuted?.(record)) {
     classes.push('muted');
   }
   return classes.join(' ');
@@ -166,8 +178,8 @@ function isExpandTriggerEvent(event: MouseEvent) {
     :data-source="rows"
     :row-key="rowKey"
     :loading="loading"
-    :pagination="pagination"
-    :row-selection="rowSelection"
+    :pagination="tablePagination"
+    :row-selection="tableSelection"
     :size="size"
     :scroll="tableScroll"
     :custom-row="customRow"

@@ -21,9 +21,13 @@ export { confirmAction } from './confirm';
 export { showErrorMessage, showSuccessMessage } from './feedback';
 export { resolveFieldComponent } from './registry';
 export type { UiIconName } from './components/UiIcon.vue';
-export type { UiDataTableColumn } from './components/UiDataTable.vue';
 export type {
   UiConfirmOptions,
+  UiDataTableColumn,
+  UiDataTableKey,
+  UiDataTablePagination,
+  UiDataTableRecord,
+  UiDataTableSelection,
   UiDropdownItem,
   UiMenuItem,
   UiRecordInlineAction,

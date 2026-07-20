@@ -474,6 +474,7 @@ test('employee management uses organization scope and platform query list panel'
   const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
   const dataTableSource = readSource('src/vue-ui-antdv/components/UiDataTable.vue');
+  const uiTypesSource = readSource('src/vue-ui-antdv/types.ts');
   const uiTableSource = readSource('src/vue-ui-antdv/components/UiTable.vue');
   const formFieldsSource = readSource('src/platform-components/RecordFormFields.vue');
   const formFieldModelSource = readSource('src/platform-components/recordFormFieldModel.ts');
@@ -514,6 +515,14 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(dataTableSource, /Table as ATable/);
   assert.match(dataTableSource, /clickableRows\?: boolean/);
   assert.match(dataTableSource, /fillHeight\?: boolean/);
+  assert.match(dataTableSource, /horizontalScroll\?: boolean/);
+  assert.match(dataTableSource, /rowMuted\?: \(record: UiDataTableRecord\) => boolean/);
+  assert.doesNotMatch(dataTableSource, /record\.muted/);
+  assert.doesNotMatch(dataTableSource, /pagination\?: false \| TablePaginationConfig/);
+  assert.doesNotMatch(dataTableSource, /rowSelection\?: TableProps/);
+  assert.doesNotMatch(dataTableSource, /scroll\?: TableProps/);
+  assert.match(uiTypesSource, /interface UiDataTablePagination/);
+  assert.match(uiTypesSource, /interface UiDataTableSelection/);
   assert.match(dataTableSource, /if \(!props\.clickableRows\)/);
   assert.match(
     dataTableSource,
@@ -524,7 +533,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(dataTableSource, /className: 'ui-data-table-action-cell'/);
   assert.match(dataTableSource, /th\.ui-data-table-action-cell/);
   assert.match(dataTableSource, /expandedRowRender/);
-  assert.match(dataTableSource, /scroll\.y === undefined && props\.fillHeight/);
+  assert.match(dataTableSource, /resolveUiDataTableScroll/);
   assert.match(dataTableSource, /\.ant-table-body/);
   assert.match(dataTableSource, /\.ant-table-expanded-row-fixed/);
   assert.match(uiTableSource, /<UiDataTable/);
@@ -586,6 +595,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /dataTableColumns = computed<UiDataTableColumn\[\]>/);
   assert.match(panelSource, /clickable-rows/);
   assert.match(panelSource, /fill-height/);
+  assert.match(panelSource, /horizontal-scroll/);
+  assert.match(panelSource, /:row-muted=/);
   assert.match(panelSource, /cellRenderers\?: Record<string, \(record: QueryListRecord\) => string>/);
   assert.match(panelSource, /props\.cellRenderers\[column\.key\]/);
   assert.match(panelSource, /@dblclick\.stop/);
