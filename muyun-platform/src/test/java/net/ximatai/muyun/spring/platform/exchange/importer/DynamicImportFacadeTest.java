@@ -240,20 +240,18 @@ class DynamicImportFacadeTest {
     }
 
     private DynamicModuleDescriptor orderDescriptor() {
-        return DynamicModuleDescriptor.from(new ModuleDefinition(
-                MODULE,
-                "Order",
-                List.of(
+        return DynamicModuleDescriptor.from(ModuleDefinition.builder(MODULE, "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "Order", List.of(
                                 FieldDefinition.string("orderNo", "Order No")
                         )),
                         new EntityDefinition("orderLine", "sales_order_line", "Order Line", List.of(
                                 FieldDefinition.string("sku", "SKU")
                         ))
-                ),
-                List.of(net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition.child(
-                        "lines", "order", "orderLine", "orderId"))
-        ));
+                ))
+                .relations(List.of(net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition.child(
+                        "lines", "order", "orderLine", "orderId")))
+                .build());
     }
 
     private DynamicImportPlan plan() {

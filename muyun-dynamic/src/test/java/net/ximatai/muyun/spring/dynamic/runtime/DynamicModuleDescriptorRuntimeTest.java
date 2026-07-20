@@ -35,7 +35,10 @@ class DynamicModuleDescriptorRuntimeTest {
                         List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE))
         ));
         DynamicModuleRegistry registry = new DynamicModuleRegistry();
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations(), registry).refresh(module);
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(nullOperations())
+                .registry(registry)
+                .build()
+                .refresh(module);
 
         DynamicModuleDescriptor fromRegistry = registry.describe("sales.contract");
         DynamicModuleDescriptor fromRuntime = runtime.describe("sales.contract");
@@ -46,10 +49,8 @@ class DynamicModuleDescriptorRuntimeTest {
 
     @Test
     void shouldExposeStableRuntimeApiForDescriptorViewActionAndReferenceContracts() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(
                         new EntityDefinition("contract", "sales_contract", "Contract",
                                 List.of(FieldDefinition.titleField(), FieldDefinition.string("code", "Code")),
                                 Set.of(EntityCapability.REFERENCE)),
@@ -57,22 +58,22 @@ class DynamicModuleDescriptorRuntimeTest {
                                 List.of(FieldDefinition.titleField(), new FieldDefinition("contractId", "contract_id",
                                         net.ximatai.muyun.spring.dynamic.metadata.FieldType.STRING, "Contract")),
                                 Set.of(EntityCapability.REFERENCE))
-                ),
-                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
-                List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")),
-                List.of(new EntityViewDefinition("contract", EntityViewType.FORM, "Contract form",
-                        List.of(new EntityViewFieldDefinition("title")))),
-                List.of(
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")))
+                .references(List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")))
+                .views(List.of(new EntityViewDefinition("contract", EntityViewType.FORM, "Contract form",
+                        List.of(new EntityViewFieldDefinition("title")))))
+                .associationViews(List.of(
                         EntityAssociationViewDefinition.childRelation("lines", "contract", "sales.contract",
                                 "line", "lines"),
                         EntityAssociationViewDefinition.reference("contractId", "line", "sales.contract",
                                 "contract", "contractId")
-                ),
-                List.of(
+                ))
+                .actions(List.of(
                         new EntityActionDefinition("contract", "create", "Create contract", true, null),
                         new EntityActionDefinition("line", "exportLine", "Export line", true, null)
-                )
-        );
+                ))
+                .build();
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations()).refresh(module);
         DynamicRecordService service = new DynamicRecordService(runtime);
 
@@ -113,10 +114,8 @@ class DynamicModuleDescriptorRuntimeTest {
                 "deleted", false,
                 "version", 0
         )));
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(
                         new EntityDefinition("contract", "sales_contract", "Contract",
                                 List.of(FieldDefinition.titleField(), FieldDefinition.string("code", "Code")),
                                 Set.of(EntityCapability.REFERENCE)),
@@ -124,11 +123,11 @@ class DynamicModuleDescriptorRuntimeTest {
                                 List.of(FieldDefinition.titleField(), new FieldDefinition("contractId", "contract_id",
                                         net.ximatai.muyun.spring.dynamic.metadata.FieldType.STRING, "Contract")),
                                 Set.of(EntityCapability.REFERENCE))
-                ),
-                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
-                List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")
-                        .withProjection("code", "contractCode"))
-        );
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")))
+                .references(List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")
+                        .withProjection("code", "contractCode")))
+                .build();
         DynamicEntityOperations lineApi = new DynamicRecordService(
                 new DynamicRecordRuntime(operations).refresh(module)).entity("sales.contract", "line");
 

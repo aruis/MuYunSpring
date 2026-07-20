@@ -326,16 +326,15 @@ class DynamicRecordRuntimeTest {
                 return protectedValue.substring("enc:".length());
             }
         };
-        return new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                RuntimeEventPublisher.noop(),
-                DynamicActionExecutorRegistry.empty(),
-                DynamicActionTransactionOperator.none(),
-                crypto,
-                (fieldName, plainValue) -> "sig:" + fieldName + ":" + plainValue
-        );
+        return DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(RuntimeEventPublisher.noop())
+                .actionExecutorRegistry(DynamicActionExecutorRegistry.empty())
+                .actionTransactionOperator(DynamicActionTransactionOperator.none())
+                .fieldProtection(crypto,
+                        (fieldName, plainValue) -> "sig:" + fieldName + ":" + plainValue)
+                .build();
     }
 
     private ModuleDefinition protectedContractModule() {

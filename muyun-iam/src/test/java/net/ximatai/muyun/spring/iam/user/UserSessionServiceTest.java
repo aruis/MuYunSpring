@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserTimeZoneResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,7 +63,7 @@ class UserSessionServiceTest {
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
@@ -104,7 +106,7 @@ class UserSessionServiceTest {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, preciseClock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, preciseClock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
@@ -125,7 +127,7 @@ class UserSessionServiceTest {
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         captureInsertedSession(sessionDao);
         CurrentUserTimeZoneResolver timeZoneResolver = currentUser -> Optional.of(ZoneId.of("Asia/Shanghai"));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock, timeZoneResolver);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock, timeZoneResolver);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
@@ -140,7 +142,7 @@ class UserSessionServiceTest {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
 
@@ -162,7 +164,7 @@ class UserSessionServiceTest {
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
@@ -183,7 +185,7 @@ class UserSessionServiceTest {
             throw new PlatformException("Tenant is not active: " + tenantId);
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "secret1"))
                 .isInstanceOf(AuthenticationFailedException.class)
@@ -204,7 +206,7 @@ class UserSessionServiceTest {
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         assertThat(sessionService.currentUser("token-1")).isEmpty();
@@ -232,7 +234,7 @@ class UserSessionServiceTest {
         UserAccountService userService = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "wrong-password"))
                 .isInstanceOf(AuthenticationFailedException.class)
@@ -253,7 +255,7 @@ class UserSessionServiceTest {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1", "127.0.0.1", "Browser");
 
@@ -275,7 +277,7 @@ class UserSessionServiceTest {
         UserAccountService userService = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "secret1"))
                 .isInstanceOf(AuthenticationFailedException.class)
@@ -292,7 +294,7 @@ class UserSessionServiceTest {
         UserAccountService userService = new UserAccountService(dao, tenantId -> {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThatThrownBy(() -> sessionService.login(null, "admin", "secret1"))
                 .isInstanceOf(AuthenticationFailedException.class)
@@ -313,7 +315,7 @@ class UserSessionServiceTest {
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         assertThat(sessionService.currentUser("token-1")).isEmpty();
@@ -336,7 +338,7 @@ class UserSessionServiceTest {
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         sessionService.logout("token-1");
@@ -364,7 +366,7 @@ class UserSessionServiceTest {
         session.setMaxExpiresAt(accessClock.instant().plusSeconds(3600));
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, accessClock);
 
         assertThat(sessionService.currentUser("token-1")).contains(
                 CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1"));
@@ -391,7 +393,7 @@ class UserSessionServiceTest {
         session.setExpiresAt(originalExpiresAt);
         session.setMaxExpiresAt(accessClock.instant().plusSeconds(3600));
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, accessClock);
 
         assertThat(sessionService.currentUserSnapshot("token-1")).contains(
                 CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1"));
@@ -416,7 +418,7 @@ class UserSessionServiceTest {
         session.setExpiresAt(accessClock.instant().plusSeconds(600));
         session.setMaxExpiresAt(accessClock.instant().plusSeconds(3600));
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, accessClock);
 
         assertThat(sessionService.currentUser("token-1")).contains(
                 CurrentUser.tenantUser("user-1", "alice", "tenant-a", "org-1", true));
@@ -445,7 +447,7 @@ class UserSessionServiceTest {
                 .thenReturn(List.of(stale))
                 .thenReturn(List.of(revoked));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(0);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, accessClock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, accessClock);
 
         assertThat(sessionService.currentUser("token-1")).isEmpty();
 
@@ -467,7 +469,7 @@ class UserSessionServiceTest {
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao,
+        UserSessionService sessionService = sessionService(userService, sessionDao,
                 UserSecurityEventPublisher.NOOP, lifecycleEventPublisher, clock);
 
         sessionService.revokeUserSessions("user-1");
@@ -498,7 +500,7 @@ class UserSessionServiceTest {
         revoked.setRevokedAt(clock.instant().minusSeconds(1));
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(active, expired, revoked));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThat(sessionService.activeSessionsOfUser("user-1", null))
                 .containsExactly(new UserSessionView(
@@ -542,7 +544,7 @@ class UserSessionServiceTest {
         UserSessionPresenceLookup presenceLookup = sessionId -> "session-active".equals(sessionId)
                 ? new UserSessionPresence(sessionId, true, 2, connectedAt, observedAt)
                 : UserSessionPresence.absent(sessionId);
-        UserSessionService sessionService = new UserSessionService(userService, new UserSessionRecordService(sessionDao),
+        UserSessionService sessionService = sessionService(userService, new UserSessionRecordService(sessionDao),
                 userService, null, () -> UserSecurityEventPublisher.NOOP,
                 () -> UserSessionLifecycleEventPublisher.NOOP, clock,
                 null, () -> presenceLookup);
@@ -640,7 +642,7 @@ class UserSessionServiceTest {
         RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
         RecordingUserSessionLifecycleEventPublisher lifecycleEventPublisher =
                 new RecordingUserSessionLifecycleEventPublisher();
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, eventPublisher,
+        UserSessionService sessionService = sessionService(userService, sessionDao, eventPublisher,
                 lifecycleEventPublisher, clock);
 
         assertThat(sessionService.revokeUserSession("user-1", "session-1", null)).isEqualTo(1);
@@ -661,7 +663,7 @@ class UserSessionServiceTest {
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         UserSession session = activeSession("session-1", "user-2");
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThat(sessionService.revokeUserSession("user-1", "session-1", null)).isZero();
 
@@ -677,7 +679,7 @@ class UserSessionServiceTest {
         }, passwordHashingService);
         UserSessionDao sessionDao = mock(UserSessionDao.class);
         AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
         LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
         persistedSession.get().setId("session-1");
         when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(persistedSession.get()));
@@ -701,7 +703,7 @@ class UserSessionServiceTest {
                 .thenReturn(List.of(web))
                 .thenReturn(List.of(mobile));
         when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
-        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+        UserSessionService sessionService = sessionService(userService, sessionDao, clock);
 
         assertThat(sessionService.revokeUserSessions("user-1", List.of("session-web", "session-mobile"), null))
                 .isEqualTo(2);
@@ -714,6 +716,72 @@ class UserSessionServiceTest {
     void shouldTreatMalformedPasswordHashAsNotMatched() {
         assertThat(passwordHashingService.matches("secret1", "pbkdf2$bad$not-base64")).isFalse();
         assertThat(passwordHashingService.matches("secret1", "pbkdf2$1$a$b")).isFalse();
+    }
+
+    private UserSessionService sessionService(UserAccountService userAccountService,
+                                              UserSessionDao userSessionDao,
+                                              Clock clock) {
+        return sessionService(userAccountService, userSessionDao, UserSecurityEventPublisher.NOOP,
+                UserSessionLifecycleEventPublisher.NOOP, clock);
+    }
+
+    private UserSessionService sessionService(UserAccountService userAccountService,
+                                              UserSessionDao userSessionDao,
+                                              Clock clock,
+                                              CurrentUserTimeZoneResolver timeZoneResolver) {
+        return sessionService(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, () -> UserSecurityEventPublisher.NOOP, () -> UserSessionLifecycleEventPublisher.NOOP,
+                clock, timeZoneResolver, () -> UserSessionPresenceLookup.NONE);
+    }
+
+    private UserSessionService sessionService(UserAccountService userAccountService,
+                                              UserSessionDao userSessionDao,
+                                              UserSecurityEventPublisher securityEventPublisher,
+                                              Clock clock) {
+        return sessionService(userAccountService, userSessionDao, securityEventPublisher,
+                UserSessionLifecycleEventPublisher.NOOP, clock);
+    }
+
+    private UserSessionService sessionService(UserAccountService userAccountService,
+                                              UserSessionDao userSessionDao,
+                                              UserSecurityEventPublisher securityEventPublisher,
+                                              UserSessionLifecycleEventPublisher lifecycleEventPublisher,
+                                              Clock clock) {
+        return sessionService(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
+                null, () -> securityEventPublisher, () -> lifecycleEventPublisher, clock, null,
+                () -> UserSessionPresenceLookup.NONE);
+    }
+
+    private UserSessionService sessionService(
+            UserAccountService userAccountService,
+            UserSessionRecordService userSessionRecordService,
+            net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
+            UserSessionRevocationService revocationService,
+            Supplier<UserSecurityEventPublisher> securityEventPublisher,
+            Supplier<UserSessionLifecycleEventPublisher> lifecycleEventPublisher,
+            Clock clock,
+            CurrentUserTimeZoneResolver timeZoneResolver,
+            Supplier<UserSessionPresenceLookup> presenceLookup) {
+        UserSessionCollaborators collaborators = new UserSessionCollaborators(
+                provider(revocationService),
+                provider(securityEventPublisher == null ? null : securityEventPublisher.get()),
+                provider(timeZoneResolver),
+                provider(presenceLookup == null ? null : presenceLookup.get()),
+                event -> {
+                    UserSessionLifecycleEventPublisher publisher = lifecycleEventPublisher == null
+                            ? UserSessionLifecycleEventPublisher.NOOP
+                            : lifecycleEventPublisher.get();
+                    publisher.publish((UserSessionLifecycleEvent) event);
+                });
+        return new UserSessionService(userAccountService, userSessionRecordService, activeTenantVerifier,
+                collaborators, clock);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ObjectProvider<T> provider(T value) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(value);
+        return provider;
     }
 
     private UserAccount activeUser() {

@@ -182,16 +182,9 @@ public class WorkflowRuntimeWebController {
     public WorkflowTaskActionResult readNoticeTask(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
-        return taskActionFacade.execute("read", new WorkflowTaskActionRequest(taskId,
-                currentOperatorId(),
-                null,
-                null,
-                null,
-                null,
-                request == null ? null : request.reason(),
-                null,
-                null,
-                null));
+        return taskActionFacade.execute("read", WorkflowTaskActionRequest.builder(taskId, currentOperatorId())
+                .reason(request == null ? null : request.reason())
+                .build());
     }
 
     @PostMapping("/workbench/todo/query")

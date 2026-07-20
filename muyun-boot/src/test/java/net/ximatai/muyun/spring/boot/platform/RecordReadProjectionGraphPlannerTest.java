@@ -13,10 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecordReadProjectionGraphPlannerTest {
     @Test
     void shouldAppendResolvedReferencePathEdgesToProjectionGraph() {
-        ModuleDefinition order = new ModuleDefinition(
-                "crm.order",
-                "订单",
-                List.of(new EntityDefinition(
+        ModuleDefinition order = ModuleDefinition.builder("crm.order", "订单")
+                .entities(List.of(new EntityDefinition(
                         "order",
                         "crm_order",
                         "Order",
@@ -24,14 +22,14 @@ class RecordReadProjectionGraphPlannerTest {
                                 FieldDefinition.string("customerId", "客户").column("customer_id"),
                                 FieldDefinition.string("orderNo", "订单号").column("order_no")
                         )
-                )),
-                List.of(),
-                List.of(new EntityReferenceDefinition(
+                )))
+                .relations(List.of())
+                .references(List.of(new EntityReferenceDefinition(
                         "order",
                         "customerId",
                         "crm.customer.customer"
-                ).withProjection("title", "customerTitle"))
-        );
+                ).withProjection("title", "customerTitle")))
+                .build();
         ModuleDefinition customer = new ModuleDefinition(
                 "crm.customer",
                 "客户",

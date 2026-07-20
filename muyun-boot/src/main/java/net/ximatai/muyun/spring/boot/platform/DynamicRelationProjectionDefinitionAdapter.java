@@ -45,21 +45,13 @@ public final class DynamicRelationProjectionDefinitionAdapter {
             throw new IllegalArgumentException("dynamic module definition must not be null");
         }
         EntityDefinition mainEntity = mainEntity(definition);
-        return new StaticModuleDefinition(
-                applicationAlias(definition.moduleAlias()),
-                definition.moduleAlias(),
-                definition.name(),
-                null,
-                ModuleEntryType.MODULE,
-                null,
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(mainEntity),
-                null,
-                references(definition, mainEntity, definitionsByAlias),
-                readProjections(definition, mainEntity, definitionsByAlias)
-        );
+        return StaticModuleDefinition.builder(
+                        applicationAlias(definition.moduleAlias()), definition.moduleAlias(), definition.name())
+                .capabilities(Set.of(EntityCapability.CRUD))
+                .entities(List.of(mainEntity))
+                .references(references(definition, mainEntity, definitionsByAlias))
+                .readProjections(readProjections(definition, mainEntity, definitionsByAlias))
+                .build();
     }
 
     private static List<StaticModuleReferenceDefinition> references(ModuleDefinition definition,

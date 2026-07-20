@@ -203,13 +203,12 @@ class RecordGenerationWriteBackOrchestrationContractTest {
         ));
         DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(
                 List.of(new RecordGenerationActionExecutor(generationRuleService)));
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null,
-                executors
-        ).register(contractModule()).register(invoiceModule());
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .actionExecutorRegistry(executors)
+                .build()
+                .register(contractModule()).register(invoiceModule());
         DynamicRecordService service = new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),
@@ -289,19 +288,17 @@ class RecordGenerationWriteBackOrchestrationContractTest {
     }
 
     private ModuleDefinition contractModule() {
-        return new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(new EntityDefinition("contract", "app_contract", "Contract", List.of(
+        return ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(new EntityDefinition("contract", "app_contract", "Contract", List.of(
                         FieldDefinition.titleField(),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                         FieldDefinition.string("region", "Region"),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
-                )).withCapabilities(EntityCapability.DATA_SCOPE, EntityCapability.REFERENCE)),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition(
+                )).withCapabilities(EntityCapability.DATA_SCOPE, EntityCapability.REFERENCE)))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition(
                         "contract",
                         "generateInvoice",
                         "生成发票",
@@ -316,24 +313,22 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                         null,
                         EntityActionExecutorType.GENERATE,
                         RecordGenerationActionExecutor.EXECUTOR_KEY
-                ))
-        );
+                )))
+                .build();
     }
 
     private ModuleDefinition invoiceModule() {
-        return new ModuleDefinition(
-                "finance.invoice",
-                "Invoice",
-                List.of(new EntityDefinition("invoice", "app_invoice", "Invoice", List.of(
+        return ModuleDefinition.builder("finance.invoice", "Invoice")
+                .entities(List.of(new EntityDefinition("invoice", "app_invoice", "Invoice", List.of(
                         FieldDefinition.string("contractId", "Contract").column("contract_id"),
                         FieldDefinition.string("contractRegion", "Contract Region").column("contract_region"),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                         FieldDefinition.decimal("receivedAmount", "Received Amount")
                                 .column("received_amount")
                                 .precision(18, 2)
-                ))),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice", "contractId",
+                ))))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice", "contractId",
                                 ReferenceTarget.of("sales.contract", "contract"))
                         .withRuntimeConfig("id", "contractNo", GENERATION_RULE_ID, "contract-query",
                                 java.util.Set.of("region"))
@@ -341,8 +336,8 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                                 List.of(new EntityReferenceFilterDefinition(
                                         "contractRegion", "region", DynamicQueryOperator.EQ)),
                                 List.of(new EntityReferenceAffectDefinition("region", "contractRegion"))
-                        ))
-        );
+                        )))
+                .build();
     }
 
     private record RuntimeFixture(DynamicRecordService service,

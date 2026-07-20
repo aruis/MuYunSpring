@@ -263,7 +263,7 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition staticDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -309,7 +309,7 @@ class StaticRecordReadProjectionServiceTest {
                     list.field("bound_employee", "employeeNo", field -> field.label("职员工号"));
                     list.field("bound_employee", "employeeTitle", field -> field.label("职员姓名"));
                 });
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -386,7 +386,7 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition userReferenceProjectionDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -418,7 +418,7 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition employeeAccountReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee_account",
                 "职员账号绑定",
@@ -457,7 +457,7 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition(FieldProtectionDefinition protection) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",

@@ -165,7 +165,7 @@ class RecordReadProjectionPlannerTest {
     @Test
     @SuppressWarnings("rawtypes")
     void shouldRecordOptionTitlePostReadTransformsForProjectedFields() {
-        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(new StaticModuleDefinition(
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -329,7 +329,7 @@ class RecordReadProjectionPlannerTest {
     }
 
     private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",

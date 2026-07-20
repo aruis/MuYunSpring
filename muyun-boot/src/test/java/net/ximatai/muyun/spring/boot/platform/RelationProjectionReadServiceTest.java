@@ -340,7 +340,7 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition userRelationDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -422,7 +422,7 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition userReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -474,7 +474,7 @@ class RelationProjectionReadServiceTest {
 
     private static StaticModuleDefinition userWithEmployeeReferenceDefinition(
             FieldProtectionDefinition employeeIdProtection) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -503,7 +503,7 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition employeeAccountReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee_account",
                 "职员账号绑定",
@@ -538,7 +538,7 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition(FieldProtectionDefinition protection) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",

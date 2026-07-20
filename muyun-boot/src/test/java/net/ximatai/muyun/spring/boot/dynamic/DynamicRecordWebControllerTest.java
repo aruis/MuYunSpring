@@ -104,6 +104,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -167,7 +168,7 @@ class DynamicRecordWebControllerTest {
         objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
                 .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
@@ -329,7 +330,7 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldAllowStaticControllerToTakeOverSameAliasUrl() throws Exception {
         MockMvc takeoverMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier),
+                .standaloneSetup(controller(service, activeTenantVerifier),
                         new StaticContractController())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
@@ -471,7 +472,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -666,7 +667,7 @@ class DynamicRecordWebControllerTest {
     void shouldSyncAttachmentsWhenSavingDynamicRecord() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -719,7 +720,7 @@ class DynamicRecordWebControllerTest {
     void shouldExposeSavedRecordAttachmentMaintenanceEndpoints() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -778,7 +779,7 @@ class DynamicRecordWebControllerTest {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         RecordAttachmentAccessService accessService = mock(RecordAttachmentAccessService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService, accessService, null, null))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -829,7 +830,7 @@ class DynamicRecordWebControllerTest {
     void shouldReturnAttachmentErrorCodeWhenAttachmentAccessAdapterMissing() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -848,7 +849,7 @@ class DynamicRecordWebControllerTest {
     void shouldExposeDuplicateCheckThroughActionScopedPath() throws Exception {
         RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
         MockMvc duplicateMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, duplicateCheckService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -891,7 +892,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectDuplicateCheckWhenActionIsNotAuthorized() throws Exception {
         RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
         MockMvc duplicateMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, duplicateCheckService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1108,7 +1109,7 @@ class DynamicRecordWebControllerTest {
     void shouldCreateNavigationSessionWhenDynamicQueryRequestsIt() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1150,7 +1151,7 @@ class DynamicRecordWebControllerTest {
     void shouldResolveRecordNavigationMove() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1181,7 +1182,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectRecordNavigationWhenNeighborIsNotVisible() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1208,7 +1209,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1297,7 +1298,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1374,7 +1375,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1430,7 +1431,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1601,7 +1602,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1930,7 +1931,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc summaryMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -2071,7 +2072,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc summaryMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -2881,7 +2882,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc referenceMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -2970,7 +2971,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         MockMvc referenceMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, null))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -3242,7 +3243,7 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldReturnStableBadRequestWhenTenantContextIsMissing() throws Exception {
         MockMvc noTenantMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier))
+                .standaloneSetup(controller(service, activeTenantVerifier))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(java.util.Optional::empty))
@@ -3291,18 +3292,16 @@ class DynamicRecordWebControllerTest {
     }
 
     private ModuleDefinition actionModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(entity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition(ENTITY, "submit", "Submit", true, EntityActionLevel.RECORD,
+        return ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(entity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition(ENTITY, "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null,
-                        EntityActionExecutorType.SERVICE, "submitExecutor"))
-        );
+                        EntityActionExecutorType.SERVICE, "submitExecutor")))
+                .build();
     }
 
     private DynamicActionDescriptor action(String code, EntityActionLevel level) {
@@ -3425,11 +3424,137 @@ class DynamicRecordWebControllerTest {
         ));
     }
 
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier) {
+        return controller(recordService, activeTenantVerifier, null, null, null, null, null,
+                null, null, null, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService, null, null, null, null,
+                null, null, null, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, null, null, null, null, null, null, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, null, null, null, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService,
+                                                  RecordAttachmentService recordAttachmentService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, recordAttachmentService, null, null, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService,
+                                                  RecordAttachmentService recordAttachmentService,
+                                                  RecordDuplicateCheckService duplicateCheckService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, recordAttachmentService, null, duplicateCheckService, null, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService,
+                                                  RecordAttachmentService recordAttachmentService,
+                                                  RecordDuplicateCheckService duplicateCheckService,
+                                                  PlatformRecordNavigationService navigationService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, recordAttachmentService, null, duplicateCheckService,
+                navigationService, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService,
+                                                  RecordAttachmentService recordAttachmentService,
+                                                  RecordAttachmentAccessService recordAttachmentAccessService,
+                                                  RecordDuplicateCheckService duplicateCheckService,
+                                                  PlatformRecordNavigationService navigationService) {
+        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
+                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, recordAttachmentService, recordAttachmentAccessService,
+                duplicateCheckService, navigationService, null);
+    }
+
+    private DynamicRecordWebController controller(DynamicRecordService recordService,
+                                                  ActiveTenantVerifier activeTenantVerifier,
+                                                  CodeBusinessPreviewService codeBusinessPreviewService,
+                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                                  PlatformQueryItemService queryItemService,
+                                                  ModuleMetadataFieldService moduleMetadataFieldService,
+                                                  RecordAttachmentService recordAttachmentService,
+                                                  RecordAttachmentAccessService recordAttachmentAccessService,
+                                                  RecordDuplicateCheckService duplicateCheckService,
+                                                  PlatformRecordNavigationService navigationService,
+                                                  DynamicRelationProjectionReadService relationProjectionReadService) {
+        DynamicRecordWebCollaborators collaborators = new DynamicRecordWebCollaborators(
+                provider(codeBusinessPreviewService),
+                provider(referenceRecordGenerationFacade),
+                provider(pageConfigSnapshotService),
+                provider(queryItemService),
+                provider(moduleMetadataFieldService),
+                provider(recordAttachmentService),
+                provider(recordAttachmentAccessService),
+                provider(duplicateCheckService),
+                provider(navigationService),
+                provider(relationProjectionReadService));
+        return new DynamicRecordWebController(recordService, activeTenantVerifier, collaborators);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ObjectProvider<T> provider(T value) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(value);
+        return provider;
+    }
+
     private MockMvc projectionMvc(PlatformPageConfigSnapshotService snapshotService,
                                   ModuleMetadataFieldService moduleFieldService,
                                   DynamicRelationProjectionReadService projectionReadService) {
         return MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                .standaloneSetup(controller(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService,
                         null, null, null, null, projectionReadService))

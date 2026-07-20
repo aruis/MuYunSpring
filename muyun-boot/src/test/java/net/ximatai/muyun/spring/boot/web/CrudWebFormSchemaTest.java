@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.form.FormField;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionTestFactory;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
@@ -213,7 +214,7 @@ class CrudWebFormSchemaTest {
     }
 
     private static StaticModuleDefinition demoStaticModuleDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "demo",
                 "demo.record.ui",
                 "UI Demo Record",

@@ -105,12 +105,11 @@ class MeasureUnitDynamicRecordServiceIntegrationTest {
     }
 
     private DynamicRecordService service(IDatabaseOperations<Object> operations) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null
-        ).register(new ModuleDefinition(MODULE, "Order", List.of(lineEntity())));
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .build()
+                .register(new ModuleDefinition(MODULE, "Order", List.of(lineEntity())));
         return new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),

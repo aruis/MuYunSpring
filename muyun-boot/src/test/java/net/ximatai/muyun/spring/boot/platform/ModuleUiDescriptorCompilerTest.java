@@ -145,7 +145,7 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition, List<EntityDefinition> entities) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 uiDefinition.moduleAlias(),
                 "职员管理",

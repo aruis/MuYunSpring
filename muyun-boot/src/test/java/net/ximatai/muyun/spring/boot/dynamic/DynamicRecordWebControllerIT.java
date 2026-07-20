@@ -51,7 +51,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         DynamicRecordWebControllerIT.StaticContractController.class,
         CurrentUserWebFilter.class,
-        DynamicRecordJacksonConfiguration.class
+        DynamicRecordJacksonConfiguration.class,
+        DynamicRecordWebCollaborators.class
 })
 class DynamicRecordWebControllerIT {
     private static final String MODULE = "sales.contract";

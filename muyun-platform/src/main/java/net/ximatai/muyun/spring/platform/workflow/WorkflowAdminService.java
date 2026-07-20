@@ -5,7 +5,6 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +12,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -30,36 +30,6 @@ public class WorkflowAdminService {
     private final WorkflowHistoryQueryService historyQueryService;
     private final WorkflowUserTitleResolver userTitleResolver;
 
-    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
-                                WorkflowTaskDao taskDao,
-                                WorkflowActionPolicyService actionPolicyService,
-                                WorkflowInstanceActionService instanceActionService,
-                                WorkflowTaskActionService taskActionService) {
-        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService,
-                null, WorkflowUserTitleResolver.NONE);
-    }
-
-    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
-                                WorkflowTaskDao taskDao,
-                                WorkflowActionPolicyService actionPolicyService,
-                                WorkflowInstanceActionService instanceActionService,
-                                WorkflowTaskActionService taskActionService,
-                                WorkflowHistoryQueryService historyQueryService) {
-        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService,
-                historyQueryService, WorkflowUserTitleResolver.NONE);
-    }
-
-    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
-                                WorkflowTaskDao taskDao,
-                                WorkflowNodeInstanceDao nodeInstanceDao,
-                                WorkflowActionPolicyService actionPolicyService,
-                                WorkflowInstanceActionService instanceActionService,
-                                WorkflowTaskActionService taskActionService,
-                                WorkflowHistoryQueryService historyQueryService) {
-        this(instanceDao, taskDao, nodeInstanceDao, null, null, actionPolicyService, instanceActionService,
-                taskActionService, historyQueryService, WorkflowUserTitleResolver.NONE);
-    }
-
     @Autowired
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
                                 WorkflowTaskDao taskDao,
@@ -70,23 +40,7 @@ public class WorkflowAdminService {
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService,
                                 WorkflowHistoryQueryService historyQueryService,
-                                ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
-        this(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao, actionPolicyService,
-                instanceActionService, taskActionService, historyQueryService, userTitleResolver == null
-                ? WorkflowUserTitleResolver.NONE
-                : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
-    }
-
-    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
-                                WorkflowTaskDao taskDao,
-                                WorkflowNodeInstanceDao nodeInstanceDao,
-                                WorkflowRouteInstanceDao routeInstanceDao,
-                                WorkflowEventDao eventDao,
-                                WorkflowActionPolicyService actionPolicyService,
-                                WorkflowInstanceActionService instanceActionService,
-                                WorkflowTaskActionService taskActionService,
-                                WorkflowHistoryQueryService historyQueryService,
-                                WorkflowUserTitleResolver userTitleResolver) {
+                                Optional<WorkflowUserTitleResolver> userTitleResolver) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeInstanceDao = nodeInstanceDao;
@@ -96,20 +50,9 @@ public class WorkflowAdminService {
         this.instanceActionService = instanceActionService;
         this.taskActionService = taskActionService;
         this.historyQueryService = historyQueryService;
-        this.userTitleResolver = userTitleResolver == null ? WorkflowUserTitleResolver.NONE : userTitleResolver;
-    }
-
-    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
-                                WorkflowTaskDao taskDao,
-                                WorkflowNodeInstanceDao nodeInstanceDao,
-                                WorkflowRouteInstanceDao routeInstanceDao,
-                                WorkflowEventDao eventDao,
-                                WorkflowActionPolicyService actionPolicyService,
-                                WorkflowInstanceActionService instanceActionService,
-                                WorkflowTaskActionService taskActionService,
-                                WorkflowHistoryQueryService historyQueryService) {
-        this(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao, actionPolicyService,
-                instanceActionService, taskActionService, historyQueryService, WorkflowUserTitleResolver.NONE);
+        this.userTitleResolver = userTitleResolver == null
+                ? WorkflowUserTitleResolver.NONE
+                : userTitleResolver.orElse(WorkflowUserTitleResolver.NONE);
     }
 
     public List<WorkflowAdminInstanceView> queryCurrentInstances(WorkflowAdminInstanceQueryRequest request,

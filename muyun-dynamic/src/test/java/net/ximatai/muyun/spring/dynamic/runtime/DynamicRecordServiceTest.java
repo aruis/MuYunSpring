@@ -129,12 +129,12 @@ class DynamicRecordServiceTest {
                         .orElse(null));
             }
         };
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                RuntimeEventPublisher.noop()
-        ).register(new ModuleDefinition(MODULE, "Contract", List.of(contractEntity())));
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(RuntimeEventPublisher.noop())
+                .build()
+                .register(new ModuleDefinition(MODULE, "Contract", List.of(contractEntity())));
         DynamicRecordService service = new DynamicRecordService(runtime,
                 new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
                 new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService(),
@@ -2770,7 +2770,9 @@ class DynamicRecordServiceTest {
                 throw new IllegalArgumentException("invalid dictionary code: " + value);
             }
         };
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, validator)
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .fieldValueValidator(validator)
+                .build()
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(dictionaryEntity())));
         DynamicEntityOperations contracts = new DynamicRecordService(runtime).entity(MODULE, "contract");
         DynamicRecord record = contracts.newRecord()
@@ -3013,16 +3015,14 @@ class DynamicRecordServiceTest {
         when(dataScope.resolveReadScope(eq("crm.customer"), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
                 .thenAnswer(invocation -> DataScopeCriteriaResult.unrestricted(invocation.getArgument(2)));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
-                .register(new ModuleDefinition(
-                        MODULE,
-                        "Contract",
-                        List.of(lineEntity()),
-                        List.of(),
-                        List.of(EntityReferenceDefinition
+                .register(ModuleDefinition.builder(MODULE, "Contract")
+                        .entities(List.of(lineEntity()))
+                        .relations(List.of())
+                        .references(List.of(EntityReferenceDefinition
                                 .to("line", "contractId", ReferenceTarget.of("crm.customer", "customer"))
                                 .withAutoTitle("customerTitle")
-                                .withProjection("code", "customerCode"))
-                ))
+                                .withProjection("code", "customerCode")))
+                        .build())
                 .register(new ModuleDefinition(
                         "crm.customer",
                         "Customer",
@@ -3091,12 +3091,11 @@ class DynamicRecordServiceTest {
                                          EntityDefinition entity,
                                          RuntimeEventPublisher eventPublisher,
                                          DataScopeCriteriaService dataScopeCriteriaService) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher
-        )
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .build()
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(entity)));
         return new DynamicRecordService(
                 runtime,
@@ -3108,12 +3107,11 @@ class DynamicRecordServiceTest {
     private DynamicRecordService serviceWithCoordinator(IDatabaseOperations<Object> operations,
                                                         EntityDefinition entity,
                                                         DynamicRecordMutationCoordinator coordinator) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                RuntimeEventPublisher.noop()
-        )
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(RuntimeEventPublisher.noop())
+                .build()
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(entity)));
         return new DynamicRecordService(
                 runtime,
@@ -3148,16 +3146,14 @@ class DynamicRecordServiceTest {
                                                     List<EntityReferenceDefinition> references,
                                                     List<EntityAssociationViewDefinition> associationViews,
                                                     DataScopeCriteriaService dataScopeCriteriaService) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(contractEntity(), lineEntity()),
-                relations,
-                references,
-                List.of(),
-                associationViews,
-                List.of()
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(contractEntity(), lineEntity()))
+                .relations(relations)
+                .references(references)
+                .views(List.of())
+                .associationViews(associationViews)
+                .actions(List.of())
+                .build();
         return new DynamicRecordService(
                 new DynamicRecordRuntime(operations).register(module),
                 new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
@@ -3215,26 +3211,24 @@ class DynamicRecordServiceTest {
                                                DynamicActionTransactionOperator transactionOperator,
                                                ActionExecutionPolicyService actionExecutionPolicyService,
                                                DataScopeCriteriaService dataScopeCriteriaService) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(submitAction.dataAuth() ? dataScopedActionEntity() : actionEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(submitAction)
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(submitAction.dataAuth() ? dataScopedActionEntity() : actionEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(submitAction))
+                .build();
         DynamicActionExecutorRegistry executorRegistry = executor == null
                 ? DynamicActionExecutorRegistry.empty()
                 : new DynamicActionExecutorRegistry(List.of(executor));
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher,
-                executorRegistry,
-                transactionOperator
-        ).register(module), actionExecutionPolicyService == null
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .actionExecutorRegistry(executorRegistry)
+                .actionTransactionOperator(transactionOperator)
+                .build()
+                .register(module), actionExecutionPolicyService == null
                 ? new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService()
                 : actionExecutionPolicyService,
                 dataScopeCriteriaService);
@@ -3248,21 +3242,19 @@ class DynamicRecordServiceTest {
     private DynamicRecordService actionServiceWithActions(IDatabaseOperations<Object> operations,
                                                           RuntimeEventPublisher eventPublisher,
                                                           EntityActionDefinition... actions) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(actions)
-        );
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher
-        ).register(module));
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(actions))
+                .build();
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .build()
+                .register(module));
     }
 
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
@@ -3275,95 +3267,87 @@ class DynamicRecordServiceTest {
                                                    RuntimeEventPublisher eventPublisher,
                                                    DynamicActionExecutor executor,
                                                    EntityActionDefinition action) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionRuleEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(action)
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionRuleEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(action))
+                .build();
         DynamicActionExecutorRegistry executorRegistry = executor == null
                 ? DynamicActionExecutorRegistry.empty()
                 : new DynamicActionExecutorRegistry(List.of(executor));
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher,
-                executorRegistry
-        ).register(module));
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .actionExecutorRegistry(executorRegistry)
+                .build()
+                .register(module));
     }
 
     private DynamicRecordService childActionRuleService(IDatabaseOperations<Object> operations,
                                                         RuntimeEventPublisher eventPublisher,
                                                         DynamicActionExecutor executor,
                                                         String expectedCode) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionChildRuleEntity(expectedCode), lineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
-                List.of(),
-                List.of(),
-                List.of(submitActionWithoutAvailability("contractSubmit"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionChildRuleEntity(expectedCode), lineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")))
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(submitActionWithoutAvailability("contractSubmit")))
+                .build();
         DynamicActionExecutorRegistry executorRegistry = executor == null
                 ? DynamicActionExecutorRegistry.empty()
                 : new DynamicActionExecutorRegistry(List.of(executor));
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher,
-                executorRegistry
-        ).register(module));
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .actionExecutorRegistry(executorRegistry)
+                .build()
+                .register(module));
     }
 
     private DynamicRecordService childActionWithoutRuleService(IDatabaseOperations<Object> operations,
                                                                RuntimeEventPublisher eventPublisher,
                                                                DynamicActionExecutor executor) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionEntity(), lineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
-                List.of(),
-                List.of(),
-                List.of(submitActionWithoutAvailability("contractSubmit"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionEntity(), lineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")))
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(submitActionWithoutAvailability("contractSubmit")))
+                .build();
         DynamicActionExecutorRegistry executorRegistry = executor == null
                 ? DynamicActionExecutorRegistry.empty()
                 : new DynamicActionExecutorRegistry(List.of(executor));
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                eventPublisher,
-                executorRegistry
-        ).register(module));
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .actionExecutorRegistry(executorRegistry)
+                .build()
+                .register(module));
     }
 
     private DynamicRecordService childEntityActionService(DynamicActionExecutor executor) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionEntity(), lineEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("line", "approveLine", "审核明细", true,
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionEntity(), lineEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition("line", "approveLine", "审核明细", true,
                         EntityActionLevel.RECORD, EntityActionCategory.CUSTOM, null, true, false,
-                        null, null, null, null, EntityActionExecutorType.SERVICE, "contractSubmit"))
-        );
-        return new DynamicRecordService(new DynamicRecordRuntime(
-                operations(),
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                RuntimeEventPublisher.noop(),
-                new DynamicActionExecutorRegistry(List.of(executor))
-        ).register(module));
+                        null, null, null, null, EntityActionExecutorType.SERVICE, "contractSubmit")))
+                .build();
+        return new DynamicRecordService(DynamicRecordRuntime.builder(operations())
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(RuntimeEventPublisher.noop())
+                .actionExecutorRegistry(new DynamicActionExecutorRegistry(List.of(executor)))
+                .build()
+                .register(module));
     }
 
     private EntityActionDefinition submitActionWithExecutorKey(String executorKey) {
@@ -3422,13 +3406,11 @@ class DynamicRecordServiceTest {
                                                            EntityDefinition sourceEntity,
                                                            EntityReferenceDefinition reference,
                                                            DataScopeCriteriaService dataScopeCriteriaService) {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(referenceEntity, sourceEntity),
-                List.of(),
-                List.of(reference)
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(referenceEntity, sourceEntity))
+                .relations(List.of())
+                .references(List.of(reference))
+                .build();
         return new DynamicRecordService(
                 new DynamicRecordRuntime(operations).register(module),
                 new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),

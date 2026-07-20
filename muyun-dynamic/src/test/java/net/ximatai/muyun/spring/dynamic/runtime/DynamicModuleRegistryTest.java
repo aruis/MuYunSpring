@@ -46,19 +46,17 @@ class DynamicModuleRegistryTest {
 
     @Test
     void shouldRejectInvalidViewDefinitions() {
-        ModuleDefinition invalid = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                contractModule().entities(),
-                List.of(),
-                List.of(),
-                List.of(new EntityViewDefinition(
+        ModuleDefinition invalid = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(contractModule().entities())
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of(new EntityViewDefinition(
                         "contract",
                         EntityViewType.LIST,
                         "Contract list",
                         List.of(new EntityViewFieldDefinition("missingField"))
-                ))
-        );
+                )))
+                .build();
 
         assertThatThrownBy(() -> new DynamicModuleRegistry().register(invalid))
                 .isInstanceOf(ModuleDefinitionException.class)

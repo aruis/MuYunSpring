@@ -72,10 +72,8 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeRuntimeModuleDefinitionAsStableDescriptor() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField().queryable(),
                         FieldDefinition.string("status", "Status")
@@ -100,21 +98,21 @@ class DynamicModuleDescriptorTest {
                                 FieldDefinition.titleField(),
                                 FieldDefinition.string("customerId", "Customer")
                         ), Set.of(EntityCapability.CRUD))
-                ),
-                List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")
-                        .withAutoPopulate()),
-                List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
+                ))
+                .relations(List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")
+                        .withAutoPopulate()))
+                .references(List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
                         .withAutoTitle("customerTitle")
-                        .withProjection("title", "customerTitle")),
-                List.of(),
-                List.of(
+                        .withProjection("title", "customerTitle")))
+                .views(List.of())
+                .associationViews(List.of(
                         EntityAssociationViewDefinition.childRelation("contacts", "customer", "crm.customer",
                                 "contact", "contacts"),
                         EntityAssociationViewDefinition.reference("customerId", "contact", "crm.customer",
                                 "customer", "customerId")
-                ),
-                List.of()
-        );
+                ))
+                .actions(List.of())
+                .build();
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 
@@ -202,23 +200,21 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeDerivedPermissionMountForDynamicActions() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
                         FieldDefinition.titleField()
-                ))),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+                ))))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(
                         new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                                 EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                                 true, true, "view", null, null,
                                 EntityActionExecutorType.SERVICE, "contractSubmit")
-                )
-        );
+                ))
+                .build();
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 
@@ -367,26 +363,24 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldApplyConfiguredActionGovernance() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer",
                                 List.of(FieldDefinition.titleField()),
                                 Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
-                ),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+                ))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(
                         new EntityActionDefinition("customer", "create", "新建客户", true),
                         new EntityActionDefinition("customer", "delete", "删除客户", false)
                                 .availableWhen("{status} == 'draft'", "只有草稿客户可删除"),
                         new EntityActionDefinition("customer", "exportData", "导出", true),
                         new EntityActionDefinition("customer", "archiveSelected", "批量归档", true, EntityActionLevel.BATCH,
                                 null, null, null, null, null, null, null, null, null)
-                )
-        );
+                ))
+                .build();
 
         List<DynamicActionDescriptor> actions = DynamicModuleDescriptor.from(module).entities().getFirst().actions();
 
@@ -417,10 +411,8 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeExplicitViewDefinition() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField(),
                                 FieldDefinition.string("status", "Status")
@@ -430,10 +422,10 @@ class DynamicModuleDescriptorTest {
                                         .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE),
                                 FieldDefinition.text("description", "Description")
                         ))
-                ),
-                List.of(),
-                List.of(),
-                List.of(new EntityViewDefinition(
+                ))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of(new EntityViewDefinition(
                         "customer",
                         EntityViewType.FORM,
                         "Customer form",
@@ -443,8 +435,8 @@ class DynamicModuleDescriptorTest {
                                 new EntityViewFieldDefinition("tags").control(ViewControlType.SELECT),
                                 new EntityViewFieldDefinition("description").hidden().control(ViewControlType.TEXTAREA)
                         )
-                ))
-        );
+                )))
+                .build();
 
         List<DynamicViewDescriptor> views = DynamicModuleDescriptor.from(module).entities().getFirst().views();
         DynamicViewDescriptor listView = views.getFirst();
@@ -469,18 +461,16 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldNeverRelaxModelRequiredFieldInViewDescriptor() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.string("code", "Code").required(),
                                 FieldDefinition.string("remark", "Remark")
                         ))
-                ),
-                List.of(),
-                List.of(),
-                List.of(new EntityViewDefinition(
+                ))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of(new EntityViewDefinition(
                         "customer",
                         EntityViewType.FORM,
                         "Customer form",
@@ -488,8 +478,8 @@ class DynamicModuleDescriptorTest {
                                 new EntityViewFieldDefinition("code").required(false),
                                 new EntityViewFieldDefinition("remark").required(true)
                         )
-                ))
-        );
+                )))
+                .build();
 
         DynamicViewDescriptor formView = DynamicModuleDescriptor.from(module).entities().getFirst().views().get(1);
 
@@ -499,21 +489,19 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeDynamicActionDefaultGrantPolicy() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                         FieldDefinition.titleField()
-                ), Set.of(EntityCapability.DATA_SCOPE))),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("customer", "follow", "关注", true, EntityActionLevel.RECORD,
+                ), Set.of(EntityCapability.DATA_SCOPE))))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("customer", "follow", "关注", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, ActionDefaultGrantPolicy.OWNER, null, null, null,
-                        EntityActionExecutorType.SERVICE, "followExecutor"))
-        );
+                        EntityActionExecutorType.SERVICE, "followExecutor")))
+                .build();
 
         DynamicActionDescriptor action = DynamicModuleDescriptor.from(module)
                 .entities().getFirst()
@@ -527,21 +515,19 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeConfiguredStandardActionDefaultGrantPolicy() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                         FieldDefinition.titleField()
-                ), Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("customer", "view", "查看", true, EntityActionLevel.RECORD,
+                ), Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("customer", "view", "查看", true, EntityActionLevel.RECORD,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, ActionDefaultGrantPolicy.OWNER, null, null, null,
-                        EntityActionExecutorType.STANDARD, null))
-        );
+                        EntityActionExecutorType.STANDARD, null)))
+                .build();
 
         DynamicActionDescriptor action = DynamicModuleDescriptor.from(module)
                 .entities().getFirst()

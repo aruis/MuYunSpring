@@ -92,22 +92,20 @@ class AssociationViewDefinitionTest {
     private ModuleDefinition module(List<EntityRelationDefinition> relations,
                                     List<EntityReferenceDefinition> references,
                                     List<EntityAssociationViewDefinition> associationViews) {
-        return new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(
+        return ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
                         new EntityDefinition("invoice", "sales_invoice", "Invoice", List.of(FieldDefinition.titleField()),
                                 java.util.Set.of(EntityCapability.REFERENCE)),
                         new EntityDefinition("invoice_line", "sales_invoice_line", "Invoice line", List.of(
                                 FieldDefinition.titleField(),
                                 new FieldDefinition("invoiceId", "invoice_id", FieldType.STRING, "Invoice")
                         ), java.util.Set.of(EntityCapability.REFERENCE))
-                ),
-                relations,
-                references,
-                List.of(),
-                associationViews,
-                List.of()
-        );
+                ))
+                .relations(relations)
+                .references(references)
+                .views(List.of())
+                .associationViews(associationViews)
+                .actions(List.of())
+                .build();
     }
 }

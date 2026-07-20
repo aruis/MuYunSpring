@@ -74,79 +74,31 @@ public class DynamicEntityService implements
     private final PlatformTimeService timeService;
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
-        this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
+        this(dao, moduleAlias, DynamicRecordLifecycle.NONE, null, unsupportedRelationResolver(),
+                unsupportedReferenceResolver(moduleAlias), null, DynamicFieldValueValidator.NONE,
+                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE, new PlatformTimeService());
     }
 
-    public DynamicEntityService(DynamicRecordDao dao, String moduleAlias, DynamicRecordLifecycle lifecycle) {
-        this(dao, moduleAlias, lifecycle, null, entityAlias -> {
-            throw new IllegalStateException("dynamic relation service resolver is not configured");
-        });
+    static DynamicEntityService withLifecycle(DynamicRecordDao dao,
+                                              String moduleAlias,
+                                              DynamicRecordLifecycle lifecycle) {
+        return new DynamicEntityService(dao, moduleAlias, lifecycle, null, unsupportedRelationResolver(),
+                unsupportedReferenceResolver(moduleAlias), null, DynamicFieldValueValidator.NONE,
+                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE, new PlatformTimeService());
     }
 
-    public DynamicEntityService(DynamicRecordDao dao,
-                                String moduleAlias,
-                                DynamicRecordLifecycle lifecycle,
-                                ModuleDefinition module,
-                                Function<String, DynamicEntityService> relationServiceResolver) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, null);
+    static DynamicEntityService withModule(DynamicRecordDao dao,
+                                           String moduleAlias,
+                                           DynamicRecordLifecycle lifecycle,
+                                           ModuleDefinition module,
+                                           Function<String, DynamicEntityService> relationServiceResolver) {
+        return new DynamicEntityService(dao, moduleAlias, lifecycle, module, relationServiceResolver,
+                sameModuleReferenceResolver(moduleAlias, relationServiceResolver), null,
+                DynamicFieldValueValidator.NONE, FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE,
+                new PlatformTimeService());
     }
 
-    public DynamicEntityService(DynamicRecordDao dao,
-                                String moduleAlias,
-                                DynamicRecordLifecycle lifecycle,
-                                ModuleDefinition module,
-                                Function<String, DynamicEntityService> relationServiceResolver,
-                                String cacheNamespacePrefix) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix,
-                DynamicFieldValueValidator.NONE);
-    }
-
-    public DynamicEntityService(DynamicRecordDao dao,
-                                String moduleAlias,
-                                DynamicRecordLifecycle lifecycle,
-                                ModuleDefinition module,
-                                Function<String, DynamicEntityService> relationServiceResolver,
-                                String cacheNamespacePrefix,
-                                DynamicFieldValueValidator fieldValueValidator) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix, fieldValueValidator,
-                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE);
-    }
-
-    public DynamicEntityService(DynamicRecordDao dao,
-                                String moduleAlias,
-                                DynamicRecordLifecycle lifecycle,
-                                ModuleDefinition module,
-                                Function<String, DynamicEntityService> relationServiceResolver,
-                                String cacheNamespacePrefix,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                FieldCryptoProvider fieldCryptoProvider,
-                                FieldSigner fieldSigner) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver,
-                target -> {
-                    if (!Objects.equals(requireModuleAlias(moduleAlias), target.moduleAlias())) {
-                        throw new IllegalArgumentException(
-                                "cross module dynamic reference is not supported: " + target.qualifiedName());
-                    }
-                    return relationServiceResolver.apply(target.entityAlias());
-                },
-                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner, new PlatformTimeService());
-    }
-
-    public DynamicEntityService(DynamicRecordDao dao,
-                                String moduleAlias,
-                                DynamicRecordLifecycle lifecycle,
-                                ModuleDefinition module,
-                                Function<String, DynamicEntityService> relationServiceResolver,
-                                Function<ReferenceTarget, DynamicEntityService> referenceServiceResolver,
-                                String cacheNamespacePrefix,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                FieldCryptoProvider fieldCryptoProvider,
-                                FieldSigner fieldSigner) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, referenceServiceResolver,
-                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner, new PlatformTimeService());
-    }
-
-    public DynamicEntityService(DynamicRecordDao dao,
+    DynamicEntityService(DynamicRecordDao dao,
                                 String moduleAlias,
                                 DynamicRecordLifecycle lifecycle,
                                 ModuleDefinition module,
@@ -173,6 +125,34 @@ public class DynamicEntityService implements
                 .filter(field -> field.protection().enabled())
                 .map(field -> (ProtectedFieldAccessor<DynamicRecord>) new DynamicProtectedFieldAccessor(field))
                 .toList());
+    }
+
+    private static Function<String, DynamicEntityService> unsupportedRelationResolver() {
+        return entityAlias -> {
+            throw new IllegalStateException("dynamic relation service resolver is not configured");
+        };
+    }
+
+    private static Function<ReferenceTarget, DynamicEntityService> unsupportedReferenceResolver(String moduleAlias) {
+        return target -> {
+            if (!Objects.equals(requireModuleAlias(moduleAlias), target.moduleAlias())) {
+                throw new IllegalArgumentException(
+                        "cross module dynamic reference is not supported: " + target.qualifiedName());
+            }
+            throw new IllegalStateException("dynamic reference service resolver is not configured");
+        };
+    }
+
+    private static Function<ReferenceTarget, DynamicEntityService> sameModuleReferenceResolver(
+            String moduleAlias,
+            Function<String, DynamicEntityService> relationServiceResolver) {
+        return target -> {
+            if (!Objects.equals(requireModuleAlias(moduleAlias), target.moduleAlias())) {
+                throw new IllegalArgumentException(
+                        "cross module dynamic reference is not supported: " + target.qualifiedName());
+            }
+            return relationServiceResolver.apply(target.entityAlias());
+        };
     }
 
     @Override

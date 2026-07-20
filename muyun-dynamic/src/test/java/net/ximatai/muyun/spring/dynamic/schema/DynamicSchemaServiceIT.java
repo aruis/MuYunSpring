@@ -831,15 +831,13 @@ class DynamicSchemaServiceIT {
     }
 
     private ModuleDefinition invoiceModule() {
-        return new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+        return ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")))
-        );
+                        .withAutoDeleteWithParent()))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))))
+                .build();
     }
 
     private EntityDefinition invoiceEntity() {

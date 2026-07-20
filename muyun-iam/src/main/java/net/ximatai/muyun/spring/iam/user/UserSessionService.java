@@ -8,8 +8,6 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -48,138 +46,21 @@ public class UserSessionService {
     public UserSessionService(UserAccountService userAccountService,
                               UserSessionRecordService userSessionRecordService,
                               ActiveTenantVerifier activeTenantVerifier,
-                              ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
-                              ObjectProvider<UserSessionRevocationService> userSessionRevocationService,
-                              ObjectProvider<CurrentUserTimeZoneResolver> currentUserTimeZoneResolver,
-                              ObjectProvider<UserSessionPresenceLookup> userSessionPresenceLookup,
-                              ApplicationEventPublisher applicationEventPublisher) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier,
-                userSessionRevocationService == null ? null : userSessionRevocationService.getIfAvailable(),
-                userSecurityEventPublisher == null
-                        ? () -> UserSecurityEventPublisher.NOOP
-                        : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
-                () -> event -> applicationEventPublisher.publishEvent(event),
-                Clock.systemUTC(),
-                currentUserTimeZoneResolver == null
-                        ? null
-                        : currentUserTimeZoneResolver.getIfAvailable(() -> CurrentUserTimeZoneResolver.NONE),
-                userSessionPresenceLookup == null
-                        ? () -> UserSessionPresenceLookup.NONE
-                        : () -> userSessionPresenceLookup.getIfAvailable(() -> UserSessionPresenceLookup.NONE));
-    }
-
-    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock,
-                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock,
-                currentUserTimeZoneResolver);
-    }
-
-    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
-                       UserSecurityEventPublisher userSecurityEventPublisher, Clock clock) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, userSecurityEventPublisher, UserSessionLifecycleEventPublisher.NOOP, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao,
-                       UserSecurityEventPublisher userSecurityEventPublisher,
-                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
-                       Clock clock) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService,
-                null, userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       Clock clock) {
-        this(userAccountService, userSessionRecordService, userAccountService,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       Clock clock) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier,
-                null, UserSecurityEventPublisher.NOOP, UserSessionLifecycleEventPublisher.NOOP, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       UserSessionRevocationService userSessionRevocationService,
-                       UserSecurityEventPublisher userSecurityEventPublisher,
-                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
-                       Clock clock) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier, userSessionRevocationService,
-                userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, null);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       UserSessionRevocationService userSessionRevocationService,
-                       UserSecurityEventPublisher userSecurityEventPublisher,
-                       UserSessionLifecycleEventPublisher userSessionLifecycleEventPublisher,
-                       Clock clock,
-                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier,
-                userSessionRevocationService,
-                () -> userSecurityEventPublisher == null ? UserSecurityEventPublisher.NOOP : userSecurityEventPublisher,
-                () -> userSessionLifecycleEventPublisher == null
-                        ? UserSessionLifecycleEventPublisher.NOOP
-                        : userSessionLifecycleEventPublisher,
-                clock,
-                currentUserTimeZoneResolver,
-                () -> UserSessionPresenceLookup.NONE);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       UserSessionRevocationService userSessionRevocationService,
-                       Supplier<UserSecurityEventPublisher> userSecurityEventPublisher,
-                       Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
-                       Clock clock,
-                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver) {
-        this(userAccountService, userSessionRecordService, activeTenantVerifier, userSessionRevocationService,
-                userSecurityEventPublisher, userSessionLifecycleEventPublisher, clock, currentUserTimeZoneResolver,
-                () -> UserSessionPresenceLookup.NONE);
-    }
-
-    UserSessionService(UserAccountService userAccountService,
-                       UserSessionRecordService userSessionRecordService,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       UserSessionRevocationService userSessionRevocationService,
-                       Supplier<UserSecurityEventPublisher> userSecurityEventPublisher,
-                       Supplier<UserSessionLifecycleEventPublisher> userSessionLifecycleEventPublisher,
-                       Clock clock,
-                       CurrentUserTimeZoneResolver currentUserTimeZoneResolver,
-                       Supplier<UserSessionPresenceLookup> userSessionPresenceLookup) {
+                              UserSessionCollaborators collaborators,
+                              Clock clock) {
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
-        this.userSessionRevocationService = userSessionRevocationService == null
-                ? new UserSessionRevocationService(userSessionRecordService, userSessionLifecycleEventPublisher, clock)
-                : userSessionRevocationService;
+        Supplier<UserSessionLifecycleEventPublisher> lifecycleEventPublisher = collaborators.lifecycleEventPublisher();
+        UserSessionRevocationService revocationService = collaborators.revocationService().get();
+        this.userSessionRevocationService = revocationService == null
+                ? new UserSessionRevocationService(userSessionRecordService, lifecycleEventPublisher, clock)
+                : revocationService;
         this.activeTenantVerifier = activeTenantVerifier;
-        this.userSecurityEventPublisher = userSecurityEventPublisher == null
-                ? () -> UserSecurityEventPublisher.NOOP
-                : userSecurityEventPublisher;
-        this.userSessionLifecycleEventPublisher = userSessionLifecycleEventPublisher == null
-                ? () -> UserSessionLifecycleEventPublisher.NOOP
-                : userSessionLifecycleEventPublisher;
-        this.clock = clock;
-        this.currentUserTimeZoneResolver = currentUserTimeZoneResolver == null
-                ? CurrentUserTimeZoneResolver.NONE
-                : currentUserTimeZoneResolver;
-        this.userSessionPresenceLookup = userSessionPresenceLookup == null
-                ? () -> UserSessionPresenceLookup.NONE
-                : userSessionPresenceLookup;
+        this.userSecurityEventPublisher = collaborators.securityEventPublisher();
+        this.userSessionLifecycleEventPublisher = lifecycleEventPublisher;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
+        this.currentUserTimeZoneResolver = collaborators.timeZoneResolver();
+        this.userSessionPresenceLookup = collaborators.presenceLookup();
     }
 
     public LoginResult login(String tenantId, String username, String password) {

@@ -78,10 +78,8 @@ class DynamicExchangeTemplatePlanBuilderTest {
 
     @Test
     void shouldBuildMainAndFirstLevelChildSheets() {
-        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
-                "sales.order",
-                "Order",
-                List.of(
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(ModuleDefinition.builder("sales.order", "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "Order", List.of(
                                 FieldDefinition.string("orderNo", "Order No")
                         )),
@@ -93,12 +91,12 @@ class DynamicExchangeTemplatePlanBuilderTest {
                                 FieldDefinition.string("lineId", "Line"),
                                 FieldDefinition.string("batchNo", "Batch No")
                         ))
-                ),
-                List.of(
+                ))
+                .relations(List.of(
                         EntityRelationDefinition.child("lines", "order", "orderLine", "orderId"),
                         EntityRelationDefinition.child("batches", "orderLine", "lineBatch", "lineId")
-                )
-        ));
+                ))
+                .build());
 
         ExcelWorkbookPlan plan = builder.build(descriptor);
 
@@ -233,10 +231,8 @@ class DynamicExchangeTemplatePlanBuilderTest {
 
     @Test
     void shouldFallbackSheetNameAndDeduplicateChildEntitySheets() {
-        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
-                "sales.order",
-                "Order",
-                List.of(
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(ModuleDefinition.builder("sales.order", "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "", List.of(
                                 FieldDefinition.string("orderNo", "Order No")
                         )),
@@ -244,12 +240,12 @@ class DynamicExchangeTemplatePlanBuilderTest {
                                 FieldDefinition.string("orderId", "Order"),
                                 FieldDefinition.string("sku", "SKU")
                         ))
-                ),
-                List.of(
+                ))
+                .relations(List.of(
                         EntityRelationDefinition.child("lines", "order", "orderLine", "orderId"),
                         EntityRelationDefinition.child("attachments", "order", "orderLine", "orderId")
-                )
-        ));
+                ))
+                .build());
 
         ExcelWorkbookPlan plan = builder.build(descriptor);
 
@@ -273,10 +269,8 @@ class DynamicExchangeTemplatePlanBuilderTest {
     }
 
     private DynamicModuleDescriptor referenceDescriptor() {
-        return DynamicModuleDescriptor.from(new ModuleDefinition(
-                "sales.order",
-                "Order",
-                List.of(
+        return DynamicModuleDescriptor.from(ModuleDefinition.builder("sales.order", "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "Order", List.of(
                                 FieldDefinition.string("orderNo", "Order No").column("order_no"),
                                 FieldDefinition.string("customerId", "Customer").column("customer_id")
@@ -284,10 +278,10 @@ class DynamicExchangeTemplatePlanBuilderTest {
                         new EntityDefinition("customer", "sales_customer", "Customer", List.of(
                                 FieldDefinition.titleField()
                         ))
-                ),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("order", "customerId", "sales.order.customer"))
-        ));
+                ))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("order", "customerId", "sales.order.customer")))
+                .build());
     }
 
     private void assertRelateIdColumn(ExcelColumnPlan column) {

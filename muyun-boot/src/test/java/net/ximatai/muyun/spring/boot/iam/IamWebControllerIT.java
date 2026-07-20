@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.ability.action.DataChangeOperation;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionTestFactory;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
@@ -1059,7 +1060,7 @@ class IamWebControllerIT {
                 employeeAccountService,
                 employeeDelegationService
         );
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 EmployeeService.MODULE_ALIAS,
                 "职员管理",
@@ -1102,7 +1103,7 @@ class IamWebControllerIT {
 
     private StaticModuleDefinition departmentStaticModuleDefinition() {
         DepartmentWebController controller = new DepartmentWebController();
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 DepartmentService.MODULE_ALIAS,
                 "部门管理",
@@ -1118,7 +1119,7 @@ class IamWebControllerIT {
     }
 
     private StaticModuleDefinition moduleDefinition(String moduleAlias, String title, Class<?> modelClass) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 moduleAlias.substring(0, moduleAlias.indexOf('.')),
                 moduleAlias,
                 title,

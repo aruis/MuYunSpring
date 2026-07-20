@@ -24,94 +24,128 @@ public record WorkflowTaskActionRequest(
         layoutJson = blankToNull(layoutJson);
     }
 
-    public WorkflowTaskActionRequest(String taskId,
-                                     String operatorId,
-                                     String targetAssigneeId,
-                                     WorkflowAddSignMode addSignMode,
-                                     WorkflowAddSignSegment addSignSegment,
-                                     WorkflowRejectResubmitMode rejectResubmitMode,
-                                     String reason,
-                                     Instant operatedAt,
-                                     String selectedRouteKey,
-                                     String selectedReason,
-                                     List<WorkflowManualRouteSelection> manualRouteSelections) {
-        this(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment, rejectResubmitMode, reason,
-                operatedAt, selectedRouteKey, selectedReason, manualRouteSelections, null, null);
-    }
-
-    public WorkflowTaskActionRequest(String taskId,
-                                     String operatorId,
-                                     String targetAssigneeId,
-                                     WorkflowAddSignMode addSignMode,
-                                     WorkflowAddSignSegment addSignSegment,
-                                     WorkflowRejectResubmitMode rejectResubmitMode,
-                                     String reason,
-                                     Instant operatedAt,
-                                     String selectedRouteKey,
-                                     String selectedReason) {
-        this(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment, rejectResubmitMode, reason,
-                operatedAt, selectedRouteKey, selectedReason, List.of());
-    }
-
-    public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
-                                     String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, null, null, null, reason, operatedAt, null, null);
-    }
-
-    public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
-                                     WorkflowRejectResubmitMode rejectResubmitMode,
-                                     String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, null, null, rejectResubmitMode, reason, operatedAt, null, null);
-    }
-
-    public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
-                                     WorkflowAddSignMode addSignMode,
-                                     WorkflowRejectResubmitMode rejectResubmitMode,
-                                     String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, addSignMode, null, rejectResubmitMode, reason, operatedAt,
-                null, null);
-    }
-
-    public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
-                                     WorkflowAddSignMode addSignMode,
-                                     WorkflowAddSignSegment addSignSegment,
-                                     WorkflowRejectResubmitMode rejectResubmitMode,
-                                     String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment, rejectResubmitMode, reason, operatedAt,
-                null, null);
+    public static Builder builder(String taskId, String operatorId) {
+        return new Builder(taskId, operatorId);
     }
 
     public static WorkflowTaskActionRequest complete(String taskId, String operatorId, String reason) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, reason, null);
+        return builder(taskId, operatorId).reason(reason).build();
     }
 
     public static WorkflowTaskActionRequest complete(String taskId, String operatorId, String reason,
                                                      String selectedRouteKey, String selectedReason) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, null, reason, null,
-                selectedRouteKey, selectedReason);
+        return builder(taskId, operatorId)
+                .reason(reason)
+                .selectedRoute(selectedRouteKey, selectedReason)
+                .build();
     }
 
     public static WorkflowTaskActionRequest complete(String taskId, String operatorId, String reason,
                                                      List<WorkflowManualRouteSelection> manualRouteSelections) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, null, reason, null,
-                null, null, manualRouteSelections);
+        return builder(taskId, operatorId)
+                .reason(reason)
+                .manualRouteSelections(manualRouteSelections)
+                .build();
     }
 
     public static WorkflowTaskActionRequest reject(String taskId, String operatorId,
                                                    WorkflowRejectResubmitMode rejectResubmitMode,
                                                    String reason) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, rejectResubmitMode, reason, null);
+        return builder(taskId, operatorId)
+                .rejectResubmitMode(rejectResubmitMode)
+                .reason(reason)
+                .build();
     }
 
     public static WorkflowTaskActionRequest transfer(String taskId, String operatorId,
                                                      String targetAssigneeId, String reason) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, targetAssigneeId, null, null, reason, null);
+        return builder(taskId, operatorId)
+                .targetAssigneeId(targetAssigneeId)
+                .reason(reason)
+                .build();
     }
 
     public static WorkflowTaskActionRequest addSign(String taskId, String operatorId,
                                                     WorkflowAddSignSegment addSignSegment,
                                                     String reason) {
-        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, addSignSegment, null, reason, null);
+        return builder(taskId, operatorId)
+                .addSignSegment(addSignSegment)
+                .reason(reason)
+                .build();
+    }
+
+    public static final class Builder {
+        private final String taskId;
+        private final String operatorId;
+        private String targetAssigneeId;
+        private WorkflowAddSignMode addSignMode;
+        private WorkflowAddSignSegment addSignSegment;
+        private WorkflowRejectResubmitMode rejectResubmitMode;
+        private String reason;
+        private Instant operatedAt;
+        private String selectedRouteKey;
+        private String selectedReason;
+        private List<WorkflowManualRouteSelection> manualRouteSelections = List.of();
+        private String semanticJson;
+        private String layoutJson;
+
+        private Builder(String taskId, String operatorId) {
+            this.taskId = taskId;
+            this.operatorId = operatorId;
+        }
+
+        public Builder targetAssigneeId(String targetAssigneeId) {
+            this.targetAssigneeId = targetAssigneeId;
+            return this;
+        }
+
+        public Builder addSignMode(WorkflowAddSignMode addSignMode) {
+            this.addSignMode = addSignMode;
+            return this;
+        }
+
+        public Builder addSignSegment(WorkflowAddSignSegment addSignSegment) {
+            this.addSignSegment = addSignSegment;
+            return this;
+        }
+
+        public Builder rejectResubmitMode(WorkflowRejectResubmitMode rejectResubmitMode) {
+            this.rejectResubmitMode = rejectResubmitMode;
+            return this;
+        }
+
+        public Builder reason(String reason) {
+            this.reason = reason;
+            return this;
+        }
+
+        public Builder operatedAt(Instant operatedAt) {
+            this.operatedAt = operatedAt;
+            return this;
+        }
+
+        public Builder selectedRoute(String selectedRouteKey, String selectedReason) {
+            this.selectedRouteKey = selectedRouteKey;
+            this.selectedReason = selectedReason;
+            return this;
+        }
+
+        public Builder manualRouteSelections(List<WorkflowManualRouteSelection> manualRouteSelections) {
+            this.manualRouteSelections = manualRouteSelections == null ? List.of() : List.copyOf(manualRouteSelections);
+            return this;
+        }
+
+        public Builder designerSnapshot(String semanticJson, String layoutJson) {
+            this.semanticJson = semanticJson;
+            this.layoutJson = layoutJson;
+            return this;
+        }
+
+        public WorkflowTaskActionRequest build() {
+            return new WorkflowTaskActionRequest(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment,
+                    rejectResubmitMode, reason, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections,
+                    semanticJson, layoutJson);
+        }
     }
 
     private static String blankToNull(String value) {

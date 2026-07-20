@@ -32,99 +32,98 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final DatabaseValueConverter valueConverter;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
-        this(operations, new DynamicModuleRegistry());
+        this(builder(operations));
     }
 
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations, DynamicModuleRegistry registry) {
-        this(operations, registry, DynamicFieldValueValidator.NONE);
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations, DynamicFieldValueValidator fieldValueValidator) {
-        this(operations, new DynamicModuleRegistry(), fieldValueValidator);
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator) {
-        this(operations, registry, fieldValueValidator, RuntimeEventPublisher.noop());
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher) {
-        this(operations, registry, fieldValueValidator, eventPublisher, DynamicActionExecutorRegistry.empty());
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher,
-                                DynamicActionExecutorRegistry actionExecutorRegistry) {
-        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry,
-                DynamicActionTransactionOperator.none());
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher,
-                                DynamicActionExecutorRegistry actionExecutorRegistry,
-                                DynamicActionTransactionOperator actionTransactionOperator) {
-        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry, actionTransactionOperator,
-                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE);
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher,
-                                DynamicActionExecutorRegistry actionExecutorRegistry,
-                                DynamicActionTransactionOperator actionTransactionOperator,
-                                FieldCryptoProvider fieldCryptoProvider,
-                                FieldSigner fieldSigner) {
-        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry, actionTransactionOperator,
-                fieldCryptoProvider, fieldSigner, new PlatformTimeService());
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher,
-                                DynamicActionExecutorRegistry actionExecutorRegistry,
-                                DynamicActionTransactionOperator actionTransactionOperator,
-                                FieldCryptoProvider fieldCryptoProvider,
-                                FieldSigner fieldSigner,
-                                PlatformTimeService timeService) {
-        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry, actionTransactionOperator,
-                fieldCryptoProvider, fieldSigner, timeService, DatabaseValueConverter.DEFAULT);
-    }
-
-    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
-                                DynamicModuleRegistry registry,
-                                DynamicFieldValueValidator fieldValueValidator,
-                                RuntimeEventPublisher eventPublisher,
-                                DynamicActionExecutorRegistry actionExecutorRegistry,
-                                DynamicActionTransactionOperator actionTransactionOperator,
-                                FieldCryptoProvider fieldCryptoProvider,
-                                FieldSigner fieldSigner,
-                                PlatformTimeService timeService,
-                                DatabaseValueConverter valueConverter) {
-        this.operations = Objects.requireNonNull(operations, "operations must not be null");
-        this.registry = Objects.requireNonNull(registry, "registry must not be null");
-        this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
-        this.eventPublisher = eventPublisher == null ? RuntimeEventPublisher.noop() : eventPublisher;
-        this.actionExecutorRegistry = actionExecutorRegistry == null
-                ? DynamicActionExecutorRegistry.empty()
-                : actionExecutorRegistry;
-        this.actionTransactionOperator = actionTransactionOperator == null
-                ? DynamicActionTransactionOperator.none()
-                : actionTransactionOperator;
-        this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
-        this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
-        this.timeService = timeService == null ? new PlatformTimeService() : timeService;
-        this.valueConverter = valueConverter == null ? DatabaseValueConverter.DEFAULT : valueConverter;
+    private DynamicRecordRuntime(Builder builder) {
+        this.operations = Objects.requireNonNull(builder.operations, "operations must not be null");
+        this.registry = Objects.requireNonNull(builder.registry, "registry must not be null");
+        this.fieldValueValidator = Objects.requireNonNull(builder.fieldValueValidator,
+                "fieldValueValidator must not be null");
+        this.eventPublisher = Objects.requireNonNull(builder.eventPublisher, "eventPublisher must not be null");
+        this.actionExecutorRegistry = Objects.requireNonNull(builder.actionExecutorRegistry,
+                "actionExecutorRegistry must not be null");
+        this.actionTransactionOperator = Objects.requireNonNull(builder.actionTransactionOperator,
+                "actionTransactionOperator must not be null");
+        this.fieldCryptoProvider = Objects.requireNonNull(builder.fieldCryptoProvider,
+                "fieldCryptoProvider must not be null");
+        this.fieldSigner = Objects.requireNonNull(builder.fieldSigner, "fieldSigner must not be null");
+        this.timeService = Objects.requireNonNull(builder.timeService, "timeService must not be null");
+        this.valueConverter = Objects.requireNonNull(builder.valueConverter, "valueConverter must not be null");
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
+    }
+
+    public static Builder builder(IDatabaseOperations<?> operations) {
+        return new Builder(operations);
+    }
+
+    public static final class Builder {
+        private final IDatabaseOperations<?> operations;
+        private DynamicModuleRegistry registry = new DynamicModuleRegistry();
+        private DynamicFieldValueValidator fieldValueValidator = DynamicFieldValueValidator.NONE;
+        private RuntimeEventPublisher eventPublisher = RuntimeEventPublisher.noop();
+        private DynamicActionExecutorRegistry actionExecutorRegistry = DynamicActionExecutorRegistry.empty();
+        private DynamicActionTransactionOperator actionTransactionOperator = DynamicActionTransactionOperator.none();
+        private FieldCryptoProvider fieldCryptoProvider = FieldCryptoProvider.UNAVAILABLE;
+        private FieldSigner fieldSigner = FieldSigner.UNAVAILABLE;
+        private PlatformTimeService timeService = new PlatformTimeService();
+        private DatabaseValueConverter valueConverter = DatabaseValueConverter.DEFAULT;
+
+        private Builder(IDatabaseOperations<?> operations) {
+            this.operations = Objects.requireNonNull(operations, "operations must not be null");
+        }
+
+        public Builder registry(DynamicModuleRegistry registry) {
+            this.registry = Objects.requireNonNull(registry, "registry must not be null");
+            return this;
+        }
+
+        public Builder fieldValueValidator(DynamicFieldValueValidator fieldValueValidator) {
+            this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator,
+                    "fieldValueValidator must not be null");
+            return this;
+        }
+
+        public Builder eventPublisher(RuntimeEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher == null ? RuntimeEventPublisher.noop() : eventPublisher;
+            return this;
+        }
+
+        public Builder actionExecutorRegistry(DynamicActionExecutorRegistry actionExecutorRegistry) {
+            this.actionExecutorRegistry = actionExecutorRegistry == null
+                    ? DynamicActionExecutorRegistry.empty()
+                    : actionExecutorRegistry;
+            return this;
+        }
+
+        public Builder actionTransactionOperator(DynamicActionTransactionOperator actionTransactionOperator) {
+            this.actionTransactionOperator = actionTransactionOperator == null
+                    ? DynamicActionTransactionOperator.none()
+                    : actionTransactionOperator;
+            return this;
+        }
+
+        public Builder fieldProtection(FieldCryptoProvider fieldCryptoProvider, FieldSigner fieldSigner) {
+            this.fieldCryptoProvider = fieldCryptoProvider == null
+                    ? FieldCryptoProvider.UNAVAILABLE
+                    : fieldCryptoProvider;
+            this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
+            return this;
+        }
+
+        public Builder timeService(PlatformTimeService timeService) {
+            this.timeService = timeService == null ? new PlatformTimeService() : timeService;
+            return this;
+        }
+
+        public Builder valueConverter(DatabaseValueConverter valueConverter) {
+            this.valueConverter = valueConverter == null ? DatabaseValueConverter.DEFAULT : valueConverter;
+            return this;
+        }
+
+        public DynamicRecordRuntime build() {
+            return new DynamicRecordRuntime(this);
+        }
     }
 
     public DynamicRecordRuntime register(ModuleDefinition module) {

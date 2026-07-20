@@ -246,10 +246,8 @@ class RelationProjectionQueryPlannerTest {
 
     @Test
     void shouldPlanDynamicReferenceProjectionThroughUnifiedRelationDefinitions() {
-        ModuleDefinition order = new ModuleDefinition(
-                "crm.order",
-                "订单",
-                List.of(new EntityDefinition(
+        ModuleDefinition order = ModuleDefinition.builder("crm.order", "订单")
+                .entities(List.of(new EntityDefinition(
                         "order",
                         "crm_order",
                         "Order",
@@ -257,14 +255,14 @@ class RelationProjectionQueryPlannerTest {
                                 FieldDefinition.string("customerId", "客户").column("customer_id"),
                                 FieldDefinition.string("orderNo", "订单号").column("order_no")
                         )
-                )),
-                List.of(),
-                List.of(new EntityReferenceDefinition(
+                )))
+                .relations(List.of())
+                .references(List.of(new EntityReferenceDefinition(
                         "order",
                         "customerId",
                         "crm.customer.customer"
-                ).withProjection("title", "customerTitle"))
-        );
+                ).withProjection("title", "customerTitle")))
+                .build();
         ModuleDefinition customer = new ModuleDefinition(
                 "crm.customer",
                 "客户",
@@ -493,7 +491,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition userSelectorReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -564,7 +562,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition userReferenceDefinitionWithOutput(String readProjectionPath, String outputField) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -610,7 +608,7 @@ class RelationProjectionQueryPlannerTest {
 
     private StaticModuleDefinition userReferenceDefinitionWithOutput(ModuleReferencePath readProjectionPath,
                                                                      String outputField) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",
@@ -655,7 +653,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition employeeAccountReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee_account",
                 "职员账号绑定",
@@ -686,7 +684,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition employeeReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -714,7 +712,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition employeeWithOrganizationAndDepartmentDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -751,7 +749,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition employeeWithReadProjectionDefinition(String readProjectionPath, String outputField) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -785,7 +783,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition organizationReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.organization",
                 "机构管理",
@@ -810,7 +808,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition departmentReferenceDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.department",
                 "部门管理",
@@ -835,7 +833,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition duplicateReadProjectionOutputDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -861,7 +859,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition duplicateReferenceCodeDefinition() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.employee",
                 "职员管理",
@@ -890,7 +888,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition cyclicDefinitionA() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "test",
                 "test.a",
                 "Cycle A",
@@ -918,7 +916,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition cyclicDefinitionB() {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "test",
                 "test.b",
                 "Cycle B",
@@ -941,7 +939,7 @@ class RelationProjectionQueryPlannerTest {
     }
 
     private StaticModuleDefinition userDefinition(RelationProjectionCardinality cardinality) {
-        return new StaticModuleDefinition(
+        return StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",

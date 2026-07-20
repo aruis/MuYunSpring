@@ -54,7 +54,7 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
+                List.of(StaticModuleDefinitionTestFactory.create(
                         "sales",
                         "sales.contract",
                         "合同",
@@ -87,7 +87,7 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
+                List.of(StaticModuleDefinitionTestFactory.create(
                         "iam",
                         "iam.user",
                         "用户管理",
@@ -142,7 +142,7 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
+                List.of(StaticModuleDefinitionTestFactory.create(
                         "iam",
                         "iam.organization",
                         "机构管理",
@@ -229,7 +229,7 @@ class StaticModuleDefinitionRegistrarTest {
     }
 
     private StaticModuleDefinition definition(String moduleAlias, List<StaticModuleActionDefinition> actions) {
-        return new StaticModuleDefinition("iam", moduleAlias, "用户管理", null, actions);
+        return StaticModuleDefinitionTestFactory.create("iam", moduleAlias, "用户管理", null, actions);
     }
 
     private PlatformModule module(String moduleAlias) {

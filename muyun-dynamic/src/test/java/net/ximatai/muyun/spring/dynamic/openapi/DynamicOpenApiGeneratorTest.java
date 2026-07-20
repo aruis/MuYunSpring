@@ -251,15 +251,13 @@ class DynamicOpenApiGeneratorTest {
 
     @Test
     void shouldNotExposeCustomActionsThatConflictWithReservedWebPaths() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(
                         action("openapi", "OpenAPI", EntityActionLevel.LIST),
                         action("query", "Query", EntityActionLevel.LIST),
                         action("import", "Import", EntityActionLevel.LIST),
@@ -269,8 +267,8 @@ class DynamicOpenApiGeneratorTest {
                         action("disable", "Disable", EntityActionLevel.RECORD),
                         action("sort", "Sort", EntityActionLevel.RECORD),
                         action("tree", "Tree", EntityActionLevel.LIST)
-                )
-        );
+                ))
+                .build();
 
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module));
 

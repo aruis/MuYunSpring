@@ -331,11 +331,11 @@ class RecordWriteBackDynamicRuntimeContractTest {
                 lifecycleRecorder,
                 writeBackCoordinator
         ));
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE
-        ).register(contractModule()).register(invoiceModule());
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .build()
+                .register(contractModule()).register(invoiceModule());
         DynamicRecordService service = new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),
@@ -450,10 +450,8 @@ class RecordWriteBackDynamicRuntimeContractTest {
     }
 
     private ModuleDefinition invoiceModule() {
-        return new ModuleDefinition(
-                "finance.invoice",
-                "Invoice",
-                List.of(
+        return ModuleDefinition.builder("finance.invoice", "Invoice")
+                .entities(List.of(
                         new EntityDefinition("invoice", "app_invoice", "Invoice", List.of(
                                 FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                                 FieldDefinition.decimal("receivedAmount", "Received Amount")
@@ -467,9 +465,9 @@ class RecordWriteBackDynamicRuntimeContractTest {
                                         .column("received_amount")
                                         .precision(18, 2)
                         ))
-                ),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
-        );
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")))
+                .build();
     }
 
     private record RuntimeFixture(DynamicRecordService service,

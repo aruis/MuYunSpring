@@ -675,10 +675,8 @@ class DynamicCodeCoordinatorRepositoryIT {
         String moduleAlias = "crm.code_child_it_" + suffix;
         String mainTableName = "crm_code_child_main_" + suffix;
         String lineTableName = "crm_code_child_line_" + suffix;
-        refresher.refresh(new ModuleDefinition(
-                moduleAlias,
-                "Code Child IT",
-                List.of(
+        refresher.refresh(ModuleDefinition.builder(moduleAlias, "Code Child IT")
+                .entities(List.of(
                         new EntityDefinition(
                                 "main",
                                 mainTableName,
@@ -697,11 +695,11 @@ class DynamicCodeCoordinatorRepositoryIT {
                                 ),
                                 Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)
                         )
-                ),
-                List.of(EntityRelationDefinition.child("lines", "main", "line", "mainId")
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "main", "line", "mainId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent())
-        ));
+                        .withAutoDeleteWithParent()))
+                .build());
         return new Scenario(moduleAlias);
     }
 
@@ -905,7 +903,9 @@ class DynamicCodeCoordinatorRepositoryIT {
 
         @Bean
         DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations<?> operations) {
-            return new DynamicRecordRuntime(operations, new DynamicModuleRegistry());
+            return DynamicRecordRuntime.builder(operations)
+                    .registry(new DynamicModuleRegistry())
+                    .build();
         }
 
         @Bean
@@ -1014,7 +1014,7 @@ class DynamicCodeCoordinatorRepositoryIT {
                                                 CodeIssueLogService issueLogService,
                                                 Clock codeClock) {
             return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
-                    issueLogService, codeClock);
+                    issueLogService, null, codeClock);
         }
 
         @Bean

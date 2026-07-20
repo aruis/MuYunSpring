@@ -53,7 +53,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(sibling, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.approve(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.approve(request(
                 "task-1", "user-1", null, null, "agree", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.DONE);
@@ -81,7 +81,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        service.approve(new WorkflowTaskActionRequest("task-1", "user-1", null, null, null, null,
+        service.approve(request("task-1", "user-1", null, null, null, null,
                 "agree", Instant.parse("2026-06-05T02:00:00Z"), "manual-left", "choose left"));
 
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
@@ -184,7 +184,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        WorkflowTaskActionResult result = adminService.forceApprove(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = adminService.forceApprove(request(
                 "task-1", "admin-1", null, null, "admin approved", Instant.parse("2026-06-05T02:30:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.DONE);
@@ -211,7 +211,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        pluginService.forceApprove(new WorkflowTaskActionRequest(
+        pluginService.forceApprove(request(
                 "task-1", "admin-1", null, null, "admin approved",
                 Instant.parse("2026-06-05T02:30:00Z")));
 
@@ -253,7 +253,7 @@ class WorkflowTaskActionServiceTest {
         when(instanceDao.findById("instance-1")).thenReturn(instance());
         when(nodeDao.findById("node-1")).thenReturn(node);
 
-        assertThatThrownBy(() -> pluginService.forceApprove(new WorkflowTaskActionRequest(
+        assertThatThrownBy(() -> pluginService.forceApprove(request(
                 "task-1", "admin-1", null, null, "admin approved",
                 Instant.parse("2026-06-05T02:30:00Z"))))
                 .isInstanceOf(PlatformException.class)
@@ -271,7 +271,7 @@ class WorkflowTaskActionServiceTest {
         WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         when(taskDao.findById("task-1")).thenReturn(task);
 
-        assertThatThrownBy(() -> service.forceApprove(new WorkflowTaskActionRequest(
+        assertThatThrownBy(() -> service.forceApprove(request(
                 "task-1", "admin-1", null, null, "admin approved", Instant.parse("2026-06-05T02:30:00Z"))))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("only supports approval task");
@@ -298,7 +298,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = pluginService.reject(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.reject(request(
                 "task-1", "user-1", null, null, "not ok", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.REJECTED);
@@ -337,7 +337,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.reject(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.reject(request(
                 "task-1", "manager-1", null, WorkflowRejectResubmitMode.RETURN_TO_ME,
                 "not ok", Instant.parse("2026-06-05T02:00:00Z")));
 
@@ -402,7 +402,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.resubmit(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.resubmit(request(
                 "resubmit-1", "starter-1", null, null, "fixed", Instant.parse("2026-06-05T03:00:00Z")));
 
         assertThat(task.getTaskStatus()).isEqualTo(WorkflowTaskStatus.DONE);
@@ -427,7 +427,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.findById("resubmit-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance);
 
-        assertThatThrownBy(() -> service.resubmit(new WorkflowTaskActionRequest(
+        assertThatThrownBy(() -> service.resubmit(request(
                 "resubmit-1", "starter-1", null, null, "fixed", Instant.parse("2026-06-05T03:00:00Z"))))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("restart resubmit requires new workflow submit entry");
@@ -462,7 +462,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.updateByIdAndVersion(route, 4)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = pluginService.rollback(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.rollback(request(
                 "task-1", "user-1", null, null, "return", Instant.parse("2026-06-05T03:00:00Z")));
 
         assertThat(currentTask.getTaskStatus()).isEqualTo(WorkflowTaskStatus.ROLLED_BACK);
@@ -532,7 +532,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.updateByIdAndVersion(any(), any())).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.rollback(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.rollback(request(
                 "task-1", "user-1", null, null, "return to pre-branch",
                 Instant.parse("2026-06-05T03:00:00Z")));
 
@@ -655,7 +655,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.completeBusinessTask(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.completeBusinessTask(request(
                 "task-1", "user-1", null, null, "done", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.DONE);
@@ -684,7 +684,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        service.completeBusinessTask(new WorkflowTaskActionRequest("task-1", "user-1", null, null, null, null,
+        service.completeBusinessTask(request("task-1", "user-1", null, null, null, null,
                 "done", Instant.parse("2026-06-05T02:00:00Z"), "manual-right", "choose right"));
 
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
@@ -704,7 +704,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        noticeService.approve(new WorkflowTaskActionRequest(
+        noticeService.approve(request(
                 "task-1", "delegate-1", null, null, "agree", Instant.parse("2026-06-05T02:00:00Z")));
 
         ArgumentCaptor<WorkflowTask> taskCaptor = ArgumentCaptor.forClass(WorkflowTask.class);
@@ -749,7 +749,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        noticeService.approve(new WorkflowTaskActionRequest(
+        noticeService.approve(request(
                 "task-1", "principal-1", null, null, "agree", Instant.parse("2026-06-05T02:00:00Z")));
 
         verify(taskDao, never()).insert(any(WorkflowTask.class));
@@ -776,7 +776,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
-        noticeService.completeBusinessTask(new WorkflowTaskActionRequest(
+        noticeService.completeBusinessTask(request(
                 "task-1", "user-b", null, null, "done", Instant.parse("2026-06-05T03:00:00Z")));
 
         ArgumentCaptor<WorkflowTask> taskCaptor = ArgumentCaptor.forClass(WorkflowTask.class);
@@ -798,7 +798,7 @@ class WorkflowTaskActionServiceTest {
         when(instanceDao.findById("instance-1")).thenReturn(instance());
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.notice(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.notice(request(
                 "notice-1", "user-1", null, null, "read", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.NOTICED);
@@ -814,7 +814,7 @@ class WorkflowTaskActionServiceTest {
         when(instanceDao.findById("instance-1")).thenReturn(instance());
         when(taskDao.updateByIdAndVersion(unread, 3)).thenReturn(1);
 
-        WorkflowTaskActionResult unreadResult = service.readNotice(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult unreadResult = service.readNotice(request(
                 "notice-1", "user-1", null, null, "read", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(unreadResult.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.NOTICED);
@@ -824,7 +824,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.findById("notice-2")).thenReturn(read);
         when(instanceDao.findById("instance-1")).thenReturn(instance());
 
-        WorkflowTaskActionResult readResult = service.readNotice(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult readResult = service.readNotice(request(
                 "notice-2", "user-1", null, null, "read again", Instant.parse("2026-06-05T03:00:00Z")));
 
         assertThat(readResult.task()).isSameAs(read);
@@ -878,7 +878,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
 
-        WorkflowTaskActionResult result = pluginService.transfer(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.transfer(request(
                 "task-1", "user-a", "user-b", null, "handover", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TRANSFERRED);
@@ -930,7 +930,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(any(WorkflowInstance.class), any(Integer.class))).thenReturn(1);
 
-        WorkflowTaskActionResult result = pluginService.addSign(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.addSign(request(
                 "task-1", "user-1", null, null, segment("add-1", "approve", "next"), null,
                 "need finance review", Instant.parse("2026-06-05T04:00:00Z"),
                 null, null, List.of(), "{\"nodes\":[\"add-1\"]}", "{\"zoom\":1}"));
@@ -997,7 +997,7 @@ class WorkflowTaskActionServiceTest {
                 WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
         when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.addSign(request(
                 "task-1", "user-1", null, null, branchConvergeSegment(), null,
                 "need parallel review", Instant.parse("2026-06-05T04:00:00Z")));
 
@@ -1051,7 +1051,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, next));
         when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = service.addSign(request(
                 "task-1", "user-1", null, null, segment("add-2", "add-1", "next2"), null,
                 "recursive review", Instant.parse("2026-06-05T04:30:00Z")));
 
@@ -1642,6 +1642,85 @@ class WorkflowTaskActionServiceTest {
         List<WorkflowRuntimePluginEventType> events() {
             return contexts.stream().map(WorkflowRuntimePluginContext::eventType).toList();
         }
+    }
+
+    private WorkflowTaskActionRequest request(String taskId,
+                                              String operatorId,
+                                              String targetAssigneeId,
+                                              WorkflowRejectResubmitMode rejectResubmitMode,
+                                              String reason,
+                                              Instant operatedAt) {
+        return WorkflowTaskActionRequest.builder(taskId, operatorId)
+                .targetAssigneeId(targetAssigneeId)
+                .rejectResubmitMode(rejectResubmitMode)
+                .reason(reason)
+                .operatedAt(operatedAt)
+                .build();
+    }
+
+    private WorkflowTaskActionRequest request(String taskId,
+                                              String operatorId,
+                                              String targetAssigneeId,
+                                              WorkflowAddSignMode addSignMode,
+                                              WorkflowAddSignSegment addSignSegment,
+                                              WorkflowRejectResubmitMode rejectResubmitMode,
+                                              String reason,
+                                              Instant operatedAt) {
+        return WorkflowTaskActionRequest.builder(taskId, operatorId)
+                .targetAssigneeId(targetAssigneeId)
+                .addSignMode(addSignMode)
+                .addSignSegment(addSignSegment)
+                .rejectResubmitMode(rejectResubmitMode)
+                .reason(reason)
+                .operatedAt(operatedAt)
+                .build();
+    }
+
+    private WorkflowTaskActionRequest request(String taskId,
+                                              String operatorId,
+                                              String targetAssigneeId,
+                                              WorkflowAddSignMode addSignMode,
+                                              WorkflowAddSignSegment addSignSegment,
+                                              WorkflowRejectResubmitMode rejectResubmitMode,
+                                              String reason,
+                                              Instant operatedAt,
+                                              String selectedRouteKey,
+                                              String selectedReason) {
+        return WorkflowTaskActionRequest.builder(taskId, operatorId)
+                .targetAssigneeId(targetAssigneeId)
+                .addSignMode(addSignMode)
+                .addSignSegment(addSignSegment)
+                .rejectResubmitMode(rejectResubmitMode)
+                .reason(reason)
+                .operatedAt(operatedAt)
+                .selectedRoute(selectedRouteKey, selectedReason)
+                .build();
+    }
+
+    private WorkflowTaskActionRequest request(String taskId,
+                                              String operatorId,
+                                              String targetAssigneeId,
+                                              WorkflowAddSignMode addSignMode,
+                                              WorkflowAddSignSegment addSignSegment,
+                                              WorkflowRejectResubmitMode rejectResubmitMode,
+                                              String reason,
+                                              Instant operatedAt,
+                                              String selectedRouteKey,
+                                              String selectedReason,
+                                              List<WorkflowManualRouteSelection> manualRouteSelections,
+                                              String semanticJson,
+                                              String layoutJson) {
+        return WorkflowTaskActionRequest.builder(taskId, operatorId)
+                .targetAssigneeId(targetAssigneeId)
+                .addSignMode(addSignMode)
+                .addSignSegment(addSignSegment)
+                .rejectResubmitMode(rejectResubmitMode)
+                .reason(reason)
+                .operatedAt(operatedAt)
+                .selectedRoute(selectedRouteKey, selectedReason)
+                .manualRouteSelections(manualRouteSelections)
+                .designerSnapshot(semanticJson, layoutJson)
+                .build();
     }
 
     private WorkflowNodeInstance node(WorkflowApprovalMode mode, Integer ratio) {

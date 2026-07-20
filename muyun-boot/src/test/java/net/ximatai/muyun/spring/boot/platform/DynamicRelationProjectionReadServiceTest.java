@@ -292,10 +292,8 @@ class DynamicRelationProjectionReadServiceTest {
     }
 
     private ModuleDefinition orderModule(FieldProtectionDefinition orderNoProtection) {
-        return new ModuleDefinition(
-                "crm.order",
-                "订单",
-                List.of(new EntityDefinition(
+        return ModuleDefinition.builder("crm.order", "订单")
+                .entities(List.of(new EntityDefinition(
                         "order",
                         "crm_order",
                         "Order",
@@ -304,9 +302,9 @@ class DynamicRelationProjectionReadServiceTest {
                                 FieldDefinition.string("orderNo", "订单号").column("order_no")
                                         .protection(orderNoProtection)
                         )
-                )),
-                List.of(),
-                List.of(new EntityReferenceDefinition(
+                )))
+                .relations(List.of())
+                .references(List.of(new EntityReferenceDefinition(
                         "order",
                         "customerId",
                         "crm.customer.customer",
@@ -314,8 +312,8 @@ class DynamicRelationProjectionReadServiceTest {
                         false,
                         "",
                         List.of(new ReferenceProjection("title", "customerTitle"))
-                ))
-        );
+                )))
+                .build();
     }
 
     private ModuleDefinition customerModule() {

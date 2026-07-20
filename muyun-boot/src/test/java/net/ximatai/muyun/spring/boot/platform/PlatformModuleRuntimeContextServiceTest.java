@@ -64,7 +64,7 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformModule module = module("iam.organization", "组织管理", ModuleKind.STATIC);
         when(moduleService.resolveVisibleModule("iam.organization")).thenReturn(module);
         when(actionService.listByModuleAliases(List.of("iam.organization"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
+        StaticModuleDefinition definition = StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.organization",
                 "组织管理",
@@ -145,7 +145,7 @@ class PlatformModuleRuntimeContextServiceTest {
         when(moduleService.resolveVisibleModule("sales.contract"))
                 .thenReturn(module("sales.contract", "合同", ModuleKind.STATIC));
         when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
+        StaticModuleDefinition definition = StaticModuleDefinitionTestFactory.create(
                 "sales",
                 "sales.contract",
                 "合同",
@@ -192,7 +192,7 @@ class PlatformModuleRuntimeContextServiceTest {
                 throw new PlatformAccessDeniedException("denied");
             }
         };
-        StaticModuleDefinition definition = new StaticModuleDefinition(
+        StaticModuleDefinition definition = StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.organization",
                 "组织管理",
@@ -395,7 +395,7 @@ class PlatformModuleRuntimeContextServiceTest {
         when(moduleService.resolveVisibleModule("iam.user"))
                 .thenReturn(module("iam.user", "用户管理", ModuleKind.STATIC));
         when(actionService.listByModuleAliases(List.of("iam.user"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
+        StaticModuleDefinition definition = StaticModuleDefinitionTestFactory.create(
                 "iam",
                 "iam.user",
                 "用户管理",

@@ -146,10 +146,8 @@ class DynamicImportPlanBuilderTest {
     }
 
     private DynamicModuleDescriptor descriptor() {
-        return DynamicModuleDescriptor.from(new ModuleDefinition(
-                "sales.order",
-                "Order",
-                List.of(
+        return DynamicModuleDescriptor.from(ModuleDefinition.builder("sales.order", "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "Order", List.of(
                                 FieldDefinition.string("orderNo", "Order No"),
                                 FieldDefinition.zonedTimestamp("placedAt", "Placed At"),
@@ -162,12 +160,12 @@ class DynamicImportPlanBuilderTest {
                         new EntityDefinition("lineBatch", "sales_line_batch", "Line Batch", List.of(
                                 FieldDefinition.string("batchNo", "Batch No")
                         ))
-                ),
-                List.of(
+                ))
+                .relations(List.of(
                         EntityRelationDefinition.child("lines", "order", "orderLine", "orderId"),
                         EntityRelationDefinition.child("batches", "orderLine", "lineBatch", "lineId")
-                )
-        ));
+                ))
+                .build());
     }
 
     private ParsedWorkbook workbook(ParsedSheet... sheets) {

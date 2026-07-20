@@ -56,8 +56,11 @@ public class WorkflowModuleTaskRuntimeService {
             return WorkflowModuleTaskContinueResult.blocked(bundle);
         }
         WorkflowTaskActionResult result = taskActionFacade.execute("complete",
-                new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, null, reason, null,
-                        selectedRouteKey, selectedReason, manualRouteSelections));
+                WorkflowTaskActionRequest.builder(taskId, operatorId)
+                        .reason(reason)
+                        .selectedRoute(selectedRouteKey, selectedReason)
+                        .manualRouteSelections(manualRouteSelections)
+                        .build());
         return WorkflowModuleTaskContinueResult.continued(result);
     }
 
