@@ -21,7 +21,14 @@ withDefaults(
     allowClear?: boolean;
     loading?: boolean;
   }>(),
-  { value: undefined, mode: undefined, placeholder: undefined, disabled: false, allowClear: true, loading: false },
+  {
+    value: undefined,
+    mode: undefined,
+    placeholder: undefined,
+    disabled: false,
+    allowClear: true,
+    loading: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -30,7 +37,10 @@ const emit = defineEmits<{
 
 function normalize(value: unknown) {
   if (Array.isArray(value)) {
-    emit('update:value', value.filter((item): item is OptionValue => typeof item === 'string' || typeof item === 'number'));
+    emit(
+      'update:value',
+      value.filter((item): item is OptionValue => typeof item === 'string' || typeof item === 'number'),
+    );
     return;
   }
   emit('update:value', typeof value === 'string' || typeof value === 'number' ? value : null);

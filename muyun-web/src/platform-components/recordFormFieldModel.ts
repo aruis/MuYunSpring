@@ -1,5 +1,6 @@
 import type {
   Option,
+  OptionValueList,
   ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
@@ -12,6 +13,7 @@ export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewField
   option?: ResolvedOptionFieldDescriptor;
 };
 export type RecordFormRecord = Record<string, unknown>;
+export type RecordFormFieldValue = string | number | boolean | OptionValueList | undefined;
 export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'recordPicker';
 
 export interface RecordFormFieldFallback {

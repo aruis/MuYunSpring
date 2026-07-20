@@ -543,10 +543,11 @@ test('employee management uses organization scope and platform query list panel'
     formFieldsSource,
     /disabledOf\?: \(fieldName: string, field: RecordFormFieldState\) => boolean/,
   );
-  assert.match(
-    formFieldsSource,
-    /'update:field': \[fieldName: string, value: string \| number \| boolean \| undefined\]/,
-  );
+  assert.match(formFieldsSource, /'update:field': \[fieldName: string, value: RecordFormFieldValue\]/);
+  assert.match(formFieldsSource, /const optionFieldErrors = ref<Record<string, string>>/);
+  assert.match(formFieldsSource, /catch \{[\s\S]*选项加载失败，请重试/);
+  assert.match(formFieldsSource, /await loadOptionField\(field\)/);
+  assert.match(formFieldsSource, /retryOptionField/);
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
   assert.match(dataTableSource, /defineOptions\(\{ name: 'UiDataTable', inheritAttrs: false \}\)/);
   assert.match(dataTableSource, /Table as ATable/);

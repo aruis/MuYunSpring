@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiInput, UiSelect, UiTreeSelect } from '@muyun/vue-ui-antdv';
+import { UiButton, UiInput, UiSelect, UiTreeSelect } from '@muyun/vue-ui-antdv';
 import type { OptionItemDescriptor, OptionValue, OptionValueList } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
@@ -12,6 +12,7 @@ import {
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordFormFieldState,
+  type RecordFormFieldValue,
   type RecordFormRecord,
 } from './recordFormFieldModel';
 import { hasOptionHierarchy, optionItemsToOptions, optionItemsToTree } from './optionFieldOptions';
@@ -45,7 +46,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  'update:field': [fieldName: string, value: string | number | boolean | undefined];
+  'update:field': [fieldName: string, value: RecordFormFieldValue];
 }>();
 
 const resolvedFieldNames = computed(
@@ -59,6 +60,7 @@ const fieldStates = computed<RecordFormFieldState[]>(() =>
 );
 const optionItems = ref<Record<string, OptionItemDescriptor[]>>({});
 const loadingOptionFields = ref(new Set<string>());
+const optionFieldErrors = ref<Record<string, string>>({});
 
 onMounted(loadOptionFields);
 watch(() => props.fields, loadOptionFields);
@@ -105,6 +107,17 @@ function optionFieldLoading(field: RecordFormFieldState) {
   return loadingOptionFields.value.has(field.fieldName);
 }
 
+function optionFieldError(field: RecordFormFieldState) {
+  return optionFieldErrors.value[field.fieldName];
+}
+
+function retryOptionField(field: RecordFormFieldState) {
+  const descriptor = props.fields?.get(field.fieldName);
+  if (descriptor) {
+    void loadOptionField(descriptor);
+  }
+}
+
 function optionFieldMultiple(field: RecordFormFieldState) {
   return field.optionSelectionMode === 'MULTIPLE';
 }
@@ -117,18 +130,31 @@ async function loadOptionFields() {
     if (!field.option) {
       continue;
     }
-    loadingOptionFields.value = new Set(loadingOptionFields.value).add(field.fieldRef.fieldName);
-    try {
-      const items = await props.optionContext.http.request<OptionItemDescriptor[]>({
-        path: `/platform.module/${encodeURIComponent(props.optionContext.moduleAlias)}/fields/${encodeURIComponent(field.fieldRef.fieldName)}/options`,
-        query: { enabledOnly: false },
-      });
-      optionItems.value = { ...optionItems.value, [field.fieldRef.fieldName]: items };
-    } finally {
-      const next = new Set(loadingOptionFields.value);
-      next.delete(field.fieldRef.fieldName);
-      loadingOptionFields.value = next;
-    }
+    await loadOptionField(field);
+  }
+}
+
+async function loadOptionField(field: RecordFormFieldDescriptor) {
+  if (!props.optionContext || !field.option) {
+    return;
+  }
+  const fieldName = field.fieldRef.fieldName;
+  loadingOptionFields.value = new Set(loadingOptionFields.value).add(fieldName);
+  try {
+    const items = await props.optionContext.http.request<OptionItemDescriptor[]>({
+      path: `/platform.module/${encodeURIComponent(props.optionContext.moduleAlias)}/fields/${encodeURIComponent(fieldName)}/options`,
+      query: { enabledOnly: false },
+    });
+    optionItems.value = { ...optionItems.value, [fieldName]: items };
+    const errors = { ...optionFieldErrors.value };
+    delete errors[fieldName];
+    optionFieldErrors.value = errors;
+  } catch {
+    optionFieldErrors.value = { ...optionFieldErrors.value, [fieldName]: '选项加载失败，请重试' };
+  } finally {
+    const next = new Set(loadingOptionFields.value);
+    next.delete(fieldName);
+    loadingOptionFields.value = next;
   }
 }
 
@@ -140,13 +166,13 @@ function fieldDisabled(field: RecordFormFieldState) {
   return props.disabled || field.readOnly || props.disabledOf?.(field.fieldName, field) === true;
 }
 
-function updateField(fieldName: string, value: string | number | boolean | undefined) {
+function updateField(fieldName: string, value: RecordFormFieldValue) {
   emit('update:field', fieldName, value);
 }
 
 function updateSelectField(field: RecordFormFieldState, value: OptionValue | OptionValueList | null) {
   if (Array.isArray(value)) {
-    emit('update:field', field.fieldName, value as unknown as string);
+    emit('update:field', field.fieldName, value);
     return;
   }
   emit('update:field', field.fieldName, value ?? undefined);
@@ -210,6 +236,12 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       :placeholder="field.placeholder"
       @update:value="updateField(field.fieldName, $event)"
     />
+    <div v-if="optionFieldError(field)" class="record-form-field-error">
+      <span>{{ optionFieldError(field) }}</span>
+      <UiButton type="link" :disabled="optionFieldLoading(field)" @click="retryOptionField(field)">
+        重试
+      </UiButton>
+    </div>
   </label>
 </template>
 
@@ -230,5 +262,13 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
 .record-form-field-label strong {
   color: #d92d20;
   font-weight: 600;
+}
+
+.record-form-field-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #d92d20;
+  font-size: 12px;
 }
 </style>

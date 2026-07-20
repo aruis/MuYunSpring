@@ -380,7 +380,10 @@ function roleFormFieldDisabled(fieldName: string) {
   return selectedRole.value?.systemManaged === true;
 }
 
-function updateRoleDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateRoleDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   const next = {
     ...roleDraft.value,
     [fieldName]: value,

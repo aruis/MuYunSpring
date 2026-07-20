@@ -564,7 +564,10 @@ function systemUserFormFieldDisabled(fieldName: string) {
   return fieldName === 'username';
 }
 
-function updateUserDraftField(fieldName: string, value: string | number | boolean | undefined) {
+function updateUserDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
   userDraft.value = {
     ...userDraft.value,
     [fieldName]: value,
