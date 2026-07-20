@@ -71,8 +71,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     private final PasswordPolicyRuleService passwordPolicyRuleService;
     private final AccountRoleGrantDao accountRoleGrantDao;
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
-    private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
-    private final Supplier<UserSessionRevocationService> userSessionRevocationService;
+    private final UserSecurityEventPublisher userSecurityEventPublisher;
+    private final UserSessionRevocationService userSessionRevocationService;
     private final SecureRandom secureRandom = new SecureRandom();
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
@@ -85,25 +85,43 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             null
     );
 
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, UserAccountCollaborators.empty());
+    UserAccountService(UserAccountDao userAccountDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       PasswordHashingService passwordHashingService) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService,
+                null, null, AllowAllDataScopeCriteriaService::new,
+                UserSecurityEventPublisher.NOOP, null);
     }
 
     @Autowired
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
-                              UserAccountCollaborators collaborators) {
+                              UserAccountAuthorizationServices authorizationServices,
+                              UserAccountSecurityServices securityServices) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService,
+                securityServices.passwordPolicyRuleService().orElse(null),
+                authorizationServices.accountRoleGrantDao(),
+                authorizationServices.dataScopeCriteriaService(),
+                securityServices.securityEventPublisher(),
+                securityServices.sessionRevocationService());
+    }
+
+    private UserAccountService(UserAccountDao userAccountDao,
+                               ActiveTenantVerifier activeTenantVerifier,
+                               PasswordHashingService passwordHashingService,
+                               PasswordPolicyRuleService passwordPolicyRuleService,
+                               AccountRoleGrantDao accountRoleGrantDao,
+                               Supplier<DataScopeCriteriaService> dataScopeCriteriaService,
+                               UserSecurityEventPublisher userSecurityEventPublisher,
+                               UserSessionRevocationService userSessionRevocationService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
-        UserAccountCollaborators resolved = collaborators == null ? UserAccountCollaborators.empty() : collaborators;
-        this.passwordPolicyRuleService = resolved.passwordPolicyRuleService();
-        this.accountRoleGrantDao = resolved.accountRoleGrantDao();
-        this.dataScopeCriteriaService = resolved.dataScopeCriteriaService();
-        this.userSecurityEventPublisher = resolved.securityEventPublisher();
-        this.userSessionRevocationService = resolved.sessionRevocationService();
+        this.passwordPolicyRuleService = passwordPolicyRuleService;
+        this.accountRoleGrantDao = accountRoleGrantDao;
+        this.dataScopeCriteriaService = dataScopeCriteriaService;
+        this.userSecurityEventPublisher = userSecurityEventPublisher;
+        this.userSessionRevocationService = userSessionRevocationService;
     }
 
     @Autowired
@@ -350,7 +368,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "password changed");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordChanged(validUserId));
         }
         return count;
     }
@@ -372,7 +390,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "password reset");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordReset(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordReset(validUserId));
         }
         return new PasswordResetResult(count, count > 0 ? temporaryPassword : null, user.getPasswordExpiresAt());
     }
@@ -386,7 +404,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             return 0;
         }
         int revoked = revokeUserSessions(validUserId, "force logout");
-        userSecurityEventPublisher.get().publish(UserSecurityEvent.forceLogout(validUserId));
+        userSecurityEventPublisher.publish(UserSecurityEvent.forceLogout(validUserId));
         return revoked;
     }
 
@@ -407,14 +425,15 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "own password changed");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordChanged(validUserId));
         }
         return count;
     }
 
     private int revokeUserSessions(String userId, String reason) {
-        UserSessionRevocationService revocationService = userSessionRevocationService.get();
-        return revocationService == null ? 0 : revocationService.revokeUserSessions(userId, reason);
+        return userSessionRevocationService == null
+                ? 0
+                : userSessionRevocationService.revokeUserSessions(userId, reason);
     }
 
     public boolean passwordChangeRequired(UserAccount user, Instant now) {

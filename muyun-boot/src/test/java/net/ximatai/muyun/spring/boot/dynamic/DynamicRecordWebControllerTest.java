@@ -168,8 +168,7 @@ class DynamicRecordWebControllerTest {
         objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
                 .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new RequestTraceWebFilter(), new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -472,9 +471,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, queryItemService, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -667,9 +664,7 @@ class DynamicRecordWebControllerTest {
     void shouldSyncAttachmentsWhenSavingDynamicRecord() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, attachmentService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).attachments(attachmentService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -720,9 +715,7 @@ class DynamicRecordWebControllerTest {
     void shouldExposeSavedRecordAttachmentMaintenanceEndpoints() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, attachmentService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).attachments(attachmentService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -779,9 +772,7 @@ class DynamicRecordWebControllerTest {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         RecordAttachmentAccessService accessService = mock(RecordAttachmentAccessService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, attachmentService, accessService, null, null))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).attachments(attachmentService).attachmentAccess(accessService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -830,9 +821,7 @@ class DynamicRecordWebControllerTest {
     void shouldReturnAttachmentErrorCodeWhenAttachmentAccessAdapterMissing() throws Exception {
         RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
         MockMvc attachmentMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, attachmentService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).attachments(attachmentService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -849,9 +838,7 @@ class DynamicRecordWebControllerTest {
     void shouldExposeDuplicateCheckThroughActionScopedPath() throws Exception {
         RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
         MockMvc duplicateMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, null, duplicateCheckService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).duplicateCheck(duplicateCheckService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -892,9 +879,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectDuplicateCheckWhenActionIsNotAuthorized() throws Exception {
         RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
         MockMvc duplicateMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, null, duplicateCheckService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).duplicateCheck(duplicateCheckService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1109,9 +1094,7 @@ class DynamicRecordWebControllerTest {
     void shouldCreateNavigationSessionWhenDynamicQueryRequestsIt() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, null, null, navigationService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).navigation(navigationService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1151,9 +1134,7 @@ class DynamicRecordWebControllerTest {
     void shouldResolveRecordNavigationMove() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, null, null, navigationService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).navigation(navigationService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1182,9 +1163,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectRecordNavigationWhenNeighborIsNotVisible() throws Exception {
         PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
         MockMvc navigationMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        null, null, null, null, null, navigationService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).navigation(navigationService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1209,9 +1188,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, queryItemService, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1298,9 +1275,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1375,9 +1350,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1431,9 +1404,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1602,9 +1573,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1931,9 +1900,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc summaryMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, queryItemService, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -2072,9 +2039,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc summaryMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -2882,9 +2847,7 @@ class DynamicRecordWebControllerTest {
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc referenceMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, moduleFieldService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, queryItemService, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -2971,9 +2934,7 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
         MockMvc referenceMvc = MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, null))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, queryItemService, null).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -3426,132 +3387,104 @@ class DynamicRecordWebControllerTest {
 
     private DynamicRecordWebController controller(DynamicRecordService recordService,
                                                   ActiveTenantVerifier activeTenantVerifier) {
-        return controller(recordService, activeTenantVerifier, null, null, null, null, null,
-                null, null, null, null, null);
+        return controllerFixture(recordService, activeTenantVerifier).build();
     }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService, null, null, null, null,
-                null, null, null, null, null);
+    private DynamicRecordWebControllerFixture controllerFixture(
+            DynamicRecordService recordService,
+            ActiveTenantVerifier activeTenantVerifier) {
+        return new DynamicRecordWebControllerFixture(recordService, activeTenantVerifier);
     }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, null, null, null, null, null, null, null, null);
-    }
+    private static final class DynamicRecordWebControllerFixture {
+        private final DynamicRecordService recordService;
+        private final ActiveTenantVerifier activeTenantVerifier;
+        private CodeBusinessPreviewService codeBusinessPreviewService;
+        private ReferenceRecordGenerationFacade referenceRecordGenerationFacade;
+        private PlatformPageConfigSnapshotService pageConfigSnapshotService;
+        private PlatformQueryItemService queryItemService;
+        private ModuleMetadataFieldService moduleMetadataFieldService;
+        private RecordAttachmentService recordAttachmentService;
+        private RecordAttachmentAccessService recordAttachmentAccessService;
+        private RecordDuplicateCheckService duplicateCheckService;
+        private PlatformRecordNavigationService navigationService;
+        private DynamicRelationProjectionReadService relationProjectionReadService =
+                DynamicRelationProjectionReadServiceTestFactory.withDefaults();
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
-                moduleMetadataFieldService, null, null, null, null, null);
-    }
+        private DynamicRecordWebControllerFixture(
+                DynamicRecordService recordService,
+                ActiveTenantVerifier activeTenantVerifier) {
+            this.recordService = recordService;
+            this.activeTenantVerifier = activeTenantVerifier;
+        }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService,
-                                                  RecordAttachmentService recordAttachmentService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
-                moduleMetadataFieldService, recordAttachmentService, null, null, null, null);
-    }
+        DynamicRecordWebControllerFixture codePreview(CodeBusinessPreviewService value) {
+            codeBusinessPreviewService = value;
+            return this;
+        }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService,
-                                                  RecordAttachmentService recordAttachmentService,
-                                                  RecordDuplicateCheckService duplicateCheckService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
-                moduleMetadataFieldService, recordAttachmentService, null, duplicateCheckService, null, null);
-    }
+        DynamicRecordWebControllerFixture generation(ReferenceRecordGenerationFacade value) {
+            referenceRecordGenerationFacade = value;
+            return this;
+        }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService,
-                                                  RecordAttachmentService recordAttachmentService,
-                                                  RecordDuplicateCheckService duplicateCheckService,
-                                                  PlatformRecordNavigationService navigationService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
-                moduleMetadataFieldService, recordAttachmentService, null, duplicateCheckService,
-                navigationService, null);
-    }
+        DynamicRecordWebControllerFixture query(
+                PlatformPageConfigSnapshotService pageConfig,
+                PlatformQueryItemService queryItems,
+                ModuleMetadataFieldService metadataFields) {
+            pageConfigSnapshotService = pageConfig;
+            queryItemService = queryItems;
+            moduleMetadataFieldService = metadataFields;
+            return this;
+        }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService,
-                                                  RecordAttachmentService recordAttachmentService,
-                                                  RecordAttachmentAccessService recordAttachmentAccessService,
-                                                  RecordDuplicateCheckService duplicateCheckService,
-                                                  PlatformRecordNavigationService navigationService) {
-        return controller(recordService, activeTenantVerifier, codeBusinessPreviewService,
-                referenceRecordGenerationFacade, pageConfigSnapshotService, queryItemService,
-                moduleMetadataFieldService, recordAttachmentService, recordAttachmentAccessService,
-                duplicateCheckService, navigationService, null);
-    }
+        DynamicRecordWebControllerFixture attachments(RecordAttachmentService value) {
+            recordAttachmentService = value;
+            return this;
+        }
 
-    private DynamicRecordWebController controller(DynamicRecordService recordService,
-                                                  ActiveTenantVerifier activeTenantVerifier,
-                                                  CodeBusinessPreviewService codeBusinessPreviewService,
-                                                  ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                                  PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                                  PlatformQueryItemService queryItemService,
-                                                  ModuleMetadataFieldService moduleMetadataFieldService,
-                                                  RecordAttachmentService recordAttachmentService,
-                                                  RecordAttachmentAccessService recordAttachmentAccessService,
-                                                  RecordDuplicateCheckService duplicateCheckService,
-                                                  PlatformRecordNavigationService navigationService,
-                                                  DynamicRelationProjectionReadService relationProjectionReadService) {
-        DynamicRecordQueryServices queryServices = new DynamicRecordQueryServices(
-                pageConfigSnapshotService,
-                queryItemService,
-                moduleMetadataFieldService,
-                relationProjectionReadService == null
-                        ? DynamicRelationProjectionReadServiceTestFactory.withDefaults()
-                        : relationProjectionReadService);
-        DynamicRecordAttachmentServices attachmentServices = new DynamicRecordAttachmentServices(
-                recordAttachmentService, recordAttachmentAccessService);
-        DynamicRecordActionServices actionServices = new DynamicRecordActionServices(
-                codeBusinessPreviewService, referenceRecordGenerationFacade, duplicateCheckService, navigationService);
-        return new DynamicRecordWebController(recordService, activeTenantVerifier,
-                queryServices, attachmentServices, actionServices);
+        DynamicRecordWebControllerFixture attachmentAccess(RecordAttachmentAccessService value) {
+            recordAttachmentAccessService = value;
+            return this;
+        }
+
+        DynamicRecordWebControllerFixture duplicateCheck(RecordDuplicateCheckService value) {
+            duplicateCheckService = value;
+            return this;
+        }
+
+        DynamicRecordWebControllerFixture navigation(PlatformRecordNavigationService value) {
+            navigationService = value;
+            return this;
+        }
+
+        DynamicRecordWebControllerFixture projection(DynamicRelationProjectionReadService value) {
+            relationProjectionReadService = value;
+            return this;
+        }
+
+        DynamicRecordWebController build() {
+            return new DynamicRecordWebController(
+                    recordService,
+                    activeTenantVerifier,
+                    new DynamicRecordQueryServices(pageConfigSnapshotService, queryItemService,
+                            moduleMetadataFieldService, relationProjectionReadService),
+                    new DynamicRecordAttachmentServices(recordAttachmentService, recordAttachmentAccessService),
+                    new DynamicRecordActionServices(codeBusinessPreviewService, referenceRecordGenerationFacade,
+                            duplicateCheckService, navigationService));
+        }
     }
 
     private MockMvc projectionMvc(PlatformPageConfigSnapshotService snapshotService,
                                   ModuleMetadataFieldService moduleFieldService,
                                   DynamicRelationProjectionReadService projectionReadService) {
         return MockMvcBuilders
-                .standaloneSetup(controller(service, activeTenantVerifier,
-                        codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, null, moduleFieldService,
-                        null, null, null, null, projectionReadService))
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier)
+                        .codePreview(codeBusinessPreviewService)
+                        .generation(referenceGenerationFacade)
+                        .query(snapshotService, null, moduleFieldService)
+                        .projection(projectionReadService)
+                        .build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(

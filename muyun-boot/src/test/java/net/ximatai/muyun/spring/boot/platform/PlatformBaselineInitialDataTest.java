@@ -28,7 +28,7 @@ class PlatformBaselineInitialDataTest {
 
     private final ApplicationService applicationService = new ApplicationService(applicationDao);
     private final TenantService tenantService = new TenantService(tenantDao);
-    private final UserAccountService userAccountService = new UserAccountService(
+    private final UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(
             userAccountDao, tenantService, new PasswordHashingService());
 
     @AfterEach

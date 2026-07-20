@@ -120,7 +120,7 @@ class IamWebControllerTest {
                 positionCategoryDao, tenantService, positionDao);
         PositionService positionService = new PositionService(positionDao, tenantService, positionCategoryService,
                 employeePositionDao);
-        UserAccountService userAccountService = new UserAccountService(
+        UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(
                 userAccountDao, tenantService, new PasswordHashingService());
         TenantWebController tenantController = new TenantWebController();
         OrganizationWebController organizationController = new OrganizationWebController();
@@ -1436,7 +1436,17 @@ class IamWebControllerTest {
         private PageResult<UserAccount> result = PageResult.of(List.of(), 0, PageRequest.of(1, 20));
 
         private RecordingUserAccountService() {
-            super(mock(UserAccountDao.class), mock(ActiveTenantVerifier.class), new PasswordHashingService());
+            super(
+                    mock(UserAccountDao.class),
+                    mock(ActiveTenantVerifier.class),
+                    new PasswordHashingService(),
+                    new net.ximatai.muyun.spring.iam.user.UserAccountAuthorizationServices(
+                            net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService::new,
+                            mock(net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao.class)),
+                    new net.ximatai.muyun.spring.iam.user.UserAccountSecurityServices(
+                            java.util.Optional.empty(),
+                            net.ximatai.muyun.spring.iam.user.UserSecurityEventPublisher.NOOP,
+                            mock(net.ximatai.muyun.spring.iam.user.UserSessionRevocationService.class)));
         }
 
         @Override

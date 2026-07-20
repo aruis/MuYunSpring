@@ -81,7 +81,7 @@ class DemoBootstrapTaskTest {
             organizationService);
     private final EmployeeService employeeService = new EmployeeService(employeeDao, tenantService, organizationService,
             departmentService);
-    private final UserAccountService userAccountService = new UserAccountService(userAccountDao, tenantService,
+    private final UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(userAccountDao, tenantService,
             new PasswordHashingService());
     private final EmployeeAccountService employeeAccountService = new EmployeeAccountService(employeeAccountDao,
             tenantService, employeeService, userAccountService);

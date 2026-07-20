@@ -10,17 +10,24 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class UserAccountCollaboratorConfiguration {
     @Bean
-    UserAccountCollaborators userAccountCollaborators(
+    UserAccountAuthorizationServices userAccountAuthorizationServices(
             ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
-            ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
-            ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao,
-            ObjectProvider<UserSecurityEventPublisher> securityEventPublisher,
-            ObjectProvider<UserSessionRevocationService> sessionRevocationService) {
-        return new UserAccountCollaborators(
+            AccountRoleGrantDao accountRoleGrantDao) {
+        return new UserAccountAuthorizationServices(
                 () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new),
-                passwordPolicyRuleService.getIfAvailable(),
-                accountRoleGrantDao.getIfAvailable(),
-                () -> securityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
-                sessionRevocationService::getIfAvailable);
+                accountRoleGrantDao);
+    }
+
+    @Bean
+    UserAccountSecurityServices userAccountSecurityServices(
+            ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
+            ObjectProvider<UserSecurityEventPublisher> securityEventPublisher,
+            UserSessionRevocationService sessionRevocationService) {
+        return new UserAccountSecurityServices(
+                java.util.Optional.ofNullable(passwordPolicyRuleService.getIfAvailable()),
+                event -> securityEventPublisher
+                        .getIfAvailable(() -> UserSecurityEventPublisher.NOOP)
+                        .publish(event),
+                sessionRevocationService);
     }
 }

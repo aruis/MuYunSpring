@@ -21,7 +21,6 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
-import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -53,26 +51,16 @@ class UserAccountServiceContractTest {
 
     @Test
     void shouldExposeDataScopeAbility() {
-        UserAccountService service = userAccountService(
-                mock(UserAccountDao.class),
-                tenantId -> {
-                },
-                passwordHashingService,
-                Optional.of(mock(DataScopeCriteriaService.class))
-        );
+        UserAccountService service = userAccountServiceFixture(mock(UserAccountDao.class), tenantId -> {
+                }, passwordHashingService).dataScope(mock(DataScopeCriteriaService.class)).build();
 
         assertThat(service).isInstanceOf(DataScopeAbility.class);
     }
 
     @Test
     void shouldExposeQuerySchemaForUserManagementScopes() {
-        UserAccountService service = userAccountService(
-                mock(UserAccountDao.class),
-                tenantId -> {
-                },
-                passwordHashingService,
-                Optional.of(mock(DataScopeCriteriaService.class))
-        );
+        UserAccountService service = userAccountServiceFixture(mock(UserAccountDao.class), tenantId -> {
+                }, passwordHashingService).dataScope(mock(DataScopeCriteriaService.class)).build();
 
         assertThat(service).isInstanceOf(QueryAbility.class);
         QuerySchema schema = service.querySchema();
@@ -150,8 +138,8 @@ class UserAccountServiceContractTest {
         );
         when(dao.updateById(any(UserAccount.class))).thenReturn(1);
         PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).passwordPolicy(passwordPolicyRuleService).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             UserAccount created = new UserAccount();
@@ -172,8 +160,8 @@ class UserAccountServiceContractTest {
         PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
         org.mockito.Mockito.doThrow(new BusinessException("iam.user.password-policy-violated", "密码必须包含数字"))
                 .when(passwordPolicyRuleService).validatePassword("secret");
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).passwordPolicy(passwordPolicyRuleService).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             UserAccount user = new UserAccount();
@@ -196,8 +184,8 @@ class UserAccountServiceContractTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(dao.count(any(Criteria.class))).thenReturn(1L);
         when(dao.deleteByIdAndVersion("user-1", 1)).thenReturn(1);
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.of(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).dataScope(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(service.delete("user-1")).isEqualTo(1);
@@ -220,11 +208,8 @@ class UserAccountServiceContractTest {
         when(dao.count(any(Criteria.class))).thenReturn(1L);
         when(dao.deleteByIdAndVersion("user-1", 1)).thenReturn(1);
         when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(grant));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService,
-                Optional.of(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()),
-                null,
-                accountRoleGrantDao);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).dataScope(new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()).roleGrants(accountRoleGrantDao).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(service.delete("user-1")).isEqualTo(1);
@@ -241,8 +226,8 @@ class UserAccountServiceContractTest {
         AccountRoleGrant grant = accountRoleGrant("grant-1", "role-1", "alice");
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(grant));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).roleGrants(accountRoleGrantDao).build();
 
         UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
 
@@ -262,8 +247,8 @@ class UserAccountServiceContractTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(usernameGrant, userIdGrant));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).roleGrants(accountRoleGrantDao).build();
 
         UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
 
@@ -284,8 +269,8 @@ class UserAccountServiceContractTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(accountRoleGrantDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(usernameGrant, userIdGrant));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), null, accountRoleGrantDao);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).roleGrants(accountRoleGrantDao).build();
 
         UserAccountService.AccountRoleGrantUserIdRepairResult result = service.repairAccountRoleGrantUserIds();
 
@@ -309,8 +294,8 @@ class UserAccountServiceContractTest {
                 org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
                 any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.of(dataScope));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).dataScope(dataScope).build();
         ActionExecutionPolicy policy = new ActionExecutionPolicy(
                 "changePassword",
                 PlatformActionLevel.RECORD,
@@ -357,8 +342,8 @@ class UserAccountServiceContractTest {
                 org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
                 any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.of(dataScope));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).dataScope(dataScope).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(service.changePassword("user-1", "secret2")).isEqualTo(1);
@@ -384,8 +369,8 @@ class UserAccountServiceContractTest {
                 org.mockito.ArgumentMatchers.<Optional<CurrentUser>>any(),
                 any(DataScopeFieldMapping.class)))
                 .thenReturn(DataScopeCriteriaResult.restricted(Criteria.of().eq("id", "user-1")));
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.of(dataScope));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).dataScope(dataScope).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.changePassword("user-1", "secret2"))
@@ -404,8 +389,8 @@ class UserAccountServiceContractTest {
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(user));
         when(dao.updateById(any(UserAccount.class))).thenReturn(1);
         PasswordPolicyRuleService passwordPolicyRuleService = mock(PasswordPolicyRuleService.class);
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService, Optional.empty(), passwordPolicyRuleService);
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).passwordPolicy(passwordPolicyRuleService).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             UserAccountService.PasswordResetResult result = service.resetPassword("user-1");
@@ -430,13 +415,8 @@ class UserAccountServiceContractTest {
         when(dao.updateById(any(UserAccount.class))).thenReturn(1);
         RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
         UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService,
-                provider(null),
-                provider(null),
-                provider(null),
-                provider(eventPublisher),
-                provider(revocationService));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).securityEvents(eventPublisher).sessionRevocation(revocationService).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             service.changePassword("user-1", "secret2");
@@ -463,13 +443,8 @@ class UserAccountServiceContractTest {
         RecordingUserSecurityEventPublisher eventPublisher = new RecordingUserSecurityEventPublisher();
         UserSessionRevocationService revocationService = mock(UserSessionRevocationService.class);
         when(revocationService.revokeUserSessions("user-1", "force logout")).thenReturn(2);
-        UserAccountService service = userAccountService(dao, tenantId -> {
-        }, passwordHashingService,
-                provider(null),
-                provider(null),
-                provider(null),
-                provider(eventPublisher),
-                provider(revocationService));
+        UserAccountService service = userAccountServiceFixture(dao, tenantId -> {
+        }, passwordHashingService).securityEvents(eventPublisher).sessionRevocation(revocationService).build();
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(service.forceLogout("user-1")).isEqualTo(2);
@@ -579,66 +554,11 @@ class UserAccountServiceContractTest {
         return new UserAccountService(dao, activeTenantVerifier, passwordHashingService);
     }
 
-    private UserAccountService userAccountService(
+    private UserAccountServiceFixture userAccountServiceFixture(
             UserAccountDao dao,
             net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
-            PasswordHashingService passwordHashingService,
-            Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
-        return userAccountService(dao, activeTenantVerifier, passwordHashingService,
-                dataScopeCriteriaService, null, null);
-    }
-
-    private UserAccountService userAccountService(
-            UserAccountDao dao,
-            net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
-            PasswordHashingService passwordHashingService,
-            Optional<DataScopeCriteriaService> dataScopeCriteriaService,
-            PasswordPolicyRuleService passwordPolicyRuleService) {
-        return userAccountService(dao, activeTenantVerifier, passwordHashingService,
-                dataScopeCriteriaService, passwordPolicyRuleService, null);
-    }
-
-    private UserAccountService userAccountService(
-            UserAccountDao dao,
-            net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
-            PasswordHashingService passwordHashingService,
-            Optional<DataScopeCriteriaService> dataScopeCriteriaService,
-            PasswordPolicyRuleService passwordPolicyRuleService,
-            AccountRoleGrantDao accountRoleGrantDao) {
-        Optional<DataScopeCriteriaService> criteria = dataScopeCriteriaService == null
-                ? Optional.empty()
-                : dataScopeCriteriaService;
-        UserAccountCollaborators collaborators = new UserAccountCollaborators(
-                () -> criteria.orElseGet(
-                        net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService::new),
-                passwordPolicyRuleService,
-                accountRoleGrantDao,
-                null,
-                null);
-        return new UserAccountService(dao, activeTenantVerifier, passwordHashingService, collaborators);
-    }
-
-    private UserAccountService userAccountService(
-            UserAccountDao dao,
-            net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
-            PasswordHashingService passwordHashingService,
-            ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
-            ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
-            ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao,
-            ObjectProvider<UserSecurityEventPublisher> securityEventPublisher,
-            ObjectProvider<UserSessionRevocationService> sessionRevocationService) {
-        UserAccountCollaborators collaborators = new UserAccountCollaborators(
-                () -> dataScopeCriteriaService == null
-                        ? new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()
-                        : dataScopeCriteriaService.getIfAvailable(
-                                net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService::new),
-                passwordPolicyRuleService == null ? null : passwordPolicyRuleService.getIfAvailable(),
-                accountRoleGrantDao == null ? null : accountRoleGrantDao.getIfAvailable(),
-                () -> securityEventPublisher == null
-                        ? UserSecurityEventPublisher.NOOP
-                        : securityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP),
-                () -> sessionRevocationService == null ? null : sessionRevocationService.getIfAvailable());
-        return new UserAccountService(dao, activeTenantVerifier, passwordHashingService, collaborators);
+            PasswordHashingService passwordHashingService) {
+        return new UserAccountServiceFixture(dao, activeTenantVerifier, passwordHashingService);
     }
 
     private UserAccount activeUser() {
@@ -669,17 +589,60 @@ class UserAccountServiceContractTest {
                 .orElseThrow(() -> new AssertionError("Missing query field: " + fieldName));
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> ObjectProvider<T> provider(T bean) {
-        ObjectProvider<T> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(bean);
-        when(provider.getIfAvailable(any(Supplier.class))).thenAnswer(invocation -> {
-            if (bean != null) {
-                return bean;
-            }
-            return invocation.<Supplier<T>>getArgument(0).get();
-        });
-        return provider;
+    private static final class UserAccountServiceFixture {
+        private final UserAccountDao dao;
+        private final net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier;
+        private final PasswordHashingService passwordHashingService;
+        private DataScopeCriteriaService dataScopeCriteriaService =
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService();
+        private PasswordPolicyRuleService passwordPolicyRuleService;
+        private AccountRoleGrantDao accountRoleGrantDao = mock(AccountRoleGrantDao.class);
+        private UserSecurityEventPublisher securityEventPublisher = UserSecurityEventPublisher.NOOP;
+        private UserSessionRevocationService sessionRevocationService = mock(UserSessionRevocationService.class);
+
+        private UserAccountServiceFixture(
+                UserAccountDao dao,
+                net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier activeTenantVerifier,
+                PasswordHashingService passwordHashingService) {
+            this.dao = dao;
+            this.activeTenantVerifier = activeTenantVerifier;
+            this.passwordHashingService = passwordHashingService;
+        }
+
+        UserAccountServiceFixture dataScope(DataScopeCriteriaService value) {
+            dataScopeCriteriaService = value;
+            return this;
+        }
+
+        UserAccountServiceFixture passwordPolicy(PasswordPolicyRuleService value) {
+            passwordPolicyRuleService = value;
+            return this;
+        }
+
+        UserAccountServiceFixture roleGrants(AccountRoleGrantDao value) {
+            accountRoleGrantDao = value;
+            return this;
+        }
+
+        UserAccountServiceFixture securityEvents(UserSecurityEventPublisher value) {
+            securityEventPublisher = value;
+            return this;
+        }
+
+        UserAccountServiceFixture sessionRevocation(UserSessionRevocationService value) {
+            sessionRevocationService = value;
+            return this;
+        }
+
+        UserAccountService build() {
+            return new UserAccountService(
+                    dao,
+                    activeTenantVerifier,
+                    passwordHashingService,
+                    new UserAccountAuthorizationServices(() -> dataScopeCriteriaService, accountRoleGrantDao),
+                    new UserAccountSecurityServices(Optional.ofNullable(passwordPolicyRuleService),
+                            securityEventPublisher, sessionRevocationService));
+        }
     }
 
     private static final class RecordingUserSecurityEventPublisher implements UserSecurityEventPublisher {
