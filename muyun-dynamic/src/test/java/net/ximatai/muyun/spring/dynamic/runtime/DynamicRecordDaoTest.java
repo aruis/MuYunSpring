@@ -263,7 +263,7 @@ class DynamicRecordDaoTest {
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
         DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
-        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract", lifecycle);
+        DynamicEntityService entityService = DynamicEntityService.withLifecycle(dao, "sales.contract", lifecycle);
 
         DynamicRecord inserted = new DynamicRecord(contractEntity())
                 .setValue("amount", BigDecimal.TEN);
@@ -363,7 +363,8 @@ class DynamicRecordDaoTest {
                 .setValue("quantity", BigDecimal.valueOf(2))
                 .setValue("price", BigDecimal.valueOf(15));
 
-        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract", lifecycle).insert(record);
+        DynamicEntityService.withLifecycle(new DynamicRecordDao(operations, entity), "sales.contract", lifecycle)
+                .insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
@@ -622,12 +623,10 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
                 )
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
         DynamicRecord parent = new DynamicRecord(invoice);
         DynamicRecord child = new DynamicRecord(line)
                 .setValue("quantity", BigDecimal.valueOf(3))
@@ -654,12 +653,10 @@ class DynamicRecordDaoTest {
                 "Invoice Line",
                 List.of(FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2))
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
 
         new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeUpdate(record, null, Map.of());
@@ -686,12 +683,10 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
                 )
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.ZERO);
         DynamicRecord first = new DynamicRecord(line)
                 .setValue("quantity", BigDecimal.valueOf(2))
@@ -723,12 +718,10 @@ class DynamicRecordDaoTest {
                 "Invoice Line",
                 List.of(FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2))
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
         record.setChildren("items", List.of());
 
@@ -763,15 +756,13 @@ class DynamicRecordDaoTest {
                 "Invoice Attachment",
                 List.of(FieldDefinition.decimal("fileSize", "File Size").column("file_size").precision(18, 2))
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, item, attachment),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, item, attachment))
+                .relations(List.of(
                         EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"),
                         EntityRelationDefinition.child("attachments", "invoice", "invoice_attachment", "invoiceId")
-                )
-        );
+                ))
+                .build();
         DynamicRecord record = new DynamicRecord(invoice)
                 .setValue("itemTotal", BigDecimal.valueOf(100))
                 .setValue("attachmentTotal", BigDecimal.ZERO);
@@ -803,12 +794,10 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
                 )
         );
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
         DynamicRecord existingLine = new DynamicRecord(line)
                 .setValue("quantity", BigDecimal.valueOf(2))
                 .setValue("price", BigDecimal.valueOf(10));
@@ -838,7 +827,7 @@ class DynamicRecordDaoTest {
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
         DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
-        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract", lifecycle);
+        DynamicEntityService entityService = DynamicEntityService.withLifecycle(dao, "sales.contract", lifecycle);
 
         DynamicRecord partial = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
         partial.setId("contract-1");

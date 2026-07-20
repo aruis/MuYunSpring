@@ -58,18 +58,16 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldValidateChildFormulaTargetAgainstModuleRelation() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
                         invoiceEntity().withFormulaRules(
                                 EntityFormulaRuleDefinition.calculation("lineAmountCalc",
                                         "items.lineAmount", "{items.quantity} * {items.price}")
                         ),
                         invoiceLineEntity()
-                ),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+                ))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
 
         validator.validate(module);
     }
@@ -130,16 +128,11 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectAssignmentInActionAvailabilityExpression() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("invoice", "delete", "删除", true)
-                        .availableWhen("{status} = 'draft'"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .actions(List.of(new EntityActionDefinition("invoice", "delete", "删除", true)
+                        .availableWhen("{status} = 'draft'")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -148,16 +141,14 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectUnknownFieldInActionAvailabilityExpression() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("invoice", "delete", "删除", true)
-                        .availableWhen("{statsu} == 'draft'"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition("invoice", "delete", "删除", true)
+                        .availableWhen("{statsu} == 'draft'")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -173,32 +164,28 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldValidateChildFieldInActionAvailabilityExpression() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("invoice", "submit", "提交", true)
-                        .availableWhen("SUM({items.lineAmount}) > 0"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition("invoice", "submit", "提交", true)
+                        .availableWhen("SUM({items.lineAmount}) > 0")))
+                .build();
 
         validator.validate(module);
     }
 
     @Test
     void shouldValidateActionAuthInheritanceTarget() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("invoice", "submit", "提交", true, null, null, null,
-                        true, false, "approve", null, null, null, null))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition("invoice", "submit", "提交", true, null, null, null,
+                        true, false, "approve", null, null, null, null)))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -207,17 +194,15 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectAnonymousActionWithAuthPolicy() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("invoice", "publicPreview", "公开预览", true, null, null,
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition("invoice", "publicPreview", "公开预览", true, null, null,
                         EntityActionAccessMode.ANONYMOUS_ALLOWED, true, false,
-                        null, null, null, null, null))
-        );
+                        null, null, null, null, null)))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -226,21 +211,19 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectActionAuthInheritanceTargetWithoutActionAuth() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(
                         new EntityActionDefinition("invoice", "submit", "提交", true, null, null, null,
                                 true, false, "preview", null, null, null, null),
                         new EntityActionDefinition("invoice", "preview", "预览", true, null, null,
                                 EntityActionAccessMode.LOGIN_REQUIRED, false, false,
                                 null, null, null, null, null)
-                )
-        );
+                ))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -249,20 +232,18 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectActionAuthInheritanceCycle() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(invoiceEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(invoiceEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(
                         new EntityActionDefinition("invoice", "submit", "提交", true, null, null, null,
                                 true, false, "approve", null, null, null, null),
                         new EntityActionDefinition("invoice", "approve", "审核", true, null, null, null,
                                 true, false, "submit", null, null, null, null)
-                )
-        );
+                ))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -271,18 +252,16 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectUnknownChildFormulaTargetField() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
                         invoiceEntity().withFormulaRules(
                                 EntityFormulaRuleDefinition.calculation("lineAmountCalc",
                                         "items.missingAmount", "{items.quantity} * {items.price}")
                         ),
                         invoiceLineEntity()
-                ),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+                ))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -291,18 +270,16 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectUnknownChildFormulaTargetRelation() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
                         invoiceEntity().withFormulaRules(
                                 EntityFormulaRuleDefinition.calculation("lineAmountCalc",
                                         "details.lineAmount", "{details.quantity} * {details.price}")
                         ),
                         invoiceLineEntity()
-                ),
-                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
-        );
+                ))
+                .relations(List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -311,22 +288,20 @@ class EntityFormulaRuleDefinitionTest {
 
     @Test
     void shouldRejectChildTargetFormulaDirectlyReadingAnotherChildRelation() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.invoice",
-                "Invoice",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
                         invoiceEntity().withFormulaRules(
                                 EntityFormulaRuleDefinition.calculation("lineAmountCalc",
                                         "items.lineAmount", "{discounts.rate} * {items.price}")
                         ),
                         invoiceLineEntity(),
                         invoiceDiscountEntity()
-                ),
-                List.of(
+                ))
+                .relations(List.of(
                         EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"),
                         EntityRelationDefinition.child("discounts", "invoice", "invoice_discount", "invoiceId")
-                )
-        );
+                ))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)

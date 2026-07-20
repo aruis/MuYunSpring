@@ -64,29 +64,24 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformModule module = module("iam.organization", "组织管理", ModuleKind.STATIC);
         when(moduleService.resolveVisibleModule("iam.organization")).thenReturn(module);
         when(actionService.listByModuleAliases(List.of("iam.organization"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
-                "iam",
-                "iam.organization",
-                "组织管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/organizations",
-                null,
-                Set.of(),
-                List.of(
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("iam", "iam.organization", "组织管理")
+                                                    .parentModuleAlias(null)
+                                                    .entry(ModuleEntryType.ROUTE, "/iam/organizations", null)
+                                                    .capabilities(Set.of())
+                                                    .actions(List.of(
                         StaticModuleActionDefinition.platformAction(PlatformAction.MENU),
                         StaticModuleActionDefinition.platformAction(PlatformAction.VIEW),
                         StaticModuleActionDefinition.platformAction(PlatformAction.TREE),
                         StaticModuleActionDefinition.platformAction(PlatformAction.ENABLE),
                         StaticModuleActionDefinition.platformAction(PlatformAction.DISABLE)
-                ),
-                List.of(),
-                ModuleUiDefinition.builder("iam.organization")
+                ))
+                                                    .entities(List.of())
+                                                    .uiDefinition(ModuleUiDefinition.builder("iam.organization")
                         .listView(list -> list
                                 .title("组织列表")
                                 .field("title", field -> field.label("组织名称")))
-                        .build()
-        );
+                        .build())
+                                                    .build();
         PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
                 moduleService,
                 actionService,
@@ -145,22 +140,17 @@ class PlatformModuleRuntimeContextServiceTest {
         when(moduleService.resolveVisibleModule("sales.contract"))
                 .thenReturn(module("sales.contract", "合同", ModuleKind.STATIC));
         when(actionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
-                "sales",
-                "sales.contract",
-                "合同",
-                null,
-                ModuleEntryType.ROUTE,
-                "/sales/contracts",
-                null,
-                Set.of(),
-                List.of(StaticModuleActionDefinition.platformAction(PlatformAction.VIEW)),
-                List.of(
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.contract", "合同")
+                                                    .parentModuleAlias(null)
+                                                    .entry(ModuleEntryType.ROUTE, "/sales/contracts", null)
+                                                    .capabilities(Set.of())
+                                                    .actions(List.of(StaticModuleActionDefinition.platformAction(PlatformAction.VIEW)))
+                                                    .entities(List.of(
                         entity("contract", Set.of(EntityCapability.CRUD)),
                         entity("contractLine", Set.of(EntityCapability.CRUD, EntityCapability.TREE,
                                 EntityCapability.ENABLE))
-                )
-        );
+                ))
+                                                    .build();
         PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
                 moduleService,
                 actionService,
@@ -192,13 +182,10 @@ class PlatformModuleRuntimeContextServiceTest {
                 throw new PlatformAccessDeniedException("denied");
             }
         };
-        StaticModuleDefinition definition = new StaticModuleDefinition(
-                "iam",
-                "iam.organization",
-                "组织管理",
-                null,
-                List.of(StaticModuleActionDefinition.platformAction(PlatformAction.TREE))
-        );
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("iam", "iam.organization", "组织管理")
+                                                    .parentModuleAlias(null)
+                                                    .actions(List.of(StaticModuleActionDefinition.platformAction(PlatformAction.TREE)))
+                                                    .build();
         PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
                 moduleService,
                 actionService,
@@ -395,12 +382,9 @@ class PlatformModuleRuntimeContextServiceTest {
         when(moduleService.resolveVisibleModule("iam.user"))
                 .thenReturn(module("iam.user", "用户管理", ModuleKind.STATIC));
         when(actionService.listByModuleAliases(List.of("iam.user"))).thenReturn(List.of());
-        StaticModuleDefinition definition = new StaticModuleDefinition(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                List.of(
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                                                    .parentModuleAlias(null)
+                                                    .actions(List.of(
                         StaticModuleActionDefinition.platformAction(PlatformAction.QUERY),
                         StaticModuleActionDefinition.platformAction(PlatformAction.VIEW),
                         StaticModuleActionDefinition.platformAction(PlatformAction.UPDATE),
@@ -415,8 +399,8 @@ class PlatformModuleRuntimeContextServiceTest {
                                 false,
                                 null
                         )
-                )
-        );
+                ))
+                                                    .build();
         ScopedModuleAbility scopedAbility = mock(ScopedModuleAbility.class);
         when(scopedAbility.getModuleAlias()).thenReturn("iam.user");
         doAnswer(invocation -> {

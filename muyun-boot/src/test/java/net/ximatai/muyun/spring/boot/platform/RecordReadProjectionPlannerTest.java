@@ -165,17 +165,12 @@ class RecordReadProjectionPlannerTest {
     @Test
     @SuppressWarnings("rawtypes")
     void shouldRecordOptionTitlePostReadTransformsForProjectedFields() {
-        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(new StaticModuleDefinition(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                                                                                                 .parentModuleAlias(null)
+                                                                                                 .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                                                                                                 .capabilities(Set.of(EntityCapability.CRUD))
+                                                                                                 .actions(List.of())
+                                                                                                 .entities(List.of(new EntityDefinition(
                         "user",
                         "iam_user",
                         "User",
@@ -183,17 +178,17 @@ class RecordReadProjectionPlannerTest {
                                 FieldDefinition.string("username", "账号"),
                                 FieldDefinition.string("passwordStatus", "密码状态")
                         )
-                )),
-                ModuleUiDefinition.builder("iam.user")
+                )))
+                                                                                                 .uiDefinition(ModuleUiDefinition.builder("iam.user")
                         .listView(list -> list
                                 .field("username")
                                 .field("passwordStatus"))
-                        .build(),
-                List.of(),
-                List.of(),
-                UserAccount.class,
-                List.of()
-        ));
+                        .build())
+                                                                                                 .references(List.of())
+                                                                                                 .readProjections(List.of())
+                                                                                                 .modelClass(UserAccount.class)
+                                                                                                 .projectionJoins(List.of())
+                                                                                                 .build());
         CrudAbility recordService = mock(CrudAbility.class);
         when(recordService.modelClass()).thenReturn(UserAccount.class);
 
@@ -329,17 +324,12 @@ class RecordReadProjectionPlannerTest {
     }
 
     private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition) {
-        return new StaticModuleDefinition(
-                "iam",
-                "iam.employee",
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee", "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee",
                         "iam_employee",
                         "Employee",
@@ -347,9 +337,9 @@ class RecordReadProjectionPlannerTest {
                                 FieldDefinition.string("employeeNo", "职员编号"),
                                 FieldDefinition.string("mobile", "手机号")
                         )
-                )),
-                uiDefinition
-        );
+                )))
+                       .uiDefinition(uiDefinition)
+                       .build();
     }
 
     @SuppressWarnings("unchecked")

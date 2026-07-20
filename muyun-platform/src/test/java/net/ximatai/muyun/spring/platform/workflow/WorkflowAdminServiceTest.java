@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +31,7 @@ class WorkflowAdminServiceTest {
     private final WorkflowHistoryQueryService historyQueryService = mock(WorkflowHistoryQueryService.class);
     private final WorkflowAdminService service = new WorkflowAdminService(instanceDao, taskDao, nodeInstanceDao,
             routeInstanceDao, eventDao, actionPolicyService, instanceActionService, taskActionService,
-            historyQueryService);
+            historyQueryService, Optional.empty());
 
     @Test
     void shouldDefaultCurrentInstanceQueryToRunningInstances() {
@@ -360,6 +361,6 @@ class WorkflowAdminServiceTest {
     private WorkflowAdminService serviceWithTitles(Map<String, String> userTitles) {
         return new WorkflowAdminService(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao,
                 actionPolicyService, instanceActionService, taskActionService, historyQueryService,
-                userIds -> userTitles);
+                Optional.of(userIds -> userTitles));
     }
 }

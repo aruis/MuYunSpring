@@ -741,7 +741,7 @@ class DynamicRelationRuntimeTest {
         AtomicReference<DynamicEntityService> invoiceService = new AtomicReference<>();
         AtomicReference<DynamicEntityService> lineService = new AtomicReference<>();
         ModuleDefinition module = invoiceModule();
-        invoiceService.set(new DynamicEntityService(
+        invoiceService.set(DynamicEntityService.withModule(
                 new DynamicRecordDao(operations, invoiceEntity()),
                 MODULE,
                 new DynamicRecordLifecycle() {
@@ -753,7 +753,7 @@ class DynamicRelationRuntimeTest {
                 module,
                 entityAlias -> "invoice_line".equals(entityAlias) ? lineService.get() : invoiceService.get()
         ));
-        lineService.set(new DynamicEntityService(
+        lineService.set(DynamicEntityService.withModule(
                 new DynamicRecordDao(operations, invoiceLineEntity()),
                 MODULE,
                 DynamicRecordLifecycle.NONE,
@@ -824,12 +824,10 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldRejectInvalidDynamicRelationMetadata() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "missingField"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "missingField")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -847,12 +845,10 @@ class DynamicRelationRuntimeTest {
                         FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.REFERENCE);
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invalidLine),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invalidLine))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -862,13 +858,11 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldRejectInvalidDynamicReferenceTargetMetadata() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales.invoice"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales.invoice")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -877,13 +871,11 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldRejectUnparseableDynamicReferenceTargetMetadata() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -892,27 +884,23 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldAllowDynamicReferenceAutoTitleAcrossModules() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
+                        .withAutoTitle("invoiceTitle")))
+                .build();
 
         new ModuleDefinitionValidator().validate(module);
     }
 
     @Test
     void shouldRejectUnknownSameModuleDynamicReferenceTarget() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "missing_invoice")))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "missing_invoice"))))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -921,14 +909,12 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldRejectDynamicReferenceAutoTitleFieldConflicts() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("title"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("title")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -943,14 +929,12 @@ class DynamicRelationRuntimeTest {
                 "Invoice",
                 List.of(FieldDefinition.string("code", "Code"))
         );
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceWithoutTitle, invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceWithoutTitle, invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("invoiceTitle")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -959,28 +943,24 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldAllowDynamicReferenceProjectionAcrossModules() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
-                        .withProjection("title", "invoiceDisplayTitle"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
+                        .withProjection("title", "invoiceDisplayTitle")))
+                .build();
 
         new ModuleDefinitionValidator().validate(module);
     }
 
     @Test
     void shouldRejectDynamicReferenceProjectionFieldConflicts() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withProjection("title", "title"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withProjection("title", "title")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -989,15 +969,13 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldRejectDuplicateDynamicReferenceOutputFields() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceDisplay")
-                        .withProjection("title", "invoiceDisplay"))
-        );
+                        .withProjection("title", "invoiceDisplay")))
+                .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -1021,15 +999,13 @@ class DynamicRelationRuntimeTest {
                         FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.REFERENCE);
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity(), payment, paymentLine),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity(), payment, paymentLine))
+                .relations(List.of(
                         EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"),
                         EntityRelationDefinition.child("lines", "payment", "payment_line", "paymentId")
-                )
-        );
+                ))
+                .build();
 
         new ModuleDefinitionValidator().validate(module);
     }
@@ -1071,31 +1047,27 @@ class DynamicRelationRuntimeTest {
     }
 
     private ModuleDefinition invoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoDeleteWithParent()))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceTitle")
-                        .withProjection("title", "invoiceDisplayTitle"))
-        );
+                        .withProjection("title", "invoiceDisplayTitle")))
+                .build();
     }
 
     private ModuleDefinition scoreModule() {
-        return new ModuleDefinition(
-                "sales.score",
-                "Score",
-                List.of(new EntityDefinition("score", "sales_score", "Score", List.of(
+        return ModuleDefinition.builder("sales.score", "Score")
+                .entities(List.of(new EntityDefinition("score", "sales_score", "Score", List.of(
                         FieldDefinition.titleField(),
                         FieldDefinition.string("studentId", "Student").column("student_id")
-                ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE))),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("score", "studentId",
-                        ReferenceTarget.of("school.student", "student")))
-        );
+                ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE))))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("score", "studentId",
+                        ReferenceTarget.of("school.student", "student"))))
+                .build();
     }
 
     private ModuleDefinition studentModule() {
@@ -1138,69 +1110,57 @@ class DynamicRelationRuntimeTest {
                         FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
                 )
         );
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoice, line),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
-        );
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoice, line))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")))
+                .build();
     }
 
     private ModuleDefinition sortableInvoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), sortableInvoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), sortableInvoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent())
-        );
+                        .withAutoDeleteWithParent()))
+                .build();
     }
 
     private ModuleDefinition writeProtectedForeignKeyInvoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), writeProtectedInvoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
-        );
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), writeProtectedInvoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")))
+                .build();
     }
 
     private ModuleDefinition manyReferenceInvoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")).many())
-        );
+                        .withAutoDeleteWithParent()))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")).many()))
+                .build();
     }
 
     private ModuleDefinition projectionOnlyInvoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withProjection("title", "invoiceDisplayTitle"))
-        );
+                        .withAutoDeleteWithParent()))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withProjection("title", "invoiceDisplayTitle")))
+                .build();
     }
 
     private ModuleDefinition manyProjectionInvoiceModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Invoice",
-                List.of(invoiceEntity(), invoiceLineEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .many()
-                        .withProjection("title", "invoiceDisplayTitle"))
-        );
+                        .withProjection("title", "invoiceDisplayTitle")))
+                .build();
     }
 
     private EntityDefinition invoiceEntity() {

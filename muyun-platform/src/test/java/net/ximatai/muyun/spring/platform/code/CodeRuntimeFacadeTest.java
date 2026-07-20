@@ -166,7 +166,7 @@ class CodeRuntimeFacadeTest {
         CodeLedgerEntryService ledgerService = new CodeLedgerEntryService(new TestMemoryDao<>());
         CodePreviewService previewService = new CodePreviewService(new FormulaEngine(clock), clock);
         CodeGenerateService generateService = new CodeGenerateService(ruleService, previewService, stateService,
-                recycleService, clock);
+                recycleService, null, null, clock);
         return new Services(ruleService, generateService, ledgerService);
     }
 

@@ -157,7 +157,9 @@ class PlatformDynamicRuntimeRefresherIT {
                     .extracting(Menu::getModuleAlias)
                     .containsExactly("crm.customer");
         }
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, new DictionaryFieldValueValidator(services.itemService));
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .fieldValueValidator(new DictionaryFieldValueValidator(services.itemService))
+                .build();
         PlatformDynamicRuntimeRefresher refresher = new PlatformDynamicRuntimeRefresher(
                 new PlatformModuleDefinitionCompiler(
                         services.moduleService,

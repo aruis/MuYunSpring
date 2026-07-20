@@ -255,12 +255,11 @@ class MoneyDynamicRecordServiceIntegrationTest {
     }
 
     private DynamicRecordService service(IDatabaseOperations<Object> operations, ModuleDefinition module) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null
-        ).register(module);
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .build()
+                .register(module);
         return new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),
@@ -317,14 +316,12 @@ class MoneyDynamicRecordServiceIntegrationTest {
     }
 
     private ModuleDefinition orderWithLineModule() {
-        return new ModuleDefinition(
-                MODULE,
-                "Order",
-                List.of(orderEntity(), orderLineEntity()),
-                List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId")
+        return ModuleDefinition.builder(MODULE, "Order")
+                .entities(List.of(orderEntity(), orderLineEntity()))
+                .relations(List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent())
-        );
+                        .withAutoDeleteWithParent()))
+                .build();
     }
 
     private EntityDefinition orderLineEntity() {

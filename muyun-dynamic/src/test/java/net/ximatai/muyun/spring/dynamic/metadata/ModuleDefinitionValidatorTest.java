@@ -14,16 +14,14 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectCustomActionThatConflictsWithReservedWebPath() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(customAction("query"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(customAction("query")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -32,16 +30,14 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectCustomActionThatConflictsWithPlatformStandardPath() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(customAction("create"))
-        );
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(customAction("create")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -50,18 +46,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectConfiguredStandardActionWithCustomCategoryOnReservedPath() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, false, null, null, null, EntityActionExecutorType.SERVICE, "deleteExecutor"))
-        );
+                        true, false, null, null, null, EntityActionExecutorType.SERVICE, "deleteExecutor")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -70,18 +64,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectStandardActionConfiguredWithCustomExecutor() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "query", "Query", true, EntityActionLevel.LIST,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "query", "Query", true, EntityActionLevel.LIST,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, false, null, null, null, EntityActionExecutorType.SERVICE, "queryExecutor"))
-        );
+                        true, false, null, null, null, EntityActionExecutorType.SERVICE, "queryExecutor")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -90,18 +82,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectStandardActionConfiguredWithWrongLevel() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.LIST,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.LIST,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
-        );
+                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null)))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -110,19 +100,17 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectScopedDefaultGrantWithoutDataAuth() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "follow", "Follow", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "follow", "Follow", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, ActionDefaultGrantPolicy.OWNER, null, null, null,
-                        EntityActionExecutorType.SERVICE, "followExecutor"))
-        );
+                        EntityActionExecutorType.SERVICE, "followExecutor")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -131,19 +119,17 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectLoginOnlyActionWithDefaultGrantPolicy() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "profile", "Profile", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "profile", "Profile", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.LOGIN_REQUIRED,
                         false, false, ActionDefaultGrantPolicy.ANY_LOGIN_USER, null, null, null,
-                        EntityActionExecutorType.SERVICE, "profileExecutor"))
-        );
+                        EntityActionExecutorType.SERVICE, "profileExecutor")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -152,18 +138,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectStandardCategoryWhenActionIsNotPlatformStandardAction() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
-        );
+                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null)))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -172,18 +156,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRejectDialogActionWithoutExecutorKey() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "submitDialog", "Submit Dialog", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "submitDialog", "Submit Dialog", true, EntityActionLevel.RECORD,
                         EntityActionCategory.DIALOG, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, false, null, null, null, EntityActionExecutorType.DIALOG, null))
-        );
+                        true, false, null, null, null, EntityActionExecutorType.DIALOG, null)))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -192,18 +174,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldRequireDataScopeCapabilityForDataAuthAction() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
-        );
+                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor")))
+                .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -212,18 +192,16 @@ class ModuleDefinitionValidatorTest {
 
     @Test
     void shouldAllowDataAuthActionWhenEntitySupportsDataScope() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity().withCapabilities(EntityCapability.DATA_SCOPE)),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity().withCapabilities(EntityCapability.DATA_SCOPE)))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
-                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
-        );
+                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor")))
+                .build();
 
         validator.validate(module);
     }

@@ -275,15 +275,20 @@ class DynamicCodeCoordinatorTest {
     }
 
     private DynamicRecordService dynamicService(Services services, IDatabaseOperations<Object> operations) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, new DynamicModuleRegistry())
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .build()
                 .register(module());
         DynamicRecordService[] holder = new DynamicRecordService[1];
         DynamicCodeCoordinator coordinator = new DynamicCodeCoordinator(
                 services.ruleService,
                 services.generateService,
+                services.previewService,
+                null,
                 services.ledgerService,
                 services.recycleService,
                 new DynamicRecordServiceProxy(holder),
+                null,
                 clock
         );
         holder[0] = new DynamicRecordService(
@@ -409,7 +414,7 @@ class DynamicCodeCoordinatorTest {
                 clock
         );
         CodeGenerateService generateService = new CodeGenerateService(ruleService, previewService, stateService,
-                recycleService, clock);
+                recycleService, null, null, clock);
         return new Services(ruleService, previewService, generateService, recycleService, ledgerService);
     }
 

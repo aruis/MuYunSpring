@@ -29,7 +29,7 @@ class CodeGenerateServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-08T00:00:00Z"), ZoneOffset.UTC);
     private final CodePreviewService previewService = new CodePreviewService(new FormulaEngine(clock), clock);
     private final CodeGenerateService generateService = new CodeGenerateService(
-            ruleService, previewService, stateService, null, issueLogService, clock);
+            ruleService, previewService, stateService, null, issueLogService, null, clock);
 
     @Test
     void shouldAdvanceFormalSequenceButPreviewDoesNotAdvance() {

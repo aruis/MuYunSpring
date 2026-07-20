@@ -67,7 +67,7 @@ class PlatformAdminMenuVisibilityContractTest {
     private final TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
 
     private final TenantService tenantService = new TenantService(tenantDao);
-    private final UserAccountService userAccountService = new UserAccountService(
+    private final UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(
             userAccountDao,
             tenantService,
             new PasswordHashingService()

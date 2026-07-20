@@ -251,15 +251,13 @@ class DynamicOpenApiGeneratorTest {
 
     @Test
     void shouldNotExposeCustomActionsThatConflictWithReservedWebPaths() {
-        ModuleDefinition module = new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .associationViews(List.of())
+                .actions(List.of(
                         action("openapi", "OpenAPI", EntityActionLevel.LIST),
                         action("query", "Query", EntityActionLevel.LIST),
                         action("import", "Import", EntityActionLevel.LIST),
@@ -269,8 +267,8 @@ class DynamicOpenApiGeneratorTest {
                         action("disable", "Disable", EntityActionLevel.RECORD),
                         action("sort", "Sort", EntityActionLevel.RECORD),
                         action("tree", "Tree", EntityActionLevel.LIST)
-                )
-        );
+                ))
+                .build();
 
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module));
 
@@ -638,22 +636,18 @@ class DynamicOpenApiGeneratorTest {
     }
 
     private ModuleDefinition module() {
-        return new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(lineEntity(), contractEntity()),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("contract", "customerId", "sales.customer.customer")),
-                List.of(),
-                List.of(),
-                List.of(
+        return ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(lineEntity(), contractEntity()))
+                .references(List.of(EntityReferenceDefinition.to(
+                        "contract", "customerId", "sales.customer.customer")))
+                .actions(List.of(
                         action("publish", "发布", EntityActionLevel.LIST),
                         action("submit", "提交", EntityActionLevel.RECORD),
                         action("archive", "归档", EntityActionLevel.BATCH),
                         action("preview", "预览", EntityActionLevel.ANY)
-                ),
-                "contract"
-        );
+                ))
+                .mainEntityAlias("contract")
+                .build();
     }
 
     private EntityActionDefinition action(String code,

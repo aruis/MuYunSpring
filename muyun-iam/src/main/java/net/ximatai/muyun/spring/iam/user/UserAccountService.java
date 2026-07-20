@@ -42,7 +42,6 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -72,8 +71,8 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     private final PasswordPolicyRuleService passwordPolicyRuleService;
     private final AccountRoleGrantDao accountRoleGrantDao;
     private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
-    private final Supplier<UserSecurityEventPublisher> userSecurityEventPublisher;
-    private final Supplier<UserSessionRevocationService> userSessionRevocationService;
+    private final UserSecurityEventPublisher userSecurityEventPublisher;
+    private final UserSessionRevocationService userSessionRevocationService;
     private final SecureRandom secureRandom = new SecureRandom();
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
@@ -86,81 +85,43 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             null
     );
 
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, Optional.empty(), null, null);
+    UserAccountService(UserAccountDao userAccountDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       PasswordHashingService passwordHashingService) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService,
+                null, null, AllowAllDataScopeCriteriaService::new,
+                UserSecurityEventPublisher.NOOP, null);
     }
 
     @Autowired
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
-                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
-                              ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
-                              ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao,
-                              ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher,
-                              ObjectProvider<UserSessionRevocationService> userSessionRevocationService) {
-        super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
-        this.passwordHashingService = passwordHashingService;
-        this.passwordPolicyRuleService = passwordPolicyRuleService == null
-                ? null
-                : passwordPolicyRuleService.getIfAvailable();
-        this.accountRoleGrantDao = accountRoleGrantDao == null ? null : accountRoleGrantDao.getIfAvailable();
-        this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
-        this.userSecurityEventPublisher = userSecurityEventPublisher == null
-                ? () -> UserSecurityEventPublisher.NOOP
-                : () -> userSecurityEventPublisher.getIfAvailable(() -> UserSecurityEventPublisher.NOOP);
-        this.userSessionRevocationService = userSessionRevocationService == null
-                ? () -> null
-                : () -> userSessionRevocationService.getIfAvailable();
+                              UserAccountAuthorizationServices authorizationServices,
+                              UserAccountSecurityServices securityServices) {
+        this(userAccountDao, activeTenantVerifier, passwordHashingService,
+                securityServices.passwordPolicyRuleService().orElse(null),
+                authorizationServices.accountRoleGrantDao(),
+                authorizationServices.dataScopeCriteriaService(),
+                securityServices.securityEventPublisher(),
+                securityServices.sessionRevocationService());
     }
 
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService,
-                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
-                              ObjectProvider<PasswordPolicyRuleService> passwordPolicyRuleService,
-                              ObjectProvider<AccountRoleGrantDao> accountRoleGrantDao,
-                              ObjectProvider<UserSecurityEventPublisher> userSecurityEventPublisher) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, dataScopeCriteriaService,
-                passwordPolicyRuleService, accountRoleGrantDao, userSecurityEventPublisher, null);
-    }
-
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService,
-                              Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, dataScopeCriteriaService, null);
-    }
-
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService,
-                              Optional<DataScopeCriteriaService> dataScopeCriteriaService,
-                              PasswordPolicyRuleService passwordPolicyRuleService) {
-        this(userAccountDao, activeTenantVerifier, passwordHashingService, dataScopeCriteriaService,
-                passwordPolicyRuleService, null);
-    }
-
-    public UserAccountService(UserAccountDao userAccountDao,
-                              ActiveTenantVerifier activeTenantVerifier,
-                              PasswordHashingService passwordHashingService,
-                              Optional<DataScopeCriteriaService> dataScopeCriteriaService,
-                              PasswordPolicyRuleService passwordPolicyRuleService,
-                              AccountRoleGrantDao accountRoleGrantDao) {
+    private UserAccountService(UserAccountDao userAccountDao,
+                               ActiveTenantVerifier activeTenantVerifier,
+                               PasswordHashingService passwordHashingService,
+                               PasswordPolicyRuleService passwordPolicyRuleService,
+                               AccountRoleGrantDao accountRoleGrantDao,
+                               Supplier<DataScopeCriteriaService> dataScopeCriteriaService,
+                               UserSecurityEventPublisher userSecurityEventPublisher,
+                               UserSessionRevocationService userSessionRevocationService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
         this.passwordPolicyRuleService = passwordPolicyRuleService;
         this.accountRoleGrantDao = accountRoleGrantDao;
-        this.userSecurityEventPublisher = () -> UserSecurityEventPublisher.NOOP;
-        this.userSessionRevocationService = () -> null;
-        Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
-                ? Optional.empty()
-                : dataScopeCriteriaService;
-        this.dataScopeCriteriaService = () -> criteriaService
-                .<DataScopeCriteriaService>map(service -> service)
-                .orElseGet(AllowAllDataScopeCriteriaService::new);
+        this.dataScopeCriteriaService = dataScopeCriteriaService;
+        this.userSecurityEventPublisher = userSecurityEventPublisher;
+        this.userSessionRevocationService = userSessionRevocationService;
     }
 
     @Autowired
@@ -407,7 +368,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "password changed");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordChanged(validUserId));
         }
         return count;
     }
@@ -429,7 +390,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "password reset");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordReset(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordReset(validUserId));
         }
         return new PasswordResetResult(count, count > 0 ? temporaryPassword : null, user.getPasswordExpiresAt());
     }
@@ -443,7 +404,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             return 0;
         }
         int revoked = revokeUserSessions(validUserId, "force logout");
-        userSecurityEventPublisher.get().publish(UserSecurityEvent.forceLogout(validUserId));
+        userSecurityEventPublisher.publish(UserSecurityEvent.forceLogout(validUserId));
         return revoked;
     }
 
@@ -464,14 +425,15 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         int count = getDao().updateById(user);
         if (count > 0) {
             revokeUserSessions(validUserId, "own password changed");
-            userSecurityEventPublisher.get().publish(UserSecurityEvent.passwordChanged(validUserId));
+            userSecurityEventPublisher.publish(UserSecurityEvent.passwordChanged(validUserId));
         }
         return count;
     }
 
     private int revokeUserSessions(String userId, String reason) {
-        UserSessionRevocationService revocationService = userSessionRevocationService.get();
-        return revocationService == null ? 0 : revocationService.revokeUserSessions(userId, reason);
+        return userSessionRevocationService == null
+                ? 0
+                : userSessionRevocationService.revokeUserSessions(userId, reason);
     }
 
     public boolean passwordChangeRequired(UserAccount user, Instant now) {

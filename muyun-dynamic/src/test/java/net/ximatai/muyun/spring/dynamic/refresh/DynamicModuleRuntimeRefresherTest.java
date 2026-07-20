@@ -260,8 +260,11 @@ class DynamicModuleRuntimeRefresherTest {
     }
 
     private DynamicRecordRuntime runtime(RuntimeEventPublisher eventPublisher) {
-        return new DynamicRecordRuntime(operations(), new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE, eventPublisher);
+        return DynamicRecordRuntime.builder(operations())
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(eventPublisher)
+                .build();
     }
 
     private ModuleDefinition emptyModule() {

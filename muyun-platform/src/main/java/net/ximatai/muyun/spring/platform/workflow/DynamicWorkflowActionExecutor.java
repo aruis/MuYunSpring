@@ -131,21 +131,19 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
     }
 
     private WorkflowTaskActionRequest taskRequest(DynamicActionExecutionRequest request) {
-        return new WorkflowTaskActionRequest(
-                requireText(payload(request, "taskId"), "workflow task id must not be blank"),
-                text(payload(request, "operatorId"), null),
-                text(payload(request, "targetAssigneeId"), null),
-                null,
-                addSignSegment(payload(request, "addSignSegment")),
-                rejectResubmitMode(payload(request, "rejectResubmitMode")),
-                text(payload(request, "reason"), null),
-                operatedAt(payload(request, "operatedAt")),
-                selectedRouteKey(request),
-                text(payload(request, "selectedReason"), null),
-                manualRouteSelections(request),
-                jsonText(payload(request, "semanticJson")),
-                jsonText(payload(request, "layoutJson"))
-        );
+        return WorkflowTaskActionRequest.builder(
+                        requireText(payload(request, "taskId"), "workflow task id must not be blank"),
+                        text(payload(request, "operatorId"), null))
+                .targetAssigneeId(text(payload(request, "targetAssigneeId"), null))
+                .addSignSegment(addSignSegment(payload(request, "addSignSegment")))
+                .rejectResubmitMode(rejectResubmitMode(payload(request, "rejectResubmitMode")))
+                .reason(text(payload(request, "reason"), null))
+                .operatedAt(operatedAt(payload(request, "operatedAt")))
+                .selectedRoute(selectedRouteKey(request), text(payload(request, "selectedReason"), null))
+                .manualRouteSelections(manualRouteSelections(request))
+                .designerSnapshot(jsonText(payload(request, "semanticJson")),
+                        jsonText(payload(request, "layoutJson")))
+                .build();
     }
 
     private WorkflowInstanceActionRequest instanceRequest(DynamicActionExecutionContext context,

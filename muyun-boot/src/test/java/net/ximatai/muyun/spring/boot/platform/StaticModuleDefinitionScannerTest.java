@@ -95,7 +95,7 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(PositionWebController.class);
             context.registerBean(PositionCategoryWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
-            UserAccountService userAccountService = new UserAccountService(mock(UserAccountDao.class),
+            UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(mock(UserAccountDao.class),
                     mock(net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier.class),
                     new PasswordHashingService());
             context.registerBean(UserAccountService.class, () -> userAccountService);

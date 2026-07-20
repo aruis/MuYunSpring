@@ -395,7 +395,7 @@ class CodeRepositoryIT {
                                                 CodeRecycleEntryService recycleEntryService,
                                                 CodeIssueLogService issueLogService) {
             return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
-                    issueLogService, null);
+                    issueLogService, null, null);
         }
 
         @Bean

@@ -287,10 +287,8 @@ class ImportWorkbookGrouperTest {
     }
 
     private DynamicModuleDescriptor descriptor() {
-        return DynamicModuleDescriptor.from(new ModuleDefinition(
-                "sales.order",
-                "Order",
-                List.of(
+        return DynamicModuleDescriptor.from(ModuleDefinition.builder("sales.order", "Order")
+                .entities(List.of(
                         new EntityDefinition("order", "sales_order", "Order", List.of(
                                 FieldDefinition.string("orderNo", "Order No")
                         )),
@@ -298,8 +296,8 @@ class ImportWorkbookGrouperTest {
                                 FieldDefinition.string("sku", "SKU"),
                                 FieldDefinition.integer("qty", "Qty")
                         ))
-                ),
-                List.of(EntityRelationDefinition.child("lines", "order", "orderLine", "orderId"))
-        ));
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "order", "orderLine", "orderId")))
+                .build());
     }
 }

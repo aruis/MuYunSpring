@@ -214,26 +214,24 @@ class RuntimeActionExecutionClosureTest {
 
     private DynamicRecordService recordService(RuntimeAuditEventListener listener) {
         DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(List.of(new SubmitExecutor()));
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                listener::onRuntimeEvent,
-                executors
-        ).register(module());
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .eventPublisher(listener::onRuntimeEvent)
+                .actionExecutorRegistry(executors)
+                .build()
+                .register(module());
         return new DynamicRecordService(runtime);
     }
 
     private ModuleDefinition module() {
-        return new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(contractEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(submitAction())
-        );
+        return ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(contractEntity()))
+                .relations(List.of())
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(submitAction()))
+                .build();
     }
 
     private EntityDefinition contractEntity() {

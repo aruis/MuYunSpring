@@ -310,26 +310,24 @@ class RecordGenerationActionExecutorTest {
     private DynamicRecordService recordService() {
         DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(
                 List.of(new RecordGenerationActionExecutor(ruleService)));
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null,
-                executors
-        ).register(sourceModule()).register(targetModule());
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .actionExecutorRegistry(executors)
+                .build()
+                .register(sourceModule()).register(targetModule());
         return new DynamicRecordService(runtime, policyService);
     }
 
     private DynamicRecordService recordServiceWithReference(RecordGenerationRule rule) {
         DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(
                 List.of(new RecordGenerationActionExecutor(ruleService)));
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null,
-                executors
-        ).register(sourceModule()).register(targetModuleWithReference(rule));
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .actionExecutorRegistry(executors)
+                .build()
+                .register(sourceModule()).register(targetModuleWithReference(rule));
         return new DynamicRecordService(runtime, policyService);
     }
 
@@ -376,10 +374,8 @@ class RecordGenerationActionExecutorTest {
     }
 
     private ModuleDefinition sourceModule() {
-        return new ModuleDefinition(
-                "sales.opportunity",
-                "Opportunity",
-                List.of(new EntityDefinition("opportunity", "sales_opportunity", "Opportunity", List.of(
+        return ModuleDefinition.builder("sales.opportunity", "Opportunity")
+                .entities(List.of(new EntityDefinition("opportunity", "sales_opportunity", "Opportunity", List.of(
                         FieldDefinition.string("opportunityNo", "Opportunity No").column("opportunity_no"),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )).withCapabilities(EntityCapability.CRUD, EntityCapability.DATA_SCOPE),
@@ -387,12 +383,12 @@ class RecordGenerationActionExecutorTest {
                                 FieldDefinition.string("opportunityId", "Opportunity Id").column("opportunity_id"),
                                 FieldDefinition.string("productName", "Product Name").column("product_name"),
                                 FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
-                        ))),
-                List.of(EntityRelationDefinition.child("lines", "opportunity", "opportunity_line", "opportunityId")
-                        .withAutoPopulate()),
-                List.of(),
-                List.of(),
-                List.of(new EntityActionDefinition(
+                        ))))
+                .relations(List.of(EntityRelationDefinition.child("lines", "opportunity", "opportunity_line", "opportunityId")
+                        .withAutoPopulate()))
+                .references(List.of())
+                .views(List.of())
+                .actions(List.of(new EntityActionDefinition(
                         "opportunity",
                         "generateContract",
                         "生成合同",
@@ -407,15 +403,13 @@ class RecordGenerationActionExecutorTest {
                         null,
                         EntityActionExecutorType.GENERATE,
                         RecordGenerationActionExecutor.EXECUTOR_KEY
-                ))
-        );
+                )))
+                .build();
     }
 
     private ModuleDefinition targetModule() {
-        return new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+        return ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
                         FieldDefinition.string("opportunityId", "Opportunity").column("opportunity_id"),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                         FieldDefinition.string("status", "Status"),
@@ -425,21 +419,19 @@ class RecordGenerationActionExecutorTest {
                                 FieldDefinition.string("contractId", "Contract Id").column("contract_id"),
                                 FieldDefinition.string("itemName", "Item Name").column("item_name"),
                                 FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
-                        ))),
-                List.of(EntityRelationDefinition.child("lines", "contract", "contract_line", "contractId"))
-        );
+                        ))))
+                .relations(List.of(EntityRelationDefinition.child("lines", "contract", "contract_line", "contractId")))
+                .build();
     }
 
     private ModuleDefinition targetModuleWithReference(RecordGenerationRule rule) {
-        return new ModuleDefinition(
-                "sales.contract",
-                "Contract",
-                targetModule().entities(),
-                targetModule().relations(),
-                List.of(EntityReferenceDefinition.to("contract", "opportunityId",
+        return ModuleDefinition.builder("sales.contract", "Contract")
+                .entities(targetModule().entities())
+                .relations(targetModule().relations())
+                .references(List.of(EntityReferenceDefinition.to("contract", "opportunityId",
                                 ReferenceTarget.of("sales.opportunity", "opportunity"))
-                        .withRuntimeConfig(null, null, rule.getId(), null, Set.of()))
-        );
+                        .withRuntimeConfig(null, null, rule.getId(), null, Set.of())))
+                .build();
     }
 
     private Map<String, Object> sourceRow() {

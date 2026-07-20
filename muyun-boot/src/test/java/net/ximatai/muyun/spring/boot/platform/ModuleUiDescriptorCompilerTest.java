@@ -145,19 +145,14 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     private StaticModuleDefinition staticDefinition(ModuleUiDefinition uiDefinition, List<EntityDefinition> entities) {
-        return new StaticModuleDefinition(
-                "iam",
-                uiDefinition.moduleAlias(),
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                entities,
-                uiDefinition
-        );
+        return StaticModuleDefinition.builder("iam", uiDefinition.moduleAlias(), "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(entities)
+                       .uiDefinition(uiDefinition)
+                       .build();
     }
 
     private List<EntityDefinition> employeeEntities() {

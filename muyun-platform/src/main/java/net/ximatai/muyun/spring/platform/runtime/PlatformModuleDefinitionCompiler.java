@@ -177,8 +177,15 @@ public class PlatformModuleDefinitionCompiler {
         List<EntityAssociationViewDefinition> associationViews = associationViews(module.getAlias(), childRelations,
                 references);
         String mainEntityAlias = metadataById.get(mainRelation.getMetadataId()).getAlias();
-        ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations,
-                references, views, associationViews, actions, mainEntityAlias);
+        ModuleDefinition definition = ModuleDefinition.builder(module.getAlias(), module.getTitle())
+                .entities(entities)
+                .relations(childRelations)
+                .references(references)
+                .views(views)
+                .associationViews(associationViews)
+                .actions(actions)
+                .mainEntityAlias(mainEntityAlias)
+                .build();
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -537,9 +544,7 @@ public class PlatformModuleDefinitionCompiler {
         List<EntityDefinition> ordered = definition.entities().stream()
                 .sorted((left, right) -> Boolean.compare(!left.alias().equals(mainEntityAlias), !right.alias().equals(mainEntityAlias)))
                 .toList();
-        return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(),
-                definition.references(), definition.views(), definition.associationViews(), definition.actions(),
-                definition.mainEntityAlias());
+        return definition.toBuilder().entities(ordered).build();
     }
 
     private List<EntityAssociationViewDefinition> associationViews(String moduleAlias,

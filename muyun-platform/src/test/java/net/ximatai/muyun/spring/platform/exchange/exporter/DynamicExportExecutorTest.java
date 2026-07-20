@@ -97,12 +97,10 @@ class DynamicExportExecutorTest {
                 FieldDefinition.string("orderId", "Order").column("order_id"),
                 FieldDefinition.string("sku", "SKU")
         ));
-        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
-                MODULE,
-                "Order",
-                List.of(order, line),
-                List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId"))
-        ));
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(ModuleDefinition.builder(MODULE, "Order")
+                .entities(List.of(order, line))
+                .relations(List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId")))
+                .build());
         DynamicRecord first = new DynamicRecord(order);
         first.setId("order-1");
         first.setValue("orderNo", "SO-001");
@@ -147,13 +145,11 @@ class DynamicExportExecutorTest {
         EntityDefinition customer = new EntityDefinition("customer", "sales_customer", "Customer", List.of(
                 FieldDefinition.string("name", "Name").title()
         ), Set.of(EntityCapability.REFERENCE));
-        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
-                MODULE,
-                "Order",
-                List.of(order, customer),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("order", "customerId", "sales.order.customer"))
-        ));
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(ModuleDefinition.builder(MODULE, "Order")
+                .entities(List.of(order, customer))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("order", "customerId", "sales.order.customer")))
+                .build());
         DynamicRecord first = new DynamicRecord(order);
         first.setId("order-1");
         first.setValue("orderNo", "SO-001");
@@ -181,13 +177,11 @@ class DynamicExportExecutorTest {
         EntityDefinition tag = new EntityDefinition("tag", "sales_tag", "Tag", List.of(
                 FieldDefinition.string("name", "Name").title()
         ), Set.of(EntityCapability.REFERENCE));
-        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
-                MODULE,
-                "Order",
-                List.of(order, tag),
-                List.of(),
-                List.of(EntityReferenceDefinition.to("order", "tagIds", "sales.order.tag").many())
-        ));
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(ModuleDefinition.builder(MODULE, "Order")
+                .entities(List.of(order, tag))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("order", "tagIds", "sales.order.tag").many()))
+                .build());
         DynamicRecord first = new DynamicRecord(order);
         first.setId("order-1");
         first.setValue("orderNo", "SO-001");

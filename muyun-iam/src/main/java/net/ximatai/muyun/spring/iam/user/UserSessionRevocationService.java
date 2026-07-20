@@ -19,10 +19,11 @@ public class UserSessionRevocationService {
     @Autowired
     public UserSessionRevocationService(
             UserSessionRecordService userSessionRecordService,
-            ApplicationEventPublisher applicationEventPublisher) {
+            ApplicationEventPublisher applicationEventPublisher,
+            Clock clock) {
         this(userSessionRecordService,
                 () -> event -> applicationEventPublisher.publishEvent(event),
-                Clock.systemUTC());
+                clock);
     }
 
     UserSessionRevocationService(UserSessionRecordService userSessionRecordService,
@@ -42,7 +43,7 @@ public class UserSessionRevocationService {
         this.userSessionLifecycleEventPublisher = userSessionLifecycleEventPublisher == null
                 ? () -> UserSessionLifecycleEventPublisher.NOOP
                 : userSessionLifecycleEventPublisher;
-        this.clock = clock;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     public int revokeUserSessions(String userId, String reason) {

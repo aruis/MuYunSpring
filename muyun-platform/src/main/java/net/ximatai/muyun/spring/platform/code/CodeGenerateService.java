@@ -25,43 +25,6 @@ public class CodeGenerateService {
     private final CodeBusinessTimeService timeService;
     private final Clock clock;
 
-    public CodeGenerateService(CodeRuleService ruleService,
-                               CodePreviewService previewService,
-                               CodeSequenceStateService sequenceStateService) {
-        this(ruleService, previewService, sequenceStateService, null, Clock.systemDefaultZone());
-    }
-
-    public CodeGenerateService(CodeRuleService ruleService,
-                               CodePreviewService previewService,
-                               CodeSequenceStateService sequenceStateService,
-                               Clock clock) {
-        this(ruleService, previewService, sequenceStateService, null, null, clock);
-    }
-
-    public CodeGenerateService(CodeRuleService ruleService,
-                               CodePreviewService previewService,
-                               CodeSequenceStateService sequenceStateService,
-                               CodeRecycleEntryService recycleEntryService) {
-        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, Clock.systemDefaultZone());
-    }
-
-    public CodeGenerateService(CodeRuleService ruleService,
-                               CodePreviewService previewService,
-                               CodeSequenceStateService sequenceStateService,
-                               CodeRecycleEntryService recycleEntryService,
-                               Clock clock) {
-        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, null, clock);
-    }
-
-    public CodeGenerateService(CodeRuleService ruleService,
-                               CodePreviewService previewService,
-                               CodeSequenceStateService sequenceStateService,
-                               CodeRecycleEntryService recycleEntryService,
-                               CodeIssueLogService issueLogService,
-                               Clock clock) {
-        this(ruleService, previewService, sequenceStateService, recycleEntryService, issueLogService, null, clock);
-    }
-
     @Autowired
     public CodeGenerateService(CodeRuleService ruleService,
                                CodePreviewService previewService,

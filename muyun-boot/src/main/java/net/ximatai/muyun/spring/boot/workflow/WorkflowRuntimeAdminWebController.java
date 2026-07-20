@@ -131,17 +131,13 @@ public class WorkflowRuntimeAdminWebController {
     public WorkflowTaskActionResult forceApprove(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowAdminTaskActionWebRequest request) {
-        return adminFacade.forceApprove(new WorkflowTaskActionRequest(taskId,
-                operatorId(request == null ? null : request.operatorId()),
-                null,
-                null,
-                null,
-                null,
-                request == null ? null : request.reason(),
-                null,
-                request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
-                request == null ? null : request.selectedReason(),
-                request == null ? null : request.manualRouteSelections()));
+        return adminFacade.forceApprove(WorkflowTaskActionRequest.builder(taskId,
+                        operatorId(request == null ? null : request.operatorId()))
+                .reason(request == null ? null : request.reason())
+                .selectedRoute(request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
+                        request == null ? null : request.selectedReason())
+                .manualRouteSelections(request == null ? null : request.manualRouteSelections())
+                .build());
     }
 
     @PostMapping("/history/query")

@@ -163,35 +163,27 @@ public class WorkflowRuntimeWebController {
             @PathVariable String taskId,
             @PathVariable String actionCode,
             @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
-        return taskActionFacade.execute(actionCode, new WorkflowTaskActionRequest(taskId,
-                currentOperatorId(),
-                request == null ? null : request.targetAssigneeId(),
-                null,
-                request == null ? null : request.addSignSegment(),
-                rejectResubmitMode(request == null ? null : request.rejectResubmitMode()),
-                request == null ? null : request.reason(),
-                null,
-                request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
-                request == null ? null : request.selectedReason(),
-                request == null ? null : request.manualRouteSelections(),
-                request == null ? null : jsonText(request.semanticJson()),
-                request == null ? null : jsonText(request.layoutJson())));
+        WorkflowTaskActionRequest actionRequest = WorkflowTaskActionRequest.builder(taskId, currentOperatorId())
+                .targetAssigneeId(request == null ? null : request.targetAssigneeId())
+                .addSignSegment(request == null ? null : request.addSignSegment())
+                .rejectResubmitMode(rejectResubmitMode(request == null ? null : request.rejectResubmitMode()))
+                .reason(request == null ? null : request.reason())
+                .selectedRoute(request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
+                        request == null ? null : request.selectedReason())
+                .manualRouteSelections(request == null ? null : request.manualRouteSelections())
+                .designerSnapshot(request == null ? null : jsonText(request.semanticJson()),
+                        request == null ? null : jsonText(request.layoutJson()))
+                .build();
+        return taskActionFacade.execute(actionCode, actionRequest);
     }
 
     @PostMapping("/task/{taskId}/read")
     public WorkflowTaskActionResult readNoticeTask(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
-        return taskActionFacade.execute("read", new WorkflowTaskActionRequest(taskId,
-                currentOperatorId(),
-                null,
-                null,
-                null,
-                null,
-                request == null ? null : request.reason(),
-                null,
-                null,
-                null));
+        return taskActionFacade.execute("read", WorkflowTaskActionRequest.builder(taskId, currentOperatorId())
+                .reason(request == null ? null : request.reason())
+                .build());
     }
 
     @PostMapping("/workbench/todo/query")

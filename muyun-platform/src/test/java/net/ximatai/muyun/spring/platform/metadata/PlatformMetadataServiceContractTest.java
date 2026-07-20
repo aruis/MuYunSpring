@@ -2178,12 +2178,11 @@ class PlatformMetadataServiceContractTest {
             IDatabaseOperations<Object> operations,
             ModuleDefinition definition,
             DynamicRecordMutationCoordinator mutationCoordinator) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations,
-                new DynamicModuleRegistry(),
-                DynamicFieldValueValidator.NONE,
-                null
-        ).register(definition);
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(DynamicFieldValueValidator.NONE)
+                .build()
+                .register(definition);
         return new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),

@@ -96,7 +96,6 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -149,148 +148,23 @@ public class DynamicRecordWebController implements
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final int SUMMARY_MAX_RECORDS = 10_000;
 
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier) {
-        this(recordService, activeTenantVerifier, (CodeBusinessPreviewService) null,
-                (ReferenceRecordGenerationFacade) null);
-    }
-
     @Autowired
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
-                                      ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider,
-                                      ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider,
-                                      ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
-                                      ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
-                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
-                                      ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider,
-                                      ObjectProvider<RecordAttachmentAccessService> recordAttachmentAccessServiceProvider,
-                                      ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider,
-                                      ObjectProvider<PlatformRecordNavigationService> navigationServiceProvider,
-                                      ObjectProvider<DynamicRelationProjectionReadService> dynamicRelationProjectionReadServiceProvider) {
-        this(recordService, activeTenantVerifier,
-                codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
-                referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
-                pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
-                queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
-                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
-                recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable(),
-                recordAttachmentAccessServiceProvider == null ? null : recordAttachmentAccessServiceProvider.getIfAvailable(),
-                duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable(),
-                navigationServiceProvider == null ? null : navigationServiceProvider.getIfAvailable(),
-                dynamicRelationProjectionReadServiceProvider == null
-                        ? null
-                        : dynamicRelationProjectionReadServiceProvider.getIfAvailable());
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                null, null, null, null, null, null, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null, null, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService,
-                                      RecordAttachmentService recordAttachmentService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
-                null, null, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService,
-                                      RecordAttachmentService recordAttachmentService,
-                                      RecordDuplicateCheckService duplicateCheckService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
-                null, duplicateCheckService, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService,
-                                      RecordAttachmentService recordAttachmentService,
-                                      RecordDuplicateCheckService duplicateCheckService,
-                                      PlatformRecordNavigationService navigationService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
-                null, duplicateCheckService, navigationService);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService,
-                                      RecordAttachmentService recordAttachmentService,
-                                      RecordAttachmentAccessService recordAttachmentAccessService,
-                                      RecordDuplicateCheckService duplicateCheckService,
-                                      PlatformRecordNavigationService navigationService) {
-        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
-                recordAttachmentAccessService, duplicateCheckService, navigationService, null);
-    }
-
-    public DynamicRecordWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      CodeBusinessPreviewService codeBusinessPreviewService,
-                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
-                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
-                                      PlatformQueryItemService queryItemService,
-                                      ModuleMetadataFieldService moduleMetadataFieldService,
-                                      RecordAttachmentService recordAttachmentService,
-                                      RecordAttachmentAccessService recordAttachmentAccessService,
-                                      RecordDuplicateCheckService duplicateCheckService,
-                                      PlatformRecordNavigationService navigationService,
-                                      DynamicRelationProjectionReadService dynamicRelationProjectionReadService) {
+                                      DynamicRecordQueryServices queryServices,
+                                      DynamicRecordAttachmentServices attachmentServices,
+                                      DynamicRecordActionServices actionServices) {
         this.recordService = recordService;
-        this.codeBusinessPreviewService = codeBusinessPreviewService;
-        this.referenceRecordGenerationFacade = referenceRecordGenerationFacade;
-        this.pageConfigSnapshotService = pageConfigSnapshotService;
-        this.queryItemService = queryItemService;
-        this.moduleMetadataFieldService = moduleMetadataFieldService;
-        this.recordAttachmentService = recordAttachmentService;
-        this.recordAttachmentAccessService = recordAttachmentAccessService;
-        this.duplicateCheckService = duplicateCheckService;
-        this.navigationService = navigationService;
-        this.dynamicRelationProjectionReadService = dynamicRelationProjectionReadService == null
-                ? new DynamicRelationProjectionReadService()
-                : dynamicRelationProjectionReadService;
+        this.codeBusinessPreviewService = actionServices.codeBusinessPreviewService();
+        this.referenceRecordGenerationFacade = actionServices.referenceRecordGenerationFacade();
+        this.pageConfigSnapshotService = queryServices.pageConfigSnapshotService();
+        this.queryItemService = queryServices.queryItemService();
+        this.moduleMetadataFieldService = queryServices.moduleMetadataFieldService();
+        this.recordAttachmentService = attachmentServices.attachmentService();
+        this.recordAttachmentAccessService = attachmentServices.attachmentAccessService();
+        this.duplicateCheckService = actionServices.duplicateCheckService();
+        this.navigationService = actionServices.navigationService();
+        this.dynamicRelationProjectionReadService = queryServices.relationProjectionReadService();
         this.dynamicModuleScopeService = new PlatformDynamicModuleScopeService(activeTenantVerifier);
     }
 

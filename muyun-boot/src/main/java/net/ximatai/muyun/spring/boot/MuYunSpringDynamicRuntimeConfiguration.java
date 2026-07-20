@@ -124,12 +124,18 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               ObjectProvider<FieldSigner> fieldSigner,
                                               PlatformTimeService platformTimeService,
                                               DatabaseValueConverter databaseValueConverter) {
-        return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
-                eventPublisher, actionExecutorRegistry, actionTransactionOperator,
-                fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
-                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE),
-                platformTimeService,
-                databaseValueConverter);
+        return DynamicRecordRuntime.builder(operations)
+                .registry(new DynamicModuleRegistry())
+                .fieldValueValidator(fieldValueValidator)
+                .eventPublisher(eventPublisher)
+                .actionExecutorRegistry(actionExecutorRegistry)
+                .actionTransactionOperator(actionTransactionOperator)
+                .fieldProtection(
+                        fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
+                        fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE))
+                .timeService(platformTimeService)
+                .valueConverter(databaseValueConverter)
+                .build();
     }
 
     @Bean

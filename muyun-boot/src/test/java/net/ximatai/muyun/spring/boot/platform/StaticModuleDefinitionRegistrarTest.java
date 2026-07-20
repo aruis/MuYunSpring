@@ -54,13 +54,10 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
-                        "sales",
-                        "sales.contract",
-                        "合同",
-                        null,
-                        List.of(StaticModuleActionDefinition.workflowAction("submitApproval", "提交审批"))
-                ))
+                List.of(StaticModuleDefinition.builder("sales", "sales.contract", "合同")
+                                .parentModuleAlias(null)
+                                .actions(List.of(StaticModuleActionDefinition.workflowAction("submitApproval", "提交审批")))
+                                .build())
         );
 
         registrar.registerAll();
@@ -87,16 +84,13 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
-                        "iam",
-                        "iam.user",
-                        "用户管理",
-                        null,
-                        List.of(
+                List.of(StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                                .parentModuleAlias(null)
+                                .actions(List.of(
                                 StaticModuleActionDefinition.platformAction(PlatformAction.MENU),
                                 StaticModuleActionDefinition.recordAction("changePassword", "修改密码")
-                        )
-                ))
+                        ))
+                                .build())
         );
 
         registrar.registerAll();
@@ -142,18 +136,13 @@ class StaticModuleDefinitionRegistrarTest {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
-                List.of(new StaticModuleDefinition(
-                        "iam",
-                        "iam.organization",
-                        "机构管理",
-                        null,
-                        ModuleEntryType.ROUTE,
-                        "/iam/organizations",
-                        null,
-                        java.util.Set.of(),
-                        List.of(),
-                        List.of()
-                ))
+                List.of(StaticModuleDefinition.builder("iam", "iam.organization", "机构管理")
+                                .parentModuleAlias(null)
+                                .entry(ModuleEntryType.ROUTE, "/iam/organizations", null)
+                                .capabilities(java.util.Set.of())
+                                .actions(List.of())
+                                .entities(List.of())
+                                .build())
         );
 
         registrar.registerAll();
@@ -229,7 +218,10 @@ class StaticModuleDefinitionRegistrarTest {
     }
 
     private StaticModuleDefinition definition(String moduleAlias, List<StaticModuleActionDefinition> actions) {
-        return new StaticModuleDefinition("iam", moduleAlias, "用户管理", null, actions);
+        return StaticModuleDefinition.builder("iam", moduleAlias, "用户管理")
+                       .parentModuleAlias(null)
+                       .actions(actions)
+                       .build();
     }
 
     private PlatformModule module(String moduleAlias) {
