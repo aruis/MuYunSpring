@@ -24,6 +24,10 @@ export function resolveRecordDetailDisplayValue(
   if (isPresent(customValue)) {
     return String(customValue);
   }
+  const optionTitle = field.optionTitleField ? record[field.optionTitleField] : undefined;
+  if (isPresent(optionTitle)) {
+    return String(optionTitle);
+  }
   if (field.controlType === 'select' && field.options) {
     const option = field.options.find((item) => item.value === value);
     if (option?.label) {

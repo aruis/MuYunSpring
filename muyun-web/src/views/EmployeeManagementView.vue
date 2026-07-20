@@ -1140,6 +1140,7 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
               :fallback="employeeFormFieldFallback"
               :picker-configs="employeeFormPickerConfigs"
               :disabled="employeeFormDisabled"
+              :option-context="employeeContext"
               @update:field="updateEmployeeDraftField"
             />
           </form>

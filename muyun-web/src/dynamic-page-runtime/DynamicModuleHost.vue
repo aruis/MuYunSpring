@@ -107,6 +107,7 @@ function recordTitle(record: QueryListRecord | undefined) {
         class="dynamic-form"
         :record="selectedRecord as RecordFormRecord"
         :fields="formFields"
+        :option-context="context"
         :disabled="true"
         @update:field="updateDraftField"
       />

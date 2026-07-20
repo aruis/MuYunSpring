@@ -456,6 +456,26 @@ export interface ResolvedViewFieldDescriptor {
   width?: string;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
+  option?: ResolvedOptionFieldDescriptor;
+}
+
+export interface OptionBindingDescriptor {
+  sourceType: string;
+  source: string;
+}
+
+export interface ResolvedOptionFieldDescriptor {
+  binding: OptionBindingDescriptor;
+  selectionMode: 'SINGLE' | 'MULTIPLE';
+  titleField?: string;
+}
+
+export interface OptionItemDescriptor {
+  code: string;
+  title: string;
+  enabled: boolean;
+  sortOrder?: number;
+  parentCode?: string;
 }
 
 export interface ViewDefinition {

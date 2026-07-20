@@ -1,5 +1,6 @@
 import type {
   Option,
+  ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
   ViewFieldDefinition,
@@ -7,7 +8,9 @@ import type {
 import type { ModuleContext } from '@muyun/web-core';
 import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstraints';
 
-export type RecordFormFieldDescriptor = ViewFieldDefinition | ResolvedViewFieldDescriptor;
+export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewFieldDescriptor) & {
+  option?: ResolvedOptionFieldDescriptor;
+};
 export type RecordFormRecord = Record<string, unknown>;
 export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'recordPicker';
 
@@ -19,6 +22,7 @@ export interface RecordFormFieldFallback {
   controlType?: RecordFormFieldControlType;
   placeholder?: string;
   options?: Option[];
+  optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
 }
 
 export interface RecordFormFieldPickerConfig {
@@ -40,6 +44,9 @@ export interface RecordFormFieldState {
   readOnly: boolean;
   visible: boolean;
   controlType: RecordFormFieldControlType;
+  hasOption: boolean;
+  optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
+  optionTitleField?: string;
   pickerConfig?: RecordFormFieldPickerConfig;
   placeholder?: string;
   options?: Option[];
@@ -105,6 +112,7 @@ export function resolveRecordFormFieldState(
   const readOnly = field?.readOnly?.constant ?? fallback?.readOnly ?? false;
   const visible = field?.visible?.constant ?? fallback?.visible ?? true;
   const controlType = controlTypeOf(field, fallback);
+  const hasOption = field?.option != null;
   const pickerConfig = controlType === 'recordPicker' ? options.pickerConfigs?.[fieldName] : undefined;
   const baseState: RecordFormFieldState = {
     fieldName,
@@ -113,10 +121,17 @@ export function resolveRecordFormFieldState(
     readOnly,
     visible,
     controlType,
+    hasOption,
     pickerConfig,
   };
   return {
     ...baseState,
+    ...(field?.option
+      ? {
+          optionSelectionMode: field.option.selectionMode,
+          ...(field.option.titleField ? { optionTitleField: field.option.titleField } : {}),
+        }
+      : {}),
     ...(fallback?.options ? { options: fallback.options } : {}),
     placeholder:
       options.placeholderOf?.(fieldName, baseState) ?? fallback?.placeholder ?? pickerConfig?.placeholder,
@@ -134,6 +149,9 @@ function controlTypeOf(
     return 'recordPicker';
   }
   if (field?.uiType === 'select') {
+    return 'select';
+  }
+  if (field?.option) {
     return 'select';
   }
   return fallback?.controlType ?? 'input';

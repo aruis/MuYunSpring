@@ -8,6 +8,11 @@ import {
   type RecordFormFieldDescriptor,
   type RecordFormFieldFallback,
 } from '../src/platform-components/recordFormFieldModel.ts';
+import {
+  hasOptionHierarchy,
+  optionItemsToOptions,
+  optionItemsToTree,
+} from '../src/platform-components/optionFieldOptions.ts';
 
 test('record form field names prefer descriptor order and fill missing fallback fields', () => {
   const fields = new Map<string, RecordFormFieldDescriptor>([
@@ -52,6 +57,7 @@ test('record form field state resolves descriptor facts with fallback control me
     readOnly: false,
     visible: true,
     controlType: 'input',
+    hasOption: false,
     pickerConfig: undefined,
     placeholder: '请输入名称',
   });
@@ -80,6 +86,7 @@ test('record form field state resolves select options from fallback metadata', (
     readOnly: false,
     visible: true,
     controlType: 'select',
+    hasOption: false,
     pickerConfig: undefined,
     placeholder: undefined,
     options: [
@@ -87,6 +94,63 @@ test('record form field state resolves select options from fallback metadata', (
       { label: '目录', value: 'FOLDER' },
     ],
   });
+});
+
+test('record form field state makes resolved option fields into selects without page fallback metadata', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'gender',
+      {
+        ...field('性别'),
+        option: {
+          binding: { sourceType: 'dictionary', source: 'iam.gender' },
+          selectionMode: 'SINGLE',
+          titleField: 'genderTitle',
+        },
+      },
+    ],
+  ]);
+
+  assert.deepEqual(resolveRecordFormFieldState('gender', { fields }), {
+    fieldName: 'gender',
+    label: '性别',
+    required: false,
+    readOnly: false,
+    visible: true,
+    controlType: 'select',
+    hasOption: true,
+    optionSelectionMode: 'SINGLE',
+    optionTitleField: 'genderTitle',
+    pickerConfig: undefined,
+    placeholder: undefined,
+  });
+});
+
+test('option items preserve tree hierarchy while exposing flat select options', () => {
+  const items = [
+    { code: 'root', title: '根节点', enabled: true, sortOrder: 10 },
+    { code: 'child', title: '子节点', enabled: true, sortOrder: 20, parentCode: 'root' },
+  ];
+
+  assert.equal(hasOptionHierarchy(items), true);
+  assert.deepEqual(optionItemsToOptions(items), [
+    { label: '根节点', value: 'root', disabled: false },
+    { label: '子节点', value: 'child', disabled: false },
+  ]);
+  assert.deepEqual(optionItemsToTree(items), [
+    {
+      value: 'root',
+      title: '根节点',
+      disabled: false,
+      children: [{ value: 'child', title: '子节点', disabled: false, children: [] }],
+    },
+  ]);
+});
+
+test('option items retain disabled historical values for editing without making them selectable', () => {
+  assert.deepEqual(optionItemsToOptions([{ code: 'legacy', title: '历史值', enabled: false }]), [
+    { label: '历史值', value: 'legacy', disabled: true },
+  ]);
 });
 
 test('record form fields resolve form view descriptors by view code', () => {

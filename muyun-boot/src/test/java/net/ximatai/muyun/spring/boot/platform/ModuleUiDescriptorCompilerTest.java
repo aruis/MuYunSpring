@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
@@ -74,6 +76,28 @@ class ModuleUiDescriptorCompilerTest {
         assertThat(descriptor.views()).singleElement()
                 .satisfies(view -> assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                         .containsExactly("employeeNo", "title", "enabled"));
+    }
+
+    @Test
+    void shouldCompileStaticOptionFieldAsResolvedFieldFact() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.employee")
+                .formView(form -> form.field("gender", field -> field.label("性别")))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("iam", "iam.employee", "职员管理")
+                .entities(List.of(new EntityDefinition("employee", "iam_employee", "Employee",
+                        List.of(FieldDefinition.string("gender", "性别")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(OptionEmployee.class)
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(definition).views().getFirst()
+                .fields().getFirst();
+
+        assertThat(field.option()).isNotNull();
+        assertThat(field.option().binding().sourceType()).isEqualTo("dictionary");
+        assertThat(field.option().binding().source()).isEqualTo("iam.gender");
+        assertThat(field.option().selectionMode().name()).isEqualTo("SINGLE");
+        assertThat(field.option().titleField()).isEqualTo("genderTitle");
     }
 
     @Test
@@ -186,5 +210,12 @@ class ModuleUiDescriptorCompilerTest {
                         )
                 )
         );
+    }
+
+    private static class OptionEmployee {
+        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        private String gender;
+
+        private String genderTitle;
     }
 }

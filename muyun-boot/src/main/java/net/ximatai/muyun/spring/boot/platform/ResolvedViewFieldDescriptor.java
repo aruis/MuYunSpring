@@ -8,7 +8,8 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                           String uiType,
                                           String width,
                                           String align,
-                                          Boolean fixed) {
+                                          Boolean fixed,
+                                          ResolvedOptionFieldDescriptor option) {
     public ResolvedViewFieldDescriptor {
         if (fieldRef == null) {
             throw new IllegalArgumentException("resolved view field ref must not be null");
@@ -20,5 +21,17 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
         uiType = uiType == null || uiType.isBlank() ? null : uiType.trim();
         width = width == null || width.isBlank() ? null : width.trim();
         align = align == null || align.isBlank() ? null : align.trim();
+    }
+
+    public ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
+                                       String label,
+                                       UiRule<Boolean> visible,
+                                       UiRule<Boolean> required,
+                                       UiRule<Boolean> readOnly,
+                                       String uiType,
+                                       String width,
+                                       String align,
+                                       Boolean fixed) {
+        this(fieldRef, label, visible, required, readOnly, uiType, width, align, fixed, null);
     }
 }

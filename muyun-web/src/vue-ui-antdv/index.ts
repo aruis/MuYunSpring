@@ -5,6 +5,7 @@ export { default as UiForm } from './components/UiForm.vue';
 export { default as UiInput } from './components/UiInput.vue';
 export { default as UiTextArea } from './components/UiTextArea.vue';
 export { default as UiSelect } from './components/UiSelect.vue';
+export { default as UiTreeSelect } from './components/UiTreeSelect.vue';
 export { default as UiSwitch } from './components/UiSwitch.vue';
 export { default as UiMenu } from './components/UiMenu.vue';
 export { default as UiTabs } from './components/UiTabs.vue';

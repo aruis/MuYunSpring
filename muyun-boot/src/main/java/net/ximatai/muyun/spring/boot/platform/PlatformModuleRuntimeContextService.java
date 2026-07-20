@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -109,7 +110,8 @@ public class PlatformModuleRuntimeContextService {
                 dynamicDescriptor);
         Set<EntityCapability> capabilities = capabilities(staticDefinition, dynamicDescriptor, actions);
         String title = title(module, staticDefinition, dynamicDescriptor, validModuleAlias);
-        ResolvedModuleUiDescriptor uiDescriptor = uiDescriptor(validModuleAlias, moduleKind, title, staticDefinition);
+        ResolvedModuleUiDescriptor uiDescriptor = uiDescriptor(validModuleAlias, moduleKind, title, staticDefinition,
+                dynamicDescriptor);
         return new PlatformModuleRuntimeContext(
                 validModuleAlias,
                 title,
@@ -128,16 +130,19 @@ public class PlatformModuleRuntimeContextService {
     private ResolvedModuleUiDescriptor uiDescriptor(String moduleAlias,
                                                     ModuleKind moduleKind,
                                                     String title,
-                                                    Optional<StaticModuleDefinition> staticDefinition) {
+                                                    Optional<StaticModuleDefinition> staticDefinition,
+                                                    DynamicModuleDescriptor dynamicDescriptor) {
         if (moduleKind == ModuleKind.DYNAMIC) {
-            return dynamicUiDescriptor(moduleAlias, title);
+            return dynamicUiDescriptor(moduleAlias, title, dynamicDescriptor);
         }
         return staticDefinition
                 .map(ModuleUiDescriptorCompiler::compile)
                 .orElse(null);
     }
 
-    private ResolvedModuleUiDescriptor dynamicUiDescriptor(String moduleAlias, String title) {
+    private ResolvedModuleUiDescriptor dynamicUiDescriptor(String moduleAlias,
+                                                           String title,
+                                                           DynamicModuleDescriptor dynamicDescriptor) {
         if (pageConfigSnapshotService == null || pageBootstrapService == null) {
             return null;
         }
@@ -146,7 +151,27 @@ public class PlatformModuleRuntimeContextService {
                 PlatformUiClientType.WEB);
         ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(snapshot,
                 resolvedConfig);
-        return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title);
+        return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title,
+                dynamicOptionFields(dynamicDescriptor));
+    }
+
+    private java.util.Map<String, ResolvedOptionFieldDescriptor> dynamicOptionFields(
+            DynamicModuleDescriptor dynamicDescriptor) {
+        if (dynamicDescriptor == null) {
+            return java.util.Map.of();
+        }
+        return dynamicDescriptor.entities().stream()
+                .filter(entity -> entity.entityAlias().equals(dynamicDescriptor.mainEntityAlias()))
+                .findFirst()
+                .map(entity -> entity.fields().stream()
+                        .filter(field -> field.optionBinding() != null)
+                        .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                                field -> field.fieldName(),
+                                field -> new ResolvedOptionFieldDescriptor(field.optionBinding(),
+                                        field.selectionMode() == null ? OptionSelectionMode.SINGLE : field.selectionMode(),
+                                        null),
+                                (left, right) -> left)))
+                .orElseGet(java.util.Map::of);
     }
 
     private DynamicModuleDescriptor dynamicDescriptor(PlatformModule module, String moduleAlias) {
