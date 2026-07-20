@@ -48,19 +48,21 @@ public class UserSessionService {
                               ActiveTenantVerifier activeTenantVerifier,
                               UserSessionCollaborators collaborators,
                               Clock clock) {
+        UserSessionCollaborators resolved = collaborators == null ? UserSessionCollaborators.empty() : collaborators;
+        Clock effectiveClock = clock == null ? Clock.systemUTC() : clock;
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
-        Supplier<UserSessionLifecycleEventPublisher> lifecycleEventPublisher = collaborators.lifecycleEventPublisher();
-        UserSessionRevocationService revocationService = collaborators.revocationService().get();
+        Supplier<UserSessionLifecycleEventPublisher> lifecycleEventPublisher = resolved.lifecycleEventPublisher();
+        UserSessionRevocationService revocationService = resolved.revocationService().get();
         this.userSessionRevocationService = revocationService == null
-                ? new UserSessionRevocationService(userSessionRecordService, lifecycleEventPublisher, clock)
+                ? new UserSessionRevocationService(userSessionRecordService, lifecycleEventPublisher, effectiveClock)
                 : revocationService;
         this.activeTenantVerifier = activeTenantVerifier;
-        this.userSecurityEventPublisher = collaborators.securityEventPublisher();
+        this.userSecurityEventPublisher = resolved.securityEventPublisher();
         this.userSessionLifecycleEventPublisher = lifecycleEventPublisher;
-        this.clock = clock == null ? Clock.systemUTC() : clock;
-        this.currentUserTimeZoneResolver = collaborators.timeZoneResolver();
-        this.userSessionPresenceLookup = collaborators.presenceLookup();
+        this.clock = effectiveClock;
+        this.currentUserTimeZoneResolver = resolved.timeZoneResolver();
+        this.userSessionPresenceLookup = resolved.presenceLookup();
     }
 
     public LoginResult login(String tenantId, String username, String password) {

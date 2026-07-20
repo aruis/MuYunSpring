@@ -63,6 +63,7 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
+import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadServiceTestFactory;
 import net.ximatai.muyun.spring.boot.platform.ProjectionQueryDescriptor;
 import net.ximatai.muyun.spring.boot.platform.ProjectionQueryFallbackReason;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -104,7 +105,6 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -3529,25 +3529,19 @@ class DynamicRecordWebControllerTest {
                                                   RecordDuplicateCheckService duplicateCheckService,
                                                   PlatformRecordNavigationService navigationService,
                                                   DynamicRelationProjectionReadService relationProjectionReadService) {
-        DynamicRecordWebCollaborators collaborators = new DynamicRecordWebCollaborators(
-                provider(codeBusinessPreviewService),
-                provider(referenceRecordGenerationFacade),
-                provider(pageConfigSnapshotService),
-                provider(queryItemService),
-                provider(moduleMetadataFieldService),
-                provider(recordAttachmentService),
-                provider(recordAttachmentAccessService),
-                provider(duplicateCheckService),
-                provider(navigationService),
-                provider(relationProjectionReadService));
-        return new DynamicRecordWebController(recordService, activeTenantVerifier, collaborators);
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> ObjectProvider<T> provider(T value) {
-        ObjectProvider<T> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(value);
-        return provider;
+        DynamicRecordQueryServices queryServices = new DynamicRecordQueryServices(
+                pageConfigSnapshotService,
+                queryItemService,
+                moduleMetadataFieldService,
+                relationProjectionReadService == null
+                        ? DynamicRelationProjectionReadServiceTestFactory.withDefaults()
+                        : relationProjectionReadService);
+        DynamicRecordAttachmentServices attachmentServices = new DynamicRecordAttachmentServices(
+                recordAttachmentService, recordAttachmentAccessService);
+        DynamicRecordActionServices actionServices = new DynamicRecordActionServices(
+                codeBusinessPreviewService, referenceRecordGenerationFacade, duplicateCheckService, navigationService);
+        return new DynamicRecordWebController(recordService, activeTenantVerifier,
+                queryServices, attachmentServices, actionServices);
     }
 
     private MockMvc projectionMvc(PlatformPageConfigSnapshotService snapshotService,

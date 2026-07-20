@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.ability.action.DataChangeOperation;
 import net.ximatai.muyun.spring.ability.action.MutationContextHolder;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionTestFactory;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
@@ -1060,20 +1059,15 @@ class IamWebControllerIT {
                 employeeAccountService,
                 employeeDelegationService
         );
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                EmployeeService.MODULE_ALIAS,
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
-                controller.moduleUiDefinition(),
-                StaticModuleReferenceCompiler.compile(Employee.class),
-                List.of(
+        return StaticModuleDefinition.builder("iam", EmployeeService.MODULE_ALIAS, "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)))
+                       .uiDefinition(controller.moduleUiDefinition())
+                       .references(StaticModuleReferenceCompiler.compile(Employee.class))
+                       .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
                                 ModuleReferencePath.from(Employee::getOrganizationId)
                                         .select(Organization::getTitle),
@@ -1095,51 +1089,41 @@ class IamWebControllerIT {
                                 ModuleReadProjection.ProjectionType.EXISTS,
                                 true,
                                 false)
-                ),
-                Employee.class,
-                List.of()
-        );
+                ))
+                       .modelClass(Employee.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private StaticModuleDefinition departmentStaticModuleDefinition() {
         DepartmentWebController controller = new DepartmentWebController();
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                DepartmentService.MODULE_ALIAS,
-                "部门管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/departments",
-                null,
-                Set.of(EntityCapability.CRUD, EntityCapability.TREE),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile("department", "部门管理", Department.class)),
-                controller.moduleUiDefinition()
-        );
+        return StaticModuleDefinition.builder("iam", DepartmentService.MODULE_ALIAS, "部门管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/departments", null)
+                       .capabilities(Set.of(EntityCapability.CRUD, EntityCapability.TREE))
+                       .actions(List.of())
+                       .entities(List.of(new StaticEntityDefinitionCompiler().compile("department", "部门管理", Department.class)))
+                       .uiDefinition(controller.moduleUiDefinition())
+                       .build();
     }
 
     private StaticModuleDefinition moduleDefinition(String moduleAlias, String title, Class<?> modelClass) {
-        return StaticModuleDefinitionTestFactory.create(
-                moduleAlias.substring(0, moduleAlias.indexOf('.')),
-                moduleAlias,
-                title,
-                null,
-                ModuleEntryType.MODULE,
-                null,
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile(
+        return StaticModuleDefinition.builder(moduleAlias.substring(0, moduleAlias.indexOf('.')), moduleAlias, title)
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.MODULE, null, null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new StaticEntityDefinitionCompiler().compile(
                         moduleAlias.substring(moduleAlias.indexOf('.') + 1),
                         title,
                         modelClass
-                )),
-                null,
-                List.of(),
-                List.of(),
-                modelClass,
-                List.of()
-        );
+                )))
+                       .uiDefinition(null)
+                       .references(List.of())
+                       .readProjections(List.of())
+                       .modelClass(modelClass)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private QueryCompiler employeeQueryCompiler() {

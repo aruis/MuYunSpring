@@ -26,7 +26,7 @@ import java.util.Set;
 public class DynamicRelationProjectionReadService {
     private final RelationProjectionReadService relationProjectionReadService;
 
-    public DynamicRelationProjectionReadService() {
+    DynamicRelationProjectionReadService() {
         this((RelationProjectionReadService) null);
     }
 

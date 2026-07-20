@@ -53,23 +53,18 @@ public class StaticModuleDefinitionScanner {
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
         validateScopeAlias(beanClass, module);
         List<RelationProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
-        return new StaticModuleDefinition(
-                module.application(),
-                module.alias(),
-                module.title(),
-                module.parent().isBlank() ? null : module.parent(),
-                entryType(module),
-                module.route(),
-                module.externalUrl(),
-                java.util.Set.of(module.capabilities()),
-                actions(beanClass, java.util.Set.of(module.capabilities())),
-                entities(bean, module, projectionJoins),
-                uiDefinition(bean, module),
-                references(bean),
-                readProjections(bean),
-                modelClass(bean),
-                projectionJoins
-        );
+        return StaticModuleDefinition.builder(module.application(), module.alias(), module.title())
+                .parentModuleAlias(module.parent().isBlank() ? null : module.parent())
+                .entry(entryType(module), module.route(), module.externalUrl())
+                .capabilities(java.util.Set.of(module.capabilities()))
+                .actions(actions(beanClass, java.util.Set.of(module.capabilities())))
+                .entities(entities(bean, module, projectionJoins))
+                .uiDefinition(uiDefinition(bean, module))
+                .references(references(bean))
+                .readProjections(readProjections(bean))
+                .modelClass(modelClass(bean))
+                .projectionJoins(projectionJoins)
+                .build();
     }
 
     private Class<?> modelClass(Object bean) {
@@ -262,23 +257,11 @@ public class StaticModuleDefinitionScanner {
                     target.uiDefinition(),
                     contributionUiDefinition(bean, targetModule)
             );
-            definitions.put(targetModule, new StaticModuleDefinition(
-                    target.applicationAlias(),
-                    target.moduleAlias(),
-                    target.title(),
-                    target.parentModuleAlias(),
-                    target.entryType(),
-                    target.entryRoute(),
-                    target.entryExternalUrl(),
-                    target.capabilities(),
-                    List.copyOf(merged.values()),
-                    entities,
-                    uiDefinition,
-                    target.references(),
-                    target.readProjections(),
-                    target.modelClass(),
-                    target.projectionJoins()
-            ));
+            definitions.put(targetModule, target.toBuilder()
+                    .actions(List.copyOf(merged.values()))
+                    .entities(entities)
+                    .uiDefinition(uiDefinition)
+                    .build());
         }
     }
 

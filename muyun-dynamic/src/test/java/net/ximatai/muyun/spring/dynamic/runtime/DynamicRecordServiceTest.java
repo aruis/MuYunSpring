@@ -1127,17 +1127,11 @@ class DynamicRecordServiceTest {
 
     @Test
     void shouldResolveStandardModuleActionToExplicitMainEntityWhenChildEntityComesFirst() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(lineEntity().withCapabilities(EntityCapability.CRUD), actionEntity().withCapabilities(EntityCapability.CRUD)),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "contract"
-        );
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(lineEntity().withCapabilities(EntityCapability.CRUD),
+                        actionEntity().withCapabilities(EntityCapability.CRUD)))
+                .mainEntityAlias("contract")
+                .build();
         DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(operations()).register(module));
 
         assertThat(service.actionEntityAlias(MODULE, "create")).isEqualTo("contract");
@@ -1810,22 +1804,16 @@ class DynamicRecordServiceTest {
 
     @Test
     void shouldExposeExplicitChildEntityActionInModuleActionAvailability() {
-        ModuleDefinition module = new ModuleDefinition(
-                MODULE,
-                "Contract",
-                List.of(actionEntity(), lineEntity()),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder(MODULE, "Contract")
+                .entities(List.of(actionEntity(), lineEntity()))
+                .actions(List.of(
                         new EntityActionDefinition("contract", "submit", "提交", true)
                                 .availableWhen("{status} == 'draft'"),
                         new EntityActionDefinition("line", "submitLine", "提交行", true)
                                 .availableWhen("{summary} != ''")
-                ),
-                "contract"
-        );
+                ))
+                .mainEntityAlias("contract")
+                .build();
         DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(operations()).register(module));
         DynamicRecord line = service.newRecord(MODULE, "line")
                 .setValue("summary", "ok");

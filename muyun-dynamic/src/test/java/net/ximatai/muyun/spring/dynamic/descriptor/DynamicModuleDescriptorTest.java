@@ -241,26 +241,22 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldExposeMainEntityActionsAsModuleActions() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("contact", "crm_contact", "Contact",
                                 List.of(FieldDefinition.titleField())),
                         new EntityDefinition("customer", "crm_customer", "Customer",
                                 List.of(FieldDefinition.titleField()),
                                 Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
-                ),
-                List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+                ))
+                .relations(List.of(EntityRelationDefinition.child(
+                        "contacts", "customer", "contact", "customerId")))
+                .actions(List.of(
                         new EntityActionDefinition("customer", "create", "新建客户", true),
                         new EntityActionDefinition("contact", "exportContact", "导出联系人", true)
-                ),
-                "customer"
-        );
+                ))
+                .mainEntityAlias("customer")
+                .build();
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 
@@ -297,26 +293,20 @@ class DynamicModuleDescriptorTest {
 
     @Test
     void shouldUseExplicitMainEntityAsModuleActionBaseAndExposeConfiguredChildActions() {
-        ModuleDefinition module = new ModuleDefinition(
-                "crm.customer",
-                "Customer",
-                List.of(
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
                         new EntityDefinition("contact", "crm_contact", "Contact",
                                 List.of(FieldDefinition.titleField())),
                         new EntityDefinition("customer", "crm_customer", "Customer",
                                 List.of(FieldDefinition.titleField()),
                                 Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
-                ),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(
+                ))
+                .actions(List.of(
                         new EntityActionDefinition("contact", "exportContact", "导出联系人", true),
                         new EntityActionDefinition("customer", "approveCustomer", "审核客户", true)
-                ),
-                "customer"
-        );
+                ))
+                .mainEntityAlias("customer")
+                .build();
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 

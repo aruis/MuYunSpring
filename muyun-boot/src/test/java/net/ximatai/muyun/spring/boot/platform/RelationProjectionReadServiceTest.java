@@ -340,17 +340,12 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition userRelationDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(
+        return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(
                         new EntityDefinition(
                                 "user",
                                 "iam_user",
@@ -370,14 +365,14 @@ class RelationProjectionReadServiceTest {
                                         FieldDefinition.string("employeeTitle", "职员姓名").column("title")
                                 )
                         )
-                ),
-                ModuleUiDefinition.builder("iam.user")
+                ))
+                       .uiDefinition(ModuleUiDefinition.builder("iam.user")
                         .listView(list -> list
                                 .field("username")
                                 .field("bound_employee", "employeeNo", field -> field.label("职员工号"))
                                 .field("bound_employee", "employeeTitle", field -> field.label("职员姓名")))
-                        .build(),
-                List.of(new RelationProjectionJoinDefinition(
+                        .build())
+                       .projectionJoins(List.of(new RelationProjectionJoinDefinition(
                         "bound_employee",
                         new EntityDefinition(
                                 "bound_employee",
@@ -417,35 +412,30 @@ class RelationProjectionReadServiceTest {
                                                 "bound_employee", "deleted", Boolean.FALSE))
                                 )
                         )
-                ))
-        );
+                )))
+                       .build();
     }
 
     private static StaticModuleDefinition userReferenceDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "user",
                         "iam_user",
                         "User",
                         List.of(FieldDefinition.string("username", "账号").column("username"))
-                )),
-                ModuleUiDefinition.builder("iam.user")
+                )))
+                       .uiDefinition(ModuleUiDefinition.builder("iam.user")
                         .listView(list -> list
                                 .field("username")
                                 .field("employeeNo")
                                 .field("employeeTitle"))
-                        .build(),
-                List.of(),
-                List.of(
+                        .build())
+                       .references(List.of())
+                       .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
                                 null,
                                 ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
@@ -462,10 +452,10 @@ class RelationProjectionReadServiceTest {
                                         .select(Employee::getTitle),
                                 "employeeTitle"
                         )
-                ),
-                UserAccount.class,
-                List.of()
-        );
+                ))
+                       .modelClass(UserAccount.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static StaticModuleDefinition userWithEmployeeReferenceDefinition() {
@@ -474,17 +464,12 @@ class RelationProjectionReadServiceTest {
 
     private static StaticModuleDefinition userWithEmployeeReferenceDefinition(
             FieldProtectionDefinition employeeIdProtection) {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "user",
                         "iam_user",
                         "User",
@@ -493,27 +478,22 @@ class RelationProjectionReadServiceTest {
                                 FieldDefinition.string("employeeId", "职员").column("employee_id")
                                         .protection(employeeIdProtection)
                         )
-                )),
-                null,
-                List.of(new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id")),
-                List.of(),
-                UserAccount.class,
-                List.of()
-        );
+                )))
+                       .uiDefinition(null)
+                       .references(List.of(new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id")))
+                       .readProjections(List.of())
+                       .modelClass(UserAccount.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static StaticModuleDefinition employeeAccountReferenceDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.employee_account",
-                "职员账号绑定",
-                null,
-                ModuleEntryType.MODULE,
-                null,
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee_account", "职员账号绑定")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.MODULE, null, null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee_account",
                         "iam_employee_account",
                         "Employee Account",
@@ -521,16 +501,16 @@ class RelationProjectionReadServiceTest {
                                 FieldDefinition.string("employeeId", "职员").column("employee_id"),
                                 FieldDefinition.string("userId", "用户").column("user_id")
                         )
-                )),
-                null,
-                List.of(
+                )))
+                       .uiDefinition(null)
+                       .references(List.of(
                         new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
                         new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
-                ),
-                List.of(),
-                EmployeeAccount.class,
-                List.of()
-        );
+                ))
+                       .readProjections(List.of())
+                       .modelClass(EmployeeAccount.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition() {
@@ -538,17 +518,12 @@ class RelationProjectionReadServiceTest {
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition(FieldProtectionDefinition protection) {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.employee",
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee", "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee",
                         "iam_employee",
                         "Employee",
@@ -557,13 +532,13 @@ class RelationProjectionReadServiceTest {
                                 FieldDefinition.string("title", "职员姓名").column("title")
                                         .protection(protection)
                         )
-                )),
-                null,
-                List.of(),
-                List.of(),
-                Employee.class,
-                List.of()
-        );
+                )))
+                       .uiDefinition(null)
+                       .references(List.of())
+                       .readProjections(List.of())
+                       .modelClass(Employee.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static FieldProtectionDefinition masked() {

@@ -115,27 +115,17 @@ public class MuYunSpringIdentityConfiguration {
 
     @Bean
     public StaticModuleDefinition employeeAccountStaticModuleDefinition() {
-        return new StaticModuleDefinition(
-                "iam",
-                EmployeeAccountService.MODULE_ALIAS,
-                "职员账号绑定",
-                null,
-                ModuleEntryType.MODULE,
-                null,
-                null,
-                java.util.Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new StaticEntityDefinitionCompiler().compile(
+        return StaticModuleDefinition.builder("iam", EmployeeAccountService.MODULE_ALIAS, "职员账号绑定")
+                .entry(ModuleEntryType.MODULE, null, null)
+                .capabilities(java.util.Set.of(EntityCapability.CRUD))
+                .entities(List.of(new StaticEntityDefinitionCompiler().compile(
                         "employee_account",
                         "职员账号绑定",
                         EmployeeAccount.class
-                )),
-                null,
-                StaticModuleReferenceCompiler.compile(EmployeeAccount.class),
-                List.of(),
-                EmployeeAccount.class,
-                List.of()
-        );
+                )))
+                .references(StaticModuleReferenceCompiler.compile(EmployeeAccount.class))
+                .modelClass(EmployeeAccount.class)
+                .build();
     }
 
     @Bean

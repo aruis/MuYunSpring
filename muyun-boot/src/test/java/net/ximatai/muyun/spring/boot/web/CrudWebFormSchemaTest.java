@@ -14,7 +14,6 @@ import net.ximatai.muyun.spring.ability.form.FormField;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionTestFactory;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
@@ -214,17 +213,12 @@ class CrudWebFormSchemaTest {
     }
 
     private static StaticModuleDefinition demoStaticModuleDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "demo",
-                "demo.record.ui",
-                "UI Demo Record",
-                null,
-                ModuleEntryType.ROUTE,
-                "/demo-records",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("demo", "demo.record.ui", "UI Demo Record")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/demo-records", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "demo_record",
                         "demo_record",
                         "Demo Record",
@@ -232,12 +226,12 @@ class CrudWebFormSchemaTest {
                                 FieldDefinition.string("title", "名称"),
                                 FieldDefinition.string("status", "状态")
                         )
-                )),
-                ModuleUiDefinition.builder("demo.record.ui")
+                )))
+                       .uiDefinition(ModuleUiDefinition.builder("demo.record.ui")
                         .listView(list -> list
                                 .field("title", field -> field.label("UI 名称")))
-                        .build()
-        );
+                        .build())
+                       .build();
     }
 
     @Table(name = "demo_record", comment = "Demo Record")

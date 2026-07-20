@@ -9,7 +9,6 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserTimeZoneResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -763,25 +762,18 @@ class UserSessionServiceTest {
             CurrentUserTimeZoneResolver timeZoneResolver,
             Supplier<UserSessionPresenceLookup> presenceLookup) {
         UserSessionCollaborators collaborators = new UserSessionCollaborators(
-                provider(revocationService),
-                provider(securityEventPublisher == null ? null : securityEventPublisher.get()),
-                provider(timeZoneResolver),
-                provider(presenceLookup == null ? null : presenceLookup.get()),
-                event -> {
+                () -> revocationService,
+                securityEventPublisher,
+                () -> event -> {
                     UserSessionLifecycleEventPublisher publisher = lifecycleEventPublisher == null
                             ? UserSessionLifecycleEventPublisher.NOOP
                             : lifecycleEventPublisher.get();
                     publisher.publish((UserSessionLifecycleEvent) event);
-                });
+                },
+                timeZoneResolver,
+                presenceLookup);
         return new UserSessionService(userAccountService, userSessionRecordService, activeTenantVerifier,
                 collaborators, clock);
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> ObjectProvider<T> provider(T value) {
-        ObjectProvider<T> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(value);
-        return provider;
     }
 
     private UserAccount activeUser() {

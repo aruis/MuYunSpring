@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.boot.platform.PlatformModuleRuntimeActionWebController;
+import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadService;
 import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailability;
 import net.ximatai.muyun.spring.boot.platform.PlatformRecordActionAvailabilityService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
@@ -52,7 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         DynamicRecordWebControllerIT.StaticContractController.class,
         CurrentUserWebFilter.class,
         DynamicRecordJacksonConfiguration.class,
-        DynamicRecordWebCollaborators.class
+        DynamicRelationProjectionReadService.class,
+        DynamicRecordWebServiceConfiguration.class
 })
 class DynamicRecordWebControllerIT {
     private static final String MODULE = "sales.contract";

@@ -73,7 +73,7 @@ public class DynamicEntityService implements
     private final FieldProtectionPlan<DynamicRecord> fieldProtectionPlan;
     private final PlatformTimeService timeService;
 
-    public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
+    DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE, null, unsupportedRelationResolver(),
                 unsupportedReferenceResolver(moduleAlias), null, DynamicFieldValueValidator.NONE,
                 FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE, new PlatformTimeService());

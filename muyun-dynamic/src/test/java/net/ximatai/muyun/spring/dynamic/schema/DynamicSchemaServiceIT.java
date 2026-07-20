@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityService;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityServiceTestFactory;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordDao;
@@ -336,7 +337,7 @@ class DynamicSchemaServiceIT {
         EntityDefinition entity = entity("app_contract_record_it");
         schemaService.ensureTable(entity);
         DynamicRecordDao dao = new DynamicRecordDao(operations, entity);
-        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
+        DynamicEntityService entityService = DynamicEntityServiceTestFactory.forDataAccess(dao, "sales.contract");
 
         DynamicRecord record = new DynamicRecord(entity)
                 .setValue("code", "C-IT-001")
@@ -380,7 +381,8 @@ class DynamicSchemaServiceIT {
     void shouldRunComplexCriteriaContractOnRealDatabase() {
         EntityDefinition entity = entity("app_contract_criteria_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8));
         schemaService.ensureTable(entity);
-        DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract.criteria");
+        DynamicEntityService service = DynamicEntityServiceTestFactory.forDataAccess(
+                new DynamicRecordDao(operations, entity), "sales.contract.criteria");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-criteria")) {
             insertContract(service, entity, "C-CR-001", "Alpha", "2026-01-01T00:00:00Z", "10.00");

@@ -263,17 +263,12 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition staticDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.employee",
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee", "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee",
                         "iam_employee",
                         "Employee",
@@ -282,13 +277,13 @@ class StaticRecordReadProjectionServiceTest {
                                 FieldDefinition.string("title", "职员姓名"),
                                 FieldDefinition.string("mobile", "手机号")
                         )
-                )),
-                ModuleUiDefinition.builder("iam.employee")
+                )))
+                       .uiDefinition(ModuleUiDefinition.builder("iam.employee")
                         .listView(list -> list
                                 .field("employeeNo")
                                 .field("title"))
-                        .build()
-        );
+                        .build())
+                       .build();
     }
 
     private static StaticModuleDefinition userRelationDefinition() {
@@ -309,17 +304,12 @@ class StaticRecordReadProjectionServiceTest {
                     list.field("bound_employee", "employeeNo", field -> field.label("职员工号"));
                     list.field("bound_employee", "employeeTitle", field -> field.label("职员姓名"));
                 });
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(
+        return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(
                         new EntityDefinition(
                                 "user",
                                 "iam_user",
@@ -339,9 +329,9 @@ class StaticRecordReadProjectionServiceTest {
                                         FieldDefinition.string("employeeTitle", "职员姓名").column("title")
                                 )
                         )
-                ),
-                uiBuilder.build(),
-                List.of(new RelationProjectionJoinDefinition(
+                ))
+                       .uiDefinition(uiBuilder.build())
+                       .projectionJoins(List.of(new RelationProjectionJoinDefinition(
                         "bound_employee",
                         new EntityDefinition(
                                 "bound_employee",
@@ -381,54 +371,44 @@ class StaticRecordReadProjectionServiceTest {
                                                 "bound_employee", "deleted", Boolean.FALSE))
                                 )
                         )
-                ))
-        );
+                )))
+                       .build();
     }
 
     private static StaticModuleDefinition userReferenceProjectionDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.user",
-                "用户管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/users",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/users", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "user",
                         "iam_user",
                         "User",
                         List.of(FieldDefinition.string("username", "账号").column("username"))
-                )),
-                ModuleUiDefinition.builder("iam.user")
+                )))
+                       .uiDefinition(ModuleUiDefinition.builder("iam.user")
                         .listView(list -> list.field("username"))
-                        .build(),
-                List.of(),
-                List.of(new StaticModuleReadProjectionDefinition(
+                        .build())
+                       .references(List.of())
+                       .readProjections(List.of(new StaticModuleReadProjectionDefinition(
                         ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle"
-                )),
-                UserAccount.class,
-                List.of()
-        );
+                )))
+                       .modelClass(UserAccount.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static StaticModuleDefinition employeeAccountReferenceDefinition() {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.employee_account",
-                "职员账号绑定",
-                null,
-                ModuleEntryType.MODULE,
-                null,
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee_account", "职员账号绑定")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.MODULE, null, null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee_account",
                         "iam_employee_account",
                         "Employee Account",
@@ -436,16 +416,16 @@ class StaticRecordReadProjectionServiceTest {
                                 FieldDefinition.string("employeeId", "职员").column("employee_id"),
                                 FieldDefinition.string("userId", "用户").column("user_id")
                         )
-                )),
-                null,
-                List.of(
+                )))
+                       .uiDefinition(null)
+                       .references(List.of(
                         new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
                         new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
-                ),
-                List.of(),
-                EmployeeAccount.class,
-                List.of()
-        );
+                ))
+                       .readProjections(List.of())
+                       .modelClass(EmployeeAccount.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition() {
@@ -457,29 +437,24 @@ class StaticRecordReadProjectionServiceTest {
     }
 
     private static StaticModuleDefinition employeeReferenceDefinition(FieldProtectionDefinition protection) {
-        return StaticModuleDefinitionTestFactory.create(
-                "iam",
-                "iam.employee",
-                "职员管理",
-                null,
-                ModuleEntryType.ROUTE,
-                "/iam/employees",
-                null,
-                Set.of(EntityCapability.CRUD),
-                List.of(),
-                List.of(new EntityDefinition(
+        return StaticModuleDefinition.builder("iam", "iam.employee", "职员管理")
+                       .parentModuleAlias(null)
+                       .entry(ModuleEntryType.ROUTE, "/iam/employees", null)
+                       .capabilities(Set.of(EntityCapability.CRUD))
+                       .actions(List.of())
+                       .entities(List.of(new EntityDefinition(
                         "employee",
                         "iam_employee",
                         "Employee",
                         List.of(FieldDefinition.string("title", "职员姓名").column("title")
                                 .protection(protection))
-                )),
-                null,
-                List.of(),
-                List.of(),
-                Employee.class,
-                List.of()
-        );
+                )))
+                       .uiDefinition(null)
+                       .references(List.of())
+                       .readProjections(List.of())
+                       .modelClass(Employee.class)
+                       .projectionJoins(List.of())
+                       .build();
     }
 
     private static FieldProtectionDefinition masked() {

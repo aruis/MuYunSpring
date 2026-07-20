@@ -151,18 +151,20 @@ public class DynamicRecordWebController implements
     @Autowired
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
-                                      DynamicRecordWebCollaborators collaborators) {
+                                      DynamicRecordQueryServices queryServices,
+                                      DynamicRecordAttachmentServices attachmentServices,
+                                      DynamicRecordActionServices actionServices) {
         this.recordService = recordService;
-        this.codeBusinessPreviewService = collaborators.codeBusinessPreviewService();
-        this.referenceRecordGenerationFacade = collaborators.referenceRecordGenerationFacade();
-        this.pageConfigSnapshotService = collaborators.pageConfigSnapshotService();
-        this.queryItemService = collaborators.queryItemService();
-        this.moduleMetadataFieldService = collaborators.moduleMetadataFieldService();
-        this.recordAttachmentService = collaborators.recordAttachmentService();
-        this.recordAttachmentAccessService = collaborators.recordAttachmentAccessService();
-        this.duplicateCheckService = collaborators.duplicateCheckService();
-        this.navigationService = collaborators.navigationService();
-        this.dynamicRelationProjectionReadService = collaborators.relationProjectionReadService();
+        this.codeBusinessPreviewService = actionServices.codeBusinessPreviewService();
+        this.referenceRecordGenerationFacade = actionServices.referenceRecordGenerationFacade();
+        this.pageConfigSnapshotService = queryServices.pageConfigSnapshotService();
+        this.queryItemService = queryServices.queryItemService();
+        this.moduleMetadataFieldService = queryServices.moduleMetadataFieldService();
+        this.recordAttachmentService = attachmentServices.attachmentService();
+        this.recordAttachmentAccessService = attachmentServices.attachmentAccessService();
+        this.duplicateCheckService = actionServices.duplicateCheckService();
+        this.navigationService = actionServices.navigationService();
+        this.dynamicRelationProjectionReadService = queryServices.relationProjectionReadService();
         this.dynamicModuleScopeService = new PlatformDynamicModuleScopeService(activeTenantVerifier);
     }
 

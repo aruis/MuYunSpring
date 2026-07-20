@@ -9,26 +9,41 @@ import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
-public record StaticModuleDefinition(
-        String applicationAlias,
-        String moduleAlias,
-        String title,
-        String parentModuleAlias,
-        ModuleEntryType entryType,
-        String entryRoute,
-        String entryExternalUrl,
-        Set<EntityCapability> capabilities,
-        List<StaticModuleActionDefinition> actions,
-        List<EntityDefinition> entities,
-        ModuleUiDefinition uiDefinition,
-        List<StaticModuleReferenceDefinition> references,
-        List<StaticModuleReadProjectionDefinition> readProjections,
-        Class<?> modelClass,
-        List<RelationProjectionJoinDefinition> projectionJoins
-) {
-    public StaticModuleDefinition {
+public final class StaticModuleDefinition {
+    private final String applicationAlias;
+    private final String moduleAlias;
+    private final String title;
+    private final String parentModuleAlias;
+    private final ModuleEntryType entryType;
+    private final String entryRoute;
+    private final String entryExternalUrl;
+    private final Set<EntityCapability> capabilities;
+    private final List<StaticModuleActionDefinition> actions;
+    private final List<EntityDefinition> entities;
+    private final ModuleUiDefinition uiDefinition;
+    private final List<StaticModuleReferenceDefinition> references;
+    private final List<StaticModuleReadProjectionDefinition> readProjections;
+    private final Class<?> modelClass;
+    private final List<RelationProjectionJoinDefinition> projectionJoins;
+
+    private StaticModuleDefinition(String applicationAlias,
+                                   String moduleAlias,
+                                   String title,
+                                   String parentModuleAlias,
+                                   ModuleEntryType entryType,
+                                   String entryRoute,
+                                   String entryExternalUrl,
+                                   Set<EntityCapability> capabilities,
+                                   List<StaticModuleActionDefinition> actions,
+                                   List<EntityDefinition> entities,
+                                   ModuleUiDefinition uiDefinition,
+                                   List<StaticModuleReferenceDefinition> references,
+                                   List<StaticModuleReadProjectionDefinition> readProjections,
+                                   Class<?> modelClass,
+                                   List<RelationProjectionJoinDefinition> projectionJoins) {
         applicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         moduleAlias = PlatformNameRules.requireModuleAliasInApplication(moduleAlias, applicationAlias);
         title = title == null || title.isBlank() ? moduleAlias : title.trim();
@@ -59,6 +74,100 @@ public record StaticModuleDefinition(
         projectionJoins = projectionJoins == null ? List.of() : List.copyOf(projectionJoins);
         validateReferences(moduleAlias, references);
         validateReadProjectionOutputFields(moduleAlias, entities, readProjections);
+        this.applicationAlias = applicationAlias;
+        this.moduleAlias = moduleAlias;
+        this.title = title;
+        this.parentModuleAlias = parentModuleAlias;
+        this.entryType = entryType;
+        this.entryRoute = entryRoute;
+        this.entryExternalUrl = entryExternalUrl;
+        this.capabilities = capabilities;
+        this.actions = actions;
+        this.entities = entities;
+        this.uiDefinition = uiDefinition;
+        this.references = references;
+        this.readProjections = readProjections;
+        this.modelClass = modelClass;
+        this.projectionJoins = projectionJoins;
+    }
+
+    public String applicationAlias() { return applicationAlias; }
+    public String moduleAlias() { return moduleAlias; }
+    public String title() { return title; }
+    public String parentModuleAlias() { return parentModuleAlias; }
+    public ModuleEntryType entryType() { return entryType; }
+    public String entryRoute() { return entryRoute; }
+    public String entryExternalUrl() { return entryExternalUrl; }
+    public Set<EntityCapability> capabilities() { return capabilities; }
+    public List<StaticModuleActionDefinition> actions() { return actions; }
+    public List<EntityDefinition> entities() { return entities; }
+    public ModuleUiDefinition uiDefinition() { return uiDefinition; }
+    public List<StaticModuleReferenceDefinition> references() { return references; }
+    public List<StaticModuleReadProjectionDefinition> readProjections() { return readProjections; }
+    public Class<?> modelClass() { return modelClass; }
+    public List<RelationProjectionJoinDefinition> projectionJoins() { return projectionJoins; }
+
+    public String getApplicationAlias() { return applicationAlias; }
+    public String getModuleAlias() { return moduleAlias; }
+    public String getTitle() { return title; }
+    public String getParentModuleAlias() { return parentModuleAlias; }
+    public ModuleEntryType getEntryType() { return entryType; }
+    public String getEntryRoute() { return entryRoute; }
+    public String getEntryExternalUrl() { return entryExternalUrl; }
+    public Set<EntityCapability> getCapabilities() { return capabilities; }
+    public List<StaticModuleActionDefinition> getActions() { return actions; }
+    public List<EntityDefinition> getEntities() { return entities; }
+    public ModuleUiDefinition getUiDefinition() { return uiDefinition; }
+    public List<StaticModuleReferenceDefinition> getReferences() { return references; }
+    public List<StaticModuleReadProjectionDefinition> getReadProjections() { return readProjections; }
+    public Class<?> getModelClass() { return modelClass; }
+    public List<RelationProjectionJoinDefinition> getProjectionJoins() { return projectionJoins; }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (!(other instanceof StaticModuleDefinition that)) return false;
+        return Objects.equals(applicationAlias, that.applicationAlias)
+                && Objects.equals(moduleAlias, that.moduleAlias)
+                && Objects.equals(title, that.title)
+                && Objects.equals(parentModuleAlias, that.parentModuleAlias)
+                && entryType == that.entryType
+                && Objects.equals(entryRoute, that.entryRoute)
+                && Objects.equals(entryExternalUrl, that.entryExternalUrl)
+                && Objects.equals(capabilities, that.capabilities)
+                && Objects.equals(actions, that.actions)
+                && Objects.equals(entities, that.entities)
+                && Objects.equals(uiDefinition, that.uiDefinition)
+                && Objects.equals(references, that.references)
+                && Objects.equals(readProjections, that.readProjections)
+                && Objects.equals(modelClass, that.modelClass)
+                && Objects.equals(projectionJoins, that.projectionJoins);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute,
+                entryExternalUrl, capabilities, actions, entities, uiDefinition, references, readProjections,
+                modelClass, projectionJoins);
+    }
+
+    @Override
+    public String toString() {
+        return "StaticModuleDefinition[applicationAlias=" + applicationAlias
+                + ", moduleAlias=" + moduleAlias
+                + ", title=" + title
+                + ", parentModuleAlias=" + parentModuleAlias
+                + ", entryType=" + entryType
+                + ", entryRoute=" + entryRoute
+                + ", entryExternalUrl=" + entryExternalUrl
+                + ", capabilities=" + capabilities
+                + ", actions=" + actions
+                + ", entities=" + entities
+                + ", uiDefinition=" + uiDefinition
+                + ", references=" + references
+                + ", readProjections=" + readProjections
+                + ", modelClass=" + modelClass
+                + ", projectionJoins=" + projectionJoins + "]";
     }
 
     public boolean supports(EntityCapability capability) {
@@ -67,6 +176,20 @@ public record StaticModuleDefinition(
 
     public static Builder builder(String applicationAlias, String moduleAlias, String title) {
         return new Builder(applicationAlias, moduleAlias, title);
+    }
+
+    public Builder toBuilder() {
+        return builder(applicationAlias, moduleAlias, title)
+                .parentModuleAlias(parentModuleAlias)
+                .entry(entryType, entryRoute, entryExternalUrl)
+                .capabilities(capabilities)
+                .actions(actions)
+                .entities(entities)
+                .uiDefinition(uiDefinition)
+                .references(references)
+                .readProjections(readProjections)
+                .modelClass(modelClass)
+                .projectionJoins(projectionJoins);
     }
 
     public static final class Builder {
