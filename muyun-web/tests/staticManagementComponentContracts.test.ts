@@ -538,7 +538,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(formFieldModelSource, /fallback\?\.controlType \?\? 'input'/);
   assert.match(formFieldsSource, /booleanFieldValue/);
   assert.match(formFieldsSource, /field\.controlType === 'recordPicker' && field\.pickerConfig/);
-  assert.match(formFieldsSource, /field\.controlType === 'select' && field\.options/);
+  assert.match(
+    formFieldsSource,
+    /field\.controlType === 'select' && \(field\.hasOption \|\| optionFieldOptions\(field\)\.length > 0\)/,
+  );
   assert.match(
     formFieldsSource,
     /disabledOf\?: \(fieldName: string, field: RecordFormFieldState\) => boolean/,
