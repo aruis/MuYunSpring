@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import type { ModuleContext } from '@muyun/web-core';
-import { UiButton } from '@muyun/vue-ui-antdv';
+import { UiActionButton } from '@muyun/vue-ui-antdv';
 import { resolveRecordActions, type RecordActionItem } from './recordActionBarModel';
 
 defineOptions({ name: 'RecordActionBar' });
@@ -48,18 +48,19 @@ function handleClick(action: RecordActionItem, event: MouseEvent) {
 
 <template>
   <div class="record-action-bar" :class="{ compact: size === 'compact' }">
-    <UiButton
+    <UiActionButton
       v-for="action in resolvedActions"
       :key="action.key"
-      :type="action.primary ? 'primary' : size === 'compact' && !action.danger ? 'text' : 'default'"
+      :emphasis="action.primary ? 'primary' : size === 'compact' && !action.danger ? 'quiet' : 'secondary'"
       :disabled="action.disabled"
       :loading="action.loading"
-      :danger="action.danger"
+      :intent="action.danger ? 'danger' : 'normal'"
+      :density="size === 'compact' ? 'compact' : 'regular'"
       :icon-name="action.iconName"
       @click="handleClick(action, $event)"
     >
       {{ action.title }}
-    </UiButton>
+    </UiActionButton>
   </div>
 </template>
 

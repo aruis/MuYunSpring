@@ -34,6 +34,7 @@ export function createTenantManagementState(
     isValid: (record) => Boolean(record.id && record.title),
     recordName: '租户',
     deleteTitle: '删除租户',
+    deleteRequiredText: tenantAliasOf,
     saveDeniedMessage: '当前用户无权保存租户',
     createDeniedMessage: '当前用户无权新建租户',
     enableDeniedMessage: '当前用户无权变更租户启停状态',

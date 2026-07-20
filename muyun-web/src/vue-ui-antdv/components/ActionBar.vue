@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Space as ASpace, Tooltip as ATooltip } from 'ant-design-vue';
 import type { ActionContract } from '@muyun/web-contracts';
-import UiButton from './UiButton.vue';
+import UiActionButton from './UiActionButton.vue';
 
-defineOptions({ name: 'ActionBar' });
+defineOptions({ name: 'ActionBar', inheritAttrs: false });
 
 defineProps<{
   actions: ActionContract[];
@@ -15,20 +15,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <ASpace wrap>
+  <ASpace wrap :class="$attrs.class" :style="$attrs.style">
     <ATooltip
       v-for="action in actions"
       :key="action.actionCode"
       :title="action.disabled ? action.disabledReason : undefined"
     >
-      <UiButton
-        :type="action.level === 'primary' ? 'primary' : 'default'"
-        :danger="action.level === 'danger'"
+      <UiActionButton
+        :emphasis="action.level === 'primary' ? 'primary' : 'secondary'"
+        :intent="action.level === 'danger' ? 'danger' : 'normal'"
         :disabled="action.disabled"
         @click="emit('execute', action)"
       >
         {{ action.title }}
-      </UiButton>
+      </UiActionButton>
     </ATooltip>
   </ASpace>
 </template>

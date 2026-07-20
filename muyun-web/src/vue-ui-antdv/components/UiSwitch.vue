@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Switch as ASwitch } from 'ant-design-vue';
 
-defineOptions({ name: 'UiSwitch' });
+defineOptions({ name: 'UiSwitch', inheritAttrs: false });
 
 withDefaults(
   defineProps<{
@@ -33,7 +33,14 @@ function handleChange(checked: unknown) {
 </script>
 
 <template>
-  <ASwitch :checked="checked" :disabled="disabled" :loading="loading" @change="handleChange">
+  <ASwitch
+    :checked="checked"
+    :disabled="disabled"
+    :loading="loading"
+    :class="$attrs.class"
+    :style="$attrs.style"
+    @change="handleChange"
+  >
     <template v-if="checkedText" #checkedChildren>{{ checkedText }}</template>
     <template v-if="uncheckedText" #unCheckedChildren>{{ uncheckedText }}</template>
   </ASwitch>

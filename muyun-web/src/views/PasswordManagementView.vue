@@ -20,7 +20,7 @@ import {
 } from '@muyun/platform-components';
 import type { PasswordPolicyRule } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import { confirmAction, UiInput } from '@muyun/vue-ui-antdv';
+import { confirmAction, UiInput, UiTextArea } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'PasswordManagementView' });
 
@@ -472,7 +472,7 @@ function blankToUndefined(value: string | undefined) {
         </label>
         <label class="wide">
           <span>说明</span>
-          <textarea v-model="draft.description" :disabled="readonly" rows="4" />
+          <UiTextArea v-model:value="draft.description" :disabled="readonly" :rows="4" />
         </label>
       </form>
 

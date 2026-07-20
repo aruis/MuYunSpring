@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import type { AuthClient } from '@muyun/web-core';
 import type { LoginResult } from '@muyun/web-contracts';
+import { UiButton, UiInput } from '@muyun/vue-ui-antdv';
 import { normalizeInitialValue, resolveLoginTenantDefaults } from './loginTenant';
 
 defineOptions({ name: 'LoginView' });
@@ -102,33 +103,33 @@ async function submitPasswordChange() {
         <p v-if="tenantLocked" class="login-context">租户：{{ tenantId }}</p>
         <label v-else>
           <span>租户 ID</span>
-          <input v-model="tenantId" autocomplete="organization" placeholder="留空进入系统工作区" />
+          <UiInput v-model:value="tenantId" autocomplete="organization" placeholder="留空进入系统工作区" />
         </label>
         <label>
           <span>用户名</span>
-          <input v-model="username" autocomplete="username" required />
+          <UiInput v-model:value="username" autocomplete="username" required />
         </label>
         <label>
           <span>密码</span>
-          <input v-model="password" type="password" autocomplete="current-password" required />
+          <UiInput v-model:value="password" type="password" autocomplete="current-password" required />
         </label>
-        <button type="submit" :disabled="submitting || loading">
+        <UiButton class="login-submit" html-type="submit" type="primary" :loading="submitting || loading">
           {{ submitting || loading ? '登录中' : '登录' }}
-        </button>
+        </UiButton>
       </form>
       <form v-else class="login-form" @submit.prevent="submitPasswordChange">
         <p class="login-context">当前密码需要修改后才能进入系统</p>
         <label>
           <span>新密码</span>
-          <input v-model="newPassword" type="password" autocomplete="new-password" required />
+          <UiInput v-model:value="newPassword" type="password" autocomplete="new-password" required />
         </label>
         <label>
           <span>确认新密码</span>
-          <input v-model="confirmPassword" type="password" autocomplete="new-password" required />
+          <UiInput v-model:value="confirmPassword" type="password" autocomplete="new-password" required />
         </label>
-        <button type="submit" :disabled="submitting || loading">
+        <UiButton class="login-submit" html-type="submit" type="primary" :loading="submitting || loading">
           {{ submitting || loading ? '保存中' : '修改密码' }}
-        </button>
+        </UiButton>
       </form>
     </section>
   </main>
@@ -204,28 +205,9 @@ label {
   font-weight: 600;
 }
 
-input {
+.login-submit {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid #cbd6e2;
-  border-radius: 6px;
-  color: #172331;
-  background: #fff;
-}
-
-input:focus {
-  border-color: #1677ff;
-  outline: 2px solid rgb(22 119 255 / 0.16);
-}
-
-button {
   min-height: 40px;
-  border: 0;
-  border-radius: 6px;
-  color: #fff;
-  background: #1677ff;
-  cursor: pointer;
 }
 
 button:disabled {

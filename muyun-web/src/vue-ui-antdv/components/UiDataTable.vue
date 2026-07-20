@@ -12,7 +12,7 @@ import type {
 } from '../types';
 import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
-defineOptions({ name: 'UiDataTable' });
+defineOptions({ name: 'UiDataTable', inheritAttrs: false });
 
 const props = withDefaults(
   defineProps<{
@@ -172,8 +172,8 @@ function isExpandTriggerEvent(event: MouseEvent) {
 
 <template>
   <ATable
-    class="ui-data-table"
-    :class="{ 'is-clickable': clickableRows, 'is-fill-height': fillHeight }"
+    :class="['ui-data-table', $attrs.class, { 'is-clickable': clickableRows, 'is-fill-height': fillHeight }]"
+    :style="$attrs.style"
     :columns="tableColumns"
     :data-source="rows"
     :row-key="rowKey"

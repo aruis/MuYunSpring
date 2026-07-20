@@ -17,7 +17,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons-vue';
 
-defineOptions({ name: 'UiIcon' });
+defineOptions({ name: 'UiIcon', inheritAttrs: false });
 
 export type UiIconName =
   | 'app'
@@ -60,5 +60,5 @@ const icon = computed(() => icons[props.name]);
 </script>
 
 <template>
-  <component :is="icon" />
+  <component :is="icon" :class="$attrs.class" :style="$attrs.style" />
 </template>

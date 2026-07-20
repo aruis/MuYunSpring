@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { UiButton } from '@muyun/vue-ui-antdv';
+import { UiActionButton } from '@muyun/vue-ui-antdv';
 import RecordDetailDrawer from './RecordDetailDrawer.vue';
 import RecordExternalChangeNotice from './RecordExternalChangeNotice.vue';
 
@@ -92,7 +92,9 @@ const actualCloseOnOutside = computed(() => props.closeOnOutside ?? viewModeActi
         <div class="record-mode-drawer-state">
           <strong>{{ errorTitle }}</strong>
           <span>{{ errorMessage }}</span>
-          <UiButton type="primary" icon-name="reload" @click="emit('retry')">{{ retryTitle }}</UiButton>
+          <UiActionButton emphasis="primary" icon-name="reload" @click="emit('retry')">
+            {{ retryTitle }}
+          </UiActionButton>
         </div>
       </slot>
     </template>

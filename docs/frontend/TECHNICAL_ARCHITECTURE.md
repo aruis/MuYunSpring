@@ -79,7 +79,9 @@ traceId 和前端异常追踪
 
 承载 MuYun UI 组件到 Ant Design Vue 的适配。业务项目使用 `UiInput`、`UiSelect`、`UiForm`、`UiTable` 等平台组件，不直接使用 Ant Design Vue 组件。组件由 `@muyun/vue-ui-antdv` 包名表达 MuYun 归属，导出名表达组件职责。
 
-基础组件可以保持轻量，但不能把 Ant Design Vue 的完整 props 原样暴露成 MuYun 公共 API。
+基础组件可以保持轻量，但不能把 Ant Design Vue 的完整 props 原样暴露成 MuYun 公共 API，也不能通过 Vue attribute fallthrough 隐式透传未知属性。`class`、`style` 是允许的外观挂点；跨业务确有需要的浏览器标准属性和可访问性属性必须显式进入组件契约。
+
+adapter 内部优先使用 Ant Design Vue 的成熟承载能力，而不是重新实现浮层定位、菜单键盘导航、模态焦点管理、遮罩和关闭生命周期。当前 `UiDropdown` 封装 `Dropdown + Menu`，`UiModal` 封装受控 `Modal`，`UiSidePanel` 封装上下文 `Drawer`；业务或平台组件只消费它们的 MuYun 语义，不直接依赖 Ant Design Vue。
 
 ### dynamic-page-runtime
 
@@ -204,6 +206,8 @@ npm run check:boundaries
 后续正式拆包时，该约束应升级为 ESLint/CI 规则。
 
 当前同时提供轻量 ESLint 与 Prettier 配置，用于保障基础代码质量和格式一致。规则保持克制，后续只在确有协作收益时逐步收紧。
+
+`check:boundaries` 除限制 Ant Design Vue 的 import/template 外，也要求所有 `Ui*` adapter 组件关闭 Vue attribute fallthrough。新增基础组件时，必须先声明可支持的 MuYun props、事件与 slots，避免未知 UI 库属性成为事实契约。
 
 ## 当前非目标
 

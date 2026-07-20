@@ -71,4 +71,5 @@ export interface UiConfirmOptions {
   okText?: string;
   cancelText?: string;
   danger?: boolean;
+  requiredText?: string;
 }

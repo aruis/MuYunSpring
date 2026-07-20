@@ -4,7 +4,7 @@ import { Select as ASelect } from 'ant-design-vue';
 import { searchReferenceRecords } from '../references';
 import type { OptionValue, Primitive, ReferenceContract } from '@muyun/web-contracts';
 
-defineOptions({ name: 'ReferenceSelect' });
+defineOptions({ name: 'ReferenceSelect', inheritAttrs: false });
 
 const props = defineProps<{
   value?: OptionValue | null;
@@ -77,6 +77,8 @@ watch(
     :loading="loading"
     :placeholder="placeholder"
     :disabled="disabled"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @search="refresh"
     @update:value="handleUpdate"
   />

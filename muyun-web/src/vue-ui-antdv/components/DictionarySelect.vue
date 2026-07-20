@@ -3,7 +3,7 @@ import UiSelect from './UiSelect.vue';
 import { resolveDictionaryOptions } from '../dictionaries';
 import type { OptionValue, OptionValueList } from '@muyun/web-contracts';
 
-defineOptions({ name: 'DictionarySelect' });
+defineOptions({ name: 'DictionarySelect', inheritAttrs: false });
 
 defineProps<{
   value?: OptionValue | null;
@@ -27,6 +27,8 @@ function handleUpdate(value: OptionValue | OptionValueList | null) {
     :options="resolveDictionaryOptions(dictionaryAlias ?? '')"
     :placeholder="placeholder"
     :disabled="disabled"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @update:value="handleUpdate"
   />
 </template>

@@ -1,1 +1,91 @@
 @import 'ant-design-vue/dist/reset.css';
+
+.ant-notification-notice.muyun-feedback-notification .ant-notification-notice-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+  margin-bottom: -2px;
+}
+
+.ant-notification-notice.muyun-feedback-notification .ant-notification-notice-icon {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.ant-notification-notice.muyun-feedback-notification-error .ant-notification-notice-icon {
+  color: var(--muyun-danger-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification-success .ant-notification-notice-icon {
+  color: var(--muyun-success-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification .ant-notification-notice-message {
+  margin-bottom: 0;
+  margin-inline-start: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ant-notification-notice.muyun-feedback-notification
+  .ant-notification-notice-with-icon
+  .ant-notification-notice-icon {
+  position: static;
+}
+
+.ant-notification-notice.muyun-feedback-notification .ant-notification-notice-close {
+  top: 8px;
+  inset-inline-end: 8px;
+}
+
+.ant-notification-notice.muyun-feedback-notification {
+  position: relative;
+  overflow: hidden;
+}
+
+.muyun-feedback-content {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.muyun-feedback-timebar {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 2px;
+  z-index: 1;
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+  transform-origin: right;
+  animation: muyun-feedback-countdown var(--muyun-feedback-duration) linear forwards;
+  transition: transform 280ms ease-out;
+  background: var(--muyun-text-muted);
+  opacity: 0.55;
+}
+
+.ant-notification-notice.muyun-feedback-notification-error .muyun-feedback-timebar {
+  background: var(--muyun-danger-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification-success .muyun-feedback-timebar {
+  background: var(--muyun-success-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification:hover .muyun-feedback-timebar {
+  transform: scaleX(1);
+  animation: none;
+}
+
+@keyframes muyun-feedback-countdown {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
