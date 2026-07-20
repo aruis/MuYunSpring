@@ -210,6 +210,7 @@ defineExpose({ openSearch, toggleSearch });
         <UiInput
           v-if="searchVisible"
           v-model:value="localKeyword"
+          allow-clear
           :autofocus="searchMode === 'collapsible'"
           :placeholder="searchPlaceholder"
           @blur="handleSearchBlur"

@@ -220,7 +220,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
       <UiButton v-if="allowClear && value && !disabled" title="清空" @click="clearValue">清空</UiButton>
     </div>
     <div v-if="open && !disabled" class="record-picker-panel">
-      <UiInput v-model:value="keyword" placeholder="搜索名称、编码或 ID" />
+      <UiInput v-model:value="keyword" allow-clear placeholder="搜索名称、编码或 ID" />
       <UiSpin v-if="loading" tip="加载可选记录" />
       <UiError v-else-if="error" :message="error" />
       <UiEmpty v-else-if="!hasRecords" description="暂无可选记录" />

@@ -12,6 +12,7 @@ import {
   firstDeepRootIdOf,
   type WorkbenchMenuNode,
 } from './menuTreeModel';
+import { presentWorkbenchRealtimeStatus, type WorkbenchRealtimeStatus } from './realtimeStatus';
 
 defineOptions({ name: 'WorkbenchMenu' });
 
@@ -21,11 +22,13 @@ const props = withDefaults(
     selectedMenuId?: string;
     tenantLabel?: string;
     searchPlaceholder?: string;
+    realtimeStatus?: WorkbenchRealtimeStatus;
   }>(),
   {
     selectedMenuId: undefined,
     tenantLabel: '系统工作区',
     searchPlaceholder: '搜索菜单、模块或路由',
+    realtimeStatus: 'unavailable',
   },
 );
 
@@ -63,6 +66,7 @@ const selectedMenuPath = computed(() =>
   props.selectedMenuId ? findWorkbenchMenuPath(menuNodes.value, props.selectedMenuId) : [],
 );
 const selectedRootMenuId = computed(() => selectedMenuPath.value[0]?.record.id);
+const realtimeStatusPresentation = computed(() => presentWorkbenchRealtimeStatus(props.realtimeStatus));
 const activeRootNode = computed(() =>
   activeRootMenuId.value ? findWorkbenchMenuNodeById(filteredMenus.value, activeRootMenuId.value) : undefined,
 );
@@ -232,6 +236,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
         <UiInput
           v-model:value="menuFilter"
           type="search"
+          allow-clear
           :placeholder="searchPlaceholder"
           aria-label="搜索菜单"
         />
@@ -261,9 +266,15 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
         <UiEmpty v-else description="暂无菜单" />
       </nav>
 
-      <div class="sidebar-footer">
+      <div
+        v-if="realtimeStatusPresentation"
+        class="sidebar-footer"
+        :class="`realtime-${realtimeStatusPresentation.tone}`"
+        :title="realtimeStatusPresentation.title"
+        role="status"
+      >
         <div class="status-dot" />
-        <span>平台在线</span>
+        <span>{{ realtimeStatusPresentation.label }}</span>
       </div>
     </aside>
 
@@ -361,10 +372,6 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   background: #fbfcfe;
 }
 
-.workbench-menu.mega-open .menu-sidebar {
-  border-right-color: transparent;
-}
-
 .brand-area {
   display: flex;
   align-items: center;
@@ -416,17 +423,29 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   color: #64748b;
 }
 
-.menu-search input {
+.menu-search :deep(.ant-input-affix-wrapper) {
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
   border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.menu-search :deep(.ant-input) {
   outline: 0;
   background: transparent;
   color: #172033;
   font-size: 12px;
 }
 
-.menu-search input::placeholder {
+.menu-search :deep(.ant-input-affix-wrapper-focused) {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.menu-search :deep(.ant-input::placeholder) {
   color: #94a3b8;
 }
 
@@ -522,6 +541,16 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   border-radius: 999px;
   background: #10b981;
   box-shadow: 0 0 0 4px rgb(16 185 129 / 12%);
+}
+
+.sidebar-footer.realtime-connecting .status-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgb(245 158 11 / 12%);
+}
+
+.sidebar-footer.realtime-disconnected .status-dot {
+  background: #94a3b8;
+  box-shadow: none;
 }
 
 .mega-panel {
