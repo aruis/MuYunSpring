@@ -2,7 +2,7 @@
 import { Input as AInput } from 'ant-design-vue';
 import type { Primitive } from '@muyun/web-contracts';
 
-defineOptions({ name: 'UiInput' });
+defineOptions({ name: 'UiInput', inheritAttrs: false });
 
 defineProps<{
   value?: Primitive;
@@ -11,6 +11,9 @@ defineProps<{
   disabled?: boolean;
   autofocus?: boolean;
   allowClear?: boolean;
+  autocomplete?: string;
+  required?: boolean;
+  ariaLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +32,11 @@ const emit = defineEmits<{
     :disabled="disabled"
     :autofocus="autofocus"
     :allow-clear="allowClear"
+    :autocomplete="autocomplete"
+    :required="required"
+    :aria-label="ariaLabel"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @blur="emit('blur', $event)"
     @focus="emit('focus', $event)"
     @keydown="emit('keydown', $event)"

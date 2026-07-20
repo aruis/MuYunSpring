@@ -121,6 +121,53 @@ test('tenant management state respects delete confirmation result', async () => 
   assert.equal(state.mode.value, 'create');
 });
 
+test('tenant deletion requires the selected tenant alias in its confirmation options', async () => {
+  const confirmations: unknown[] = [];
+  const context = createContext();
+  const state = createTenantManagementState(context, async (options) => {
+    confirmations.push(options);
+    return false;
+  });
+
+  state.handleSelect({ id: 'demo', alias: 'demo', title: '演示租户', enabled: true });
+  await state.removeSelected();
+
+  assert.deepEqual(confirmations, [
+    {
+      title: '删除租户',
+      content: '确认删除租户「演示租户」？',
+      okText: '删除',
+      danger: true,
+      requiredText: 'demo',
+    },
+  ]);
+});
+
+test('tenant deletion stops when the selected record changes during confirmation', async () => {
+  const calls: string[] = [];
+  let resolveConfirmation!: (confirmed: boolean) => void;
+  const context = createContext({
+    delete: async (id) => {
+      calls.push(`delete:${id}`);
+      return 1;
+    },
+  });
+  const state = createTenantManagementState(
+    context,
+    () => new Promise<boolean>((resolve) => (resolveConfirmation = resolve)),
+  );
+
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  const removing = state.removeSelected();
+  state.handleSelect({ id: 'tenant_b', alias: 'tenant_b', title: '租户 B', enabled: true });
+  resolveConfirmation(true);
+  await removing;
+
+  assert.deepEqual(calls, []);
+  assert.equal(state.selected.value?.id, 'tenant_b');
+  assert.equal(state.actionError.value, '待删除记录已变化，请重新确认删除操作');
+});
+
 test('tenant management state treats platform alias as ordinary tenant', async () => {
   const calls: string[] = [];
   const context = createContext({

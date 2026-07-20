@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UiButton } from '@muyun/vue-ui-antdv';
+import { UiActionButton } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'RecordExternalChangeNotice' });
 
@@ -31,8 +31,12 @@ const emit = defineEmits<{
       <span>{{ message }}</span>
     </div>
     <div class="record-external-change-notice-actions">
-      <UiButton size="small" icon-name="reload" @click="emit('reload')">{{ reloadTitle }}</UiButton>
-      <UiButton size="small" type="text" @click="emit('dismiss')">{{ dismissTitle }}</UiButton>
+      <UiActionButton density="compact" icon-name="reload" @click="emit('reload')">
+        {{ reloadTitle }}
+      </UiActionButton>
+      <UiActionButton density="compact" emphasis="quiet" @click="emit('dismiss')">
+        {{ dismissTitle }}
+      </UiActionButton>
     </div>
   </section>
 </template>

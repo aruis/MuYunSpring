@@ -51,6 +51,7 @@ export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   isValid: (record: TRecord) => boolean;
   recordName: string;
   deleteTitle: string;
+  deleteRequiredText?: (record: TRecord) => string | undefined;
   saveDeniedMessage: string;
   createDeniedMessage: string;
   enableDeniedMessage: string;
@@ -229,20 +230,26 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     if (saving.value) {
       return;
     }
-    if (!selected.value?.id) {
+    const record = selected.value;
+    if (!record?.id) {
       return;
     }
     if (!canDelete.value) {
-      presentActionMessage(options.deleteDeniedMessage(selected.value), 'authorization');
+      presentActionMessage(options.deleteDeniedMessage(record), 'authorization');
       return;
     }
     const confirmed = await options.confirmAction({
       title: options.deleteTitle,
-      content: `确认删除${options.recordName}「${options.titleOf(selected.value)}」？`,
+      content: `确认删除${options.recordName}「${options.titleOf(record)}」？`,
       okText: '删除',
       danger: true,
+      requiredText: options.deleteRequiredText?.(record),
     });
     if (!confirmed) {
+      return;
+    }
+    if (selected.value?.id !== record.id) {
+      presentActionMessage('待删除记录已变化，请重新确认删除操作');
       return;
     }
     clearFeedback();
@@ -250,7 +257,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     try {
       await options.context.runtime.ready;
       const crud = options.context.abilities.crud();
-      const result = await crud.delete(selected.value.id);
+      const result = await crud.delete(record.id);
       await presentActionSuccess(result, [
         platformActionResultReactions.clearSelection(),
         platformActionResultReactions.refreshList(),

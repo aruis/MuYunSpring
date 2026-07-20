@@ -2,7 +2,7 @@
 import UiIcon from './UiIcon.vue';
 import type { UiRecordInlineAction } from '../types';
 
-defineOptions({ name: 'UiRecordExplorerItem' });
+defineOptions({ name: 'UiRecordExplorerItem', inheritAttrs: false });
 
 withDefaults(
   defineProps<{
@@ -45,12 +45,16 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
 
 <template>
   <span
-    class="ui-record-explorer-item"
-    :class="{
-      'ui-record-explorer-item-muted': muted,
-      'ui-record-explorer-item-selected': selected,
-      'ui-record-explorer-item-clickable': clickable,
-    }"
+    :class="[
+      'ui-record-explorer-item',
+      $attrs.class,
+      {
+        'ui-record-explorer-item-muted': muted,
+        'ui-record-explorer-item-selected': selected,
+        'ui-record-explorer-item-clickable': clickable,
+      },
+    ]"
+    :style="$attrs.style"
     @click="emit('click')"
   >
     <span class="ui-record-explorer-item-main">

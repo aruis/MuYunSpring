@@ -2,7 +2,7 @@
 import { Button as AButton } from 'ant-design-vue';
 import UiIcon, { type UiIconName } from './UiIcon.vue';
 
-defineOptions({ name: 'UiButton' });
+defineOptions({ name: 'UiButton', inheritAttrs: false });
 
 withDefaults(
   defineProps<{
@@ -11,6 +11,9 @@ withDefaults(
     disabled?: boolean;
     loading?: boolean;
     danger?: boolean;
+    size?: 'small' | 'middle' | 'large';
+    title?: string;
+    ariaLabel?: string;
     iconName?: UiIconName;
     iconPosition?: 'start' | 'end';
   }>(),
@@ -20,6 +23,9 @@ withDefaults(
     disabled: false,
     loading: false,
     danger: false,
+    size: 'middle',
+    title: undefined,
+    ariaLabel: undefined,
     iconName: undefined,
     iconPosition: 'start',
   },
@@ -37,6 +43,11 @@ const emit = defineEmits<{
     :disabled="disabled"
     :loading="loading"
     :danger="danger"
+    :size="size"
+    :title="title"
+    :aria-label="ariaLabel"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @click="emit('click', $event)"
   >
     <template v-if="iconName && iconPosition === 'start'" #icon>

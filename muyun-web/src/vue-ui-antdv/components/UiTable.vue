@@ -5,7 +5,7 @@ import UiDataTable from './UiDataTable.vue';
 import type { UiDataTableColumn, UiDataTablePagination, UiDataTableSelection } from '../types';
 import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
 
-defineOptions({ name: 'UiTable' });
+defineOptions({ name: 'UiTable', inheritAttrs: false });
 
 const props = defineProps<{
   contract: TableContract;
@@ -55,6 +55,8 @@ const columns = computed(() =>
     :selection="selection"
     :size="size ?? 'middle'"
     horizontal-scroll
+    :class="$attrs.class"
+    :style="$attrs.style"
   >
     <template #cell="{ column, value }">
       {{ renderCell(contractColumnOf(column), value) }}

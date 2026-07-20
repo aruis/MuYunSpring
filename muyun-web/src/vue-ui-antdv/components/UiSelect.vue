@@ -2,7 +2,7 @@
 import { Select as ASelect } from 'ant-design-vue';
 import type { Option, OptionValue, OptionValueList } from '@muyun/web-contracts';
 
-defineOptions({ name: 'UiSelect' });
+defineOptions({ name: 'UiSelect', inheritAttrs: false });
 
 withDefaults(
   defineProps<{
@@ -56,6 +56,8 @@ function normalize(value: unknown) {
     :show-search="showSearch"
     :filter-option="filterOption"
     :loading="loading"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @search="emit('search', $event)"
     @update:value="normalize"
   />

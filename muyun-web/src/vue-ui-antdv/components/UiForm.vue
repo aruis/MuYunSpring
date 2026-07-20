@@ -11,7 +11,7 @@ import type {
   RecordData,
 } from '@muyun/web-contracts';
 
-defineOptions({ name: 'UiForm' });
+defineOptions({ name: 'UiForm', inheritAttrs: false });
 
 const props = defineProps<{
   contract: FormContract;
@@ -74,7 +74,13 @@ const visibleFields = computed(() => props.contract.fields.filter(isVisible));
 </script>
 
 <template>
-  <AForm :model="formModel" layout="vertical" @finish="emit('submit', modelValue)">
+  <AForm
+    :model="formModel"
+    layout="vertical"
+    :class="$attrs.class"
+    :style="$attrs.style"
+    @finish="emit('submit', modelValue)"
+  >
     <AFormItem
       v-for="field in visibleFields"
       :key="field.name"

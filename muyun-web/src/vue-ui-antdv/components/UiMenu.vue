@@ -4,7 +4,7 @@ import { Menu as AMenu } from 'ant-design-vue';
 import type { ItemType } from 'ant-design-vue';
 import type { UiMenuItem } from '../types';
 
-defineOptions({ name: 'UiMenu' });
+defineOptions({ name: 'UiMenu', inheritAttrs: false });
 
 const props = withDefaults(
   defineProps<{
@@ -53,6 +53,8 @@ function handleOpenChange(keys: (string | number)[]) {
     :mode="mode"
     :selected-keys="selectedKeys"
     :open-keys="openKeys"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @click="handleClick"
     @open-change="handleOpenChange"
   />

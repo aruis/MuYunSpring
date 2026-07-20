@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Empty as AEmpty } from 'ant-design-vue';
 
-defineOptions({ name: 'UiEmpty' });
+defineOptions({ name: 'UiEmpty', inheritAttrs: false });
 
 defineProps<{
   description?: string;
@@ -9,5 +9,5 @@ defineProps<{
 </script>
 
 <template>
-  <AEmpty :description="description" />
+  <AEmpty :description="description" :class="$attrs.class" :style="$attrs.style" />
 </template>

@@ -4,7 +4,7 @@ import { Tree as ATree } from 'ant-design-vue';
 import UiRecordExplorerItem from './UiRecordExplorerItem.vue';
 import type { UiRecordInlineAction, UiTreeNode } from '../types';
 
-defineOptions({ name: 'UiTree' });
+defineOptions({ name: 'UiTree', inheritAttrs: false });
 
 const props = defineProps<{
   nodes: UiTreeNode[];
@@ -68,6 +68,8 @@ function findNode(nodes: UiTreeNode[], key: string): UiTreeNode | undefined {
     :tree-data="nodes"
     :selected-keys="selectedKeys"
     :expanded-keys="expandedKeys"
+    :class="$attrs.class"
+    :style="$attrs.style"
     @select="handleSelect"
     @expand="handleExpand"
   >

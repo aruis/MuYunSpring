@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ModuleContext } from '@muyun/web-core';
-import { UiButton, type UiIconName } from '@muyun/vue-ui-antdv';
+import { UiActionButton, type UiIconName } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'ModuleActionButton' });
 
@@ -66,12 +66,12 @@ function defaultIconName(actionCode: string): UiIconName | undefined {
 </script>
 
 <template>
-  <UiButton
-    :html-type="type"
-    :type="primary ? 'primary' : 'default'"
+  <UiActionButton
+    :submit="type === 'submit'"
+    :emphasis="primary ? 'primary' : 'secondary'"
     :disabled="buttonDisabled"
     :loading="loading"
-    :danger="danger"
+    :intent="danger ? 'danger' : 'normal'"
     :icon-name="iconName ?? defaultIconName(actionCode)"
     :title="buttonTitle"
     @click="handleClick"
@@ -79,5 +79,5 @@ function defaultIconName(actionCode: string): UiIconName | undefined {
     <template v-if="!iconOnly">
       <slot>{{ action?.title ?? actionCode }}</slot>
     </template>
-  </UiButton>
+  </UiActionButton>
 </template>

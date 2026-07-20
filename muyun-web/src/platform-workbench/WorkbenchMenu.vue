@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-import { UiEmpty, UiIcon } from '@muyun/vue-ui-antdv';
+import { UiEmpty, UiIcon, UiInput } from '@muyun/vue-ui-antdv';
 import type { MenuNavigationTarget, MenuRecord, MenuTreeNode } from '@muyun/web-contracts';
 import WorkbenchMenuTree from './WorkbenchMenuTree.vue';
 import {
@@ -229,7 +229,12 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 
       <div class="menu-search">
         <UiIcon name="search" />
-        <input v-model="menuFilter" type="search" :placeholder="searchPlaceholder" aria-label="搜索菜单" />
+        <UiInput
+          v-model:value="menuFilter"
+          type="search"
+          :placeholder="searchPlaceholder"
+          aria-label="搜索菜单"
+        />
       </div>
 
       <nav class="root-menu" aria-label="主导航">
