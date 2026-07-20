@@ -7,6 +7,7 @@ import {
   moduleDataChangeChannel,
   sessionActivityCommand,
   type RealtimeClient,
+  type RealtimeConnectionState,
   type RealtimeSubscription,
 } from '@muyun/web-core';
 import type {
@@ -25,6 +26,7 @@ const ACTIVITY_REPORT_INTERVAL_MS = 30_000;
 export interface AppRealtimeOptions {
   onUnauthorized?: () => void;
   onUserNotification?: (notification: WebUserNotification) => void;
+  onStateChange?: (state: RealtimeConnectionState) => void;
 }
 
 interface DataChangeTopicSubscription {
@@ -38,6 +40,7 @@ export function createAppRealtimeClient(options: AppRealtimeOptions = {}) {
     baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
     token: effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN),
     onStateChange: (state) => {
+      options.onStateChange?.(state);
       if (state === 'unauthorized') {
         options.onUnauthorized?.();
       }

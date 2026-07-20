@@ -8,6 +8,26 @@ import {
   restoreWorkbenchStartupStateFromUrl,
 } from '../src/app/workbenchStartup.ts';
 import { getMenuNavigationTarget } from '../src/platform-workbench/menuNavigation.ts';
+import { presentWorkbenchRealtimeStatus } from '../src/platform-workbench/realtimeStatus.ts';
+
+test('workbench realtime status presents transport state without claiming platform health', () => {
+  assert.deepEqual(presentWorkbenchRealtimeStatus('connected'), {
+    label: '实时连接正常',
+    title: '与平台实时服务连接正常',
+    tone: 'connected',
+  });
+  assert.deepEqual(presentWorkbenchRealtimeStatus('connecting'), {
+    label: '实时连接中',
+    title: '正在连接平台实时服务',
+    tone: 'connecting',
+  });
+  assert.deepEqual(presentWorkbenchRealtimeStatus('disconnected'), {
+    label: '实时连接已断开',
+    title: '与平台实时服务的连接已断开，正在等待恢复',
+    tone: 'disconnected',
+  });
+  assert.equal(presentWorkbenchRealtimeStatus('unavailable'), undefined);
+});
 
 const currentUser = {
   userId: 'user-1',

@@ -23,3 +23,5 @@ export {
   firstDeepRootIdOf,
 } from './menuTreeModel';
 export type { WorkbenchMegaMenuModel, WorkbenchMenuNode } from './menuTreeModel';
+export { presentWorkbenchRealtimeStatus } from './realtimeStatus';
+export type { WorkbenchRealtimeStatus, WorkbenchRealtimeStatusPresentation } from './realtimeStatus';

@@ -65,6 +65,33 @@ test('record explorer panel uses a single title contract', () => {
   assert.doesNotMatch(layoutSource, /groupTitle/);
 });
 
+test('workbench keeps the sidebar separator when the mega menu opens', () => {
+  const workbenchMenuSource = readSource('src/platform-workbench/WorkbenchMenu.vue');
+
+  assert.match(
+    workbenchMenuSource,
+    /border-right: var\(--workbench-menu-border-width\) solid var\(--workbench-menu-border\)/,
+  );
+  assert.doesNotMatch(workbenchMenuSource, /border-right-color: transparent/);
+});
+
+test('workbench presents realtime transport state through an application facade', () => {
+  const appSource = readSource('src/App.vue');
+  const appRealtimeSource = readSource('src/app/realtime.ts');
+  const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
+  const menuSource = readSource('src/platform-workbench/WorkbenchMenu.vue');
+  const workbenchStart = appSource.indexOf('<Workbench');
+  const workbenchSourceInApp = appSource.slice(workbenchStart);
+
+  assert.match(appSource, /function workbenchRealtimeStatusOf\(state: RealtimeConnectionState\)/);
+  assert.match(workbenchSourceInApp, /:realtime-status="realtimeStatus"/);
+  assert.match(appRealtimeSource, /options\.onStateChange\?\.\(state\)/);
+  assert.match(workbenchSource, /:realtime-status="realtimeStatus"/);
+  assert.match(menuSource, /presentWorkbenchRealtimeStatus\(props\.realtimeStatus\)/);
+  assert.match(menuSource, /role="status"/);
+  assert.doesNotMatch(menuSource, /平台在线/);
+});
+
 test('record containers delegate chain errors to page feedback', () => {
   const treeSource = readSource('src/platform-components/TreeRecordExplorer.vue');
   const crudListSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
@@ -191,13 +218,22 @@ test('static edit draft normalizers preserve standard record fields', () => {
 
 test('record explorer panel focuses and closes search from keyboard', () => {
   const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
+  const treeSource = readSource('src/platform-components/TreeRecordExplorer.vue');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
 
   assert.match(panelSource, /focusSearchInput/);
   assert.match(panelSource, /querySelector\('input'\)\?\.focus\(\)/);
   assert.match(panelSource, /@mousedown\.prevent/);
   assert.match(panelSource, /@keydown\.esc="handleSearchEscape"/);
+  assert.match(panelSource, /:value="searchKeyword"\s+allow-clear/);
+  assert.match(treeSource, /v-model:value="localKeyword"\s+allow-clear/);
   assert.match(inputSource, /keydown: \[event: KeyboardEvent\]/);
+});
+
+test('record picker search supports clearing its keyword', () => {
+  const pickerSource = readSource('src/platform-components/RecordPicker.vue');
+
+  assert.match(pickerSource, /v-model:value="keyword" allow-clear placeholder="搜索名称、编码或 ID"/);
 });
 
 test('menu management keeps scheme actions inline and delegates search to panel', () => {

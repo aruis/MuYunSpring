@@ -11,6 +11,7 @@ import type {
 import type { UiDropdownItem, UiTabItem } from '@muyun/vue-ui-antdv';
 import WorkbenchMenu from './WorkbenchMenu.vue';
 import { resolvePageDescriptor } from './menuNavigation';
+import type { WorkbenchRealtimeStatus } from './realtimeStatus';
 
 defineOptions({ name: 'Workbench' });
 
@@ -20,12 +21,14 @@ const props = withDefaults(
     loading?: boolean;
     error?: string;
     activeTabKey?: string;
+    realtimeStatus?: WorkbenchRealtimeStatus;
   }>(),
   {
     loading: false,
     error: undefined,
     startup: undefined,
     activeTabKey: undefined,
+    realtimeStatus: 'unavailable',
   },
 );
 
@@ -122,6 +125,7 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
       :menus="startup?.menus ?? []"
       :selected-menu-id="activeTab?.target?.menuId"
       :tenant-label="tenantLabel"
+      :realtime-status="realtimeStatus"
       @select-menu="handleSelectMenu"
       @invalid-menu="emit('invalidMenu', $event)"
     />

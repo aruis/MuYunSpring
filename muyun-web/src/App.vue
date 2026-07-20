@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
+import { Workbench, WorkbenchOutlet, type WorkbenchRealtimeStatus } from '@muyun/platform-workbench';
 import { presentPlatformError, providePlatformTimeZoneContext } from '@muyun/platform-components';
-import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
+import {
+  configureModuleContext,
+  createAuthClient,
+  provideModuleContextConfig,
+  type RealtimeConnectionState,
+} from '@muyun/web-core';
 import type {
   LoginResult,
   MenuNavigationTarget,
@@ -51,6 +56,7 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const securityNotification = ref<WebUserNotification>();
 const securityLogoutCountdown = ref(0);
+const realtimeStatus = ref<WorkbenchRealtimeStatus>('unavailable');
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
 let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
 let securityLogoutTimer: number | undefined;
@@ -230,6 +236,9 @@ function reconnectRealtime() {
     realtimeConnection = connectAppRealtime({
       onUnauthorized: handleRealtimeUnauthorized,
       onUserNotification: handleSecurityNotification,
+      onStateChange: (state) => {
+        realtimeStatus.value = workbenchRealtimeStatusOf(state);
+      },
     });
   }
 }
@@ -237,7 +246,21 @@ function reconnectRealtime() {
 function disconnectRealtime() {
   const current = realtimeConnection;
   realtimeConnection = undefined;
+  realtimeStatus.value = 'unavailable';
   void current?.disconnect();
+}
+
+function workbenchRealtimeStatusOf(state: RealtimeConnectionState): WorkbenchRealtimeStatus {
+  if (state === 'connected') {
+    return 'connected';
+  }
+  if (state === 'connecting' || state === 'reconnecting') {
+    return 'connecting';
+  }
+  if (state === 'idle') {
+    return 'unavailable';
+  }
+  return 'disconnected';
 }
 
 function handleRealtimeUnauthorized() {
@@ -381,6 +404,7 @@ function requiresLogin(cause: unknown) {
     :startup="startup"
     :loading="loading"
     :error="error"
+    :realtime-status="realtimeStatus"
     @select-menu="handleSelectMenu"
     @change-tab="handleChangeTab"
     @close-tab="handleCloseTab"

@@ -93,6 +93,7 @@ async function focusSearchInput() {
       <div v-if="searchVisible" ref="searchRoot" class="record-explorer-search">
         <UiInput
           :value="searchKeyword"
+          allow-clear
           :placeholder="searchPlaceholder"
           autofocus
           @update:value="emit('update:searchKeyword', $event)"
