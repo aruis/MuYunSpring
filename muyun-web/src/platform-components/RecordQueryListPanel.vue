@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiButton, UiDropdown, UiEmpty, UiInput, UiSelect, UiSpin } from '@muyun/vue-ui-antdv';
-import type { UiDropdownItem } from '@muyun/vue-ui-antdv';
+import { UiButton, UiDataTable, UiDropdown, UiEmpty, UiInput, UiSelect, UiSpin } from '@muyun/vue-ui-antdv';
+import type { UiDataTableColumn, UiDropdownItem } from '@muyun/vue-ui-antdv';
 import type {
   Option,
   OptionValue,
@@ -49,6 +49,7 @@ interface ConditionDraft {
 }
 
 interface QueryListRow {
+  [key: string]: unknown;
   key: string;
   record: QueryListRecord;
   primaryAction?: ResolvedRecordActionItem;
@@ -186,6 +187,14 @@ const tableColumns = computed<RecordQueryListColumn[]>(() => {
   }
   return columnsFromRuntimeListView(runtimeViews.value);
 });
+const dataTableColumns = computed<UiDataTableColumn[]>(() =>
+  tableColumns.value.map((column) => ({
+    key: column.key,
+    title: column.title,
+    width: column.width,
+    align: column.align,
+  })),
+);
 const pageSizeOptions: Option[] = [
   { label: '10 条/页', value: 10 },
   { label: '20 条/页', value: 20 },
@@ -443,17 +452,16 @@ function handleSecondaryRowAction(row: QueryListRow, key: string) {
   emit('rowAction', action, row.record);
 }
 
-function toggleRowExpanded(row: QueryListRow, event?: MouseEvent) {
-  event?.stopPropagation();
-  emit('rowExpand', row.record, !isRowExpanded(row.key));
+function handleTableRowClick(row: QueryListRow) {
+  emit('select', row.record);
 }
 
-function isRowExpanded(rowKey: string) {
-  return props.expandedRowKeys.includes(rowKey);
+function handleTableRowDblclick(row: QueryListRow, event: MouseEvent) {
+  emit('rowDblclick', row.record, event);
 }
 
-function bodyColumnCount() {
-  return tableColumns.value.length + (hasRowActions.value ? 1 : 0) + (hasExpandedRow.value ? 1 : 0);
+function handleTableRowExpand(row: QueryListRow, expanded: boolean) {
+  emit('rowExpand', row.record, expanded);
 }
 
 function submitQuickSearch() {
@@ -809,98 +817,85 @@ defineExpose({ refresh });
       <UiEmpty v-else-if="!queryReady" :description="waitingDescription" />
       <UiEmpty v-else-if="descriptorLoadError" description="列表声明加载失败，请稍后重试" />
       <UiEmpty v-else-if="records.length === 0" :description="emptyDescription" />
-      <div v-else class="record-query-list-table-wrap">
-        <table class="record-query-list-table">
-          <thead>
-            <tr>
-              <th v-if="hasExpandedRow" class="record-query-list-expand-head" />
-              <th
-                v-for="column in tableColumns"
-                :key="column.key"
-                :style="{ width: column.width, textAlign: column.align ?? 'left' }"
-              >
-                {{ column.title }}
-              </th>
-              <th v-if="hasRowActions" class="record-query-list-action-head">
-                {{ rowActionsTitle }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="row in rows" :key="row.key">
-              <tr
-                :class="{
-                  selected: selectedKey === row.key,
-                  muted: row.record.enabled === false,
-                  expanded: isRowExpanded(row.key),
-                }"
-                @click="emit('select', row.record)"
-                @dblclick="emit('rowDblclick', row.record, $event)"
-              >
-                <td v-if="hasExpandedRow" class="record-query-list-expand-cell" @click.stop @dblclick.stop>
-                  <UiButton
-                    type="text"
-                    icon-name="down"
-                    :class="{ expanded: isRowExpanded(row.key) }"
-                    :title="isRowExpanded(row.key) ? '收起' : '展开'"
-                    :aria-label="isRowExpanded(row.key) ? '收起' : '展开'"
-                    @click="toggleRowExpanded(row, $event)"
-                    @dblclick.stop
-                  />
-                </td>
-                <td
-                  v-for="column in tableColumns"
-                  :key="column.key"
-                  :style="{ textAlign: column.align ?? 'left' }"
-                >
-                  <RecordStatusTag
-                    v-if="column.type === 'enabledStatus'"
-                    :enabled="row.record[column.key] !== false"
-                  />
-                  <DateTimeText
-                    v-else-if="column.type === 'datetime'"
-                    :value="dateTimeCellValue(row.record, column)"
-                  />
-                  <template v-else>
-                    {{ cellValue(row.record, column) }}
-                  </template>
-                </td>
-                <td v-if="hasRowActions" class="record-query-list-row-actions" @click.stop @dblclick.stop>
-                  <UiButton
-                    v-if="row.primaryAction"
-                    class="record-query-list-primary-action"
-                    type="text"
-                    :disabled="row.primaryAction.disabled"
-                    :icon-name="row.primaryAction.iconName"
-                    @click="handlePrimaryRowAction(row, $event)"
-                  >
-                    {{ row.primaryAction.title }}
-                  </UiButton>
-                  <UiDropdown
-                    v-if="row.secondaryActions.length > 0"
-                    :items="row.dropdownItems"
-                    trigger="hover"
-                    @select="handleSecondaryRowAction(row, $event)"
-                  >
-                    <UiButton
-                      class="record-query-list-more-action"
-                      type="text"
-                      icon-name="down"
-                      title="更多"
-                      aria-label="更多"
-                    />
-                  </UiDropdown>
-                </td>
-              </tr>
-              <tr v-if="isRowExpanded(row.key)" class="record-query-list-expanded-row">
-                <td :colspan="bodyColumnCount()">
-                  <slot name="expandedRow" :record="row.record" :row-key="row.key" />
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+      <UiDataTable
+        v-else
+        class="record-query-list-table"
+        :columns="dataTableColumns"
+        :rows="rows"
+        :row-key="(row) => String(row.key ?? '')"
+        :pagination="false"
+        :selected-row-key="selectedKey"
+        :expanded-row-keys="expandedRowKeys"
+        clickable-rows
+        fill-height
+        horizontal-scroll
+        :row-muted="(row) => (row as QueryListRow).record.enabled === false"
+        :show-action-column="hasRowActions"
+        :action-column-title="rowActionsTitle"
+        :action-column-width="92"
+        @row-click="handleTableRowClick($event as QueryListRow)"
+        @row-dblclick="(row, event) => handleTableRowDblclick(row as QueryListRow, event)"
+        @row-expand="(row, expanded) => handleTableRowExpand(row as QueryListRow, expanded)"
+      >
+        <template #cell="{ column, record }">
+          <RecordStatusTag
+            v-if="tableColumns.find((item) => item.key === column.key)?.type === 'enabledStatus'"
+            :enabled="(record as QueryListRow).record[column.key] !== false"
+          />
+          <DateTimeText
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'datetime'"
+            :value="
+              dateTimeCellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            "
+          />
+          <template v-else>
+            {{
+              cellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            }}
+          </template>
+        </template>
+        <template #rowActions="{ record }">
+          <div class="record-query-list-row-actions" @click.stop @dblclick.stop>
+            <UiButton
+              v-if="(record as QueryListRow).primaryAction"
+              class="record-query-list-primary-action"
+              type="text"
+              :disabled="(record as QueryListRow).primaryAction?.disabled"
+              :icon-name="(record as QueryListRow).primaryAction?.iconName"
+              @click="handlePrimaryRowAction(record as QueryListRow, $event)"
+            >
+              {{ (record as QueryListRow).primaryAction?.title }}
+            </UiButton>
+            <UiDropdown
+              v-if="(record as QueryListRow).secondaryActions.length > 0"
+              :items="(record as QueryListRow).dropdownItems"
+              trigger="hover"
+              @select="handleSecondaryRowAction(record as QueryListRow, $event)"
+            >
+              <UiButton
+                class="record-query-list-more-action"
+                type="text"
+                icon-name="down"
+                title="更多"
+                aria-label="更多"
+              />
+            </UiDropdown>
+          </div>
+        </template>
+        <template v-if="hasExpandedRow" #expandedRow="{ record }">
+          <slot
+            name="expandedRow"
+            :record="(record as QueryListRow).record"
+            :row-key="String(record.key ?? '')"
+          />
+        </template>
+      </UiDataTable>
     </section>
 
     <footer class="record-query-list-pagination">
@@ -1041,98 +1036,12 @@ defineExpose({ refresh });
   min-height: 0;
 }
 
-.record-query-list-table-wrap {
-  align-self: stretch;
+.record-query-list-table {
   min-height: 0;
-  overflow: auto;
+  height: 100%;
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 8px;
-}
-
-.record-query-list-table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.record-query-list-table th,
-.record-query-list-table td {
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--muyun-border-subtle);
-  color: var(--muyun-text-body);
-  line-height: 1.4;
-}
-
-.record-query-list-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text);
-  font-weight: 700;
-}
-
-.record-query-list-action-head {
-  width: 92px;
-  color: var(--muyun-text-muted);
-  font-weight: 500;
-  text-align: center;
-}
-
-.record-query-list-expand-head {
-  width: 36px;
-}
-
-.record-query-list-table tbody tr {
-  cursor: pointer;
-}
-
-.record-query-list-table tbody tr:hover {
-  background: var(--muyun-hover);
-}
-
-.record-query-list-table tbody tr.selected {
-  background: var(--muyun-selected);
-}
-
-.record-query-list-table tbody tr.expanded {
-  background: var(--muyun-hover-subtle);
-}
-
-.record-query-list-table tbody tr.muted td {
-  color: var(--muyun-text-muted);
-}
-
-.record-query-list-expand-cell {
-  width: 36px;
-  text-align: center;
-}
-
-.record-query-list-expand-cell :deep(.ant-btn) {
-  width: 24px;
-  min-width: 0;
-  height: 24px;
-  padding: 0;
-  color: var(--muyun-text-muted);
-  transition: transform 0.14s ease;
-}
-
-.record-query-list-expand-cell :deep(.ant-btn.expanded) {
-  transform: rotate(180deg);
-}
-
-.record-query-list-expanded-row {
-  cursor: default;
-  background: #fbfcfe;
-}
-
-.record-query-list-expanded-row:hover {
-  background: #fbfcfe;
-}
-
-.record-query-list-expanded-row > td {
-  padding: 0;
+  overflow: hidden;
 }
 
 .record-query-list-row-actions {
@@ -1168,7 +1077,7 @@ defineExpose({ refresh });
   transition: opacity 0.14s ease;
 }
 
-.record-query-list-table tbody tr:hover .record-query-list-more-action,
+.record-query-list-table :deep(.ant-table-tbody > tr:hover) .record-query-list-more-action,
 .record-query-list-row-actions:focus-within .record-query-list-more-action {
   opacity: 1;
 }

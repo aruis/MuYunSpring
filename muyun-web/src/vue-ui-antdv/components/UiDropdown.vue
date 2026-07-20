@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import UiIcon from './UiIcon.vue';
+import { resolveDropdownPopupLayout } from '../dropdownPosition';
 import type { UiDropdownItem } from '../types';
 
 defineOptions({ name: 'UiDropdown' });
@@ -29,7 +30,25 @@ const emit = defineEmits<{
 
 const open = ref(false);
 const root = ref<HTMLElement>();
+const popup = ref<HTMLElement>();
+const popupPosition = ref({ top: 0, left: 0, minWidth: 112, maxWidth: 0, maxHeight: 0 });
 let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+const popupStyle = computed(() => ({
+  top: `${popupPosition.value.top}px`,
+  left: `${popupPosition.value.left}px`,
+  minWidth: `${popupPosition.value.minWidth}px`,
+  maxWidth: popupPosition.value.maxWidth > 0 ? `${popupPosition.value.maxWidth}px` : undefined,
+  maxHeight: popupPosition.value.maxHeight > 0 ? `${popupPosition.value.maxHeight}px` : undefined,
+}));
+
+watch(open, async (visible) => {
+  if (!visible) {
+    return;
+  }
+  await nextTick();
+  updatePopupPosition();
+});
 
 function toggle() {
   clearCloseTimer();
@@ -91,7 +110,8 @@ function select(item: UiDropdownItem) {
 }
 
 function handleDocumentClick(event: MouseEvent) {
-  if (!root.value?.contains(event.target as Node)) {
+  const target = event.target as Node;
+  if (!root.value?.contains(target) && !popup.value?.contains(target)) {
     closeDropdown();
   }
 }
@@ -105,13 +125,33 @@ function handleDocumentKeydown(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', handleDocumentKeydown);
+  window.addEventListener('resize', updatePopupPosition);
+  window.addEventListener('scroll', updatePopupPosition, true);
 });
 
 onBeforeUnmount(() => {
   clearCloseTimer();
   document.removeEventListener('click', handleDocumentClick);
   document.removeEventListener('keydown', handleDocumentKeydown);
+  window.removeEventListener('resize', updatePopupPosition);
+  window.removeEventListener('scroll', updatePopupPosition, true);
 });
+
+function updatePopupPosition() {
+  if (!open.value || !root.value) {
+    return;
+  }
+  const rect = root.value.getBoundingClientRect();
+  const layout = resolveDropdownPopupLayout({
+    trigger: rect,
+    popupWidth: Math.max(popup.value?.offsetWidth ?? 0, popup.value?.scrollWidth ?? 0),
+    popupHeight: popup.value?.scrollHeight ?? 0,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    align: props.align,
+  });
+  popupPosition.value = layout;
+}
 </script>
 
 <template>
@@ -119,7 +159,17 @@ onBeforeUnmount(() => {
     <span class="ui-dropdown-trigger" @click.stop="handleTriggerClick">
       <slot :toggle="toggle" />
     </span>
-    <div v-if="open" class="ui-dropdown-popup" :class="`align-${align}`" role="menu">
+  </div>
+  <Teleport to="body">
+    <div
+      v-if="open"
+      ref="popup"
+      class="ui-dropdown-popup"
+      role="menu"
+      :style="popupStyle"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
+    >
       <button
         v-for="item in items"
         :key="item.key"
@@ -134,7 +184,7 @@ onBeforeUnmount(() => {
         <UiIcon v-if="item.key === selectedKey" name="check" class="ui-dropdown-item-check" />
       </button>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -148,23 +198,16 @@ onBeforeUnmount(() => {
 }
 
 .ui-dropdown-popup {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 50;
-  min-width: max(100%, 112px);
+  position: fixed;
+  z-index: 3000;
   padding: 5px;
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
-}
-
-.ui-dropdown-popup.align-start {
-  left: 0;
-}
-
-.ui-dropdown-popup.align-end {
-  right: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .ui-dropdown-item {

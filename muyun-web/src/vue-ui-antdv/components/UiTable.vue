@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Table as ATable } from 'ant-design-vue';
 import { resolveDictionaryOptions } from '../dictionaries';
+import UiDataTable from './UiDataTable.vue';
+import type { UiDataTableColumn, UiDataTablePagination, UiDataTableSelection } from '../types';
 import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
-import type { TablePaginationConfig, TableProps } from 'ant-design-vue';
 
 defineOptions({ name: 'UiTable' });
 
@@ -11,8 +11,8 @@ const props = defineProps<{
   contract: TableContract;
   rows: RecordData[];
   loading?: boolean;
-  pagination?: false | TablePaginationConfig;
-  rowSelection?: TableProps['rowSelection'];
+  pagination?: false | UiDataTablePagination;
+  selection?: UiDataTableSelection;
   size?: 'small' | 'middle' | 'large';
 }>();
 
@@ -25,25 +25,39 @@ function renderCell(column: TableColumn, value: unknown) {
   return option?.label ?? String(value ?? '');
 }
 
+function contractColumnOf(column: UiDataTableColumn): TableColumn {
+  return (
+    props.contract.columns.find((item) => item.key === column.key) ?? {
+      key: column.key,
+      title: column.title,
+      width: typeof column.width === 'number' ? column.width : undefined,
+    }
+  );
+}
+
 const columns = computed(() =>
-  props.contract.columns.map((column) => ({
+  props.contract.columns.map<UiDataTableColumn>((column) => ({
     title: column.title,
-    dataIndex: column.key,
     key: column.key,
+    dataIndex: column.key,
     width: column.width,
-    customRender: ({ text }: { text: unknown }) => renderCell(column, text),
   })),
 );
 </script>
 
 <template>
-  <ATable
+  <UiDataTable
     :columns="columns"
-    :data-source="rows"
+    :rows="rows"
     :row-key="contract.rowKey ?? 'id'"
     :loading="loading"
     :pagination="pagination ?? { pageSize: 5, showSizeChanger: false }"
-    :row-selection="rowSelection"
+    :selection="selection"
     :size="size ?? 'middle'"
-  />
+    horizontal-scroll
+  >
+    <template #cell="{ column, value }">
+      {{ renderCell(contractColumnOf(column), value) }}
+    </template>
+  </UiDataTable>
 </template>

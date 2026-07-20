@@ -119,7 +119,7 @@ const userTableContract: TableContract = {
 const rowSelection = computed(() => ({
   selectedRowKeys: [...checkedUserIds.value],
   preserveSelectedRowKeys: true,
-  getCheckboxProps: () => ({ disabled: saving.value }),
+  disabledOf: () => saving.value,
   onChange: (keys: (string | number)[]) => {
     checkedUserIds.value = new Set(keys.map((key) => String(key)));
   },
@@ -361,7 +361,7 @@ function roleTitle(record: Partial<Role>) {
         :rows="rows"
         :loading="loadingUsers"
         :pagination="false"
-        :row-selection="rowSelection"
+        :selection="rowSelection"
       />
 
       <div class="role-account-grant-pagination">
