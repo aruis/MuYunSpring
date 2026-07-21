@@ -217,9 +217,10 @@ function handleCategoryAction(action: RecordActionItem) {
 }
 
 function selectTenant(tenant: Tenant) {
+  if (tenant.id !== selectedTenant.value?.id) {
+    handleCategoriesLoaded([]);
+  }
   selectedTenant.value = tenant;
-  categoryReloadKey.value += 1;
-  positionReloadKey.value += 1;
 }
 
 function startCreateRootCategoryScoped() {

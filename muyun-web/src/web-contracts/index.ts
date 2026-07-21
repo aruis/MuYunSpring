@@ -693,6 +693,7 @@ export interface EmploymentRoleGrant extends StandardEntity {
 
 export interface EmploymentSelectorItem {
   id: string;
+  version?: number;
   employeeId?: string;
   employeeNo?: string;
   employeeTitle?: string;

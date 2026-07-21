@@ -150,6 +150,7 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(pageRealtimeSource, /subscribeAppModuleDataChanges\(options\.moduleAlias\)/);
 
   const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  const employmentContractsSource = readSource('src/web-contracts/index.ts');
   assert.match(systemUserSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.user'/);
   assert.match(systemUserSource, /:externally-changed="userExternalChange\.externallyChanged\.value"/);
   assert.match(systemUserSource, /@reload-external-change="reloadExternalUserChange"/);
@@ -198,6 +199,11 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(employmentDrawerSource, /<RecordPicker[\s\S]*:context="positionContext"[\s\S]*mode="list"/);
   assert.match(employmentDrawerSource, /:constraints="\[enabledOnly\(\)\]"/);
   assert.match(employmentDrawerSource, /function updatePrimary[\s\S]*主岗必须与职员主机构、主部门一致/);
+  assert.match(employmentDrawerSource, /draft\.value = \{ \.\.\.row \}/);
+  assert.match(
+    employmentContractsSource,
+    /export interface EmploymentSelectorItem \{\s*id: string;\s*version\?: number;/,
+  );
   assert.match(employmentDrawerSource, /<UiDataTable[\s\S]*horizontal-scroll[\s\S]*show-action-column/);
   assert.match(employmentDrawerSource, /action-column-width="92"/);
   assert.match(employmentDrawerSource, /<UiDropdown[\s\S]*trigger="hover"/);
@@ -1051,6 +1057,7 @@ test('role management keeps basic scope management separate from binding and aut
   );
   assert.match(employeeEmploymentTableSource, /function updateEmployeeSelectedIds/);
   assert.match(employeeEmploymentTableSource, /<UiDataTable[\s\S]*horizontal-scroll/);
+  assert.match(roleEmploymentGrantDrawerSource, /boundOnly: false/);
   assert.doesNotMatch(roleViewSource, /account-grants/);
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);

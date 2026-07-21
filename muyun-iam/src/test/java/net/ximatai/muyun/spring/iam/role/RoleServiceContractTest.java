@@ -420,6 +420,32 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldRequireEnabledEmployeeWhenGrantingEmploymentRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        EmploymentRoleGrantDao employmentGrantDao = mock(EmploymentRoleGrantDao.class);
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeePosition position = employeePosition("position-1", "employee-1", "org-1", "dept-1", true);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)));
+        when(employmentGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(employmentGrantDao.insert(any())).thenReturn("grant-1");
+        when(employeePositionService.requireEnabled("position-1", "employee position is not active: position-1"))
+                .thenReturn(position);
+        when(employeePositionService.select("position-1")).thenReturn(position);
+        when(employeeService.requireEnabled("employee-1", "employee is not active: employee-1"))
+                .thenReturn(employee("employee-1", "org-1", "dept-1", true));
+        RoleService service = new RoleService(roleDao, mock(AccountRoleGrantDao.class), employmentGrantDao,
+                mock(RoleActionDao.class), activeTenantVerifier(), RoleActionGrantVerifier.platformActionsOnly(),
+                null, employeeService, employeePositionService, null);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.grantEmploymentRole("r1", "position-1");
+        }
+
+        verify(employeeService).requireEnabled("employee-1", "employee is not active: employee-1");
+    }
+
+    @Test
     void shouldRejectAccountRoleGrantedToEmploymentAndEmploymentRoleGrantedToAccount() {
         RoleDao roleDao = mock(RoleDao.class);
         when(roleDao.query(any(Criteria.class), any(PageRequest.class)))

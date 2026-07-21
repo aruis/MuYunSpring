@@ -119,6 +119,7 @@
 | `POST` | `/iam.employee/{employeeId}/account/provision`                  | 基于职员档案创建登录账号并自动绑定，适合职员侧“设置账号”流程。                              |
 | `POST` | `/iam.employee/{employeeId}/account/delete`                     | 删除职员账号绑定。                                                                          |
 | `GET`  | `/iam.employee/{employeeId}/positions`                          | 查询职员任岗关系。                                                                          |
+| `GET`  | `/iam.employee/{employeeId}/employment-view`                    | 查询包含职员、机构、部门、岗位展示信息的任职视图，供职员任职管理与列表子表使用。            |
 | `POST` | `/iam.employee/{employeeId}/positions`                          | 为职员新增任岗关系。                                                                        |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/update`      | 更新职员任岗关系。                                                                          |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/delete`      | 删除职员任岗关系。                                                                          |

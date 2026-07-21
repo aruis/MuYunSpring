@@ -64,7 +64,7 @@ async function load(page = 0) {
       client.value.employmentRoleGrants(id),
       client.value.employmentSelector(id, {
         enabledOnly: true,
-        boundOnly: true,
+        boundOnly: false,
         page: { pageNum: page, pageSize: 50 },
       }),
     ]);

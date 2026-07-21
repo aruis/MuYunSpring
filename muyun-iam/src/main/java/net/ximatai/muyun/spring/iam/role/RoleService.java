@@ -1140,6 +1140,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (employeePositionService != null) {
             employeePositionService.requireEnabled(validEmployeePositionId,
                     "employee position is not active: " + validEmployeePositionId);
+            EmployeePosition employeePosition = employeePositionService.select(validEmployeePositionId);
+            if (employeeService != null && employeePosition != null) {
+                employeeService.requireEnabled(employeePosition.getEmployeeId(),
+                        "employee is not active: " + employeePosition.getEmployeeId());
+            }
         }
         ensureDataGrantUnique(validEmployeePositionId, role);
         EmploymentRoleGrant existing = findEmploymentRoleGrant(role.getId(), validEmployeePositionId);
