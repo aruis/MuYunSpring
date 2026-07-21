@@ -52,6 +52,7 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.position.Position;
+import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrant;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
@@ -143,6 +144,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private PositionService positionService;
+
+    @MockitoBean
+    private PositionCategoryService positionCategoryService;
 
     @MockitoBean
     private RoleService roleService;
