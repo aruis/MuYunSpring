@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.boot.web.BusinessMutation;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
@@ -8,6 +10,8 @@ import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
@@ -59,6 +63,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
         StaticModuleUiContributor {
     private final RoleGrantableActionResolver grantableActionResolver;
     private final MenuService menuService;
+    private EmployeeEmploymentReadService employeeEmploymentReadService;
 
     public RoleWebController(RoleGrantableActionResolver grantableActionResolver) {
         this(grantableActionResolver, (MenuService) null);
@@ -75,6 +80,11 @@ public class RoleWebController extends WebSupport<RoleService> implements
                               MenuService menuService) {
         this.grantableActionResolver = grantableActionResolver;
         this.menuService = menuService;
+    }
+
+    @Autowired(required = false)
+    void setEmployeeEmploymentReadService(EmployeeEmploymentReadService employeeEmploymentReadService) {
+        this.employeeEmploymentReadService = employeeEmploymentReadService;
     }
 
     @Override
@@ -165,6 +175,25 @@ public class RoleWebController extends WebSupport<RoleService> implements
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public List<EmploymentRoleGrant> employmentRoleGrants(@PathVariable String roleId) {
         return roleRecordScope(roleId, () -> service().employmentRoleGrants(roleId));
+    }
+
+    @PostMapping("/{roleId}/employment-selector/query")
+    @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public WebPageResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentSelector(@PathVariable String roleId,
+                                                                        @RequestBody(required = false)
+                                                                        EmploymentSelectorRequest request) {
+        return roleRecordScope(roleId, () -> {
+            if (employeeEmploymentReadService == null) throw new IllegalStateException("employment selector is not available");
+            EmploymentSelectorRequest normalized = request == null ? EmploymentSelectorRequest.EMPTY : request;
+            WebPageRequest page = normalized.pageOrDefault();
+            PageResult<EmployeeEmploymentReadService.EmployeeEmploymentView> result = employeeEmploymentReadService.page(
+                    new EmployeeEmploymentReadService.Query(null, normalized.organizationId(), normalized.departmentId(),
+                            normalized.enabledOnly(), normalized.boundOnly(), PageRequest.of(page.pageNum(), page.pageSize())));
+            return new WebPageResponse<>(result.getRecords(),
+                    result.getTotal(), result.getPageNum(), result.getPageSize(), result.getPages(),
+                    result.isTotalKnown(), null);
+        });
     }
 
     @PostMapping("/{roleId}/employment-grants")
@@ -308,6 +337,17 @@ public class RoleWebController extends WebSupport<RoleService> implements
     public record EmploymentRoleGrantRequest(
             String employeePositionId
     ) {
+    }
+
+    public record EmploymentSelectorRequest(String organizationId, String departmentId, Boolean enabledOnly,
+                                            Boolean boundOnly,
+                                            WebPageRequest page) {
+        static final EmploymentSelectorRequest EMPTY = new EmploymentSelectorRequest(null, null, Boolean.TRUE,
+                Boolean.TRUE, null);
+
+        WebPageRequest pageOrDefault() {
+            return page == null ? WebPageRequest.DEFAULT : page;
+        }
     }
 
     public record GrantActionRequest(

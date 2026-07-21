@@ -685,6 +685,37 @@ export interface AccountRoleGrant extends StandardEntity {
   enabled?: boolean;
 }
 
+export interface EmploymentRoleGrant extends StandardEntity {
+  roleId?: string;
+  employeePositionId?: string;
+  enabled?: boolean;
+}
+
+export interface EmploymentSelectorItem {
+  id: string;
+  employeeId?: string;
+  employeeNo?: string;
+  employeeTitle?: string;
+  organizationId?: string;
+  organizationTitle?: string;
+  departmentId?: string;
+  departmentTitle?: string;
+  positionId?: string;
+  positionTitle?: string;
+  primaryPosition?: boolean;
+  enabled?: boolean;
+  username?: string;
+}
+
+export interface EmployeePosition extends StandardEntity {
+  employeeId?: string;
+  organizationId?: string;
+  departmentId?: string;
+  positionId?: string;
+  primaryPosition?: boolean;
+  enabled?: boolean;
+}
+
 export type PasswordPolicyScopeType = 'global' | 'tenant';
 
 export interface PasswordPolicyRule extends StandardEnabledSortableEntity {

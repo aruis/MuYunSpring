@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import RecordDetailPanel from './RecordDetailPanel.vue';
 import RecordExplorerPanel from './RecordExplorerPanel.vue';
+import ManagementExplorerColumn from './ManagementExplorerColumn.vue';
+import ManagementWorkspace from './ManagementWorkspace.vue';
 
 defineOptions({ name: 'StaticManagementLayout' });
 
@@ -30,22 +32,24 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="static-management-page">
-    <RecordExplorerPanel
-      class="static-management-sidebar"
-      :title="sidebarTitle"
-      :refresh-title="refreshTitle"
-      :search-keyword="sidebarSearchKeyword"
-      :search-placeholder="sidebarSearchPlaceholder"
-      :searchable="sidebarSearchable"
-      @update:search-keyword="emit('update:sidebarSearchKeyword', $event)"
-      @refresh="emit('refresh')"
-    >
-      <template #actions>
-        <slot name="sidebar-actions" />
-      </template>
-      <slot name="explorer" />
-    </RecordExplorerPanel>
+  <ManagementWorkspace class="static-management-page">
+    <ManagementExplorerColumn>
+      <RecordExplorerPanel
+        class="static-management-sidebar"
+        :title="sidebarTitle"
+        :refresh-title="refreshTitle"
+        :search-keyword="sidebarSearchKeyword"
+        :search-placeholder="sidebarSearchPlaceholder"
+        :searchable="sidebarSearchable"
+        @update:search-keyword="emit('update:sidebarSearchKeyword', $event)"
+        @refresh="emit('refresh')"
+      >
+        <template #actions>
+          <slot name="sidebar-actions" />
+        </template>
+        <slot name="explorer" />
+      </RecordExplorerPanel>
+    </ManagementExplorerColumn>
 
     <RecordDetailPanel class="static-management-card" :title="cardTitle">
       <template #status>
@@ -59,15 +63,13 @@ const emit = defineEmits<{
 
       <slot />
     </RecordDetailPanel>
-  </section>
+  </ManagementWorkspace>
 </template>
 
 <style scoped>
 .static-management-page {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 12px;
-  min-height: calc(100vh - 116px);
+  --muyun-management-explorer-width: 280px;
+  --muyun-management-detail-min-width: 560px;
 }
 
 .static-management-sidebar,
@@ -120,7 +122,6 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 900px) {
-  .static-management-page,
   :deep(.static-record-form) {
     grid-template-columns: 1fr;
   }

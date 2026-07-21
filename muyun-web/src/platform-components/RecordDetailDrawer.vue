@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 <template>
   <UiSidePanel :open="open" :close-on-outside="closeOnOutside" @close="emit('close')">
-    <RecordDetailPanel class="record-detail-drawer-panel" :title="title">
+    <RecordDetailPanel class="record-detail-drawer-panel" :title="title" scrollable-content>
       <template #status>
         <slot name="status" />
       </template>
@@ -46,7 +46,6 @@ const emit = defineEmits<{
 <style scoped>
 .record-detail-drawer-panel {
   height: 100%;
-  overflow: auto;
   border-radius: 8px;
 }
 </style>

@@ -1,13 +1,20 @@
 <script setup lang="ts">
 defineOptions({ name: 'RecordDetailPanel' });
 
-defineProps<{
-  title: string;
-}>();
+withDefaults(
+  defineProps<{
+    title: string;
+    /** Keeps the panel header fixed while the detail content scrolls. */
+    scrollableContent?: boolean;
+  }>(),
+  {
+    scrollableContent: false,
+  },
+);
 </script>
 
 <template>
-  <main class="record-detail-panel">
+  <main class="record-detail-panel" :class="{ 'record-detail-panel--scrollable': scrollableContent }">
     <header class="record-detail-panel-header">
       <div class="record-detail-panel-title-group">
         <h2>{{ title }}</h2>
@@ -17,7 +24,10 @@ defineProps<{
         <slot name="actions" />
       </div>
     </header>
-    <slot />
+    <div v-if="scrollableContent" class="record-detail-panel-content">
+      <slot />
+    </div>
+    <slot v-else />
   </main>
 </template>
 
@@ -32,6 +42,16 @@ defineProps<{
   border: 1px solid var(--muyun-border);
   border-radius: 8px;
   background: var(--muyun-surface);
+}
+
+.record-detail-panel--scrollable {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.record-detail-panel-content {
+  min-height: 0;
+  overflow: auto;
 }
 
 .record-detail-panel-header {

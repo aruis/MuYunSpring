@@ -220,6 +220,7 @@
 | `GET`  | `/iam.role/{roleId}/employment-grants`                  | 查询任职角色授权实例。                                                                    |
 | `POST` | `/iam.role/{roleId}/employment-grants`                  | 给职员任职授予任职角色、角色组或数据授权角色。                                            |
 | `POST` | `/iam.role/{roleId}/employment-grants/{grantId}/delete` | 删除任职角色授权实例。                                                                    |
+| `POST` | `/iam.role/{roleId}/employment-selector/query`          | 分页读取可授权任职，返回职员、机构、部门、岗位和主岗信息，供角色侧“绑定任职”选择器使用。 |
 | `POST` | `/iam.role/grant/{roleId}`                              | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
 | `POST` | `/iam.role/grant/{roleId}/batch`                        | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。                                  |
 | `POST` | `/iam.role/revoke/{roleId}`                             | 撤销角色某个模块动作授权。                                                                |

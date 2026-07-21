@@ -6,13 +6,18 @@ import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.position.Position;
+import net.ximatai.muyun.spring.iam.position.PositionCategory;
 import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Optional;
 
 
 @RestController
@@ -26,9 +31,39 @@ public class PositionWebController extends WebSupport<PositionService> implement
         CrudWeb<Position, PositionService>,
         EnableWeb<Position, PositionService>,
         SortWeb<Position, PositionService>,
+        MutationTenantScopeResolver<Position>,
         StaticModuleUiContributor {
 
     private static final String RESOURCE = "position";
+    private PositionCategoryService positionCategoryService;
+
+    @Autowired
+    void setPositionCategoryService(PositionCategoryService positionCategoryService) {
+        this.positionCategoryService = positionCategoryService;
+    }
+
+    @Override
+    public Optional<String> tenantIdForCreate(Position record) {
+        return tenantIdForCategory(record == null ? null : record.getCategoryId());
+    }
+
+    @Override
+    public Optional<String> tenantIdForUpdate(String id, Position record) {
+        Position existing = service().select(id);
+        return tenantIdForCategory(existing == null ? (record == null ? null : record.getCategoryId()) : existing.getCategoryId());
+    }
+
+    @Override
+    public Optional<String> tenantIdForExistingRecord(String id) {
+        Position existing = service().select(id);
+        return tenantIdForCategory(existing == null ? null : existing.getCategoryId());
+    }
+
+    private Optional<String> tenantIdForCategory(String categoryId) {
+        if (categoryId == null || categoryId.isBlank() || positionCategoryService == null) return Optional.empty();
+        PositionCategory category = positionCategoryService.select(categoryId);
+        return Optional.ofNullable(category == null ? null : category.getTenantId()).filter(value -> !value.isBlank());
+    }
 
     @Override
     public boolean supportsUnpagedQuery() {

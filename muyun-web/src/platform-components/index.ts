@@ -4,11 +4,14 @@ export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue'
 export { default as DateTimeText } from './DateTimeText.vue';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
+export { default as ManagementWorkspace } from './ManagementWorkspace.vue';
+export { default as ManagementExplorerColumn } from './ManagementExplorerColumn.vue';
 export { default as RecordActionBar } from './RecordActionBar.vue';
 export { default as RecordDetailDrawer } from './RecordDetailDrawer.vue';
 export { default as RecordExternalChangeNotice } from './RecordExternalChangeNotice.vue';
 export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
+export { default as RecordExpandedSubtable } from './RecordExpandedSubtable.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 export { default as RecordFormFields } from './RecordFormFields.vue';

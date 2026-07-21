@@ -6,6 +6,7 @@ import {
   RecordActionBar,
   RecordDetailDrawer,
   RecordDetailFields,
+  RecordExpandedSubtable,
   RecordExplorerPanel,
   RecordFormFields,
   RecordMetaSection,
@@ -793,46 +794,39 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       @select="selectedUserKey = String($event.id ?? '')"
     >
       <template #expandedRow="{ record }">
-        <section class="user-session-section">
-          <div class="user-session-header">
-            <h3>在线会话</h3>
-            <div class="user-session-actions">
-              <UiButton
-                type="text"
-                icon-name="reload"
-                :disabled="userSessionState(String(record.id ?? '')).loading"
-                @click="loadUserSessions(String(record.id ?? ''))"
-              >
-                刷新
-              </UiButton>
-              <UiButton
-                v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
-                danger
-                icon-name="power"
-                :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
-                @click="revokeAllUserSessions(record)"
-              >
-                全部下线
-              </UiButton>
-            </div>
-          </div>
-          <UiSpin
-            v-if="userSessionState(String(record.id ?? '')).loading"
-            class="user-session-state"
-            tip="加载在线会话"
-          />
-          <UiError
-            v-else-if="userSessionState(String(record.id ?? '')).error"
-            title="在线会话加载失败"
-            :message="userSessionState(String(record.id ?? '')).error ?? '无法加载在线会话，请重试'"
-          />
-          <p
-            v-else-if="userSessionState(String(record.id ?? '')).records.length === 0"
-            class="user-session-empty"
-          >
+        <RecordExpandedSubtable
+          title="在线会话"
+          :loading="userSessionState(String(record.id ?? '')).loading"
+          :error="userSessionState(String(record.id ?? '')).error"
+          loading-tip="加载在线会话"
+          error-title="在线会话加载失败"
+        >
+          <template #actions>
+            <UiButton
+              type="text"
+              icon-name="reload"
+              :disabled="userSessionState(String(record.id ?? '')).loading"
+              @click="loadUserSessions(String(record.id ?? ''))"
+            >
+              刷新
+            </UiButton>
+            <UiButton
+              v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
+              danger
+              icon-name="power"
+              :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
+              @click="revokeAllUserSessions(record)"
+            >
+              全部下线
+            </UiButton>
+          </template>
+          <p v-if="userSessionState(String(record.id ?? '')).records.length === 0" class="user-session-empty">
             当前无在线会话
           </p>
           <div v-else class="user-session-list">
+            <header class="user-session-table-header">
+              <span>会话</span><span>登录与活动</span><span>操作</span>
+            </header>
             <article
               v-for="session in userSessionState(String(record.id ?? '')).records"
               :key="session.id"
@@ -881,7 +875,7 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
               </UiButton>
             </article>
           </div>
-        </section>
+        </RecordExpandedSubtable>
       </template>
     </RecordQueryListPanel>
 
@@ -1078,6 +1072,17 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 6px;
   background: var(--muyun-surface);
+}
+
+.user-session-table-header {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(460px, 2fr) auto;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--muyun-border-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .user-session-item {

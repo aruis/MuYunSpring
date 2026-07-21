@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
+  ManagementWorkspace,
+  ManagementExplorerColumn,
   RecordActionBar,
   RecordDetailDrawer,
   RecordDetailFields,
+  RecordExpandedSubtable,
   RecordExternalChangeNotice,
   RecordExplorerPanel,
   RecordFormFields,
@@ -50,6 +53,8 @@ import {
   validateEmployeeRequiredFormFields,
   type EmployeeDetailMode,
 } from './employeeDetailStateModel';
+import EmployeeEmploymentDrawer from './EmployeeEmploymentDrawer.vue';
+import { useEmployeeEmploymentRows } from './useEmployeeEmploymentRows';
 
 defineOptions({ name: 'EmployeeManagementView' });
 
@@ -91,11 +96,20 @@ const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
 const employeeDetailDepartment = ref<Department>();
 const employeeAccount = ref<EmployeeAccount>();
 const employeeAccountUser = ref<UserAccount>();
+const employeeEmploymentDrawerOpen = ref(false);
+const employeeEmploymentDrawerEmployee = ref<Employee>();
 const loadingEmployeeAccounts = ref(false);
 const savingEmployeeAccount = ref(false);
 const employeeAccountsLoadFailed = ref(false);
 const showAccountProvisionForm = ref(false);
 const accountProvisionDraft = ref<Partial<UserAccount>>(createAccountProvisionDraft(undefined));
+const {
+  expandedEmployeeKeys,
+  employmentRowState,
+  handleEmployeeRowExpand,
+  loadEmployeeEmploymentRows,
+  resetEmployeeEmploymentRows,
+} = useEmployeeEmploymentRows({ context: employeeContext, source: 'employee-management' });
 const employeeExternalChange = usePageRecordExternalChange({
   moduleAlias: 'iam.employee',
   recordId: () => selectedEmployee.value?.id,
@@ -312,6 +326,7 @@ function selectOrganization(record: Organization) {
   employeeDetailLoadFailed.value = false;
   employeeDetailDepartment.value = undefined;
   resetEmployeeAccountState();
+  resetEmployeeEmploymentRows();
   closeEmployeeDetail();
 }
 
@@ -353,6 +368,10 @@ function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: Query
   if (!canLeaveEmployeeDetailContext()) {
     return;
   }
+  if (action.key === 'employment') {
+    void openEmployeeEmploymentDrawer(record);
+    return;
+  }
   if (action.key === 'view') {
     void openEmployeeDetail(record, 'view');
     return;
@@ -363,6 +382,39 @@ function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: Query
   }
   if (action.key === 'delete') {
     void removeEmployee(record);
+  }
+}
+
+function employeeExtraRowActionsOf(record: QueryListRecord): RecordActionItem[] {
+  return [
+    {
+      key: 'employment',
+      actionCode: 'employeePositions',
+      title: '任职',
+      after: 'edit',
+      visible: Boolean(record.id) && employeeContext.can('employeePositions', String(record.id)) !== false,
+    },
+  ];
+}
+
+async function openEmployeeEmploymentDrawer(record: QueryListRecord) {
+  const employeeId = String(record.id ?? '');
+  if (!employeeId) return;
+  try {
+    employeeEmploymentDrawerEmployee.value = await employeeContext.crud.view(employeeId);
+    employeeEmploymentDrawerOpen.value = true;
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+  }
+}
+
+function closeEmployeeEmploymentDrawer() {
+  employeeEmploymentDrawerOpen.value = false;
+}
+
+function handleEmployeeEmploymentSaved(employeeId: string) {
+  if (expandedEmployeeKeys.value.includes(employeeId)) {
+    void loadEmployeeEmploymentRows(employeeId);
   }
 }
 
@@ -959,31 +1011,33 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 </script>
 
 <template>
-  <section class="employee-management-page">
-    <RecordExplorerPanel
-      class="employee-scope-panel"
-      title="机构树"
-      refresh-title="刷新机构树"
-      :search-keyword="organizationSearchKeyword"
-      search-placeholder="搜索机构名称、编码或 ID"
-      @refresh="refreshOrganizations"
-      @update:search-keyword="organizationSearchKeyword = $event"
-    >
-      <TreeRecordExplorer
-        :context="organizationContext"
-        :selected-id="selectedOrganization?.id"
-        :reload-key="organizationReloadKey"
-        :keyword="organizationSearchKeyword"
-        search-mode="none"
-        search-trigger="external"
-        empty-description="暂无机构"
-        loading-tip="加载机构树"
-        fallback-title="未命名机构"
-        :item-of="(record) => organizationItemOf(record as Organization)"
-        @loaded="handleOrganizationsLoaded"
-        @select="selectOrganization"
-      />
-    </RecordExplorerPanel>
+  <ManagementWorkspace class="employee-management-page">
+    <ManagementExplorerColumn>
+      <RecordExplorerPanel
+        class="employee-scope-panel"
+        title="机构树"
+        refresh-title="刷新机构树"
+        :search-keyword="organizationSearchKeyword"
+        search-placeholder="搜索机构名称、编码或 ID"
+        @refresh="refreshOrganizations"
+        @update:search-keyword="organizationSearchKeyword = $event"
+      >
+        <TreeRecordExplorer
+          :context="organizationContext"
+          :selected-id="selectedOrganization?.id"
+          :reload-key="organizationReloadKey"
+          :keyword="organizationSearchKeyword"
+          search-mode="none"
+          search-trigger="external"
+          empty-description="暂无机构"
+          loading-tip="加载机构树"
+          fallback-title="未命名机构"
+          :item-of="(record) => organizationItemOf(record as Organization)"
+          @loaded="handleOrganizationsLoaded"
+          @select="selectOrganization"
+        />
+      </RecordExplorerPanel>
+    </ManagementExplorerColumn>
 
     <RecordQueryListPanel
       class="employee-list-panel"
@@ -992,7 +1046,9 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
       standard-crud-actions
       create-title="新建职员"
       standard-crud-row-actions
+      :extra-row-actions-of="employeeExtraRowActionsOf"
       :selected-key="selectedEmployeeKey"
+      :expanded-row-keys="expandedEmployeeKeys"
       :reload-key="employeeReloadKey"
       :ready="Boolean(selectedOrganization?.id)"
       :external-query-values="employeeExternalQueryValues"
@@ -1002,8 +1058,49 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
       @action="handleEmployeeListAction"
       @row-action="handleEmployeeRowAction"
       @row-dblclick="handleEmployeeRowDblclick"
+      @row-expand="handleEmployeeRowExpand"
       @select="selectEmployee"
-    />
+    >
+      <template #expandedRow="{ record }">
+        <RecordExpandedSubtable
+          title="任职信息"
+          :loading="employmentRowState(String(record.id ?? '')).loading"
+          :error="employmentRowState(String(record.id ?? '')).error"
+          loading-tip="加载任职信息"
+          error-title="任职信息加载失败"
+        >
+          <template #actions>
+            <UiButton
+              type="text"
+              icon-name="reload"
+              :disabled="employmentRowState(String(record.id ?? '')).loading"
+              @click="loadEmployeeEmploymentRows(String(record.id ?? ''))"
+            >
+              刷新
+            </UiButton>
+          </template>
+          <p v-if="employmentRowState(String(record.id ?? '')).records.length === 0">暂无任职信息</p>
+          <div v-else class="employee-row-employment-list">
+            <header class="employee-row-employment-table-header">
+              <span>岗位</span>
+              <span>机构</span>
+              <span>部门</span>
+              <span>主岗位</span>
+            </header>
+            <article
+              v-for="employment in employmentRowState(String(record.id ?? '')).records"
+              :key="employment.id"
+              :class="{ 'is-disabled': employment.enabled === false }"
+            >
+              <strong>{{ employment.positionTitle ?? employment.positionId }}</strong>
+              <span>{{ employment.organizationTitle ?? employment.organizationId }}</span>
+              <span>{{ employment.departmentTitle ?? employment.departmentId }}</span>
+              <span>{{ employment.primaryPosition ? '是' : '否' }}</span>
+            </article>
+          </div>
+        </RecordExpandedSubtable>
+      </template>
+    </RecordQueryListPanel>
 
     <RecordDetailDrawer
       :open="employeeDetailOpen"
@@ -1150,17 +1247,22 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
         </template>
       </template>
     </RecordDetailDrawer>
-  </section>
+
+    <EmployeeEmploymentDrawer
+      :open="employeeEmploymentDrawerOpen"
+      :employee="employeeEmploymentDrawerEmployee"
+      @close="closeEmployeeEmploymentDrawer"
+      @saved="handleEmployeeEmploymentSaved"
+    />
+  </ManagementWorkspace>
 </template>
 
 <style scoped>
 .employee-management-page {
+  --muyun-management-explorer-width: 280px;
+  --muyun-management-detail-min-width: 560px;
+
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 12px;
-  height: calc(100vh - 116px);
-  overflow: hidden;
 }
 
 .employee-scope-panel,
@@ -1283,11 +1385,86 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
   background: var(--muyun-hover-subtle);
 }
 
-@media (max-width: 900px) {
-  .employee-management-page {
-    grid-template-columns: 1fr;
-  }
+.employee-row-employment-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 14px 46px;
+  border-top: 1px solid var(--muyun-border-subtle);
+  background: #fbfcfe;
+}
 
+.employee-row-employment-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.employee-row-employment-section h3,
+.employee-row-employment-section p {
+  margin: 0;
+}
+
+.employee-row-employment-section h3 {
+  color: var(--muyun-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.employee-row-employment-section p {
+  color: var(--muyun-text-muted);
+  font-size: 13px;
+}
+
+.employee-row-employment-state {
+  min-height: 56px;
+}
+
+.employee-row-employment-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--muyun-border-subtle);
+  border-radius: 6px;
+  background: var(--muyun-surface);
+}
+
+.employee-row-employment-list article {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(100px, auto);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--muyun-border-subtle);
+  color: var(--muyun-text-body);
+  font-size: 12px;
+}
+
+.employee-row-employment-table-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(100px, auto);
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--muyun-border-subtle);
+  color: var(--muyun-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.employee-row-employment-list article:last-child {
+  border-bottom: 0;
+}
+
+.employee-row-employment-list article.is-disabled {
+  color: var(--muyun-text-muted);
+  background: var(--muyun-hover-subtle);
+}
+
+.employee-row-employment-list strong {
+  color: var(--muyun-text);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
   .employee-account-card {
     grid-template-columns: 1fr;
     align-items: start;
