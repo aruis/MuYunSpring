@@ -119,6 +119,7 @@
 | `POST` | `/iam.employee/{employeeId}/account/provision`                  | 基于职员档案创建登录账号并自动绑定，适合职员侧“设置账号”流程。                              |
 | `POST` | `/iam.employee/{employeeId}/account/delete`                     | 删除职员账号绑定。                                                                          |
 | `GET`  | `/iam.employee/{employeeId}/positions`                          | 查询职员任岗关系。                                                                          |
+| `GET`  | `/iam.employee/{employeeId}/employment-view`                    | 查询包含职员、机构、部门、岗位展示信息的任职视图，供职员任职管理与列表子表使用。            |
 | `POST` | `/iam.employee/{employeeId}/positions`                          | 为职员新增任岗关系。                                                                        |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/update`      | 更新职员任岗关系。                                                                          |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/delete`      | 删除职员任岗关系。                                                                          |
@@ -220,6 +221,7 @@
 | `GET`  | `/iam.role/{roleId}/employment-grants`                  | 查询任职角色授权实例。                                                                    |
 | `POST` | `/iam.role/{roleId}/employment-grants`                  | 给职员任职授予任职角色、角色组或数据授权角色。                                            |
 | `POST` | `/iam.role/{roleId}/employment-grants/{grantId}/delete` | 删除任职角色授权实例。                                                                    |
+| `POST` | `/iam.role/{roleId}/employment-selector/query`          | 分页读取可授权任职，返回职员、机构、部门、岗位和主岗信息，供角色侧“绑定任职”选择器使用。 |
 | `POST` | `/iam.role/grant/{roleId}`                              | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
 | `POST` | `/iam.role/grant/{roleId}/batch`                        | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。                                  |
 | `POST` | `/iam.role/revoke/{roleId}`                             | 撤销角色某个模块动作授权。                                                                |

@@ -55,6 +55,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     private final EmployeeDelegationService employeeDelegationService;
     private OrganizationService organizationService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
+    private EmployeeEmploymentReadService employeeEmploymentReadService;
 
     @Autowired
     public EmployeeWebController(EmployeePositionService employeePositionService,
@@ -73,6 +74,11 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @Autowired(required = false)
     void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
         this.staticRecordReadProjectionService = staticRecordReadProjectionService;
+    }
+
+    @Autowired(required = false)
+    void setEmployeeEmploymentReadService(EmployeeEmploymentReadService employeeEmploymentReadService) {
+        this.employeeEmploymentReadService = employeeEmploymentReadService;
     }
 
     @Override
@@ -170,6 +176,18 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     public WebListResponse<EmployeePosition> positions(@PathVariable String employeeId) {
         return employeeRecordScope(employeeId,
                 () -> new WebListResponse<>(employeePositionService.positions(employeeId)));
+    }
+
+    @GetMapping("/{employeeId}/employment-view")
+    @CustomActionEndpoint(value = "employeePositions", title = "职员任岗", level = PlatformActionLevel.RECORD,
+            dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentView(@PathVariable String employeeId) {
+        return employeeRecordScope(employeeId, () -> {
+            if (employeeEmploymentReadService == null) throw new IllegalStateException("employment view is not available");
+            return new WebListResponse<>(employeeEmploymentReadService.page(
+                    new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE,
+                            new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
+        });
     }
 
     @PostMapping("/{employeeId}/positions")

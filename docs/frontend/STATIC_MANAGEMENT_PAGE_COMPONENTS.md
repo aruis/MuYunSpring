@@ -169,6 +169,8 @@ RecordPicker
 
 ## 常见组合
 
+多栏管理页的列宽、右侧主体下限和窄屏降级统一由 [管理工作区布局](MANAGEMENT_WORKSPACE_LAYOUT.md) 的 `ManagementWorkspace` 提供；页面继续决定 explorer 的数量与业务联动。
+
 两栏平铺管理页：
 
 ```text

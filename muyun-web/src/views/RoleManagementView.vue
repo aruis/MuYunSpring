@@ -51,6 +51,7 @@ import type {
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
+import RoleEmploymentGrantDrawer from './RoleEmploymentGrantDrawer.vue';
 import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
 
 defineOptions({ name: 'RoleManagementView' });
@@ -98,6 +99,7 @@ const roleDetailLoadFailed = ref(false);
 const savingRole = ref(false);
 const bindingRole = ref<Role>();
 const bindingDrawerOpen = ref(false);
+const employmentBindingDrawerOpen = ref(false);
 const roleDetailRequestSeq = ref(0);
 const roleDraft = ref<Partial<Role>>(createRoleDraft(undefined));
 const roleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
@@ -186,6 +188,12 @@ const canSaveRole = computed(() => {
     !selectedRole.value?.systemManaged
   );
 });
+const canToggleRole = computed(() => {
+  const role = selectedRole.value;
+  return Boolean(
+    role?.id && role.systemManaged !== true && roleContext.can(roleToggleActionCode(role)) === true,
+  );
+});
 const roleDetailActions = computed<RecordActionItem[]>(() => {
   if (roleDetailMode.value === 'view') {
     if (!selectedRole.value?.id) {
@@ -201,10 +209,10 @@ const roleDetailActions = computed<RecordActionItem[]>(() => {
       },
       {
         key: 'bind',
-        actionCode: 'accountRoleGrants',
-        title: '绑定',
+        actionCode: roleBindingActionCode(selectedRole.value),
+        title: roleBindingTitle(selectedRole.value),
         iconName: 'lock',
-        visible: canBindAccountRoleRecord(selectedRole.value),
+        visible: canBindRoleRecord(selectedRole.value),
         disabled: savingRole.value || selectedRole.value.systemManaged === true,
       },
       {
@@ -481,11 +489,11 @@ function roleExtraRowActionsOf(record: QueryListRecord): RecordActionItem[] {
   return [
     {
       key: 'bind',
-      actionCode: 'accountRoleGrants',
+      actionCode: roleBindingActionCode(record),
       title: '绑定',
       iconName: 'lock',
       after: 'edit',
-      visible: canBindAccountRoleRecord(record),
+      visible: canBindRoleRecord(record),
     },
     {
       key: 'toggle',
@@ -524,7 +532,7 @@ function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryList
     return;
   }
   if (action.key === 'bind') {
-    void openRoleBinding(record);
+    void openRoleBinding(record, record.assignmentType === 'employment');
     return;
   }
   if (action.key === 'toggle') {
@@ -543,7 +551,7 @@ function handleRoleRowDblclick(record: QueryListRecord) {
   void openRoleDetail(record, 'view');
 }
 
-async function openRoleBinding(record: QueryListRecord) {
+async function openRoleBinding(record: QueryListRecord, employment = false) {
   if (!canLeaveRoleDetailContext()) {
     return;
   }
@@ -551,12 +559,14 @@ async function openRoleBinding(record: QueryListRecord) {
   if (!id) {
     return;
   }
-  bindingDrawerOpen.value = true;
+  bindingDrawerOpen.value = !employment;
+  employmentBindingDrawerOpen.value = employment;
   bindingRole.value = copyRole(record as Role);
   try {
     bindingRole.value = await roleContext.crud.view(id);
   } catch (cause) {
     bindingDrawerOpen.value = false;
+    employmentBindingDrawerOpen.value = false;
     bindingRole.value = undefined;
     presentPlatformError(cause, { source: 'role-management', phase: 'load' });
   }
@@ -567,6 +577,7 @@ function closeRoleBinding() {
     return;
   }
   bindingDrawerOpen.value = false;
+  employmentBindingDrawerOpen.value = false;
   bindingRole.value = undefined;
 }
 
@@ -667,7 +678,10 @@ function handleRoleDetailAction(action: RecordActionItem) {
     return;
   }
   if (action.key === 'bind' && selectedRole.value) {
-    void openRoleBinding(selectedRole.value as QueryListRecord);
+    void openRoleBinding(
+      selectedRole.value as QueryListRecord,
+      selectedRole.value.assignmentType === 'employment',
+    );
     return;
   }
   if (action.key === 'delete') {
@@ -966,13 +980,18 @@ function optionTitle(record: QueryListRecord, fieldName: string, fallback: strin
   return typeof title === 'string' && title.trim() ? title : fallback;
 }
 
-function canBindAccountRoleRecord(record: Partial<Role> | QueryListRecord | undefined) {
+function canBindRoleRecord(record: Partial<Role> | QueryListRecord | undefined) {
   return (
-    Boolean(record?.id) &&
-    record?.assignmentType === 'account' &&
-    record.roleKind !== 'group' &&
-    record.roleKind !== 'dataGrant'
+    Boolean(record?.id) && (record?.assignmentType === 'account' || record?.assignmentType === 'employment')
   );
+}
+
+function roleBindingActionCode(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.assignmentType === 'employment' ? 'employmentRoleGrants' : 'accountRoleGrants';
+}
+
+function roleBindingTitle(record: Partial<Role> | QueryListRecord | undefined) {
+  return record?.assignmentType === 'employment' ? '绑定任职' : '绑定用户';
 }
 
 function roleToggleActionCode(record: Partial<Role> | QueryListRecord | undefined) {
@@ -1187,9 +1206,10 @@ function parseRoleIds(value: unknown) {
         <RecordStatusSwitch
           v-if="roleDetailMode === 'view' && selectedRole"
           :enabled="selectedRole.enabled !== false"
-          :disabled="true"
+          :disabled="savingRole || !canToggleRole"
           :loading="savingRole"
           :show-label="false"
+          @change="toggleRoleEnabled(selectedRole)"
         />
       </template>
       <template #actions>
@@ -1254,6 +1274,13 @@ function parseRoleIds(value: unknown) {
 
     <RoleAccountGrantDrawer
       :open="bindingDrawerOpen"
+      :context="roleContext"
+      :role="bindingRole"
+      @close="closeRoleBinding"
+      @saved="roleReloadKey += 1"
+    />
+    <RoleEmploymentGrantDrawer
+      :open="employmentBindingDrawerOpen"
       :context="roleContext"
       :role="bindingRole"
       @close="closeRoleBinding"

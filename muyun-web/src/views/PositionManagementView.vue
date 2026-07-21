@@ -2,24 +2,30 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   ModuleActionButton,
+  ManagementWorkspace,
+  ManagementExplorerColumn,
   RecordActionBar,
   RecordDetailPanel,
   RecordExplorerPanel,
   RecordFormFields,
   RecordListExplorer,
+  CrudRecordListExplorer,
   RecordMetaSection,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  createScopedTreeModuleContext,
   childResourceDefaultFormViewCode,
   presentPlatformError,
+  presentPlatformMessage,
   resolveRecordFormFields,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import type { Option, Position, PositionCategory } from '@muyun/web-contracts';
-import { useModuleContext } from '@muyun/web-core';
+import type { Option, Position, PositionCategory, Tenant } from '@muyun/web-contracts';
+import { useModuleContext, type ModuleContext } from '@muyun/web-core';
+import { useCurrentUserContext } from '../app/currentUserContext';
 import { confirmAction, UiEmpty, UiInput, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createPositionManagementState,
@@ -35,6 +41,39 @@ const POSITION_RESOURCE = 'position';
 
 const categoryContext = useModuleContext<PositionCategory>({ moduleAlias: 'iam.position_category' });
 const positionContext = useModuleContext<Position>({ moduleAlias: 'iam.position' });
+const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
+const currentUser = useCurrentUserContext();
+const selectedTenant = ref<Tenant>();
+const tenantSearchKeyword = ref('');
+const tenantReloadKey = ref(0);
+const canBrowseTenants = computed(() => currentUser?.value?.system === true);
+const selectedTenantId = computed(() => selectedTenant.value?.id);
+const categoryScopeOptions = {
+  scopeFieldName: 'tenantId',
+  get scopeValue() {
+    return selectedTenantId.value;
+  },
+  treePath: '/iam.position_category/tree',
+};
+const scopedCategoryContext = createScopedTreeModuleContext(
+  categoryContext,
+  categoryScopeOptions,
+) as ModuleContext<PositionCategory>;
+const categoryCrud = {
+  ...scopedCategoryContext.crud,
+  insert: (record: PositionCategory) =>
+    scopedCategoryContext.crud.insert({ ...record, tenantId: selectedTenantId.value }),
+  update: (id: string, record: PositionCategory) =>
+    scopedCategoryContext.crud.update(id, { ...record, tenantId: selectedTenantId.value }),
+};
+const categoryManagementContext: ModuleContext<PositionCategory> = {
+  ...scopedCategoryContext,
+  crud: categoryCrud,
+  abilities: {
+    ...scopedCategoryContext.abilities,
+    crud: () => categoryCrud,
+  },
+};
 const categorySearchKeyword = ref('');
 const positionSearchKeyword = ref('');
 const positionFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
@@ -76,7 +115,7 @@ const {
   savePosition,
   togglePosition,
   deletePosition,
-} = createPositionManagementState(categoryContext, positionContext.crud, confirmAction);
+} = createPositionManagementState(categoryManagementContext, positionContext.crud, confirmAction);
 
 const categoryOptions = computed<Option[]>(() =>
   categories.value
@@ -147,7 +186,12 @@ const positionActions = computed<RecordActionItem[]>(() => {
 });
 
 onMounted(loadPositionFormDefinition);
-onMounted(loadPositions);
+onMounted(() => {
+  if (!canBrowseTenants.value && currentUser?.value?.tenantId) {
+    selectedTenant.value = { id: currentUser.value.tenantId, title: currentUser.value.tenantId } as Tenant;
+  }
+  void loadPositions();
+});
 
 watch(positionReloadKey, () => {
   void loadPositions();
@@ -155,6 +199,11 @@ watch(positionReloadKey, () => {
 
 watch(selectedCategoryId, () => {
   void loadPositions();
+});
+
+watch(selectedTenantId, () => {
+  categoryReloadKey.value += 1;
+  positionReloadKey.value += 1;
 });
 
 function handleCategoryAction(action: RecordActionItem) {
@@ -165,6 +214,28 @@ function handleCategoryAction(action: RecordActionItem) {
   if (action.key === 'category-save') {
     void saveCategory();
   }
+}
+
+function selectTenant(tenant: Tenant) {
+  if (tenant.id !== selectedTenant.value?.id) {
+    handleCategoriesLoaded([]);
+  }
+  selectedTenant.value = tenant;
+}
+
+function startCreateRootCategoryScoped() {
+  if (canBrowseTenants.value && !selectedTenantId.value) {
+    presentPlatformMessage('请先选择租户', { source: 'position-management', phase: 'validation' });
+    return;
+  }
+  startCreateRootCategory();
+}
+
+function tenantItemOf(record: Tenant): RecordExplorerItemDescriptor {
+  return {
+    title: record.title ?? record.alias ?? record.id ?? '未命名租户',
+    secondary: record.alias ?? record.id,
+  };
 }
 
 function categoryTreeActionsOf(record: PositionCategory): UiRecordInlineAction[] {
@@ -255,110 +326,134 @@ function updatePositionDraftField(
 </script>
 
 <template>
-  <section class="position-workspace">
-    <RecordExplorerPanel
-      v-model:search-keyword="categorySearchKeyword"
-      class="category-column"
-      title="岗位分类"
-      search-placeholder="搜索分类名称、编码或 ID"
-      @refresh="categoryReloadKey += 1"
-    >
-      <template #actions>
-        <ModuleActionButton
-          class="record-panel-create-button"
-          :context="categoryContext"
-          action-code="create"
-          title="新增分类"
-          icon-only
-          :disabled="categorySaving"
-          @click="startCreateRootCategory"
+  <ManagementWorkspace class="position-workspace" :explorer-count="canBrowseTenants ? 3 : 2">
+    <ManagementExplorerColumn v-if="canBrowseTenants">
+      <RecordExplorerPanel
+        v-model:search-keyword="tenantSearchKeyword"
+        title="租户"
+        search-placeholder="搜索租户"
+        @refresh="tenantReloadKey += 1"
+      >
+        <CrudRecordListExplorer
+          :context="tenantContext"
+          :selected-id="selectedTenant?.id"
+          :reload-key="tenantReloadKey"
+          :keyword="tenantSearchKeyword"
+          empty-description="暂无租户"
+          loading-tip="加载租户"
+          fallback-title="未命名租户"
+          :item-of="(record) => tenantItemOf(record as Tenant)"
+          @select="selectTenant($event as Tenant)"
         />
-      </template>
-      <TreeRecordExplorer
-        :context="categoryContext"
-        :selected-id="selectedCategory?.id"
-        :reload-key="categoryReloadKey"
-        :keyword="categorySearchKeyword"
-        search-mode="none"
+      </RecordExplorerPanel>
+    </ManagementExplorerColumn>
+    <ManagementExplorerColumn>
+      <RecordExplorerPanel
+        v-model:search-keyword="categorySearchKeyword"
+        class="category-column"
+        title="岗位分类"
         search-placeholder="搜索分类名称、编码或 ID"
-        empty-description="暂无岗位分类"
-        loading-tip="加载岗位分类"
-        fallback-title="未命名分类"
-        :item-of="categoryItemOf"
-        @loaded="handleCategoriesLoaded"
-        @select="handleSelectCategory"
-        @action="handleCategoryTreeAction"
-      />
-      <template #editor>
-        <Transition name="category-editor-drawer">
-          <section v-if="categoryEditorVisible" class="category-editor-panel">
-            <header class="category-editor-header">
-              <div>
-                <h3>{{ categoryEditorTitle }}</h3>
-              </div>
-              <RecordActionBar
-                :context="categoryContext"
-                :actions="categoryActions"
-                size="compact"
-                @action="handleCategoryAction"
-              />
-            </header>
-            <form class="category-form" @submit.prevent="saveCategory">
-              <label>
-                <span>分类编码</span>
-                <UiInput v-model:value="categoryDraft.code" :disabled="categoryReadonly" />
-              </label>
-              <label>
-                <span>分类名称</span>
-                <UiInput v-model:value="categoryDraft.title" :disabled="categoryReadonly" />
-              </label>
-              <label>
-                <span>说明</span>
-                <UiInput v-model:value="categoryDraft.description" :disabled="categoryReadonly" />
-              </label>
-            </form>
-            <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
-              <RecordStatusSwitch
-                :enabled="categoryDraft.enabled"
-                :disabled="categorySaving || !canToggleCategory"
-                @change="categoryDraft.enabled = $event"
-              />
-            </section>
-          </section>
-        </Transition>
-      </template>
-    </RecordExplorerPanel>
-
-    <RecordExplorerPanel
-      v-model:search-keyword="positionSearchKeyword"
-      class="list-column"
-      title="岗位"
-      search-placeholder="搜索岗位名称、编码或 ID"
-      @refresh="positionReloadKey += 1"
-    >
-      <template #actions>
-        <ModuleActionButton
-          class="record-panel-create-button"
-          :context="categoryContext"
-          action-code="position_create"
-          title="新增岗位"
-          icon-only
-          :disabled="!selectedCategory || positionSaving || !canCreatePosition"
-          @click="startCreatePosition"
+        @refresh="categoryReloadKey += 1"
+      >
+        <template #actions>
+          <ModuleActionButton
+            class="record-panel-create-button"
+            :context="categoryManagementContext"
+            action-code="create"
+            title="新增分类"
+            icon-only
+            :disabled="categorySaving || (canBrowseTenants && !selectedTenantId)"
+            @click="startCreateRootCategoryScoped"
+          />
+        </template>
+        <TreeRecordExplorer
+          :context="categoryManagementContext"
+          :selected-id="selectedCategory?.id"
+          :reload-key="categoryReloadKey"
+          :keyword="categorySearchKeyword"
+          search-mode="none"
+          search-placeholder="搜索分类名称、编码或 ID"
+          empty-description="暂无岗位分类"
+          loading-tip="加载岗位分类"
+          fallback-title="未命名分类"
+          :item-of="categoryItemOf"
+          @loaded="handleCategoriesLoaded"
+          @select="handleSelectCategory"
+          @action="handleCategoryTreeAction"
         />
-      </template>
-      <UiSpin v-if="positionLoading" tip="加载岗位列表" />
-      <UiEmpty v-else-if="!selectedCategory" description="请选择岗位分类" />
-      <RecordListExplorer
-        v-else
-        :records="filteredPositions"
-        :selected-id="selectedPosition?.id"
-        :keyword="positionSearchKeyword"
-        :empty-description="positionListEmptyDescription"
-        :item-of="(record) => positionItemOf(record as Position)"
-        @select="selectPosition"
-      />
-    </RecordExplorerPanel>
+        <template #editor>
+          <Transition name="category-editor-drawer">
+            <section v-if="categoryEditorVisible" class="category-editor-panel">
+              <header class="category-editor-header">
+                <div>
+                  <h3>{{ categoryEditorTitle }}</h3>
+                </div>
+                <RecordActionBar
+                  :context="categoryManagementContext"
+                  :actions="categoryActions"
+                  size="compact"
+                  @action="handleCategoryAction"
+                />
+              </header>
+              <form class="category-form" @submit.prevent="saveCategory">
+                <label>
+                  <span>分类编码</span>
+                  <UiInput v-model:value="categoryDraft.code" :disabled="categoryReadonly" />
+                </label>
+                <label>
+                  <span>分类名称</span>
+                  <UiInput v-model:value="categoryDraft.title" :disabled="categoryReadonly" />
+                </label>
+                <label>
+                  <span>说明</span>
+                  <UiInput v-model:value="categoryDraft.description" :disabled="categoryReadonly" />
+                </label>
+              </form>
+              <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
+                <RecordStatusSwitch
+                  :enabled="categoryDraft.enabled"
+                  :disabled="categorySaving || !canToggleCategory"
+                  @change="categoryDraft.enabled = $event"
+                />
+              </section>
+            </section>
+          </Transition>
+        </template>
+      </RecordExplorerPanel>
+    </ManagementExplorerColumn>
+
+    <ManagementExplorerColumn>
+      <RecordExplorerPanel
+        v-model:search-keyword="positionSearchKeyword"
+        class="list-column"
+        title="岗位"
+        search-placeholder="搜索岗位名称、编码或 ID"
+        @refresh="positionReloadKey += 1"
+      >
+        <template #actions>
+          <ModuleActionButton
+            class="record-panel-create-button"
+            :context="categoryManagementContext"
+            action-code="position_create"
+            title="新增岗位"
+            icon-only
+            :disabled="!selectedCategory || positionSaving || !canCreatePosition"
+            @click="startCreatePosition"
+          />
+        </template>
+        <UiSpin v-if="positionLoading" tip="加载岗位列表" />
+        <UiEmpty v-else-if="!selectedCategory" description="请选择岗位分类" />
+        <RecordListExplorer
+          v-else
+          :records="filteredPositions"
+          :selected-id="selectedPosition?.id"
+          :keyword="positionSearchKeyword"
+          :empty-description="positionListEmptyDescription"
+          :item-of="(record) => positionItemOf(record as Position)"
+          @select="selectPosition"
+        />
+      </RecordExplorerPanel>
+    </ManagementExplorerColumn>
 
     <RecordDetailPanel class="position-column" :title="positionCardTitle">
       <template #status>
@@ -379,7 +474,7 @@ function updatePositionDraftField(
       </template>
       <template #actions>
         <RecordActionBar
-          :context="categoryContext"
+          :context="categoryManagementContext"
           :actions="positionActions"
           @action="handlePositionAction"
         />
@@ -401,25 +496,24 @@ function updatePositionDraftField(
         show-sort-order
       />
     </RecordDetailPanel>
-  </section>
+  </ManagementWorkspace>
 </template>
 
 <style scoped>
 .position-workspace {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(280px, 360px) minmax(420px, 1fr);
-  gap: 12px;
-  min-height: calc(100vh - 116px);
+  --muyun-management-explorer-width: 280px;
+  --muyun-management-detail-min-width: 560px;
 }
 
 .position-column {
   display: grid;
   align-content: start;
-  min-width: 0;
+  min-width: 560px;
   min-height: 0;
   border: 1px solid var(--muyun-border);
   border-radius: 8px;
   background: var(--muyun-surface);
+  container-type: inline-size;
 }
 
 .category-column,
@@ -543,15 +637,29 @@ h3 {
 
 .position-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
 }
 
-@media (max-width: 1180px) {
-  .position-workspace {
+.position-form :deep(.record-form-field),
+.position-form :deep(.ant-input),
+.position-form :deep(.ant-select) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container (max-width: 520px) {
+  .position-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 719px) {
+  .position-form {
     grid-template-columns: 1fr;
   }
 
-  .position-form {
-    grid-template-columns: 1fr;
+  .position-column {
+    min-width: 0;
   }
 }
 </style>

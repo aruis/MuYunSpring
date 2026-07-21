@@ -110,6 +110,11 @@ async function loadRecords() {
   loading.value = true;
   error.value = undefined;
   try {
+    if (props.mode === 'list') {
+      actualMode.value = 'list';
+      await loadListRecords();
+      return;
+    }
     await props.context.runtime.ready;
     const treeAbility = props.context.abilities.tryTree();
     actualMode.value = resolveRecordPickerMode(props.mode, Boolean(treeAbility));
@@ -120,14 +125,18 @@ async function loadRecords() {
       expandedKeys.value = firstTwoTreeLevels(response.records);
       return;
     }
-    const response = await props.context.abilities.crud().query({ page: { pageNum: 1, pageSize: 100 } });
-    tree.value = [];
-    records.value = response.records;
+    await loadListRecords();
   } catch (cause) {
     error.value = normalizeError(cause).message;
   } finally {
     loading.value = false;
   }
+}
+
+async function loadListRecords() {
+  const response = await props.context.crud.query({ page: { pageNum: 1, pageSize: 100 } });
+  tree.value = [];
+  records.value = response.records;
 }
 
 function recordTitle(record: RecordPickerRecord) {

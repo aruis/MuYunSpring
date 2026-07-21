@@ -1,5 +1,7 @@
 import type {
   AccountRoleGrant,
+  EmploymentRoleGrant,
+  EmploymentSelectorItem,
   ManagementScopeType,
   UserSelectorItem,
   WebActionResultEnvelope,
@@ -21,6 +23,14 @@ export interface UserSelectorRequest {
     pageNum: number;
     pageSize: number;
   };
+}
+
+export interface EmploymentSelectorRequest {
+  roleId?: string;
+  organizationId?: string;
+  departmentId?: string;
+  enabledOnly?: boolean;
+  page?: { pageNum: number; pageSize: number };
 }
 
 export function createRoleGrantClient(http: HttpClient) {
@@ -47,6 +57,31 @@ export function createRoleGrantClient(http: HttpClient) {
       return http.request<WebPageResponse<UserSelectorItem>>({
         method: 'POST',
         path: '/iam.user/selector/query',
+        body: request,
+      });
+    },
+    employmentRoleGrants(roleId: string) {
+      return http.request<EmploymentRoleGrant[]>({
+        path: `/iam.role/${encodeURIComponent(roleId)}/employment-grants`,
+      });
+    },
+    grantEmploymentRole(roleId: string, employeePositionId: string) {
+      return http.request<WebActionResultEnvelope<string> | string>({
+        method: 'POST',
+        path: `/iam.role/${encodeURIComponent(roleId)}/employment-grants`,
+        body: { employeePositionId },
+      });
+    },
+    deleteEmploymentRoleGrant(roleId: string, grantId: string) {
+      return http.request<WebActionResultEnvelope<number> | number>({
+        method: 'POST',
+        path: `/iam.role/${encodeURIComponent(roleId)}/employment-grants/${encodeURIComponent(grantId)}/delete`,
+      });
+    },
+    employmentSelector(roleId: string, request: EmploymentSelectorRequest) {
+      return http.request<WebPageResponse<EmploymentSelectorItem>>({
+        method: 'POST',
+        path: `/iam.role/${encodeURIComponent(roleId)}/employment-selector/query`,
         body: request,
       });
     },
