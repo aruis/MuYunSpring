@@ -1138,9 +1138,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         requireSystemManagedMutationAllowed(role, "grant employment role");
         String validEmployeePositionId = Preconditions.requireText(employeePositionId, "employeePositionId");
         if (employeePositionService != null) {
-            employeePositionService.requireEnabled(validEmployeePositionId,
+            EmployeePosition employeePosition = employeePositionService.requireEnabled(validEmployeePositionId,
                     "employee position is not active: " + validEmployeePositionId);
-            EmployeePosition employeePosition = employeePositionService.select(validEmployeePositionId);
             if (employeeService != null && employeePosition != null) {
                 employeeService.requireEnabled(employeePosition.getEmployeeId(),
                         "employee is not active: " + employeePosition.getEmployeeId());

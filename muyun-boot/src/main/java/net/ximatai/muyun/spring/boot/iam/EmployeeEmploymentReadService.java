@@ -110,8 +110,9 @@ public class EmployeeEmploymentReadService {
                 .collect(Collectors.toCollection(LinkedHashSet::new)).stream().toList();
     }
 
-    public record Query(String employeeId, String organizationId, String departmentId, Boolean enabledOnly, Boolean boundOnly, PageRequest pageRequest) {
-        static Query defaults() { return new Query(null, null, null, Boolean.TRUE, Boolean.TRUE, new PageRequest(0, 50)); }
+    public record Query(String employeeId, String organizationId, String departmentId, Boolean enabledOnly,
+                        PageRequest pageRequest) {
+        static Query defaults() { return new Query(null, null, null, Boolean.TRUE, new PageRequest(0, 50)); }
         public PageRequest pageRequest() { return pageRequest == null ? new PageRequest(0, 50) : pageRequest; }
     }
     public record EmployeeEmploymentView(String id, Integer version, String employeeId, String employeeNo,

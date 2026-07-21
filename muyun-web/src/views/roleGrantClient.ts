@@ -30,7 +30,6 @@ export interface EmploymentSelectorRequest {
   organizationId?: string;
   departmentId?: string;
   enabledOnly?: boolean;
-  boundOnly?: boolean;
   page?: { pageNum: number; pageSize: number };
 }
 

@@ -431,7 +431,6 @@ class RoleServiceContractTest {
         when(employmentGrantDao.insert(any())).thenReturn("grant-1");
         when(employeePositionService.requireEnabled("position-1", "employee position is not active: position-1"))
                 .thenReturn(position);
-        when(employeePositionService.select("position-1")).thenReturn(position);
         when(employeeService.requireEnabled("employee-1", "employee is not active: employee-1"))
                 .thenReturn(employee("employee-1", "org-1", "dept-1", true));
         RoleService service = new RoleService(roleDao, mock(AccountRoleGrantDao.class), employmentGrantDao,

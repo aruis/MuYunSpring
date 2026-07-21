@@ -189,7 +189,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
             WebPageRequest page = normalized.pageOrDefault();
             PageResult<EmployeeEmploymentReadService.EmployeeEmploymentView> result = employeeEmploymentReadService.page(
                     new EmployeeEmploymentReadService.Query(null, normalized.organizationId(), normalized.departmentId(),
-                            normalized.enabledOnly(), normalized.boundOnly(), PageRequest.of(page.pageNum(), page.pageSize())));
+                            normalized.enabledOnly(), PageRequest.of(page.pageNum(), page.pageSize())));
             return new WebPageResponse<>(result.getRecords(),
                     result.getTotal(), result.getPageNum(), result.getPageSize(), result.getPages(),
                     result.isTotalKnown(), null);
@@ -340,10 +340,9 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     public record EmploymentSelectorRequest(String organizationId, String departmentId, Boolean enabledOnly,
-                                            Boolean boundOnly,
                                             WebPageRequest page) {
         static final EmploymentSelectorRequest EMPTY = new EmploymentSelectorRequest(null, null, Boolean.TRUE,
-                Boolean.TRUE, null);
+                null);
 
         WebPageRequest pageOrDefault() {
             return page == null ? WebPageRequest.DEFAULT : page;

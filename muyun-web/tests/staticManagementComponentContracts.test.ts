@@ -1057,7 +1057,6 @@ test('role management keeps basic scope management separate from binding and aut
   );
   assert.match(employeeEmploymentTableSource, /function updateEmployeeSelectedIds/);
   assert.match(employeeEmploymentTableSource, /<UiDataTable[\s\S]*horizontal-scroll/);
-  assert.match(roleEmploymentGrantDrawerSource, /boundOnly: false/);
   assert.doesNotMatch(roleViewSource, /account-grants/);
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);

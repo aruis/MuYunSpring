@@ -185,7 +185,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         return employeeRecordScope(employeeId, () -> {
             if (employeeEmploymentReadService == null) throw new IllegalStateException("employment view is not available");
             return new WebListResponse<>(employeeEmploymentReadService.page(
-                    new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE, Boolean.FALSE,
+                    new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE,
                             new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
         });
     }
