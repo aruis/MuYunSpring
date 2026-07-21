@@ -188,6 +188,12 @@ const canSaveRole = computed(() => {
     !selectedRole.value?.systemManaged
   );
 });
+const canToggleRole = computed(() => {
+  const role = selectedRole.value;
+  return Boolean(
+    role?.id && role.systemManaged !== true && roleContext.can(roleToggleActionCode(role)) === true,
+  );
+});
 const roleDetailActions = computed<RecordActionItem[]>(() => {
   if (roleDetailMode.value === 'view') {
     if (!selectedRole.value?.id) {
@@ -1200,9 +1206,10 @@ function parseRoleIds(value: unknown) {
         <RecordStatusSwitch
           v-if="roleDetailMode === 'view' && selectedRole"
           :enabled="selectedRole.enabled !== false"
-          :disabled="true"
+          :disabled="savingRole || !canToggleRole"
           :loading="savingRole"
           :show-label="false"
+          @change="toggleRoleEnabled(selectedRole)"
         />
       </template>
       <template #actions>

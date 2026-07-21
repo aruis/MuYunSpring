@@ -1024,6 +1024,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /:extra-row-actions-of="roleExtraRowActionsOf"/);
   assert.match(roleViewSource, /key: 'bind'[\s\S]*title: '绑定'[\s\S]*after: 'edit'/);
   assert.match(roleViewSource, /:row-action-state-of="roleRowActionStateOf"/);
+  assert.match(roleViewSource, /const canToggleRole = computed\(/);
+  assert.match(roleViewSource, /:disabled="savingRole \|\| !canToggleRole"/);
+  assert.match(roleViewSource, /@change="toggleRoleEnabled\(selectedRole\)"/);
   assert.match(
     roleViewSource,
     /return record\?\.assignmentType === 'employment' \? 'employmentRoleGrants' : 'accountRoleGrants';/,
