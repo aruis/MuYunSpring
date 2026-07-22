@@ -397,6 +397,17 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldNotExposeDataScopeOptionForAccountRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(accountRole("r1", RoleKind.STANDARD)));
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+
+        assertThat(service.dataScopePolicyCatalog("r1", "sales.contract").options()).isEmpty();
+    }
+
+    @Test
     void shouldExposeBackendOwnedDataScopeCatalogAndValidateReferenceDependency() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleActionDao actionDao = mock(RoleActionDao.class);
@@ -414,8 +425,8 @@ class RoleServiceContractTest {
         RoleDataScopePolicyCatalog catalog = service.dataScopePolicyCatalog("r1", "sales.score");
 
         assertThat(catalog.options()).extracting(RoleDataScopePolicyCatalog.Option::code)
-                .contains(DataScopePolicy.NONE, DataScopePolicy.INHERIT_DATA_GRANT,
-                        DataScopePolicy.REFERENCE_DEPENDENCY);
+                .contains(DataScopePolicy.INHERIT_DATA_GRANT, DataScopePolicy.REFERENCE_DEPENDENCY)
+                .doesNotContain(DataScopePolicy.NONE);
         assertThat(catalog.options()).filteredOn(option -> option.code() == DataScopePolicy.ALL)
                 .singleElement().extracting(RoleDataScopePolicyCatalog.Option::title)
                 .isEqualTo("全部数据（当前租户）");
@@ -491,6 +502,35 @@ class RoleServiceContractTest {
 
         verify(actionDao).insert(argThat(action ->
                 action.getDataScopePolicy() == DataScopePolicy.INHERIT_DATA_GRANT));
+    }
+
+    @Test
+    void shouldRejectNoDataScopeForEmploymentDataAction() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)));
+        RoleActionGrantVerifier verifier = new RoleActionGrantVerifier() {
+            @Override
+            public String resolveGrantablePermissionActionCode(String moduleAlias, String actionCode) {
+                return actionCode;
+            }
+
+            @Override
+            public boolean requiresDataScope(String moduleAlias, String actionCode) {
+                return true;
+            }
+        };
+        RoleService service = new RoleService(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(), verifier,
+                null, null, null, null);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantAction("r1", "sales.contract", "view",
+                    DataScopePolicy.NONE, TenantScopePolicy.CURRENT_TENANT))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.role.employment-data-scope-required"));
+        }
     }
 
     @Test

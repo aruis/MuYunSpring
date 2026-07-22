@@ -915,7 +915,7 @@ class IamWebControllerTest {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(roleService.dataScopePolicyCatalog("role-1", "sales.score"))
                 .thenReturn(new RoleDataScopePolicyCatalog("role-1",
-                        List.of(new RoleDataScopePolicyCatalog.Option(DataScopePolicy.NONE, "无数据权限"),
+                        List.of(new RoleDataScopePolicyCatalog.Option(DataScopePolicy.INHERIT_DATA_GRANT, "继承数据授权"),
                                 new RoleDataScopePolicyCatalog.Option(DataScopePolicy.REFERENCE_DEPENDENCY,
                                         "引用依赖")),
                         List.of(new RoleDataScopePolicyCatalog.ReferenceDependency(
@@ -924,7 +924,7 @@ class IamWebControllerTest {
         mvc.perform(get("/iam.role/dataScopePolicyCatalog/{roleId}", "role-1")
                         .queryParam("moduleAlias", "sales.score"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.options[0].code").value("none"))
+                .andExpect(jsonPath("$.options[0].code").value("inheritDataGrant"))
                 .andExpect(jsonPath("$.referenceDependencies[0].referenceFieldId").value("score.studentId"))
                 .andExpect(jsonPath("$.referenceDependencies[0].referenceActionCode").value("view"));
     }

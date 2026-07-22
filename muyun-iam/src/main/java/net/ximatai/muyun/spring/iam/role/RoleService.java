@@ -1556,9 +1556,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                     .stream().map(this::dataScopeOption).toList();
         }
         if (role.getAssignmentType() == RoleAssignmentType.ACCOUNT) {
-            return List.of(dataScopeOption(DataScopePolicy.NONE));
+            return List.of();
         }
-        return List.of(DataScopePolicy.NONE, DataScopePolicy.INHERIT_DATA_GRANT, DataScopePolicy.ALL,
+        return List.of(DataScopePolicy.INHERIT_DATA_GRANT, DataScopePolicy.ALL,
                         DataScopePolicy.OWNER, DataScopePolicy.ASSIGNEE, DataScopePolicy.MEMBER,
                         DataScopePolicy.ORGANIZATION, DataScopePolicy.ORGANIZATION_AND_CHILDREN,
                         DataScopePolicy.DEPARTMENT, DataScopePolicy.DEPARTMENT_AND_CHILDREN,
@@ -1570,15 +1570,17 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                                     String moduleAlias,
                                                     String actionCode,
                                                     DataScopePolicy requestedPolicy) {
-        if (requestedPolicy != null) {
-            return requestedPolicy;
-        }
-        if (role.getRoleKind() == RoleKind.STANDARD
+        boolean employmentDataAction = role.getRoleKind() == RoleKind.STANDARD
                 && role.getAssignmentType() == RoleAssignmentType.EMPLOYMENT
-                && grantVerifier.requiresDataScope(moduleAlias, actionCode)) {
-            return DataScopePolicy.INHERIT_DATA_GRANT;
+                && grantVerifier.requiresDataScope(moduleAlias, actionCode);
+        if (employmentDataAction) {
+            if (requestedPolicy == DataScopePolicy.NONE) {
+                throw BusinessExceptions.warning("iam.role.employment-data-scope-required",
+                        "employment data action must configure an inheritable or concrete data scope: " + role.getId());
+            }
+            return requestedPolicy == null ? DataScopePolicy.INHERIT_DATA_GRANT : requestedPolicy;
         }
-        return DataScopePolicy.NONE;
+        return requestedPolicy == null ? DataScopePolicy.NONE : requestedPolicy;
     }
 
     private RoleDataScopePolicyCatalog.Option dataScopeOption(DataScopePolicy policy) {
