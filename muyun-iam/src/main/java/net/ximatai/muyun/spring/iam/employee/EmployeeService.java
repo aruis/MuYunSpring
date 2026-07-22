@@ -119,7 +119,7 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 "department is not active: " + employee.getDepartmentId());
         if (!SortAbility.sameValue(employee.getOrganizationId(), department.getOrganizationId())) {
             throw BusinessExceptions.warning("iam.employee.department-organization-mismatch",
-                    "Employee department must belong to the same organization");
+                    "职员所属部门必须隶属于同一机构");
         }
         rejectDuplicate(employee, Criteria.of()
                         .eq("organizationId", employee.getOrganizationId())

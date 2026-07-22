@@ -685,7 +685,7 @@ class UserSessionServiceTest {
 
         assertThatThrownBy(() -> sessionService.revokeUserSession("user-1", "session-1", login.token()))
                 .isInstanceOf(net.ximatai.muyun.spring.ability.action.BusinessException.class)
-                .hasMessageContaining("cannot revoke current session");
+                .hasMessage("不能在用户管理中下线当前登录会话");
 
         verify(sessionDao, never()).updateByIdAndVersion(any(UserSession.class), any());
     }

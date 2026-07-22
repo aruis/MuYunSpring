@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.iam.position;
 
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -121,8 +122,11 @@ class PositionServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeDelete("position-1"))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("position is referenced by employee positions");
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("code", "iam.position.delete-referenced")
+                    .hasMessage("该岗位已被职员任职信息引用，不能删除")
+                    .satisfies(error -> assertThat(((BusinessException) error).messageArgs())
+                            .containsEntry("referenceCount", 1L));
         }
 
         verify(employeePositionDao).count(any());

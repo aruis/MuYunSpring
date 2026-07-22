@@ -5,13 +5,15 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 @Service
 public class PositionCategoryService extends TenantStandardBusinessService<PositionCategory> implements
@@ -53,14 +55,17 @@ public class PositionCategoryService extends TenantStandardBusinessService<Posit
                 .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
                 .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE));
         if (childCategories > 0) {
-            throw new PlatformException("position category has child categories: " + id);
+            throw BusinessExceptions.warning("iam.position-category.delete-has-children",
+                    "该岗位分类下仍有子分类，不能删除");
         }
         long referencedPositions = positionDao.count(Criteria.of()
                 .eq("categoryId", categoryId)
                 .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
                 .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE));
         if (referencedPositions > 0) {
-            throw new PlatformException("position category is referenced by positions: " + id);
+            throw BusinessExceptions.warning("iam.position-category.delete-referenced",
+                    "该岗位分类已被岗位引用，不能删除",
+                    Map.of("referenceCount", referencedPositions));
         }
     }
 

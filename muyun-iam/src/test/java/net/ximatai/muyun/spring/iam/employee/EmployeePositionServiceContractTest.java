@@ -100,7 +100,7 @@ class EmployeePositionServiceContractTest {
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.actionMessage().code())
                                     .isEqualTo("iam.employee-position.primary-owner-mismatch"))
-                    .hasMessageContaining("main organization and department");
+                    .hasMessage("主岗位的机构和部门必须与职员主机构、主部门一致");
         }
     }
 
@@ -114,7 +114,43 @@ class EmployeePositionServiceContractTest {
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.actionMessage().code())
                                     .isEqualTo("iam.employee-position.department-organization-mismatch"))
-                    .hasMessageContaining("same organization");
+                    .hasMessage("任职所属部门必须隶属于同一机构");
+        }
+    }
+
+    @Test
+    void shouldExposePrimaryPositionDuplicateAsBusinessError() {
+        EmployeePositionDao dao = mock(EmployeePositionDao.class);
+        EmployeePosition existing = relation("employee-1", "org-1", "dept-1", "position-1", true);
+        existing.setId("relation-existing");
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
+        EmployeePositionService service = service(dao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeInsert(
+                    relation("employee-1", "org-1", "dept-1", "position-2", true)))
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-position.primary-already-exists"))
+                    .hasMessage("该职员已有主岗位");
+        }
+    }
+
+    @Test
+    void shouldExposeDuplicateEmploymentAsBusinessError() {
+        EmployeePositionDao dao = mock(EmployeePositionDao.class);
+        EmployeePosition existing = relation("employee-1", "org-1", "dept-1", "position-1", false);
+        existing.setId("relation-existing");
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(existing));
+        EmployeePositionService service = service(dao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeInsert(
+                    relation("employee-1", "org-1", "dept-1", "position-1", false)))
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.employee-position.already-exists"))
+                    .hasMessage("该职员已存在相同任职");
         }
     }
 
@@ -171,13 +207,13 @@ class EmployeePositionServiceContractTest {
         OrganizationService organizationService = mock(OrganizationService.class);
         DepartmentService departmentService = mock(DepartmentService.class);
         PositionService positionService = mock(PositionService.class);
-        when(employeeService.requireEnabled(eq("employee-1"), any())).thenReturn(employee("employee-1", "org-1", "dept-1"));
-        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
-        when(organizationService.requireEnabled(eq("org-2"), any())).thenReturn(organization("org-2"));
-        when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("dept-1", "org-1"));
-        when(departmentService.requireEnabled(eq("dept-2"), any())).thenReturn(department("dept-2", "org-1"));
-        when(positionService.requireEnabled(eq("position-1"), any())).thenReturn(position("position-1"));
-        when(positionService.requireEnabled(eq("position-2"), any())).thenReturn(position("position-2"));
+        when(employeeService.requireEnabledOrThrow(eq("employee-1"), any())).thenReturn(employee("employee-1", "org-1", "dept-1"));
+        when(organizationService.requireEnabledOrThrow(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(organizationService.requireEnabledOrThrow(eq("org-2"), any())).thenReturn(organization("org-2"));
+        when(departmentService.requireEnabledOrThrow(eq("dept-1"), any())).thenReturn(department("dept-1", "org-1"));
+        when(departmentService.requireEnabledOrThrow(eq("dept-2"), any())).thenReturn(department("dept-2", "org-1"));
+        when(positionService.requireEnabledOrThrow(eq("position-1"), any())).thenReturn(position("position-1"));
+        when(positionService.requireEnabledOrThrow(eq("position-2"), any())).thenReturn(position("position-2"));
         return new EmployeePositionService(dao, tenantVerifier, employeeService, organizationService,
                 departmentService, positionService);
     }

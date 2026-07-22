@@ -50,6 +50,7 @@ export class AppError extends Error {
   readonly scope?: Record<string, unknown>;
   readonly targets: ErrorTarget[];
   readonly details?: Record<string, unknown>;
+  readonly messageArgs?: Record<string, unknown>;
   readonly actionMessage?: WebActionMessage;
 
   constructor(
@@ -61,6 +62,7 @@ export class AppError extends Error {
       scope?: Record<string, unknown>;
       targets?: ErrorTarget[];
       details?: Record<string, unknown>;
+      messageArgs?: Record<string, unknown>;
       actionMessage?: WebActionMessage;
     } = {},
   ) {
@@ -72,6 +74,7 @@ export class AppError extends Error {
     this.scope = options.scope;
     this.targets = options.targets ?? [];
     this.details = options.details;
+    this.messageArgs = options.messageArgs;
     this.actionMessage = options.actionMessage;
   }
 }

@@ -85,7 +85,7 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");
         if (accountOfEmployee(validEmployeeId) != null) {
             throw BusinessExceptions.warning("iam.employee-account.already-bound",
-                    "employee already has user account: " + validEmployeeId);
+                    "该职员已绑定账号");
         }
         employeeService.requireEnabled(validEmployeeId, "employee is not active: " + validEmployeeId);
         UserAccount user = normalizeProvisionUser(account);

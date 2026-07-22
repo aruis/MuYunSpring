@@ -145,7 +145,8 @@ public class PlatformWebExceptionHandler {
 
     private ResponseEntity<PlatformWebError> platformError(PlatformException exception,
                                                            ActionMessageType messageType) {
-        ActionMessage actionMessage = new ActionMessage(exception.code(), exception.getMessage(), messageType);
+        ActionMessage actionMessage = new ActionMessage(exception.code(), exception.getMessage(), messageType,
+                exception.messageArgs());
         return ResponseEntity.status(exception.httpStatus())
                 .body(PlatformWebError.of(exception).withActionMessage(actionMessage));
     }

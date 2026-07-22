@@ -69,11 +69,30 @@
 | `code`    | 稳定机器码，供特殊链路、测试、日志和排查使用。                                           |
 | `status`  | HTTP 状态码的响应体冗余事实，便于日志和非标准 HTTP client 读取；不作为前端展示策略来源。 |
 | `message` | 默认用户文案。特殊链路可以使用，也可以用自己的文案覆盖。                                 |
+| `messageArgs` | 可安全展示的模板参数；与 `code` 共同构成未来翻译输入，不承载技术诊断信息。                 |
 | `scope`   | 错误发生的业务上下文，例如模块、实体、动作。                                             |
 | `targets` | 错误定位事实，例如字段、子表行、记录、动作或附件。                                       |
 | `details` | 特殊链路需要的机器可读补充信息。                                                         |
 
 `scope`、`targets` 和 `details` 只表达事实，不表达 UI 展示策略。
+
+## 默认文案与未来国际化
+
+当前阶段不建设语言包、Locale 解析或翻译服务。业务异常仍返回中文默认 `message`，管理端直接将其作为回退展示；但 `code` 已是稳定的 message key，前端和后端都不得再以文案本身作为判断条件。
+
+需要插值时，服务应提供 `messageArgs`，而不是把记录 ID、技术状态或拼接结果写进 `message`：
+
+```json
+{
+  "code": "iam.position-category.delete-referenced",
+  "message": "该岗位分类已被岗位引用，不能删除",
+  "messageArgs": {
+    "referenceCount": 3
+  }
+}
+```
+
+`messageArgs` 只允许安全、可展示且可翻译的业务参数；排查数据继续进入 `details`，关联日志继续使用 `traceId`。后续国际化落地时，UI 可按 `code + messageArgs` 选择本地翻译，未命中时回退服务端 `message`。领域 service 不读取 `Accept-Language`，避免业务规则依赖 Web 语言环境。
 
 第一阶段不建议对前端暴露以下字段作为稳定展示契约：
 

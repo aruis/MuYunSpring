@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.position;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -74,8 +75,11 @@ class PositionCategoryServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeDelete("category-1"))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("position category is referenced by positions");
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("code", "iam.position-category.delete-referenced")
+                    .hasMessage("该岗位分类已被岗位引用，不能删除")
+                    .satisfies(error -> assertThat(((BusinessException) error).messageArgs())
+                            .containsEntry("referenceCount", 1L));
         }
 
         verify(positionDao).count(any());
@@ -91,8 +95,9 @@ class PositionCategoryServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeDelete("category-1"))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("position category has child categories");
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("code", "iam.position-category.delete-has-children")
+                    .hasMessage("该岗位分类下仍有子分类，不能删除");
         }
 
         verify(categoryDao).count(any());

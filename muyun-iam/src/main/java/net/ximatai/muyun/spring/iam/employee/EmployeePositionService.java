@@ -62,17 +62,19 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         if (Boolean.TRUE.equals(relation.getPrimaryPosition())) {
             validatePrimaryPositionOwner(relation, employee);
             rejectDuplicate(relation, Criteria.of()
-                            .eq("employeeId", relation.getEmployeeId())
+                    .eq("employeeId", relation.getEmployeeId())
                             .eq("primaryPosition", Boolean.TRUE)
                             .eq("enabled", Boolean.TRUE),
-                    "employee can only have one primary position");
+                    () -> BusinessExceptions.warning("iam.employee-position.primary-already-exists",
+                            "该职员已有主岗位"));
         }
         rejectDuplicate(relation, Criteria.of()
                         .eq("employeeId", relation.getEmployeeId())
                         .eq("organizationId", relation.getOrganizationId())
                         .eq("departmentId", relation.getDepartmentId())
                         .eq("positionId", relation.getPositionId()),
-                "employee position already exists");
+                () -> BusinessExceptions.warning("iam.employee-position.already-exists",
+                        "该职员已存在相同任职"));
     }
 
     @Override
@@ -162,7 +164,7 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         EmployeePosition relation = select(validRelationId);
         if (relation == null || !SortAbility.sameValue(validEmployeeId, relation.getEmployeeId())) {
             throw BusinessExceptions.warning("iam.employee-position.not-belong-to-employee",
-                    "employee position does not belong to employee: " + validRelationId);
+                    "该任职不属于当前职员");
         }
         return relation;
     }
@@ -178,17 +180,17 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
     }
 
     private Employee validatePositionReferences(EmployeePosition relation) {
-        Employee employee = employeeService.requireEnabled(relation.getEmployeeId(),
-                "employee is not active: " + relation.getEmployeeId());
-        organizationService.requireEnabled(relation.getOrganizationId(),
-                "organization is not active: " + relation.getOrganizationId());
-        Department department = departmentService.requireEnabled(relation.getDepartmentId(),
-                "department is not active: " + relation.getDepartmentId());
-        positionService.requireEnabled(relation.getPositionId(),
-                "position is not active: " + relation.getPositionId());
+        Employee employee = employeeService.requireEnabledOrThrow(relation.getEmployeeId(), () -> BusinessExceptions.warning(
+                "iam.employee-position.employee-not-active", "职员不存在或已停用"));
+        organizationService.requireEnabledOrThrow(relation.getOrganizationId(), () -> BusinessExceptions.warning(
+                "iam.employee-position.organization-not-active", "任职机构不存在或已停用"));
+        Department department = departmentService.requireEnabledOrThrow(relation.getDepartmentId(), () -> BusinessExceptions.warning(
+                "iam.employee-position.department-not-active", "任职部门不存在或已停用"));
+        positionService.requireEnabledOrThrow(relation.getPositionId(), () -> BusinessExceptions.warning(
+                "iam.employee-position.position-not-active", "任职岗位不存在或已停用"));
         if (!SortAbility.sameValue(relation.getOrganizationId(), department.getOrganizationId())) {
             throw BusinessExceptions.warning("iam.employee-position.department-organization-mismatch",
-                    "Employee position department must belong to the same organization");
+                    "任职所属部门必须隶属于同一机构");
         }
         return employee;
     }
@@ -197,7 +199,7 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         if (!SortAbility.sameValue(relation.getOrganizationId(), employee.getOrganizationId())
                 || !SortAbility.sameValue(relation.getDepartmentId(), employee.getDepartmentId())) {
             throw BusinessExceptions.warning("iam.employee-position.primary-owner-mismatch",
-                    "Primary employee position must match employee main organization and department");
+                    "主岗位的机构和部门必须与职员主机构、主部门一致");
         }
     }
 }

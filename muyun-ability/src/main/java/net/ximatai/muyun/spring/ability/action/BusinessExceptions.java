@@ -14,6 +14,11 @@ public final class BusinessExceptions {
         return new BusinessException(code, message, ActionMessageType.WARNING);
     }
 
+    public static BusinessException warning(String code, String message, Map<String, Object> messageArgs) {
+        return new BusinessException(code, 422, message, ActionMessageType.WARNING,
+                ErrorScope.empty(), List.of(), Map.of(), messageArgs);
+    }
+
     public static BusinessException error(String code, String message) {
         return new BusinessException(code, message, ActionMessageType.ERROR);
     }
@@ -28,5 +33,15 @@ public final class BusinessExceptions {
                                             List<ErrorTarget> targets,
                                             Map<String, Object> details) {
         return new BusinessException(code, 422, message, ActionMessageType.WARNING, scope, targets, details);
+    }
+
+    public static BusinessException warning(String code,
+                                            String message,
+                                            ErrorScope scope,
+                                            List<ErrorTarget> targets,
+                                            Map<String, Object> details,
+                                            Map<String, Object> messageArgs) {
+        return new BusinessException(code, 422, message, ActionMessageType.WARNING,
+                scope, targets, details, messageArgs);
     }
 }

@@ -29,12 +29,23 @@ public class BusinessException extends PlatformException {
                              ErrorScope scope,
                              List<ErrorTarget> targets,
                              Map<String, Object> details) {
-        super(code, httpStatus, message, scope, targets, details);
+        this(code, httpStatus, message, messageType, scope, targets, details, Map.of());
+    }
+
+    public BusinessException(String code,
+                             int httpStatus,
+                             String message,
+                             ActionMessageType messageType,
+                             ErrorScope scope,
+                             List<ErrorTarget> targets,
+                             Map<String, Object> details,
+                             Map<String, Object> messageArgs) {
+        super(code, httpStatus, message, scope, targets, details, messageArgs);
         this.messageType = messageType == null ? ActionMessageType.WARNING : messageType;
     }
 
     public ActionMessage actionMessage() {
-        return new ActionMessage(code(), getMessage(), messageType);
+        return new ActionMessage(code(), getMessage(), messageType, messageArgs());
     }
 
     public ActionMessageType messageType() {

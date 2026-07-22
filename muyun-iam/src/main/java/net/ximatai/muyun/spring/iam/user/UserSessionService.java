@@ -371,7 +371,7 @@ public class UserSessionService {
         String currentTokenHash = currentTokenHash(currentToken);
         if (currentTokenHash != null && currentTokenHash.equals(session.getTokenHash())) {
             throw BusinessExceptions.warning("iam.user-session.revoke-current-denied",
-                    "cannot revoke current session from user management");
+                    "不能在用户管理中下线当前登录会话");
         }
     }
 

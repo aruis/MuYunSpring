@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.util.Preconditions;
 
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public abstract class AbstractAbilityService<T extends EntityContract> implements CrudAbility<T> {
     private final String moduleAlias;
@@ -66,8 +67,17 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
     }
 
     protected final void rejectDuplicate(T entity, Criteria criteria, String message) {
+        rejectDuplicate(entity, criteria, () -> new PlatformException(message));
+    }
+
+    /**
+     * Rejects a duplicate record while leaving the public business error
+     * contract to the calling domain service.
+     */
+    protected final void rejectDuplicate(T entity, Criteria criteria,
+                                         Supplier<? extends RuntimeException> exceptionSupplier) {
         if (existsOtherInCurrentScope(entity, criteria)) {
-            throw new PlatformException(message);
+            throw Objects.requireNonNull(exceptionSupplier, "exceptionSupplier must not be null").get();
         }
     }
 

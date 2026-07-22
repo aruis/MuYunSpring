@@ -522,7 +522,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 .ifPresent(currentUser -> {
                     throw BusinessExceptions.warning(
                             "iam.user.password-admin-current-user",
-                            "cannot administrate current user's password; use change own password");
+                            "不能由管理员重置当前登录用户的密码，请使用修改本人密码");
                 });
     }
 
@@ -532,15 +532,15 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
                 .ifPresent(currentUser -> {
                     throw BusinessExceptions.warning(
                             "iam.user.force-logout-current-user",
-                            "cannot force logout current user");
+                            "不能强制当前登录用户下线");
                 });
     }
 
     private String selfAdministrationReason(String actionCode) {
         if ("forceLogout".equals(actionCode)) {
-            return "cannot force logout current user";
+            return "不能强制当前登录用户下线";
         }
-        return "cannot administrate current user's password";
+        return "不能由管理员重置当前登录用户的密码，请使用修改本人密码";
     }
 
     private String requireUsername(String username) {
@@ -630,7 +630,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
             }
         }
         throw BusinessExceptions.warning("iam.user.temporary-password-unavailable",
-                "unable to generate temporary password that satisfies current policy");
+                "无法生成符合当前密码策略的临时密码");
     }
 
     private boolean passwordExpired(UserAccount user, Instant now) {
