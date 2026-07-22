@@ -600,12 +600,13 @@ test('static module client normalizes backend action envelopes', async () => {
       changeSetId: 'change-set-1',
       changes: [{ type: 'record-created', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
-    assert.deepEqual(await client.delete('org-1'), {
+    assert.deepEqual(await client.delete('org-1', { version: 3 }), {
       data: 1,
       message: { code: 'platform.crud.deleted', text: '删除成功', type: 'SUCCESS' },
       changeSetId: 'change-set-2',
       changes: [{ type: 'record-deleted', moduleAlias: 'iam.organization', recordId: 'org-1' }],
     });
+    assert.equal(await requests[1].text(), '{"version":3}');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -874,13 +875,14 @@ test('module context abilities compose tree and enable capabilities', async () =
 
     await context.abilities.crud().query({ keyword: '总部' });
     await tree.tree();
-    await enable.disable('org-1');
+    await enable.disable('org-1', { version: 4 });
 
     assert.equal(context.moduleAlias, 'iam.organization');
     assert.equal(requests[0].url, 'http://api.local/platform.module/iam.organization/context');
     assert.equal(requests[1].url, 'http://api.local/iam.organization/query');
     assert.equal(requests[2].url, 'http://api.local/iam.organization/tree');
     assert.equal(requests[3].url, 'http://api.local/iam.organization/disable/org-1');
+    assert.equal(await requests[3].text(), '{"version":4}');
     assert.equal(context.abilities.hasTree(), true);
     assert.equal(context.abilities.has('tree'), true);
     assert.equal(context.abilities.tryTree(), tree);

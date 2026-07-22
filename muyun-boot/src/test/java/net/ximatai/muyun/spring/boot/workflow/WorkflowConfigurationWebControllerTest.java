@@ -156,18 +156,20 @@ class WorkflowConfigurationWebControllerTest {
         ReflectionTestUtils.setField(controller, "service", definitionService);
         when(definitionService.select("def-1")).thenReturn(
                 definition("def-1", "sales.contract", WorkflowDefinitionStatus.DRAFT));
-        when(publishFacade.publish("def-1", "ver-1", "user-1"))
+        when(publishFacade.publish("def-1", "ver-1", 3, 2, "user-1"))
                 .thenReturn(version("ver-1", "def-1", 1, WorkflowPublishStatus.PUBLISHED));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant-a"))))
                 .build();
-        mvc.perform(post("/platform.module/sales.contract/workflow-definitions/def-1/versions/ver-1/publish"))
+        mvc.perform(post("/platform.module/sales.contract/workflow-definitions/def-1/versions/ver-1/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"definitionVersion\":3,\"version\":2}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publishStatus").value("PUBLISHED"));
 
-        verify(publishFacade).publish("def-1", "ver-1", "user-1");
+        verify(publishFacade).publish("def-1", "ver-1", 3, 2, "user-1");
     }
 
     private WorkflowDefinition definition(String id, String moduleAlias, WorkflowDefinitionStatus status) {

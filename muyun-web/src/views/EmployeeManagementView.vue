@@ -622,8 +622,8 @@ async function toggleEmployeeEnabled() {
     deniedMessage: '当前用户无权变更职员启停状态',
     execute: (employee) =>
       employee.enabled === false
-        ? employeeContext.crud.enable(employee.id!)
-        : employeeContext.crud.disable(employee.id!),
+        ? employeeContext.crud.enable(employee.id!, { version: employee.version! })
+        : employeeContext.crud.disable(employee.id!, { version: employee.version! }),
     onExecuted: async (_, employee) => {
       const refreshed = await employeeContext.crud.view(employee.id!);
       const requestSeq = commitEmployeeDetailRecord(refreshed);
@@ -647,7 +647,8 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         okText: '删除',
         danger: true,
       }),
-    execute: (target) => employeeContext.crud.delete(String(target.id)),
+    execute: (target) =>
+      employeeContext.crud.delete(String(target.id), { version: (target as { version: number }).version }),
     onExecuted: (_, target) => {
       const id = String(target.id);
       if (selectedEmployeeKey.value === id) {

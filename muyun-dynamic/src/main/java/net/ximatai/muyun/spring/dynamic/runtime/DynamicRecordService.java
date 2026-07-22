@@ -788,18 +788,24 @@ public class DynamicRecordService {
 
     @Transactional
     public int delete(String moduleAlias, String entityAlias, String id) {
-        return delete(moduleAlias, entityAlias, id, RuntimeMutationSource.BUSINESS, null);
+        return delete(moduleAlias, entityAlias, id, null, RuntimeMutationSource.BUSINESS, null);
+    }
+
+    @Transactional
+    public int delete(String moduleAlias, String entityAlias, String id, Integer expectedVersion) {
+        return delete(moduleAlias, entityAlias, id, expectedVersion, RuntimeMutationSource.BUSINESS, null);
     }
 
     int deleteFromAction(String moduleAlias, String entityAlias, String id, String traceId) {
-        return delete(moduleAlias, entityAlias, id, RuntimeMutationSource.ACTION, traceId);
+        return delete(moduleAlias, entityAlias, id, null, RuntimeMutationSource.ACTION, traceId);
     }
 
     int deleteBatchFromAction(String moduleAlias, String entityAlias, Collection<String> ids, String traceId) {
         return deleteBatch(moduleAlias, entityAlias, ids, RuntimeMutationSource.ACTION, traceId);
     }
 
-    private int delete(String moduleAlias, String entityAlias, String id, RuntimeMutationSource mutationSource, String traceId) {
+    private int delete(String moduleAlias, String entityAlias, String id, Integer expectedVersion,
+                       RuntimeMutationSource mutationSource, String traceId) {
         try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
                 traceId, Map.of())) {
             DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
@@ -819,7 +825,8 @@ public class DynamicRecordService {
                     before,
                     mutation.before()
             ));
-            int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).delete(id));
+            int deleted = withTenantScope(mutationScope,
+                    () -> entityService(moduleAlias, entityAlias).delete(id, expectedVersion));
             if (deleted > 0) {
                 mutationCoordinator.afterDelete(moduleAlias, entityAlias, before);
                 mutationCoordinator.afterMutation(mutationEvent(
@@ -1232,19 +1239,25 @@ public class DynamicRecordService {
     }
 
     public int enable(String moduleAlias, String entityAlias, String id) {
-        return enable(moduleAlias, entityAlias, id, RuntimeMutationSource.BUSINESS, null);
+        return enable(moduleAlias, entityAlias, id, null, RuntimeMutationSource.BUSINESS, null);
+    }
+
+    public int enable(String moduleAlias, String entityAlias, String id, Integer expectedVersion) {
+        return enable(moduleAlias, entityAlias, id, expectedVersion, RuntimeMutationSource.BUSINESS, null);
     }
 
     int enableFromAction(String moduleAlias, String entityAlias, String id, String traceId) {
-        return enable(moduleAlias, entityAlias, id, RuntimeMutationSource.ACTION, traceId);
+        return enable(moduleAlias, entityAlias, id, null, RuntimeMutationSource.ACTION, traceId);
     }
 
-    private int enable(String moduleAlias, String entityAlias, String id, RuntimeMutationSource mutationSource, String traceId) {
+    private int enable(String moduleAlias, String entityAlias, String id, Integer expectedVersion,
+                       RuntimeMutationSource mutationSource, String traceId) {
         DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
         if (mutationSource == RuntimeMutationSource.BUSINESS) {
             mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.ENABLE, normalizeRecordId(id));
         }
-        int updated = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).enable(id));
+        int updated = withTenantScope(mutationScope,
+                () -> entityService(moduleAlias, entityAlias).enable(id, expectedVersion));
         if (updated > 0) {
             eventPublisher.enabled(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         }
@@ -1252,19 +1265,25 @@ public class DynamicRecordService {
     }
 
     public int disable(String moduleAlias, String entityAlias, String id) {
-        return disable(moduleAlias, entityAlias, id, RuntimeMutationSource.BUSINESS, null);
+        return disable(moduleAlias, entityAlias, id, null, RuntimeMutationSource.BUSINESS, null);
+    }
+
+    public int disable(String moduleAlias, String entityAlias, String id, Integer expectedVersion) {
+        return disable(moduleAlias, entityAlias, id, expectedVersion, RuntimeMutationSource.BUSINESS, null);
     }
 
     int disableFromAction(String moduleAlias, String entityAlias, String id, String traceId) {
-        return disable(moduleAlias, entityAlias, id, RuntimeMutationSource.ACTION, traceId);
+        return disable(moduleAlias, entityAlias, id, null, RuntimeMutationSource.ACTION, traceId);
     }
 
-    private int disable(String moduleAlias, String entityAlias, String id, RuntimeMutationSource mutationSource, String traceId) {
+    private int disable(String moduleAlias, String entityAlias, String id, Integer expectedVersion,
+                        RuntimeMutationSource mutationSource, String traceId) {
         DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
         if (mutationSource == RuntimeMutationSource.BUSINESS) {
             mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.DISABLE, normalizeRecordId(id));
         }
-        int updated = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).disable(id));
+        int updated = withTenantScope(mutationScope,
+                () -> entityService(moduleAlias, entityAlias).disable(id, expectedVersion));
         if (updated > 0) {
             eventPublisher.disabled(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         }
@@ -2034,7 +2053,7 @@ public class DynamicRecordService {
             public int delete(String id) {
                 DataScopeCriteriaResult scope = requireActionRecordDataScope(moduleAlias, entityAlias, policy, normalizeRecordId(id));
                 return withTenantScope(scope, () -> DynamicRecordService.this.delete(moduleAlias, entityAlias, id,
-                        RuntimeMutationSource.ACTION, traceId));
+                        null, RuntimeMutationSource.ACTION, traceId));
             }
         };
     }

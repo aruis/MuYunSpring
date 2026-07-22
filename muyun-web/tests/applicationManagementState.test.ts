@@ -49,7 +49,7 @@ test('application management state keeps existing alias stable while editing tit
   });
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   state.startEdit();
   state.draft.value.alias = 'changed';
   state.draft.value.title = '平台配置';
@@ -62,6 +62,7 @@ test('application management state keeps existing alias stable while editing tit
       alias: 'platform',
       title: '平台配置',
       enabled: true,
+      version: 0,
     },
   });
   assert.equal(state.selected.value?.alias, 'platform');
@@ -76,12 +77,12 @@ test('application management state toggles enable state and refreshes selected r
     },
     view: async (id) => {
       calls.push(`view:${id}`);
-      return { id, alias: id, title: '平台', enabled: false };
+      return { id, alias: id, title: '平台', enabled: false, version: 1 };
     },
   });
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   await state.toggleEnabled();
 
   assert.deepEqual(calls, ['disable:platform', 'view:platform']);
@@ -120,7 +121,7 @@ test('application management state refreshes selected draft from loaded records 
   const context = createContext();
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   state.handleListLoaded([
     { id: 'platform', alias: 'platform', title: '平台配置', enabled: false, sortOrder: 20 },
   ]);
@@ -135,7 +136,7 @@ test('application management state does not overwrite editing draft when loaded 
   const context = createContext();
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   state.startEdit();
   state.draft.value.title = '本地编辑';
   state.handleListLoaded([{ id: 'platform', alias: 'platform', title: '远端刷新', enabled: false }]);
@@ -178,7 +179,7 @@ test('application management state cancels creation back to selected application
   const context = createContext();
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   state.startCreate();
   state.cancelEdit();
 
@@ -198,7 +199,7 @@ test('application management state respects delete confirmation result', async (
   let confirmed = false;
   const state = createApplicationManagementState(context, async () => confirmed);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.deepEqual(calls, []);
@@ -223,7 +224,7 @@ test('application management state records unhandled chain errors for platform f
   });
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true });
+  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.equal(state.actionError.value, '该应用下仍有字典类目，不能删除');
@@ -252,7 +253,7 @@ test('application management state lets business handler own matched action erro
     ],
   });
 
-  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true });
+  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.deepEqual(handled, ['delete:dictionaryCategory']);
@@ -287,7 +288,7 @@ test('application management state stays readonly after deleting last applicatio
   );
   const state = createApplicationManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.deepEqual(calls, ['delete:platform']);

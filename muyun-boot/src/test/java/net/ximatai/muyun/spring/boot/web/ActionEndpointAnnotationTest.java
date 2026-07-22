@@ -23,13 +23,16 @@ class ActionEndpointAnnotationTest {
         assertThat(endpoint(CrudWeb.class, "view", String.class).value()).isEqualTo(PlatformAction.VIEW);
         assertThat(endpoint(CrudWeb.class, "insert", EntityContract.class).value()).isEqualTo(PlatformAction.CREATE);
         assertThat(endpoint(CrudWeb.class, "update", String.class, EntityContract.class).value()).isEqualTo(PlatformAction.UPDATE);
-        assertThat(endpoint(CrudWeb.class, "delete", String.class).value()).isEqualTo(PlatformAction.DELETE);
+        assertThat(endpoint(CrudWeb.class, "delete", String.class, RecordActionWebRequest.class).value())
+                .isEqualTo(PlatformAction.DELETE);
     }
 
     @Test
     void shouldDescribeAbilityEndpointActionSemantics() throws Exception {
-        assertThat(endpoint(EnableWeb.class, "enable", String.class).value()).isEqualTo(PlatformAction.ENABLE);
-        assertThat(endpoint(EnableWeb.class, "disable", String.class).value()).isEqualTo(PlatformAction.DISABLE);
+        assertThat(endpoint(EnableWeb.class, "enable", String.class, RecordActionWebRequest.class).value())
+                .isEqualTo(PlatformAction.ENABLE);
+        assertThat(endpoint(EnableWeb.class, "disable", String.class, RecordActionWebRequest.class).value())
+                .isEqualTo(PlatformAction.DISABLE);
         assertThat(endpoint(SortWeb.class, "sort", String.class, SortWebRequest.class).value()).isEqualTo(PlatformAction.SORT);
         assertThat(endpoint(TreeWeb.class, "tree", HttpServletRequest.class, boolean.class).value())
                 .isEqualTo(PlatformAction.TREE);

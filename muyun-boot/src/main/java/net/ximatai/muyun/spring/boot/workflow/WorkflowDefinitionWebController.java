@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
+import net.ximatai.muyun.spring.boot.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -89,9 +90,10 @@ public class WorkflowDefinitionWebController
     @Override
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
-    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id,
+                      @RequestBody RecordActionWebRequest request) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow definition can only delete draft definitions");
-        return super.delete(servletRequest, id);
+        return super.delete(servletRequest, id, request);
     }
 
     @PostMapping("/{definitionId}/versions/{versionId}/publish")
@@ -99,30 +101,34 @@ public class WorkflowDefinitionWebController
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
     public WorkflowVersion publish(HttpServletRequest request,
                                    @PathVariable String definitionId,
-                                   @PathVariable String versionId) {
+                                   @PathVariable String versionId,
+                                   @RequestBody WorkflowPublishWebRequest publishRequest) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
-            return publishFacade.publish(definitionId, versionId, currentOperatorIdOrNull());
+            return publishFacade.publish(definitionId, versionId, publishRequest.definitionVersion(),
+                    publishRequest.version(), currentOperatorIdOrNull());
         });
     }
 
     @PostMapping("/{definitionId}/disable")
     @CustomActionEndpoint(value = "disableWorkflowDefinition", title = "停用工作流定义",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
-    public WorkflowDefinition disableDefinition(HttpServletRequest request, @PathVariable String definitionId) {
+    public WorkflowDefinition disableDefinition(HttpServletRequest request, @PathVariable String definitionId,
+                                                @RequestBody RecordActionWebRequest actionRequest) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
-            return publishFacade.disable(definitionId);
+            return publishFacade.disable(definitionId, actionRequest.version());
         });
     }
 
     @PostMapping("/{definitionId}/archive")
     @CustomActionEndpoint(value = "archiveWorkflowDefinition", title = "归档工作流定义",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "definitionId")
-    public WorkflowDefinition archive(HttpServletRequest request, @PathVariable String definitionId) {
+    public WorkflowDefinition archive(HttpServletRequest request, @PathVariable String definitionId,
+                                      @RequestBody RecordActionWebRequest actionRequest) {
         return webScope(() -> {
             requireScopedRecord(request, definitionId);
-            return publishFacade.archive(definitionId);
+            return publishFacade.archive(definitionId, actionRequest.version());
         });
     }
 
@@ -158,5 +164,13 @@ public class WorkflowDefinitionWebController
                 .map(user -> user.userId())
                 .filter(userId -> !userId.isBlank())
                 .orElse(null);
+    }
+
+    public record WorkflowPublishWebRequest(Integer definitionVersion, Integer version) {
+        public WorkflowPublishWebRequest {
+            if (definitionVersion == null || version == null) {
+                throw new IllegalArgumentException("definitionVersion and version are required for workflow publish");
+            }
+        }
     }
 }

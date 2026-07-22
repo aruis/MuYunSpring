@@ -765,7 +765,8 @@ async function removeRole(record: Partial<Role> | QueryListRecord | undefined) {
         okText: '删除',
         danger: true,
       }),
-    execute: (target) => roleContext.crud.delete(String(target.id)),
+    execute: (target) =>
+      roleContext.crud.delete(String(target.id), { version: (target as { version: number }).version }),
     onExecuted: (_, target) => {
       if (selectedRoleKey.value === String(target.id)) {
         selectedRoleKey.value = undefined;
@@ -793,8 +794,8 @@ async function toggleRoleEnabled(record: Partial<Role> | QueryListRecord | undef
     deniedMessage: '当前用户无权变更角色启停状态',
     execute: (target) =>
       target.enabled === false
-        ? roleContext.crud.enable(String(target.id))
-        : roleContext.crud.disable(String(target.id)),
+        ? roleContext.crud.enable(String(target.id), { version: (target as { version: number }).version })
+        : roleContext.crud.disable(String(target.id), { version: (target as { version: number }).version }),
     onExecuted: async (_, target) => {
       if (selectedRoleKey.value === String(target.id)) {
         const refreshed = await roleContext.crud.view(String(target.id));

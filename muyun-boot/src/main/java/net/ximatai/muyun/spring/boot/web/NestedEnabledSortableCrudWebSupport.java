@@ -20,20 +20,22 @@ public abstract class NestedEnabledSortableCrudWebSupport<
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
     @StandardMutation(StandardMutationKind.ENABLE)
-    public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int enable(HttpServletRequest servletRequest, @PathVariable String id,
+                      @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id));
+            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id, request.version()));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
     @StandardMutation(StandardMutationKind.DISABLE)
-    public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int disable(HttpServletRequest servletRequest, @PathVariable String id,
+                       @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id));
+            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id, request.version()));
         });
     }
 

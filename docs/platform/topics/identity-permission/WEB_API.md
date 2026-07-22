@@ -44,6 +44,8 @@
 | `POST` | `/{moduleAlias}/disable/{id}` | 停用记录。                                        |
 | `POST` | `/{moduleAlias}/sort/{id}`    | 同级排序；树模块也使用该路径做树内移动。          |
 
+通用记录动作 `delete`、`enable`、`disable` 统一提交 `{"version": n}`。版本不匹配时返回 `409 CONFLICT_VERSION`，调用方不得以旧快照重试。
+
 树模块额外接口：
 
 | 方法  | URL                        | 功能                                                  |

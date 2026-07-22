@@ -559,7 +559,9 @@ async function toggleUserEnabled() {
     canExecute: () => canToggleUser.value,
     deniedMessage: '当前用户无权变更用户启停状态',
     execute: (user) =>
-      user.enabled === false ? userContext.crud.enable(user.id!) : userContext.crud.disable(user.id!),
+      user.enabled === false
+        ? userContext.crud.enable(user.id!, { version: user.version! })
+        : userContext.crud.disable(user.id!, { version: user.version! }),
     onExecuted: async (_, user) => {
       const refreshed = await userContext.crud.view(user.id!);
       commitUserDetailRecord(refreshed);
@@ -582,7 +584,8 @@ async function removeUser(record: Partial<UserAccount> | QueryListRecord | undef
         okText: '删除',
         danger: true,
       }),
-    execute: (target) => userContext.crud.delete(String(target.id)),
+    execute: (target) =>
+      userContext.crud.delete(String(target.id), { version: (target as { version: number }).version }),
     onExecuted: (_, target) => {
       if (selectedUserKey.value === String(target.id)) {
         selectedUserKey.value = undefined;

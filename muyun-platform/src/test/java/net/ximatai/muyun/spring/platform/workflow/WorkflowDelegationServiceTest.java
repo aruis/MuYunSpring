@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,21 @@ class WorkflowDelegationServiceTest {
         service.enable(service.insert(delegation));
 
         assertThat(service.match("user-a", "sales.contract", null)).isNull();
+    }
+
+    @Test
+    void shouldReportOptimisticLockWhenEnableLosesCompareAndSetRace() {
+        WorkflowDelegationService racingService = new WorkflowDelegationService(new TestMemoryDao<>() {
+            @Override
+            public int updateByIdAndVersion(WorkflowDelegation entity, Integer expectedVersion) {
+                return 0;
+            }
+        });
+        String id = racingService.insert(delegation("racing", "user-a", "user-b"));
+
+        assertThatThrownBy(() -> racingService.enable(id, 0))
+                .isInstanceOf(OptimisticLockException.class)
+                .hasMessageContaining("workflow delegation version conflict");
     }
 
     private WorkflowDelegation delegation(String title, String principal, String delegate) {

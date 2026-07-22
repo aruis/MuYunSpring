@@ -52,6 +52,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -78,6 +79,13 @@ import static org.mockito.Mockito.when;
 class DynamicRecordServiceTest {
     private static final String SCHEMA = "public";
     private static final String MODULE = "sales.contract";
+
+    @Test
+    void shouldKeepVersionedDeleteInsideTransactionBoundary() throws Exception {
+        assertThat(DynamicRecordService.class
+                .getMethod("delete", String.class, String.class, String.class, Integer.class)
+                .getAnnotation(Transactional.class)).isNotNull();
+    }
 
     @Test
     void shouldRunCrudThroughStableServiceApi() {

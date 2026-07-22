@@ -32,6 +32,8 @@
 
 保存请求中的 `id`、`version`、`values`、`children`、`attachments`、`originContext`、`uiConfigId` 和 `record` 是动态记录请求保留字段，不应作为动态业务字段名。
 
+删除、启用和停用均为带乐观锁的记录动作，必须提交当前记录快照：`{"version": n}`。版本不一致时接口返回 `409 CONFLICT_VERSION`，客户端应刷新记录后由用户决定是否重试。
+
 ## 能力型标准入口
 
 | 方法 | URL | 功能 |

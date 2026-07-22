@@ -147,8 +147,8 @@ export function createOrganizationManagementState(
       const enable = organizationContext.abilities.enable();
       const result =
         selected.value.enabled === false
-          ? await enable.enable(selected.value.id)
-          : await enable.disable(selected.value.id);
+          ? await enable.enable(selected.value.id, { version: selected.value.version! })
+          : await enable.disable(selected.value.id, { version: selected.value.version! });
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
@@ -182,7 +182,7 @@ export function createOrganizationManagementState(
     try {
       await organizationContext.runtime.ready;
       const crud = organizationContext.abilities.crud();
-      const result = await crud.delete(selected.value.id);
+      const result = await crud.delete(selected.value.id, { version: selected.value.version! });
       await presentActionSuccess(result, [
         platformActionResultReactions.clearSelection(),
         platformActionResultReactions.refreshList(),

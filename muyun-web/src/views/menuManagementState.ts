@@ -256,7 +256,9 @@ export function createMenuManagementState(
       execute: async (scheme) => {
         await schemeContext.runtime.ready;
         const enable = schemeContext.abilities.enable();
-        return scheme.enabled === false ? enable.enable(scheme.id!) : enable.disable(scheme.id!);
+        return scheme.enabled === false
+          ? enable.enable(scheme.id!, { version: scheme.version! })
+          : enable.disable(scheme.id!, { version: scheme.version! });
       },
       onExecuted: async (_, scheme) => {
         const refreshed = await schemeContext.abilities.crud().view(scheme.id!);
@@ -277,7 +279,9 @@ export function createMenuManagementState(
         const context = menuContext();
         await context.runtime.ready;
         const enable = context.abilities.enable();
-        return menu.enabled === false ? enable.enable(menu.id) : enable.disable(menu.id);
+        return menu.enabled === false
+          ? enable.enable(menu.id, { version: menu.version! })
+          : enable.disable(menu.id, { version: menu.version! });
       },
       onExecuted: async (_, menu) => {
         const refreshed = await menuContext().abilities.crud().view(menu.id);
@@ -301,7 +305,7 @@ export function createMenuManagementState(
           okText: '删除',
           danger: true,
         }),
-      execute: (scheme) => schemeContext.abilities.crud().delete(scheme.id!),
+      execute: (scheme) => schemeContext.abilities.crud().delete(scheme.id!, { version: scheme.version! }),
       onExecuted: () => {
         selectedScheme.value = undefined;
         schemeDraft.value = emptySchemeDraft(currentUser());
@@ -326,7 +330,7 @@ export function createMenuManagementState(
           okText: '删除',
           danger: true,
         }),
-      execute: (menu) => menuContext().abilities.crud().delete(menu.id),
+      execute: (menu) => menuContext().abilities.crud().delete(menu.id, { version: menu.version! }),
       onExecuted: () => {
         menuEditor.clearSelection();
         menuMode.value = 'view';

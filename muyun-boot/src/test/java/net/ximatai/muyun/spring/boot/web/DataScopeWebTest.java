@@ -104,7 +104,7 @@ class DataScopeWebTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             controller.update("record-1", record);
-            controller.delete("record-2");
+            controller.delete("record-2", new RecordActionWebRequest(0));
         }
 
         assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE, PlatformAction.DELETE);
@@ -157,8 +157,8 @@ class DataScopeWebTest {
         DataScopedEnabledController controller = new DataScopedEnabledController(service);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            controller.enable("record-1");
-            controller.disable("record-2");
+            controller.enable("record-1", new RecordActionWebRequest(0));
+            controller.disable("record-2", new RecordActionWebRequest(0));
         }
 
         assertThat(service.scopedActions).containsExactly(PlatformAction.ENABLE, PlatformAction.DISABLE);
@@ -171,7 +171,7 @@ class DataScopeWebTest {
         DataScopedEnabledController controller = new DataScopedEnabledController(service);
 
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
-            controller.enable("record-1");
+            controller.enable("record-1", new RecordActionWebRequest(0));
         }
 
         assertThat(service.mutationTenantIds).containsExactly(Optional.of("tenant-b"));
@@ -322,7 +322,7 @@ class DataScopeWebTest {
         }
 
         @Override
-        public int delete(String id) {
+        public int delete(String id, Integer expectedVersion) {
             return 1;
         }
     }
@@ -350,13 +350,13 @@ class DataScopeWebTest {
         }
 
         @Override
-        public int enable(String id) {
+        public int enable(String id, Integer expectedVersion) {
             mutationTenantIds.add(TenantContext.currentTenantId());
             return 1;
         }
 
         @Override
-        public int disable(String id) {
+        public int disable(String id, Integer expectedVersion) {
             mutationTenantIds.add(TenantContext.currentTenantId());
             return 1;
         }

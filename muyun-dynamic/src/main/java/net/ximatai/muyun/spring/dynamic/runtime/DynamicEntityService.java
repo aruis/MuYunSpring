@@ -330,13 +330,21 @@ public class DynamicEntityService implements
     }
 
     public int enable(String id) {
+        return enable(id, null);
+    }
+
+    public int enable(String id, Integer expectedVersion) {
         requireCapability(EntityCapability.ENABLE);
-        return updateEnabled(id, Boolean.TRUE);
+        return updateEnabled(id, Boolean.TRUE, expectedVersion);
     }
 
     public int disable(String id) {
+        return disable(id, null);
+    }
+
+    public int disable(String id, Integer expectedVersion) {
         requireCapability(EntityCapability.ENABLE);
-        return updateEnabled(id, Boolean.FALSE);
+        return updateEnabled(id, Boolean.FALSE, expectedVersion);
     }
 
     public boolean isEnabled(String id) {
@@ -789,12 +797,15 @@ public class DynamicEntityService implements
         }
     }
 
-    private int updateEnabled(String id, Boolean enabled) {
+    private int updateEnabled(String id, Boolean enabled, Integer expectedVersion) {
         DynamicRecord entity = selectActiveRaw(id);
         if (entity == null) {
             return 0;
         }
         entity.enabled(enabled);
+        if (expectedVersion != null) {
+            entity.setVersion(expectedVersion);
+        }
         return update(entity);
     }
 

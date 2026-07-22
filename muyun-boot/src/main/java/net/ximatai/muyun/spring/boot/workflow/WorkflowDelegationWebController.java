@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
+import net.ximatai.muyun.spring.boot.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -71,22 +72,22 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @PostMapping("/delete/{id}")
     @CustomActionEndpoint(value = "delete", title = "Delegation Delete", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public int delete(@PathVariable String id) {
-        return service.deleteForPrincipal(id, currentUserId());
+    public int delete(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.deleteForPrincipal(id, request.version(), currentUserId());
     }
 
     @PostMapping("/enable/{id}")
     @CustomActionEndpoint(value = "enable", title = "Delegation Enable", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WorkflowDelegation enable(@PathVariable String id) {
-        return service.enableForPrincipal(id, currentUserId());
+    public WorkflowDelegation enable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.enableForPrincipal(id, request.version(), currentUserId());
     }
 
     @PostMapping("/disable/{id}")
     @CustomActionEndpoint(value = "disable", title = "Delegation Disable", level = PlatformActionLevel.RECORD,
             dataAuth = true)
-    public WorkflowDelegation disable(@PathVariable String id) {
-        return service.disableForPrincipal(id, currentUserId());
+    public WorkflowDelegation disable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.disableForPrincipal(id, request.version(), currentUserId());
     }
 
     @PostMapping("/delegatedToMe/query")
@@ -129,22 +130,22 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @PostMapping("/manage/delete/{id}")
     @CustomActionEndpoint(value = "manageDelete", title = "Delegation Manage Delete",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public int manageDelete(@PathVariable String id) {
-        return service.delete(id);
+    public int manageDelete(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.delete(id, request.version());
     }
 
     @PostMapping("/manage/enable/{id}")
     @CustomActionEndpoint(value = "manageEnable", title = "Delegation Manage Enable",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WorkflowDelegation manageEnable(@PathVariable String id) {
-        return service.enable(id);
+    public WorkflowDelegation manageEnable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.enable(id, request.version());
     }
 
     @PostMapping("/manage/disable/{id}")
     @CustomActionEndpoint(value = "manageDisable", title = "Delegation Manage Disable",
             level = PlatformActionLevel.RECORD, dataAuth = true)
-    public WorkflowDelegation manageDisable(@PathVariable String id) {
-        return service.disable(id);
+    public WorkflowDelegation manageDisable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
+        return service.disable(id, request.version());
     }
 
     private PageRequest page(WebQueryRequest request) {

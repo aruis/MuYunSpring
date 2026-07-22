@@ -7,9 +7,12 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -185,7 +188,26 @@ class WorkflowDelegationWebControllerTest {
                 WebQueryRequest.class);
         assertCustomAction("manageQuery", "manageQuery", PlatformActionLevel.LIST, false,
                 WebQueryRequest.class);
-        assertCustomAction("manageEnable", "manageEnable", PlatformActionLevel.RECORD, true, String.class);
+        assertCustomAction("manageEnable", "manageEnable", PlatformActionLevel.RECORD, true,
+                String.class, net.ximatai.muyun.spring.boot.web.RecordActionWebRequest.class);
+    }
+
+    @Test
+    void shouldReturnVersionConflictWhenDelegationEnableLosesCompareAndSetRace() throws Exception {
+        when(service.enableForPrincipal("delegation-1", 3, "principal-1"))
+                .thenThrow(new OptimisticLockException("workflow delegation version conflict: delegation-1"));
+        MockMvc conflictMvc = MockMvcBuilders
+                .standaloneSetup(new WorkflowDelegationWebController(service))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .addFilters(new CurrentUserWebFilter(() -> Optional.of(
+                        CurrentUser.tenantUser("principal-1", "Principal", "tenant-a"))))
+                .build();
+
+        conflictMvc.perform(post("/workflow/delegation/enable/delegation-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\":3}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_VERSION));
     }
 
     private WorkflowDelegation delegation(String title, String principal, String delegate) {

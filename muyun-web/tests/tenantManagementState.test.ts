@@ -70,12 +70,12 @@ test('tenant management state toggles enable state and refreshes selected record
     },
     view: async (id) => {
       calls.push(`view:${id}`);
-      return { id, alias: id, title: '租户 A', enabled: false };
+      return { id, alias: id, title: '租户 A', enabled: false, version: 1 };
     },
   });
   const state = createTenantManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true, version: 0 });
   await state.toggleEnabled();
 
   assert.deepEqual(calls, ['disable:tenant_a', 'view:tenant_a']);
@@ -87,7 +87,7 @@ test('tenant management state cancels creation back to selected tenant', () => {
   const context = createContext();
   const state = createTenantManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true, version: 0 });
   state.startCreate();
   state.cancelEdit();
 
@@ -107,7 +107,7 @@ test('tenant management state respects delete confirmation result', async () => 
   let confirmed = false;
   const state = createTenantManagementState(context, async () => confirmed);
 
-  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.deepEqual(calls, []);
@@ -175,6 +175,7 @@ test('tenant management state treats platform alias as ordinary tenant', async (
       calls.push(`disable:${id}`);
       return 1;
     },
+    view: async (id) => ({ id, alias: id, title: '平台', enabled: false, version: 1 }),
     delete: async (id) => {
       calls.push(`delete:${id}`);
       return 1;
@@ -182,7 +183,7 @@ test('tenant management state treats platform alias as ordinary tenant', async (
   });
   const state = createTenantManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true, version: 0 });
 
   assert.equal(state.canDelete.value, true);
   assert.equal(state.canEnable.value, true);
@@ -250,7 +251,7 @@ test('tenant management state stays readonly after deleting last tenant without 
   );
   const state = createTenantManagementState(context, async () => true);
 
-  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true, version: 0 });
   await state.removeSelected();
 
   assert.deepEqual(calls, ['delete:tenant_a']);

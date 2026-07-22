@@ -31,6 +31,8 @@
 
 普通定义维护只面向草稿；发布、停用和归档必须走发布门面，避免绕过动作贡献和状态同步。
 
+删除、停用和归档请求体均为 `{"version": n}`。发布同时锁定定义和版本，请求体为 `{"definitionVersion": n, "version": m}`；任一快照失效均返回 `409 CONFLICT_VERSION`。
+
 ## 工作流版本配置
 
 根路径：`/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions`
@@ -44,6 +46,8 @@
 | `POST` | `/delete/{id}` | 删除草稿版本。 |
 
 版本配置用于承载设计器语义图和布局图 JSON。版本发布仍通过定义配置下的 `publish` 入口完成。
+
+版本删除同样提交 `{"version": n}`，以避免删除已被其他编辑者更新的草稿版本。
 
 ## 运行实例读取
 

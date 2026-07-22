@@ -264,10 +264,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     @StandardMutation(StandardMutationKind.DELETE)
-    default int delete(@PathVariable String id) {
+    default int delete(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DELETE, id);
-            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id));
+            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id, request.version()));
         }));
     }
 }

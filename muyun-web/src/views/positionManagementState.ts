@@ -229,8 +229,8 @@ export function createPositionManagementState(
       const enable = categoryContext.abilities.enable();
       const result =
         selectedCategory.value.enabled === false
-          ? await enable.enable(selectedCategory.value.id)
-          : await enable.disable(selectedCategory.value.id);
+          ? await enable.enable(selectedCategory.value.id, { version: selectedCategory.value.version! })
+          : await enable.disable(selectedCategory.value.id, { version: selectedCategory.value.version! });
       categoryEditor.select(await categoryContext.abilities.crud().view(selectedCategory.value.id));
       await presentCategorySuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
@@ -261,7 +261,9 @@ export function createPositionManagementState(
     categorySaving.value = true;
     try {
       await categoryContext.runtime.ready;
-      const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
+      const result = await categoryContext.abilities
+        .crud()
+        .delete(selectedCategory.value.id, { version: selectedCategory.value.version! });
       await presentCategorySuccess(result, [
         platformActionResultReactions.clearSelection(),
         platformActionResultReactions.refreshList(),
@@ -410,8 +412,12 @@ export function createPositionManagementState(
     try {
       const result =
         selectedPosition.value.enabled === false
-          ? await positionClient.enable(selectedPosition.value.id)
-          : await positionClient.disable(selectedPosition.value.id);
+          ? await positionClient.enable(selectedPosition.value.id, {
+              version: selectedPosition.value.version!,
+            })
+          : await positionClient.disable(selectedPosition.value.id, {
+              version: selectedPosition.value.version!,
+            });
       positionEditor.select(await positionClient.view(selectedPosition.value.id));
       await presentPositionSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
@@ -441,7 +447,9 @@ export function createPositionManagementState(
     clearPositionFeedback();
     positionSaving.value = true;
     try {
-      const result = await positionClient.delete(selectedPosition.value.id);
+      const result = await positionClient.delete(selectedPosition.value.id, {
+        version: selectedPosition.value.version!,
+      });
       positionEditor.clearSelection();
       if (selectedCategoryId.value && canCreatePosition.value) {
         positionEditor.startCreate();
