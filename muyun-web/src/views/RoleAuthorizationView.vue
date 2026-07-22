@@ -315,7 +315,10 @@ async function saveDataGrantMatrix() {
               :disabled="saving"
               @change="updateAction(record as unknown as RolePermissionAction, $event)"
             />
-            <div v-else-if="record.dataAuth && isEmploymentRole" class="data-scope-editor">
+            <div
+              v-else-if="record.dataAuth && isEmploymentRole && Boolean(record.granted)"
+              class="data-scope-editor"
+            >
               <UiSelect
                 :value="displayedDataScopePolicy(record as unknown as RolePermissionAction)"
                 :options="scopeOptions"
@@ -339,6 +342,7 @@ async function saveDataGrantMatrix() {
                 <small v-else>请先选择引用字段，再开启该动作授权。</small>
               </template>
             </div>
+            <span v-else-if="column.key === 'dataScopePolicy' && record.dataAuth && isEmploymentRole">—</span>
             <span v-else class="not-applicable">不适用</span>
           </template>
         </UiDataTable>
