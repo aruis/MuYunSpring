@@ -463,6 +463,59 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldDefaultEmploymentDataActionToInheritedDataGrant() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("action-1");
+        RoleActionGrantVerifier verifier = new RoleActionGrantVerifier() {
+            @Override
+            public String resolveGrantablePermissionActionCode(String moduleAlias, String actionCode) {
+                return actionCode;
+            }
+
+            @Override
+            public boolean requiresDataScope(String moduleAlias, String actionCode) {
+                return true;
+            }
+        };
+        RoleService service = new RoleService(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), actionDao, activeTenantVerifier(), verifier,
+                null, null, null, null);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.grantAction("r1", "sales.contract", "view");
+        }
+
+        verify(actionDao).insert(argThat(action ->
+                action.getDataScopePolicy() == DataScopePolicy.INHERIT_DATA_GRANT));
+    }
+
+    @Test
+    void shouldRequireDataGrantRoleBeforeBindingInheritedEmploymentRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        EmploymentRoleGrantDao employmentGrantDao = mock(EmploymentRoleGrantDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        RoleAction inheritedAction = enabledAction("action-1", "r1", "sales.contract", "view");
+        inheritedAction.setDataScopePolicy(DataScopePolicy.INHERIT_DATA_GRANT);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)));
+        when(employmentGrantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(inheritedAction));
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class), employmentGrantDao, actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantEmploymentRole("r1", "position-1"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("must bind a data grant role")
+                    .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
+                            .isEqualTo("iam.role.data-grant-required"));
+        }
+    }
+
+    @Test
     void shouldRequireEnabledEmployeeWhenGrantingEmploymentRole() {
         RoleDao roleDao = mock(RoleDao.class);
         EmploymentRoleGrantDao employmentGrantDao = mock(EmploymentRoleGrantDao.class);
@@ -957,7 +1010,7 @@ class RoleServiceContractTest {
                                     RolePermissionAction::permissionActionCode,
                                     RolePermissionAction::granted,
                                     RolePermissionAction::dataScopePolicy)
-                            .containsExactly("delete", "delete", false, DataScopePolicy.NONE);
+                            .containsExactly("delete", "delete", false, null);
                     assertThat(module.actions().get(2))
                             .extracting(RolePermissionAction::actionCode,
                                     RolePermissionAction::permissionActionCode,

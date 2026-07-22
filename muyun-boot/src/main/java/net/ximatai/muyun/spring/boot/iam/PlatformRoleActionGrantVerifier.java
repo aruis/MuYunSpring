@@ -62,6 +62,33 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
                 + moduleAlias + "." + actionCode);
     }
 
+    @Override
+    public boolean requiresDataScope(String moduleAlias, String actionCode) {
+        PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
+        if (module == null) {
+            throw new PlatformException("role action requires existing module: " + moduleAlias);
+        }
+        List<PlatformModuleAction> registeredActions = registeredModuleActions(moduleAlias);
+        if (!registeredActions.isEmpty()) {
+            return registeredActions.stream()
+                    .filter(action -> actionCode.equals(action.getActionCode()))
+                    .map(PlatformModuleAction::getDataAuth)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElseThrow(() -> new PlatformException("role action requires configured module action: "
+                            + moduleAlias + "." + actionCode));
+        }
+        if (module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC) {
+            return PlatformAction.fromCode(actionCode)
+                    .filter(action -> staticModuleActionRegistry.isGrantable(moduleAlias, action))
+                    .map(PlatformAction::dataAuth)
+                    .orElseThrow(() -> new PlatformException("role action requires configured module action: "
+                            + moduleAlias + "." + actionCode));
+        }
+        throw new PlatformException("role action requires configured module action: "
+                + moduleAlias + "." + actionCode);
+    }
+
     private List<PlatformModuleAction> registeredModuleActions(String moduleAlias) {
         return moduleActionService.listByModuleAliases(List.of(moduleAlias)).stream()
                 .filter(action -> Boolean.TRUE.equals(action.getEnabled()))

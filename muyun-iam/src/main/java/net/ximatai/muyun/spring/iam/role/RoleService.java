@@ -459,7 +459,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String requestedActionCode = requireActionCode(actionCode);
         String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, requestedActionCode);
-        DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(role, validModuleAlias, dataScopePolicy,
+        DataScopePolicy requestedDataScopePolicy = defaultDataScopePolicy(role, validModuleAlias,
+                requestedActionCode, dataScopePolicy);
+        DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(role, validModuleAlias, requestedDataScopePolicy,
                 scopeCondition, referenceFieldId, referenceActionCode);
 
         RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
@@ -1271,6 +1273,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             }
         }
         ensureDataGrantUnique(validEmployeePositionId, role);
+        ensureInheritedDataGrantCoverage(validEmployeePositionId, role);
         EmploymentRoleGrant existing = findEmploymentRoleGrant(role.getId(), validEmployeePositionId);
         if (existing != null) {
             if (!Boolean.TRUE.equals(existing.getEnabled())) {
@@ -1294,6 +1297,41 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             throw BusinessExceptions.warning("iam.role.data-grant-duplicate",
                     "employment can have at most one data grant role: " + employeePositionId);
         }
+    }
+
+    private void ensureInheritedDataGrantCoverage(String employeePositionId, Role newRole) {
+        if (!requiresInheritedDataGrant(newRole)) {
+            return;
+        }
+        if (effectiveDataGrantRoleIds(employeePositionId, newRole).isEmpty()) {
+            throw BusinessExceptions.warning("iam.role.data-grant-required",
+                    "employment must bind a data grant role before granting inherited data permissions: "
+                            + employeePositionId);
+        }
+    }
+
+    private boolean requiresInheritedDataGrant(Role role) {
+        if (role == null || role.getId() == null) {
+            return false;
+        }
+        LinkedHashSet<String> roleIds = new LinkedHashSet<>();
+        if (role.getRoleKind() == RoleKind.STANDARD) {
+            roleIds.add(role.getId());
+        } else if (role.getRoleKind() == RoleKind.GROUP) {
+            for (String memberRoleId : parseRoleIds(role.getMemberRoleIds())) {
+                Role member = selectGrantedRole(memberRoleId);
+                if (member != null && member.getRoleKind() == RoleKind.STANDARD) {
+                    roleIds.add(member.getId());
+                }
+            }
+        }
+        return !roleIds.isEmpty() && roleActionDao.query(activeCriteria(Criteria.of()
+                        .in("roleId", List.copyOf(roleIds))
+                        .eq("enabled", Boolean.TRUE)
+                        .eq("dataScopePolicy", DataScopePolicy.INHERIT_DATA_GRANT)), ALL)
+                .stream()
+                .findAny()
+                .isPresent();
     }
 
     private void validateGroupDataGrantUsage(Role group) {
@@ -1526,6 +1564,21 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         DataScopePolicy.DEPARTMENT, DataScopePolicy.DEPARTMENT_AND_CHILDREN,
                         DataScopePolicy.REFERENCE_DEPENDENCY)
                 .stream().map(this::dataScopeOption).toList();
+    }
+
+    private DataScopePolicy defaultDataScopePolicy(Role role,
+                                                    String moduleAlias,
+                                                    String actionCode,
+                                                    DataScopePolicy requestedPolicy) {
+        if (requestedPolicy != null) {
+            return requestedPolicy;
+        }
+        if (role.getRoleKind() == RoleKind.STANDARD
+                && role.getAssignmentType() == RoleAssignmentType.EMPLOYMENT
+                && grantVerifier.requiresDataScope(moduleAlias, actionCode)) {
+            return DataScopePolicy.INHERIT_DATA_GRANT;
+        }
+        return DataScopePolicy.NONE;
     }
 
     private RoleDataScopePolicyCatalog.Option dataScopeOption(DataScopePolicy policy) {

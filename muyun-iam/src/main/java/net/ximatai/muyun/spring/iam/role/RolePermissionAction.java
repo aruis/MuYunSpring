@@ -42,7 +42,7 @@ public record RolePermissionAction(
                 action.actionAuth(),
                 action.dataAuth(),
                 granted,
-                grant == null || grant.getDataScopePolicy() == null ? DataScopePolicy.NONE : grant.getDataScopePolicy(),
+                grant == null ? null : grant.getDataScopePolicy(),
                 grant == null || grant.getTenantScopePolicy() == null
                         ? TenantScopePolicy.CURRENT_TENANT
                         : grant.getTenantScopePolicy(),

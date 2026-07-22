@@ -135,6 +135,9 @@ async function loadActions() {
 
 async function updateAction(action: RolePermissionAction, granted: boolean) {
   if (!selectedModuleAlias.value) return;
+  if (granted && action.dataAuth && isEmploymentRole.value && !action.dataScopePolicy) {
+    action.dataScopePolicy = 'inheritDataGrant';
+  }
   if (granted && action.dataScopePolicy === 'referenceDependency' && !action.referenceFieldId) return;
   saving.value = true;
   try {
@@ -143,7 +146,9 @@ async function updateAction(action: RolePermissionAction, granted: boolean) {
           moduleAlias: selectedModuleAlias.value,
           actionCode: action.actionCode,
           dataScopePolicy:
-            action.dataAuth && isEmploymentRole.value ? (action.dataScopePolicy ?? 'none') : undefined,
+            action.dataAuth && isEmploymentRole.value
+              ? (action.dataScopePolicy ?? 'inheritDataGrant')
+              : undefined,
           referenceFieldId:
             action.dataScopePolicy === 'referenceDependency' ? action.referenceFieldId : undefined,
           referenceActionCode:
@@ -189,6 +194,10 @@ function referenceDependencyOf(referenceFieldId: unknown) {
 
 function selectValue(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? value : undefined;
+}
+
+function displayedDataScopePolicy(action: RolePermissionAction): DataScopePolicy {
+  return action.dataScopePolicy ?? 'inheritDataGrant';
 }
 
 async function saveDataGrantMatrix() {
@@ -301,7 +310,7 @@ async function saveDataGrantMatrix() {
             />
             <div v-else-if="record.dataAuth && isEmploymentRole" class="data-scope-editor">
               <UiSelect
-                :value="(record.dataScopePolicy || 'none') as DataScopePolicy"
+                :value="displayedDataScopePolicy(record as unknown as RolePermissionAction)"
                 :options="scopeOptions"
                 :disabled="saving"
                 :allow-clear="false"
