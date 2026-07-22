@@ -217,7 +217,7 @@ public class WorkflowDelegationService extends AbstractAbilityService<WorkflowDe
         EntityLifecycle.prepareUpdate(delegation, Instant.now(), EntityLifecycle.nextVersion(delegation.getVersion()));
         int updated = getDao().updateByIdAndVersion(delegation, expectedVersion);
         if (updated <= 0) {
-            throw new PlatformException("workflow delegation version conflict: " + delegation.getId());
+            throw new OptimisticLockException("workflow delegation version conflict: " + delegation.getId());
         }
         return select(delegation.getId());
     }

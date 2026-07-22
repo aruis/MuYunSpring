@@ -90,6 +90,8 @@
 | 字段 UI 类型 | `POST` | `/platform.field_ui_type/enable/{id}`、`/disable/{id}` | 启用或停用字段 UI 类型 |
 | 字段 UI 类型 | `POST` | `/platform.field_ui_type/sort/{id}` | 调整字段 UI 类型排序 |
 
+上述标准维护接口中的 `delete`、`enable`、`disable` 必须带请求体 `{"version": n}`，以当前记录版本执行乐观锁校验。版本失效时统一返回 `409 CONFLICT_VERSION`；调用方应先刷新记录，再决定是否重试。
+
 ## 字段 UI 类型配置
 
 字段 UI 类型属性和字段映射挂在字段 UI 类型 alias 下。请求体中的 `fieldUiTypeAlias` 以后端 URL 为准，避免跨 UI 类型维护。

@@ -791,6 +791,7 @@ public class DynamicRecordService {
         return delete(moduleAlias, entityAlias, id, null, RuntimeMutationSource.BUSINESS, null);
     }
 
+    @Transactional
     public int delete(String moduleAlias, String entityAlias, String id, Integer expectedVersion) {
         return delete(moduleAlias, entityAlias, id, expectedVersion, RuntimeMutationSource.BUSINESS, null);
     }
