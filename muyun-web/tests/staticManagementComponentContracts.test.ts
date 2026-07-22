@@ -1073,6 +1073,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);
   assert.match(roleAuthorizationViewSource, /dataScopePolicyCatalog/);
   assert.match(roleAuthorizationViewSource, /action\.dataScopePolicy = 'inheritDataGrant'/);
+  assert.match(roleAuthorizationViewSource, /function normalizeEmploymentDataScope/);
+  assert.match(roleAuthorizationViewSource, /action\.dataScopePolicy === 'none'/);
+  assert.match(roleAuthorizationViewSource, /dataScopePolicy: 'inheritDataGrant'/);
   assert.match(roleAuthorizationViewSource, /displayedDataScopePolicy/);
   assert.match(roleAuthorizationViewSource, /referenceDependencyOptions/);
   assert.match(roleAuthorizationViewSource, /handlePlatformActionSuccess\(result/);

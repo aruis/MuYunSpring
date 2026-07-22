@@ -124,7 +124,7 @@ async function loadActions() {
       client.permissionMatrix(roleId, [moduleAlias]),
       client.dataScopePolicyCatalog(roleId, moduleAlias),
     ]);
-    actions.value = matrix.modules[0]?.actions ?? [];
+    actions.value = (matrix.modules[0]?.actions ?? []).map(normalizeEmploymentDataScope);
     dataScopeCatalog.value = catalog;
   } catch (cause) {
     presentPlatformError(cause, { source: 'role-authorization', phase: 'load' });
@@ -198,6 +198,13 @@ function selectValue(value: unknown) {
 
 function displayedDataScopePolicy(action: RolePermissionAction): DataScopePolicy {
   return action.dataScopePolicy ?? 'inheritDataGrant';
+}
+
+function normalizeEmploymentDataScope(action: RolePermissionAction): RolePermissionAction {
+  if (isEmploymentRole.value && action.dataAuth && action.dataScopePolicy === 'none') {
+    return { ...action, dataScopePolicy: 'inheritDataGrant' };
+  }
+  return action;
 }
 
 async function saveDataGrantMatrix() {
