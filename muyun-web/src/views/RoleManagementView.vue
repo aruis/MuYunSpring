@@ -570,7 +570,8 @@ function openRoleAuthorization(record: QueryListRecord) {
     hostType: 'business-route-host',
     title: `授权 - ${roleTitle(record as Role)}`,
     target: { route: '/iam/role-authorization', moduleAlias: 'iam.role', query: { roleId: id } },
-    tabPolicy: { identity: 'by-target' },
+    params: { roleId: id },
+    tabPolicy: { identity: 'by-params' },
   });
 }
 

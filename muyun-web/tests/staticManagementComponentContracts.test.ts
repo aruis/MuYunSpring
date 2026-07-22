@@ -1067,6 +1067,7 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
   assert.match(roleViewSource, /key: 'authorize'[\s\S]*actionCode: 'rolePermissions'[\s\S]*title: '授权'/);
   assert.match(roleViewSource, /route: '\/iam\/role-authorization'/);
+  assert.match(roleViewSource, /params: \{ roleId: id \}[\s\S]*tabPolicy: \{ identity: 'by-params' \}/);
   const roleAuthorizationViewSource = readSource('src/views/RoleAuthorizationView.vue');
   assert.match(roleAuthorizationViewSource, /角色组不独立授权/);
   assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);

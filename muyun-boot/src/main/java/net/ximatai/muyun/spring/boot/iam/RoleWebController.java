@@ -337,8 +337,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
         if (platformModuleService == null) {
             throw new IllegalStateException("platform module service is not available");
         }
-        List<RoleAuthorizationModule> modules = platformModuleService.list(
-                        Criteria.of().eq("enabled", Boolean.TRUE), new PageRequest(0, Integer.MAX_VALUE))
+        List<RoleAuthorizationModule> modules = platformModuleService.listVisibleModules()
                 .stream()
                 .map(module -> new RoleAuthorizationModule(module.getId(), module.getTitle(),
                         module.getApplicationAlias(), module.getParentId()))
