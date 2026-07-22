@@ -687,10 +687,10 @@ class IamWebControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.message")
-                        .value("cannot administrate current user's password; use change own password"))
+                        .value("不能由管理员重置当前登录用户的密码，请使用修改本人密码"))
                 .andExpect(jsonPath("$.actionMessage.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.actionMessage.text")
-                        .value("cannot administrate current user's password; use change own password"))
+                        .value("不能由管理员重置当前登录用户的密码，请使用修改本人密码"))
                 .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
 
         verify(userAccountDao, never()).updateById(any(UserAccount.class));
@@ -708,10 +708,10 @@ class IamWebControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.message")
-                        .value("cannot administrate current user's password; use change own password"))
+                        .value("不能由管理员重置当前登录用户的密码，请使用修改本人密码"))
                 .andExpect(jsonPath("$.actionMessage.code").value("iam.user.password-admin-current-user"))
                 .andExpect(jsonPath("$.actionMessage.text")
-                        .value("cannot administrate current user's password; use change own password"))
+                        .value("不能由管理员重置当前登录用户的密码，请使用修改本人密码"))
                 .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
 
         verify(userAccountDao, never()).updateById(any(UserAccount.class));

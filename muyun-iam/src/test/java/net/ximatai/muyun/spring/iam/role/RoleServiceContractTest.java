@@ -121,8 +121,9 @@ class RoleServiceContractTest {
         role.setSharePolicy(RoleSharePolicy.PLATFORM);
 
         assertThatThrownBy(() -> service.insert(role))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("platform role management requires system tenant context");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("仅系统身份可以管理平台角色")
+                .hasFieldOrPropertyWithValue("code", "iam.role.platform-management-system-context-required");
 
         try (TenantContext.Scope ignored = TenantContext.system("test")) {
             assertThat(service.insert(role)).isEqualTo("platform-role");
@@ -183,7 +184,7 @@ class RoleServiceContractTest {
             assertThatThrownBy(() -> service.grantAccountRole(
                     "platform-private", "user-1", ManagementScopeType.TENANT, "tenant_a"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("platform private role cannot be bound by tenant")
+                    .hasMessage("租户不能绑定平台私有角色")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.role.platform-private-not-bindable"));
         }
@@ -202,11 +203,13 @@ class RoleServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.normalizeBeforeMutation(tenantRole))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("tenant role only supports private or tenant share policy");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("租户角色仅支持私有或租户共享策略")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.tenant-share-policy-invalid");
             assertThatThrownBy(() -> service.normalizeBeforeMutation(organizationRole))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("organization role only supports private or owner-and-children share policy");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("组织角色仅支持私有或归属机构及下级共享策略")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.organization-share-policy-invalid");
         }
     }
 
@@ -219,8 +222,9 @@ class RoleServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.normalizeBeforeMutation(role))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("tenant role owner scope id must match current tenant");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("租户角色的归属租户必须与当前租户一致")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.owner-tenant-mismatch");
         }
     }
 
@@ -243,8 +247,9 @@ class RoleServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.normalizeBeforeMutation(role))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("role owner organization does not belong to current tenant");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色归属机构不属于当前租户")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.owner-organization-tenant-mismatch");
         }
     }
 
@@ -296,8 +301,56 @@ class RoleServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("role group can only contain employment roles");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色组只能包含任职角色")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.group-member-assignment-type-invalid");
+        }
+    }
+
+    @Test
+    void shouldRejectMissingOrInactiveRoleGroupMember() {
+        Role missingGroup = employmentRole("group-missing", RoleKind.GROUP);
+        missingGroup.setMemberRoleIds("missing-role");
+        RoleService missingService = service(mock(RoleDao.class), mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+
+        RoleDao inactiveRoleDao = mock(RoleDao.class);
+        Role inactiveRole = employmentRole("inactive-role", RoleKind.STANDARD);
+        inactiveRole.setEnabled(false);
+        when(inactiveRoleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(inactiveRole));
+        RoleService inactiveService = service(inactiveRoleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role inactiveGroup = employmentRole("group-inactive", RoleKind.GROUP);
+        inactiveGroup.setMemberRoleIds("inactive-role");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> missingService.normalizeBeforeMutation(missingGroup))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色组包含不存在的角色")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.group-member-not-found");
+            assertThatThrownBy(() -> inactiveService.normalizeBeforeMutation(inactiveGroup))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色组不能包含已停用的角色")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.group-member-inactive");
+        }
+    }
+
+    @Test
+    void shouldRejectMoreThanOneDataGrantRoleInRoleGroup() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(employmentRole("data-role-1", RoleKind.DATA_GRANT)))
+                .thenReturn(List.of(employmentRole("data-role-2", RoleKind.DATA_GRANT)));
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
+        Role group = employmentRole("group-1", RoleKind.GROUP);
+        group.setMemberRoleIds("data-role-1,data-role-2");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色组最多只能包含一个数据授权角色")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.group-data-grant-member-duplicate");
         }
     }
 
@@ -313,15 +366,17 @@ class RoleServiceContractTest {
             Role created = employmentRole("managed-2", RoleKind.STANDARD);
             created.setSystemManaged(Boolean.TRUE);
             assertThatThrownBy(() -> service.insert(created))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("system managed role");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("系统托管角色不能在当前上下文中修改")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.system-managed-mutation-denied");
             assertThatThrownBy(() -> service.update(employmentRole("managed-1", RoleKind.STANDARD)))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("system managed role");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("系统托管角色不能在当前上下文中修改")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.system-managed-mutation-denied");
             assertThatThrownBy(() -> service.grantAccountRole(
                     "managed-1", "user-1", ManagementScopeType.TENANT, "tenant_a"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("system managed role")
+                    .hasMessage("系统托管角色不能在当前上下文中修改")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.role.system-managed-mutation-denied"));
         }
@@ -392,8 +447,9 @@ class RoleServiceContractTest {
 
         assertThatThrownBy(() -> service.grantAction(
                 "r1", "sales.contract", "query", DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("account role action cannot configure data scope");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("账号角色的动作不能配置数据范围")
+                .hasFieldOrPropertyWithValue("code", "iam.role.account-role-data-scope-denied");
     }
 
     @Test
@@ -446,7 +502,8 @@ class RoleServiceContractTest {
                 DataScopePolicy.REFERENCE_DEPENDENCY, TenantScopePolicy.CURRENT_TENANT,
                 null, "score.otherId", "view"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("reference dependency is not available");
+                .hasMessage("当前模块没有可用的引用依赖数据范围")
+                .hasFieldOrPropertyWithValue("code", "iam.role.reference-dependency-unavailable");
     }
 
     @Test
@@ -549,7 +606,7 @@ class RoleServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.grantEmploymentRole("r1", "position-1"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("must bind a data grant role")
+                    .hasMessage("使用继承数据权限前，任职必须先绑定数据授权角色")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.role.data-grant-required"));
         }
@@ -591,13 +648,13 @@ class RoleServiceContractTest {
 
         assertThatThrownBy(() -> service.grantEmploymentRole("account-role", "position-1"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("role is not employment role")
+                .hasMessage("当前角色不是任职角色")
                 .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                         .isEqualTo("iam.role.not-employment-role"));
         assertThatThrownBy(() -> service.grantAccountRole(
                 "employment-role", "user-1", ManagementScopeType.TENANT, "tenant_a"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("role is not account role")
+                .hasMessage("当前角色不是账号角色")
                 .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                         .isEqualTo("iam.role.not-account-role"));
     }
@@ -615,8 +672,9 @@ class RoleServiceContractTest {
                 mock(EmploymentRoleGrantDao.class), actionDao);
 
         assertThatThrownBy(() -> service.grantAction("data-role", "sales.contract", "query"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("data grant role must configure concrete data scope");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("数据授权角色必须配置具体的数据范围")
+                .hasFieldOrPropertyWithValue("code", "iam.role.data-grant-scope-required");
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThat(service.grantAction(
                     "data-role", "sales.contract", "query", DataScopePolicy.ORGANIZATION,
@@ -638,8 +696,9 @@ class RoleServiceContractTest {
                 employmentGrantDao, mock(RoleActionDao.class));
 
         assertThatThrownBy(() -> service.grantEmploymentRole("data-2", "position-1"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("employment can have at most one data grant role");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("同一任职最多只能绑定一个数据授权角色")
+                .hasFieldOrPropertyWithValue("code", "iam.role.data-grant-duplicate");
     }
 
     @Test
@@ -712,8 +771,9 @@ class RoleServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.normalizeBeforeMutation(group))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("employment can have at most one data grant role");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("同一任职最多只能绑定一个数据授权角色")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.data-grant-duplicate");
         }
     }
 
@@ -728,11 +788,13 @@ class RoleServiceContractTest {
         RoleService service = service(roleDao, accountGrantDao, employmentGrantDao, mock(RoleActionDao.class));
 
         assertThatThrownBy(() -> service.deleteAccountRoleGrant("managed-1", "grant-1"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("system managed role");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("系统托管角色不能在当前上下文中修改")
+                .hasFieldOrPropertyWithValue("code", "iam.role.system-managed-mutation-denied");
         assertThatThrownBy(() -> service.deleteEmploymentRoleGrant("managed-1", "grant-1"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("system managed role");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("系统托管角色不能在当前上下文中修改")
+                .hasFieldOrPropertyWithValue("code", "iam.role.system-managed-mutation-denied");
         verify(accountGrantDao, never()).deleteById(any());
         verify(employmentGrantDao, never()).deleteById(any());
     }
@@ -912,20 +974,31 @@ class RoleServiceContractTest {
         Role changedAssignment = employmentRole("role-1", RoleKind.STANDARD);
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.beforeUpdate(changedAssignment))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("role assignment type cannot be changed");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色创建后不能修改分配类型")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.assignment-type-immutable");
 
             Role changedKind = accountRole("role-1", RoleKind.SYSTEM);
             assertThatThrownBy(() -> service.beforeUpdate(changedKind))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("role kind cannot be changed");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色创建后不能修改角色类型")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.kind-immutable");
 
             Role changedOwner = accountRole("role-1", RoleKind.STANDARD);
             changedOwner.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
             changedOwner.setOwnerScopeId("org-1");
             assertThatThrownBy(() -> service.beforeUpdate(changedOwner))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("role owner scope type cannot be changed");
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色创建后不能修改归属范围类型")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.owner-scope-type-immutable");
+
+            Role existingOrganizationRole = organizationRole("role-2", "org-1");
+            doReturn(existingOrganizationRole).when(service).select("role-2");
+            Role changedOwnerId = organizationRole("role-2", "org-2");
+            assertThatThrownBy(() -> service.beforeUpdate(changedOwnerId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("角色创建后不能修改归属范围")
+                    .hasFieldOrPropertyWithValue("code", "iam.role.owner-scope-id-immutable");
         }
     }
 
@@ -1070,8 +1143,9 @@ class RoleServiceContractTest {
         assertThatThrownBy(() -> service.permissionMatrix("group-1", List.of(
                 GrantableAction.ofPlatformDefaults("sales.contract", PlatformAction.QUERY)
         )))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("role group cannot be granted actions directly");
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("角色组不能直接配置动作授权")
+                .hasFieldOrPropertyWithValue("code", "iam.role.group-action-grant-denied");
     }
 
     private RoleService service(RoleDao roleDao,

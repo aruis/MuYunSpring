@@ -95,7 +95,7 @@ docs              架构原则、平台专题、前端路线和技术债记录
 ./scripts/dev-local.sh
 ```
 
-该脚本会启动 PostgreSQL，并并行启动后端和前端；默认启用演示初始化，便于本地验证租户、机构和角色基础数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。需要关闭演示初始化时：
+该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。默认启用演示初始化，便于本地验证租户、机构和角色基础数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。需要关闭演示初始化时：
 
 ```bash
 MUYUN_DEMO_BOOTSTRAP_ENABLED=false ./scripts/dev-local.sh
@@ -129,7 +129,11 @@ docker run --name muyun-spring-postgres \
 ./gradlew :muyun-boot:bootRun --args='--muyun.runtime.mode=development --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring --spring.datasource.username=postgres --spring.datasource.password=muyun_dev'
 ```
 
-后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。
+后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。分终端开发时，额外在另一个终端运行下列连续编译命令；它与开发态 DevTools 共同保证跨模块代码变化会重启本地后端：
+
+```bash
+./gradlew :muyun-boot:classes --continuous
+```
 
 3. 启动前端：
 

@@ -17,7 +17,8 @@ public record PlatformWebError(String traceId,
                                ActionMessage actionMessage,
                                ErrorScope scope,
                                List<ErrorTarget> targets,
-                               Map<String, Object> details) {
+                               Map<String, Object> details,
+                               Map<String, Object> messageArgs) {
     public static PlatformWebError of(PlatformException exception) {
         return new PlatformWebError(
                 responseTraceId(),
@@ -27,26 +28,27 @@ public record PlatformWebError(String traceId,
                 null,
                 emptyScopeAsNull(exception.scope()),
                 exception.targets().isEmpty() ? List.of() : exception.targets(),
-                exception.details().isEmpty() ? Map.of() : exception.details());
+                exception.details().isEmpty() ? Map.of() : exception.details(),
+                exception.messageArgs().isEmpty() ? Map.of() : exception.messageArgs());
     }
 
     public static PlatformWebError of(String code, int status, String message) {
         return new PlatformWebError(responseTraceId(), code, status, message, null, null, List.of(),
-                Map.of());
+                Map.of(), Map.of());
     }
 
     public static PlatformWebError of(String code, int status, String message, ActionMessage actionMessage) {
         return new PlatformWebError(responseTraceId(), code, status, message, actionMessage, null, List.of(),
-                Map.of());
+                Map.of(), Map.of());
     }
 
     public static PlatformWebError of(String code, int status, String message, Map<String, Object> details) {
         return new PlatformWebError(responseTraceId(), code, status, message, null, null, List.of(),
-                details == null ? Map.of() : Map.copyOf(details));
+                details == null ? Map.of() : Map.copyOf(details), Map.of());
     }
 
     public PlatformWebError withActionMessage(ActionMessage actionMessage) {
-        return new PlatformWebError(traceId, code, status, message, actionMessage, scope, targets, details);
+        return new PlatformWebError(traceId, code, status, message, actionMessage, scope, targets, details, messageArgs);
     }
 
     private static ErrorScope emptyScopeAsNull(ErrorScope scope) {

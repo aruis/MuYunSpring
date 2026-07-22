@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.department;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -15,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -37,7 +39,7 @@ class DepartmentServiceContractTest {
         when(dao.insert(any())).thenReturn("dept-1");
         ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
         OrganizationService organizationService = organizationService();
-        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(organizationService.requireEnabledOrThrow(eq("org-1"), any())).thenReturn(organization("org-1"));
         DepartmentService service = new DepartmentService(dao, tenantVerifier, organizationService);
         Department department = department("org-1", "FIN", "Finance");
 
@@ -49,7 +51,7 @@ class DepartmentServiceContractTest {
         assertThat(department.getParentId()).isEqualTo(TreeAbility.ROOT_ID);
         assertThat(department.getTenantId()).isEqualTo("tenant_a");
         verify(tenantVerifier).verifyActiveTenant("tenant_a");
-        verify(organizationService).requireEnabled(eq("org-1"), any());
+        verify(organizationService).requireEnabledOrThrow(eq("org-1"), any());
     }
 
     @Test
@@ -88,7 +90,7 @@ class DepartmentServiceContractTest {
         DepartmentDao dao = mock(DepartmentDao.class);
         when(dao.insert(any())).thenReturn("dept-1");
         OrganizationService organizationService = organizationService();
-        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(organizationService.requireEnabledOrThrow(eq("org-1"), any())).thenReturn(organization("org-1"));
         DepartmentService service = new DepartmentService(dao, activeTenantVerifier(), organizationService);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
@@ -109,22 +111,23 @@ class DepartmentServiceContractTest {
     @Test
     void shouldRejectMissingOrDisabledOrganization() {
         OrganizationService organizationService = organizationService();
-        when(organizationService.requireEnabled(eq("org-missing"), any()))
-                .thenThrow(new PlatformException("organization is not active: org-missing"));
+        doCallRealMethod().when(organizationService).requireEnabledOrThrow(eq("org-missing"), any());
         DepartmentService service = new DepartmentService(mock(DepartmentDao.class), activeTenantVerifier(),
                 organizationService);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.insert(department("org-missing", "FIN", "Finance")))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("organization is not active");
+                    .isInstanceOfSatisfying(BusinessException.class, exception ->
+                            assertThat(exception.actionMessage().code())
+                                    .isEqualTo("iam.department.organization-not-active"))
+                    .hasMessage("所属机构不存在或已停用");
         }
     }
 
     @Test
     void shouldPreserveTenantAndNormalizeChecksBeforeUpdate() {
         OrganizationService organizationService = organizationService();
-        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(organizationService.requireEnabledOrThrow(eq("org-1"), any())).thenReturn(organization("org-1"));
         ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
         DepartmentService service = new DepartmentService(mock(DepartmentDao.class), tenantVerifier,
                 organizationService);
@@ -143,7 +146,7 @@ class DepartmentServiceContractTest {
             service.beforeUpdate(department("org-1", "FIN", "Finance"));
         }
         verify(tenantVerifier, times(2)).verifyActiveTenant("tenant_a");
-        verify(organizationService).requireEnabled(eq("org-1"), any());
+        verify(organizationService).requireEnabledOrThrow(eq("org-1"), any());
     }
 
     @Test

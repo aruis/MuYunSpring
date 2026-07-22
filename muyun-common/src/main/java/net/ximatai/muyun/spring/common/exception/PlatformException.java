@@ -10,6 +10,7 @@ public class PlatformException extends RuntimeException {
     private final ErrorScope scope;
     private final List<ErrorTarget> targets;
     private final Map<String, Object> details;
+    private final Map<String, Object> messageArgs;
 
     public PlatformException(String message) {
         this(PlatformErrorCodes.VALIDATION_FAILED, 400, message);
@@ -33,12 +34,23 @@ public class PlatformException extends RuntimeException {
                              ErrorScope scope,
                              List<ErrorTarget> targets,
                              Map<String, Object> details) {
+        this(code, httpStatus, message, scope, targets, details, Map.of());
+    }
+
+    public PlatformException(String code,
+                             int httpStatus,
+                             String message,
+                             ErrorScope scope,
+                             List<ErrorTarget> targets,
+                             Map<String, Object> details,
+                             Map<String, Object> messageArgs) {
         super(message);
         this.code = normalizeCode(code);
         this.httpStatus = httpStatus;
         this.scope = scope == null ? ErrorScope.empty() : scope;
         this.targets = copyTargets(targets);
         this.details = details == null ? Map.of() : Map.copyOf(details);
+        this.messageArgs = messageArgs == null ? Map.of() : Map.copyOf(messageArgs);
     }
 
     public PlatformException(String code,
@@ -48,12 +60,24 @@ public class PlatformException extends RuntimeException {
                              ErrorScope scope,
                              List<ErrorTarget> targets,
                              Map<String, Object> details) {
+        this(code, httpStatus, message, cause, scope, targets, details, Map.of());
+    }
+
+    public PlatformException(String code,
+                             int httpStatus,
+                             String message,
+                             Throwable cause,
+                             ErrorScope scope,
+                             List<ErrorTarget> targets,
+                             Map<String, Object> details,
+                             Map<String, Object> messageArgs) {
         super(message, cause);
         this.code = normalizeCode(code);
         this.httpStatus = httpStatus;
         this.scope = scope == null ? ErrorScope.empty() : scope;
         this.targets = copyTargets(targets);
         this.details = details == null ? Map.of() : Map.copyOf(details);
+        this.messageArgs = messageArgs == null ? Map.of() : Map.copyOf(messageArgs);
     }
 
     public String code() {
@@ -74,6 +98,10 @@ public class PlatformException extends RuntimeException {
 
     public Map<String, Object> details() {
         return details;
+    }
+
+    public Map<String, Object> messageArgs() {
+        return messageArgs;
     }
 
     private static String normalizeCode(String code) {

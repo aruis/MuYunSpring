@@ -466,12 +466,12 @@ class UserAccountServiceContractTest {
                      CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
             assertThatThrownBy(() -> service.changePassword("user-1", "secret2"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("cannot administrate current user's password")
+                    .hasMessage("不能由管理员重置当前登录用户的密码，请使用修改本人密码")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.user.password-admin-current-user"));
             assertThatThrownBy(() -> service.resetPassword("user-1"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("cannot administrate current user's password")
+                    .hasMessage("不能由管理员重置当前登录用户的密码，请使用修改本人密码")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.user.password-admin-current-user"));
         }
@@ -490,7 +490,7 @@ class UserAccountServiceContractTest {
                      CurrentUser.tenantUser("user-1", "Alice", "tenant-a"))) {
             assertThatThrownBy(() -> service.forceLogout("user-1"))
                     .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("cannot force logout current user")
+                    .hasMessage("不能强制当前登录用户下线")
                     .satisfies(error -> assertThat(((BusinessException) error).actionMessage().code())
                             .isEqualTo("iam.user.force-logout-current-user"));
         }
@@ -509,14 +509,14 @@ class UserAccountServiceContractTest {
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-1"))
                     .hasValueSatisfying(decision -> {
                         assertThat(decision.available()).isFalse();
-                        assertThat(decision.reason()).isEqualTo("cannot administrate current user's password");
+                        assertThat(decision.reason()).isEqualTo("不能由管理员重置当前登录用户的密码，请使用修改本人密码");
                     });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "changePassword", "user-1"))
                     .hasValueSatisfying(decision -> assertThat(decision.available()).isFalse());
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "forceLogout", "user-1"))
                     .hasValueSatisfying(decision -> {
                         assertThat(decision.available()).isFalse();
-                        assertThat(decision.reason()).isEqualTo("cannot force logout current user");
+                        assertThat(decision.reason()).isEqualTo("不能强制当前登录用户下线");
                     });
             assertThat(service.availability(UserAccountService.MODULE_ALIAS, "resetPassword", "user-2"))
                     .isEmpty();

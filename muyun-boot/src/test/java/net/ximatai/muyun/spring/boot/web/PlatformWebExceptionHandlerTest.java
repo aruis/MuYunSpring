@@ -1,8 +1,7 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
-import net.ximatai.muyun.spring.ability.action.ActionMessageType;
-import net.ximatai.muyun.spring.ability.action.BusinessException;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
@@ -61,8 +60,10 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("iam.employee-account.username-occupied"))
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.message").value("登录账号已被占用"))
+                .andExpect(jsonPath("$.messageArgs.username").value("demo-admin"))
                 .andExpect(jsonPath("$.actionMessage.code").value("iam.employee-account.username-occupied"))
                 .andExpect(jsonPath("$.actionMessage.text").value("登录账号已被占用"))
+                .andExpect(jsonPath("$.actionMessage.messageArgs.username").value("demo-admin"))
                 .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
@@ -147,10 +148,8 @@ class PlatformWebExceptionHandlerTest {
 
         @GetMapping("/demo/business")
         String business() {
-            throw new BusinessException(
-                    "iam.employee-account.username-occupied",
-                    "登录账号已被占用",
-                    ActionMessageType.WARNING);
+            throw BusinessExceptions.warning("iam.employee-account.username-occupied", "登录账号已被占用",
+                    Map.of("username", "demo-admin"));
         }
 
         @GetMapping("/demo/auth")

@@ -17,7 +17,7 @@ Usage: $0 [-f|--force]
 
 Starts the local development stack:
   - PostgreSQL via docker compose
-  - Spring Boot backend on http://127.0.0.1:${BACKEND_PORT}
+  - Spring Boot backend with continuous recompilation on http://127.0.0.1:${BACKEND_PORT}
   - Vite frontend on http://127.0.0.1:${FRONTEND_PORT}/
 
 Options:
@@ -162,6 +162,11 @@ start_backend() {
   ./gradlew :muyun-boot:bootRun --args="$(backend_args)"
 }
 
+watch_backend_classes() {
+  cd "$ROOT_DIR"
+  ./gradlew :muyun-boot:classes --continuous
+}
+
 start_frontend() {
   cd "$ROOT_DIR"
   npm run dev:backend --prefix muyun-web -- --port "$FRONTEND_PORT"
@@ -205,7 +210,8 @@ echo "Starting PostgreSQL..."
 docker compose up -d
 ensure_frontend_dependencies
 
-echo "Starting backend and frontend..."
+echo "Starting backend, continuous compilation and frontend..."
+start_process backend-compiler watch_backend_classes
 start_process backend start_backend
 start_process frontend start_frontend
 

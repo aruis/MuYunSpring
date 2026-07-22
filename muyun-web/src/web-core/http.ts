@@ -107,6 +107,7 @@ async function appErrorFromResponse(response: Response) {
     scope: recordField(details, 'scope'),
     targets: targetsOf(details),
     details: recordField(details, 'details') ?? (isRecord(details) ? details : undefined),
+    messageArgs: recordField(details, 'messageArgs') ?? actionMessage?.messageArgs,
     actionMessage,
   });
 }
@@ -148,10 +149,12 @@ function actionMessageOf(details: unknown) {
   }
   const code = objectField(details.actionMessage, 'code');
   const type = objectField(details.actionMessage, 'type');
+  const messageArgs = recordField(details.actionMessage, 'messageArgs');
   return {
     text,
     code,
     type,
+    ...(messageArgs ? { messageArgs } : {}),
   };
 }
 

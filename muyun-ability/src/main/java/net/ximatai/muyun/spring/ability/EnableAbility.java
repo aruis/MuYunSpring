@@ -5,6 +5,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> {
     default int enable(String id) {
         return updateEnabled(id, Boolean.TRUE);
@@ -23,6 +26,18 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
         T entity = selectActiveRaw(id);
         if (entity == null || !Boolean.TRUE.equals(entity.getEnabled())) {
             throw new PlatformException(message);
+        }
+        return entity;
+    }
+
+    /**
+     * Requires an enabled record while allowing the calling business service to
+     * preserve its own error contract.
+     */
+    default T requireEnabledOrThrow(String id, Supplier<? extends RuntimeException> exceptionSupplier) {
+        T entity = selectActiveRaw(id);
+        if (entity == null || !Boolean.TRUE.equals(entity.getEnabled())) {
+            throw Objects.requireNonNull(exceptionSupplier, "exceptionSupplier must not be null").get();
         }
         return entity;
     }

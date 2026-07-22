@@ -5,8 +5,8 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
+
+import java.util.Map;
 
 @Service
 public class PositionService extends TenantStandardBusinessService<Position> implements
@@ -79,7 +81,9 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
                 .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
                 .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE));
         if (referencedEmployeePositions > 0) {
-            throw new PlatformException("position is referenced by employee positions: " + id);
+            throw BusinessExceptions.warning("iam.position.delete-referenced",
+                    "该岗位已被职员任职信息引用，不能删除",
+                    Map.of("referenceCount", referencedEmployeePositions));
         }
     }
 

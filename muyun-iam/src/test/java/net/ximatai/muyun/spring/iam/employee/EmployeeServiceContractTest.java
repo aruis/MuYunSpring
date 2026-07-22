@@ -107,7 +107,7 @@ class EmployeeServiceContractTest {
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.actionMessage().code())
                                     .isEqualTo("iam.employee.department-organization-mismatch"))
-                    .hasMessageContaining("same organization");
+                    .hasMessage("职员所属部门必须隶属于同一机构");
         }
     }
 

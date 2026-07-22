@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
@@ -171,7 +172,7 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
     }
 
     private void requireActiveOrganization(String organizationId) {
-        organizationService.requireEnabled(organizationId,
-                "organization is not active: " + organizationId);
+        organizationService.requireEnabledOrThrow(organizationId, () -> BusinessExceptions.warning(
+                "iam.department.organization-not-active", "所属机构不存在或已停用"));
     }
 }

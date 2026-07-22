@@ -52,6 +52,7 @@ export interface WebActionMessage {
   code?: string;
   text?: string;
   type?: WebActionMessageType;
+  messageArgs?: Record<string, unknown>;
 }
 
 export interface WebActionResultFacts {

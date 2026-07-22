@@ -375,7 +375,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
         if (grant == null || !SortAbility.sameValue(role.getId(), grant.getRoleId())) {
             throw BusinessExceptions.warning("iam.role.account-grant-role-mismatch",
-                    "account role grant does not belong to role: " + grantId);
+                    "该账号角色绑定不属于当前角色");
         }
         return accountRoleGrantDao.deleteById(grant.getId());
     }
@@ -419,7 +419,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
         if (grant == null || !SortAbility.sameValue(role.getId(), grant.getRoleId())) {
             throw BusinessExceptions.warning("iam.role.employment-grant-role-mismatch",
-                    "employment role grant does not belong to role: " + grantId);
+                    "该任职角色绑定不属于当前角色");
         }
         return employmentRoleGrantDao.deleteById(grant.getId());
     }
@@ -876,14 +876,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             role = selectPlatformSharedRole(validRoleId);
         }
         if (role == null || !Boolean.TRUE.equals(role.getEnabled())) {
-            throw BusinessExceptions.warning("iam.role.inactive", "role is not active: " + roleId);
+            throw BusinessExceptions.warning("iam.role.inactive", "角色不存在或已停用");
         }
         normalizeLoadedRoleDefaults(role);
         if (role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM
                 && role.getSharePolicy() != RoleSharePolicy.PLATFORM
                 && TenantContext.currentTenantId().isPresent()) {
             throw BusinessExceptions.warning("iam.role.platform-private-not-bindable",
-                    "platform private role cannot be bound by tenant: " + roleId);
+                    "租户不能绑定平台私有角色");
         }
         return role;
     }
@@ -934,32 +934,32 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         Role role = requireEnabledRole(roleId);
         if (role.getRoleKind() == RoleKind.GROUP) {
             throw BusinessExceptions.warning("iam.role.group-action-grant-denied",
-                    "role group cannot be granted actions directly: " + roleId);
+                    "角色组不能直接配置动作授权");
         }
         return role;
     }
 
     private void requireAccountRole(Role role) {
         if (role.getAssignmentType() != RoleAssignmentType.ACCOUNT) {
-            throw BusinessExceptions.warning("iam.role.not-account-role", "role is not account role: " + role.getId());
+            throw BusinessExceptions.warning("iam.role.not-account-role", "当前角色不是账号角色");
         }
         if (role.getRoleKind() == RoleKind.GROUP || role.getRoleKind() == RoleKind.DATA_GRANT) {
             throw BusinessExceptions.warning("iam.role.account-grant-kind-denied",
-                    "role kind cannot be granted to account: " + role.getId());
+                    "角色组和数据授权角色不能绑定到账号");
         }
     }
 
     private void requireEmploymentAssignableRole(Role role) {
         if (role.getAssignmentType() != RoleAssignmentType.EMPLOYMENT) {
             throw BusinessExceptions.warning("iam.role.not-employment-role",
-                    "role is not employment role: " + role.getId());
+                    "当前角色不是任职角色");
         }
     }
 
     private void requireSystemManagedMutationAllowed(Role role, String operation) {
         if (role != null && Boolean.TRUE.equals(role.getSystemManaged()) && !CurrentUserContext.isSystem()) {
             throw BusinessExceptions.warning("iam.role.system-managed-mutation-denied",
-                    "system managed role cannot be modified by " + operation + ": " + role.getId());
+                    "系统托管角色不能在当前上下文中修改");
         }
     }
 
@@ -968,16 +968,19 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             return;
         }
         if (updated.getAssignmentType() != null && existing.getAssignmentType() != updated.getAssignmentType()) {
-            throw new PlatformException("role assignment type cannot be changed after creation: " + existing.getId());
+            throw BusinessExceptions.warning("iam.role.assignment-type-immutable",
+                    "角色创建后不能修改分配类型");
         }
         if (updated.getRoleKind() != null && existing.getRoleKind() != updated.getRoleKind()) {
-            throw new PlatformException("role kind cannot be changed after creation: " + existing.getId());
+            throw BusinessExceptions.warning("iam.role.kind-immutable", "角色创建后不能修改角色类型");
         }
         if (updated.getOwnerScopeType() != null && existing.getOwnerScopeType() != updated.getOwnerScopeType()) {
-            throw new PlatformException("role owner scope type cannot be changed after creation: " + existing.getId());
+            throw BusinessExceptions.warning("iam.role.owner-scope-type-immutable",
+                    "角色创建后不能修改归属范围类型");
         }
         if (updated.getOwnerScopeId() != null && !Objects.equals(existing.getOwnerScopeId(), updated.getOwnerScopeId())) {
-            throw new PlatformException("role owner scope id cannot be changed after creation: " + existing.getId());
+            throw BusinessExceptions.warning("iam.role.owner-scope-id-immutable",
+                    "角色创建后不能修改归属范围");
         }
     }
 
@@ -1122,7 +1125,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private void requirePlatformRoleSystemContext() {
         if (!TenantContext.isSystem()) {
-            throw new PlatformException("platform role management requires system tenant context");
+            throw BusinessExceptions.warning("iam.role.platform-management-system-context-required",
+                    "仅系统身份可以管理平台角色");
         }
     }
 
@@ -1133,9 +1137,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (ownerScopeType == RoleOwnerScopeType.TENANT) {
             String normalized = normalizeBlank(ownerScopeId);
             String currentTenantId = TenantContext.currentTenantId()
-                    .orElseThrow(() -> new PlatformException("tenant role requires tenant owner scope id"));
+                    .orElseThrow(() -> BusinessExceptions.warning("iam.role.tenant-context-required",
+                            "租户角色管理需要租户上下文"));
             if (normalized != null && !Objects.equals(normalized, currentTenantId)) {
-                throw new PlatformException("tenant role owner scope id must match current tenant: " + normalized);
+                throw BusinessExceptions.warning("iam.role.owner-tenant-mismatch",
+                        "租户角色的归属租户必须与当前租户一致");
             }
             return currentTenantId;
         }
@@ -1160,10 +1166,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 role.getOwnerScopeId(),
                 "role owner organization is not active: " + role.getOwnerScopeId());
         String currentTenantId = TenantContext.currentTenantId()
-                .orElseThrow(() -> new PlatformException("organization role requires tenant context"));
+                .orElseThrow(() -> BusinessExceptions.warning("iam.role.tenant-context-required",
+                        "组织角色管理需要租户上下文"));
         if (!Objects.equals(currentTenantId, organization.getTenantId())) {
-            throw new PlatformException("role owner organization does not belong to current tenant: "
-                    + role.getOwnerScopeId());
+            throw BusinessExceptions.warning("iam.role.owner-organization-tenant-mismatch",
+                    "角色归属机构不属于当前租户");
         }
     }
 
@@ -1172,19 +1179,21 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.PLATFORM) {
                 return;
             }
-            throw new PlatformException("platform role only supports private or platform share policy: " + roleId);
+            throw BusinessExceptions.warning("iam.role.platform-share-policy-invalid",
+                    "平台角色仅支持私有或平台共享策略");
         }
         if (ownerScopeType == RoleOwnerScopeType.TENANT) {
             if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.TENANT) {
                 return;
             }
-            throw new PlatformException("tenant role only supports private or tenant share policy: " + roleId);
+            throw BusinessExceptions.warning("iam.role.tenant-share-policy-invalid",
+                    "租户角色仅支持私有或租户共享策略");
         }
         if (sharePolicy == RoleSharePolicy.PRIVATE || sharePolicy == RoleSharePolicy.OWNER_AND_CHILDREN) {
             return;
         }
-        throw new PlatformException("organization role only supports private or owner-and-children share policy: "
-                + roleId);
+        throw BusinessExceptions.warning("iam.role.organization-share-policy-invalid",
+                "组织角色仅支持私有或归属机构及下级共享策略");
     }
 
     private void validateGroupMembers(String memberRoleIds) {
@@ -1192,23 +1201,26 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         for (String memberRoleId : parseRoleIds(memberRoleIds)) {
             Role member = selectGrantedRole(memberRoleId);
             if (member == null) {
-                throw new PlatformException("role group contains missing role: " + memberRoleId);
+                throw BusinessExceptions.warning("iam.role.group-member-not-found", "角色组包含不存在的角色");
             }
             if (member.getAssignmentType() != RoleAssignmentType.EMPLOYMENT) {
-                throw new PlatformException("role group can only contain employment roles: " + memberRoleId);
+                throw BusinessExceptions.warning("iam.role.group-member-assignment-type-invalid",
+                        "角色组只能包含任职角色");
             }
             if (member.getRoleKind() != RoleKind.STANDARD && member.getRoleKind() != RoleKind.DATA_GRANT) {
-                throw new PlatformException("role group can only contain standard or data grant roles: " + memberRoleId);
+                throw BusinessExceptions.warning("iam.role.group-member-kind-invalid",
+                        "角色组只能包含标准角色或数据授权角色");
             }
             if (!Boolean.TRUE.equals(member.getEnabled())) {
-                throw new PlatformException("role group contains inactive role: " + memberRoleId);
+                throw BusinessExceptions.warning("iam.role.group-member-inactive", "角色组不能包含已停用的角色");
             }
             if (member.getRoleKind() == RoleKind.DATA_GRANT) {
                 dataGrantMembers++;
             }
         }
         if (dataGrantMembers > 1) {
-            throw new PlatformException("role group can contain at most one data grant role");
+            throw BusinessExceptions.warning("iam.role.group-data-grant-member-duplicate",
+                    "角色组最多只能包含一个数据授权角色");
         }
     }
 
@@ -1295,7 +1307,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private void ensureDataGrantUnique(String employeePositionId, Role newRole) {
         if (effectiveDataGrantRoleIds(employeePositionId, newRole).size() > 1) {
             throw BusinessExceptions.warning("iam.role.data-grant-duplicate",
-                    "employment can have at most one data grant role: " + employeePositionId);
+                    "同一任职最多只能绑定一个数据授权角色");
         }
     }
 
@@ -1305,8 +1317,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         if (effectiveDataGrantRoleIds(employeePositionId, newRole).isEmpty()) {
             throw BusinessExceptions.warning("iam.role.data-grant-required",
-                    "employment must bind a data grant role before granting inherited data permissions: "
-                            + employeePositionId);
+                    "使用继承数据权限前，任职必须先绑定数据授权角色");
         }
     }
 
@@ -1576,7 +1587,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (employmentDataAction) {
             if (requestedPolicy == DataScopePolicy.NONE) {
                 throw BusinessExceptions.warning("iam.role.employment-data-scope-required",
-                        "employment data action must configure an inheritable or concrete data scope: " + role.getId());
+                        "任职角色的数据动作必须配置继承或具体的数据范围");
             }
             return requestedPolicy == null ? DataScopePolicy.INHERIT_DATA_GRANT : requestedPolicy;
         }
@@ -1596,17 +1607,17 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
         if (role.getAssignmentType() == RoleAssignmentType.ACCOUNT && policy != DataScopePolicy.NONE) {
             throw BusinessExceptions.warning("iam.role.account-role-data-scope-denied",
-                    "account role action cannot configure data scope: " + role.getId());
+                    "账号角色的动作不能配置数据范围");
         }
         if (role.getRoleKind() == RoleKind.DATA_GRANT) {
             if (policy == DataScopePolicy.NONE || policy == DataScopePolicy.INHERIT_DATA_GRANT) {
                 throw BusinessExceptions.warning("iam.role.data-grant-scope-required",
-                        "data grant role must configure concrete data scope: " + role.getId());
+                        "数据授权角色必须配置具体的数据范围");
             }
         }
         if (policy == DataScopePolicy.CUSTOM) {
             throw BusinessExceptions.warning("iam.role.custom-data-scope-unsupported",
-                    "custom data scope policy is not supported yet");
+                    "暂不支持自定义数据范围");
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             String validReferenceFieldId = Preconditions.requireText(referenceFieldId, "referenceFieldId");
@@ -1617,7 +1628,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                             && candidate.referenceActionCode().equals(validReferenceActionCode));
             if (!supported) {
                 throw BusinessExceptions.warning("iam.role.reference-dependency-unavailable",
-                        "reference dependency is not available for module: " + moduleAlias);
+                        "当前模块没有可用的引用依赖数据范围");
             }
         }
         return policy;
@@ -1630,7 +1641,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         if (!PlatformAction.VIEW.code().equals(value)) {
             throw BusinessExceptions.warning("iam.role.reference-dependency-action-unsupported",
-                    "reference dependency currently only supports view action");
+                    "引用依赖数据范围当前仅支持查看动作");
         }
         return value;
     }
@@ -1639,7 +1650,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         Role role = requireConfigurableRole(roleId);
         if (role.getRoleKind() != RoleKind.DATA_GRANT) {
             throw BusinessExceptions.warning("iam.role.not-data-grant-role",
-                    "role is not a data grant role: " + roleId);
+                    "当前角色不是数据授权角色");
         }
         return role;
     }
@@ -1665,7 +1676,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .anyMatch(action -> action.permissionActionCode().equals(permissionActionCode));
         if (!supported) {
             throw BusinessExceptions.warning("iam.role.data-grant-action-unsupported",
-                    "data grant role only supports standard data actions: " + actionCode);
+                    "数据授权角色仅支持配置标准数据动作");
         }
         return permissionActionCode;
     }
@@ -1674,7 +1685,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (policy == null || policy == DataScopePolicy.NONE || policy == DataScopePolicy.INHERIT_DATA_GRANT
                 || policy == DataScopePolicy.CUSTOM || policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             throw BusinessExceptions.warning("iam.role.data-grant-scope-required",
-                    "data grant role must configure a concrete standard data scope");
+                    "数据授权角色必须配置具体的标准数据范围");
         }
         return policy;
     }
