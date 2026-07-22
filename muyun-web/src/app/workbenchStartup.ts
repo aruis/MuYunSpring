@@ -55,6 +55,14 @@ export function openMenuTab(
   return { tabs: [...tabs, tab], activeTabKey: tab.key };
 }
 
+export function openDirectTab(
+  tabs: MenuTab[],
+  descriptor: PageDescriptor,
+): { tabs: MenuTab[]; activeTabKey: string } {
+  const tab = createDirectTab(descriptor);
+  return { tabs: upsertTab(tabs, tab), activeTabKey: tab.key };
+}
+
 export function menuTargetUrl(menu: MenuRecord, target: MenuNavigationTarget): string {
   return pageDescriptorToUrl(resolvePageDescriptor(target, { title: menu.title }));
 }

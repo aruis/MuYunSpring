@@ -1022,7 +1022,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /standard-crud-actions/);
   assert.match(roleViewSource, /standard-crud-row-actions/);
   assert.match(roleViewSource, /:extra-row-actions-of="roleExtraRowActionsOf"/);
-  assert.match(roleViewSource, /key: 'bind'[\s\S]*title: '绑定'[\s\S]*after: 'edit'/);
+  assert.match(roleViewSource, /key: 'bind'[\s\S]*title: '绑定'[\s\S]*after: 'edit'[\s\S]*pinned: true/);
+  assert.match(panelSource, /primaryActions: ResolvedRecordActionItem\[\]/);
+  assert.match(panelSource, /index === 0 \|\| action\.pinned === true/);
   assert.match(roleViewSource, /:row-action-state-of="roleRowActionStateOf"/);
   assert.match(roleViewSource, /const canToggleRole = computed\(/);
   assert.match(roleViewSource, /:disabled="savingRole \|\| !canToggleRole"/);
@@ -1063,7 +1065,31 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /account-grants/);
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
-  assert.doesNotMatch(roleViewSource, /rolePermissions/);
+  assert.match(roleViewSource, /key: 'authorize'[\s\S]*actionCode: 'rolePermissions'[\s\S]*title: '授权'/);
+  assert.match(roleViewSource, /route: '\/iam\/role-authorization'/);
+  assert.match(roleViewSource, /params: \{ roleId: id \}[\s\S]*tabPolicy: \{ identity: 'by-params' \}/);
+  const roleAuthorizationViewSource = readSource('src/views/RoleAuthorizationView.vue');
+  assert.match(roleAuthorizationViewSource, /角色组不独立授权/);
+  assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);
+  assert.match(roleAuthorizationViewSource, /dataScopePolicyCatalog/);
+  assert.match(roleAuthorizationViewSource, /action\.dataScopePolicy = 'inheritDataGrant'/);
+  assert.match(roleAuthorizationViewSource, /function normalizeEmploymentDataScope/);
+  assert.match(roleAuthorizationViewSource, /action\.dataScopePolicy === 'none'/);
+  assert.match(roleAuthorizationViewSource, /dataScopePolicy: 'inheritDataGrant'/);
+  assert.match(
+    roleAuthorizationViewSource,
+    /record\.dataAuth && isEmploymentRole && Boolean\(record\.granted\)/,
+  );
+  assert.match(
+    roleAuthorizationViewSource,
+    /column\.key === 'dataScopePolicy' && record\.dataAuth && isEmploymentRole/,
+  );
+  assert.match(roleAuthorizationViewSource, /displayedDataScopePolicy/);
+  assert.match(roleAuthorizationViewSource, /referenceDependencyOptions/);
+  assert.match(roleAuthorizationViewSource, /handlePlatformActionSuccess\(result/);
+  assert.doesNotMatch(roleAuthorizationViewSource, /presentPlatformMessage\('授权已保存'/);
+  assert.match(roleAuthorizationViewSource, /authorizationModules/);
+  assert.match(roleAuthorizationViewSource, /permissionMatrix/);
   assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);

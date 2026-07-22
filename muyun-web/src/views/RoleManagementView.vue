@@ -50,6 +50,7 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
+import { useWorkbenchNavigation } from '../app/workbenchNavigation';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
 import RoleEmploymentGrantDrawer from './RoleEmploymentGrantDrawer.vue';
 import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
@@ -83,6 +84,7 @@ const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const roleContext = useModuleContext<Role>({ moduleAlias: 'iam.role' });
 const currentUser = useCurrentUserContext();
+const workbenchNavigation = useWorkbenchNavigation();
 const tenantSearchKeyword = ref('');
 const organizationSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
@@ -491,9 +493,17 @@ function roleExtraRowActionsOf(record: QueryListRecord): RecordActionItem[] {
       key: 'bind',
       actionCode: roleBindingActionCode(record),
       title: '绑定',
-      iconName: 'lock',
       after: 'edit',
+      pinned: true,
       visible: canBindRoleRecord(record),
+    },
+    {
+      key: 'authorize',
+      actionCode: 'rolePermissions',
+      title: '授权',
+      after: 'bind',
+      pinned: true,
+      visible: canAuthorizeRoleRecord(record),
     },
     {
       key: 'toggle',
@@ -513,6 +523,7 @@ function roleRowActionStateOf(record: QueryListRecord, action: RecordActionItem)
   return actionKey === 'edit' ||
     actionKey === 'update' ||
     actionKey === 'bind' ||
+    actionKey === 'authorize' ||
     actionKey === 'toggle' ||
     actionKey === 'delete'
     ? { disabled: true }
@@ -535,6 +546,10 @@ function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryList
     void openRoleBinding(record, record.assignmentType === 'employment');
     return;
   }
+  if (action.key === 'authorize') {
+    openRoleAuthorization(record);
+    return;
+  }
   if (action.key === 'toggle') {
     void toggleRoleEnabled(record);
     return;
@@ -542,6 +557,22 @@ function handleRoleRowAction(action: ResolvedRecordActionItem, record: QueryList
   if (action.key === 'delete') {
     void removeRole(record);
   }
+}
+
+function openRoleAuthorization(record: QueryListRecord) {
+  const id = String(record.id ?? '');
+  if (!id || record.roleKind === 'group') {
+    return;
+  }
+  workbenchNavigation?.openPage({
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    title: `授权 - ${roleTitle(record as Role)}`,
+    target: { route: '/iam/role-authorization', moduleAlias: 'iam.role', query: { roleId: id } },
+    params: { roleId: id },
+    tabPolicy: { identity: 'by-params' },
+  });
 }
 
 function handleRoleRowDblclick(record: QueryListRecord) {
@@ -984,6 +1015,10 @@ function canBindRoleRecord(record: Partial<Role> | QueryListRecord | undefined) 
   return (
     Boolean(record?.id) && (record?.assignmentType === 'account' || record?.assignmentType === 'employment')
   );
+}
+
+function canAuthorizeRoleRecord(record: Partial<Role> | QueryListRecord | undefined) {
+  return Boolean(record?.id) && record?.roleKind !== 'group';
 }
 
 function roleBindingActionCode(record: Partial<Role> | QueryListRecord | undefined) {

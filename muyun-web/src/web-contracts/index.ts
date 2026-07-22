@@ -657,6 +657,20 @@ export type RoleOwnerScopeType = 'platform' | 'tenant' | 'organization';
 
 export type RoleSharePolicy = 'private' | 'ownerAndChildren' | 'tenant' | 'platform';
 
+export type DataScopePolicy =
+  | 'none'
+  | 'inheritDataGrant'
+  | 'all'
+  | 'owner'
+  | 'assignee'
+  | 'member'
+  | 'organization'
+  | 'organizationAndChildren'
+  | 'department'
+  | 'departmentAndChildren'
+  | 'custom'
+  | 'referenceDependency';
+
 export type ManagementScopeType = 'platform' | 'tenant' | 'organization';
 
 export interface Role extends StandardEnabledSortableEntity {
@@ -674,6 +688,63 @@ export interface Role extends StandardEnabledSortableEntity {
   builtIn?: boolean;
   systemManaged?: boolean;
   description?: string;
+}
+
+export interface RoleAuthorizationModule {
+  moduleAlias: string;
+  title: string;
+  applicationAlias?: string;
+  parentId?: string;
+}
+
+export interface RolePermissionAction {
+  moduleAlias: string;
+  actionCode: string;
+  permissionActionCode?: string;
+  title?: string;
+  titleKey?: string;
+  actionAuth?: boolean;
+  dataAuth?: boolean;
+  granted?: boolean;
+  dataScopePolicy?: DataScopePolicy;
+  referenceFieldId?: string;
+  referenceActionCode?: string;
+}
+
+export interface RolePermissionMatrixModule {
+  moduleAlias: string;
+  actions: RolePermissionAction[];
+}
+
+export interface RolePermissionMatrix {
+  roleId: string;
+  modules: RolePermissionMatrixModule[];
+}
+
+export interface RoleDataGrantActionMatrix {
+  roleId: string;
+  actions: Array<{
+    actionCode: string;
+    title?: string;
+    configured: boolean;
+    dataScopePolicy?: DataScopePolicy;
+  }>;
+}
+
+export interface RoleDataScopePolicyCatalog {
+  roleId: string;
+  options: Array<{
+    code: DataScopePolicy;
+    title: string;
+  }>;
+  referenceDependencies: Array<{
+    referenceFieldId: string;
+    title: string;
+    targetModuleAlias: string;
+    targetModuleTitle: string;
+    referenceActionCode: string;
+    referenceActionTitle: string;
+  }>;
 }
 
 export interface AccountRoleGrant extends StandardEntity {

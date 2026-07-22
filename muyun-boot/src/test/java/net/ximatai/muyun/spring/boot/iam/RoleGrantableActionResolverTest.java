@@ -56,6 +56,27 @@ class RoleGrantableActionResolverTest {
 
         assertThat(actions).extracting(GrantableAction::actionCode)
                 .containsExactly("view", "delete");
+        assertThat(actions).extracting(GrantableAction::title)
+                .containsExactly("查看", "删除");
+        assertThat(actions).extracting(GrantableAction::titleKey)
+                .containsExactly("platform.action.view", "platform.action.delete");
+    }
+
+    @Test
+    void shouldNormalizeLegacyEnglishStandardActionTitlesButKeepModuleSpecificTitles() {
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        when(moduleService.resolveVisibleModule("iam.position")).thenReturn(module("iam.position", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("iam.position"))).thenReturn(List.of(
+                moduleAction("view", "view", "View", true),
+                moduleAction("update", "update", "编辑岗位", true)
+        ));
+        RoleGrantableActionResolver resolver = new RoleGrantableActionResolver(moduleService, moduleActionService);
+
+        List<GrantableAction> actions = resolver.resolve(List.of("iam.position"));
+
+        assertThat(actions).extracting(GrantableAction::title).containsExactly("查看", "编辑岗位");
+        assertThat(actions).extracting(GrantableAction::titleKey).containsExactly("platform.action.view", null);
     }
 
     @Test

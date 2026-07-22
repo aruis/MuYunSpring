@@ -15,6 +15,8 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Comparator;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
@@ -91,6 +93,27 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
         return selectGlobalModule(validAlias);
     }
 
+    /**
+     * Returns the enabled module catalog visible to the current tenant. Tenant-owned modules take
+     * precedence over a global module with the same alias, while system callers only receive the
+     * global catalog instead of every tenant's private definitions.
+     */
+    public List<PlatformModule> listVisibleModules() {
+        LinkedHashMap<String, PlatformModule> visible = new LinkedHashMap<>();
+        listGlobalEnabledModules().forEach(module -> visible.put(module.getAlias(), module));
+        TenantContext.currentTenantId().ifPresent(tenantId -> {
+            list(Criteria.of()
+                    .eq("enabled", Boolean.TRUE)
+                    .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId), new PageRequest(0, Integer.MAX_VALUE))
+                    .forEach(module -> visible.put(module.getAlias(), module));
+        });
+        return visible.values().stream()
+                .sorted(Comparator.comparing(PlatformModule::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(PlatformModule::getApplicationAlias)
+                        .thenComparing(PlatformModule::getAlias))
+                .toList();
+    }
+
     public List<PlatformModule> listSystemManagedStaticModules() {
         try (TenantContext.Scope ignored = TenantContext.system("select system managed static modules")) {
             return list(Criteria.of()
@@ -98,6 +121,17 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
                     .eq("systemManaged", Boolean.TRUE)
                     .isNull(StandardEntitySchema.TENANT_ID_FIELD),
                     new PageRequest(0, Integer.MAX_VALUE));
+        }
+    }
+
+    private List<PlatformModule> listGlobalEnabledModules() {
+        try (TenantContext.Scope ignored = TenantContext.system("select global visible platform modules")) {
+            return list(Criteria.of()
+                    .eq("enabled", Boolean.TRUE)
+                    .isNull(StandardEntitySchema.TENANT_ID_FIELD), new PageRequest(0, Integer.MAX_VALUE))
+                    .stream()
+                    .filter(module -> module.getTenantId() == null || module.getTenantId().isBlank())
+                    .toList();
         }
     }
 

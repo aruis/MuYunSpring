@@ -22,6 +22,7 @@ test('static business route registry exposes route prefixes for navigation resol
     '/iam/users',
     '/iam/system-users',
     '/iam/roles',
+    '/iam/role-authorization',
     '/iam/positions',
   ]);
   assert.deepEqual(businessModuleRoutes, {
@@ -38,6 +39,15 @@ test('static business route registry exposes route prefixes for navigation resol
     'iam.role': '/iam/roles',
     'iam.position_category': '/iam/positions',
   });
+});
+
+test('role authorization is a direct workbench page and does not replace the role menu route', () => {
+  const descriptor = pageDescriptorFromUrl('/iam/role-authorization?roleId=role-1', {
+    businessRoutePrefixes,
+  });
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.deepEqual(descriptor.target, { route: '/iam/role-authorization', query: { roleId: 'role-1' } });
+  assert.equal(businessModuleRoutes['iam.role'], '/iam/roles');
 });
 
 test('static business route registry resolves module alias by route', () => {

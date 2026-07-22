@@ -227,6 +227,7 @@
 | `POST` | `/iam.role/revoke/{roleId}`                             | 撤销角色某个模块动作授权。                                                                |
 | `POST` | `/iam.role/revoke/{roleId}/batch`                       | 批量撤销角色多个模块动作授权。                                                            |
 | `POST` | `/iam.role/permissionMatrix/{roleId}`                   | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。                              |
+| `GET`  | `/iam.role/dataScopePolicyCatalog/{roleId}`             | 返回当前角色可配置的数据范围策略；传入 `moduleAlias` 时同时返回该模块可用的引用依赖候选。 |
 | `GET`  | `/iam.role/menuMatrix/{roleId}/{schemeId}`              | 按菜单方案返回菜单树和角色对模块菜单的授权状态。                                          |
 
 角色基础字段：
@@ -263,8 +264,8 @@
 | `dataScopePolicy`     | 数据范围策略，JSON 使用业务 code，如 `all`、`owner`、`organizationAndChildren`、`departmentAndChildren`、`inheritDataGrant`。账号角色动作只能使用 `none`；任职角色可按动作数据权限配置具体范围或“继承数据授权”。 |
 | `tenantScopePolicy`   | 租户范围策略，当前 JSON 使用业务 code，如 `currentTenant`、`allTenants`。                                                                                                                                        |
 | `scopeCondition`      | 自定义条件保留字段；当前不开放可执行自定义条件授权。                                                                                                                                                             |
-| `referenceFieldId`    | 引用依赖数据权限使用的引用字段。                                                                                                                                                                                 |
-| `referenceActionCode` | 引用依赖数据权限使用的目标动作。                                                                                                                                                                                 |
+| `referenceFieldId`    | 引用依赖数据权限使用的、由数据范围策略目录返回的引用字段标识。                                                                                                                                                   |
+| `referenceActionCode` | 引用依赖数据权限使用的目标动作；当前目录仅开放安全的 `view`。                                                                                                                                                    |
 
 ## 菜单剪枝
 

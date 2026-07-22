@@ -47,6 +47,7 @@ import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
+import net.ximatai.muyun.spring.iam.role.RoleDataScopePolicyCatalog;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
@@ -113,6 +114,11 @@ class IamWebControllerTest {
         employeePositionDao = mock(EmployeePositionDao.class);
         userAccountDao = mock(UserAccountDao.class);
         roleService = mock(RoleService.class);
+        when(roleService.select(any())).thenAnswer(invocation -> {
+            Role role = new Role();
+            role.setId(invocation.getArgument(0));
+            return role;
+        });
         grantableActionResolver = mock(RoleGrantableActionResolver.class);
         TenantService tenantService = new TenantService(tenantDao);
         OrganizationService organizationService = new OrganizationService(organizationDao, tenantService);
@@ -902,6 +908,25 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.modules[0].actions[0].actionCode").value("query"))
                 .andExpect(jsonPath("$.modules[0].actions[0].permissionActionCode").value("view"))
                 .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
+    }
+
+    @Test
+    void shouldExposeBackendOwnedDataScopePolicyCatalog() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(roleService.dataScopePolicyCatalog("role-1", "sales.score"))
+                .thenReturn(new RoleDataScopePolicyCatalog("role-1",
+                        List.of(new RoleDataScopePolicyCatalog.Option(DataScopePolicy.INHERIT_DATA_GRANT, "继承数据授权"),
+                                new RoleDataScopePolicyCatalog.Option(DataScopePolicy.REFERENCE_DEPENDENCY,
+                                        "引用依赖")),
+                        List.of(new RoleDataScopePolicyCatalog.ReferenceDependency(
+                                "score.studentId", "学生", "school.student", "学生", "view", "查看"))));
+
+        mvc.perform(get("/iam.role/dataScopePolicyCatalog/{roleId}", "role-1")
+                        .queryParam("moduleAlias", "sales.score"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.options[0].code").value("inheritDataGrant"))
+                .andExpect(jsonPath("$.referenceDependencies[0].referenceFieldId").value("score.studentId"))
+                .andExpect(jsonPath("$.referenceDependencies[0].referenceActionCode").value("view"));
     }
 
     @Test

@@ -78,6 +78,25 @@ class PlatformModuleServiceContractTest {
     }
 
     @Test
+    void shouldListGlobalAndTenantVisibleModulesWithoutLeakingOtherTenantModules() {
+        PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
+        try (TenantContext.Scope ignored = TenantContext.system("create global module")) {
+            service.insert(module("crm.customer", "crm"));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            PlatformModule tenantModule = module("crm.tenant_customer", "crm");
+            tenantModule.setTenantId("tenant-a");
+            service.insert(tenantModule);
+            assertThat(service.listVisibleModules()).extracting(PlatformModule::getAlias)
+                    .containsExactly("crm.customer", "crm.tenant_customer");
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.listVisibleModules()).extracting(PlatformModule::getAlias)
+                    .containsExactly("crm.customer");
+        }
+    }
+
+    @Test
     void shouldRejectModuleAliasOutsideApplication() {
         PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
         PlatformModule module = module("sales.customer", "crm");
@@ -359,6 +378,7 @@ class PlatformModuleServiceContractTest {
                 case "applicationAlias" -> row.getApplicationAlias();
                 case "parentId" -> row.getParentId();
                 case "deleted" -> row.getDeleted();
+                case "enabled" -> row.getEnabled();
                 default -> null;
             };
             return expected == null ? actual == null : expected.equals(actual);

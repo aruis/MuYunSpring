@@ -9,6 +9,7 @@ public record GrantableAction(
         String actionCode,
         String permissionActionCode,
         String title,
+        String titleKey,
         boolean actionAuth,
         boolean dataAuth
 ) {
@@ -19,6 +20,16 @@ public record GrantableAction(
                 ? actionCode
                 : Preconditions.requireText(permissionActionCode, "permissionActionCode");
         title = title == null || title.isBlank() ? actionCode : title.trim();
+        titleKey = titleKey == null || titleKey.isBlank() ? null : titleKey.trim();
+    }
+
+    public GrantableAction(String moduleAlias,
+                           String actionCode,
+                           String permissionActionCode,
+                           String title,
+                           boolean actionAuth,
+                           boolean dataAuth) {
+        this(moduleAlias, actionCode, permissionActionCode, title, null, actionAuth, dataAuth);
     }
 
     public static GrantableAction ofPlatformDefaults(String moduleAlias, PlatformAction action) {
@@ -27,6 +38,7 @@ public record GrantableAction(
                 action.code(),
                 action.permissionActionCode(),
                 action.title(),
+                action.titleKey(),
                 action.actionAuth(),
                 action.dataAuth()
         );

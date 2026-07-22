@@ -4,6 +4,7 @@ import {
   activeTabUrlOf,
   closeMenuTab,
   loadWorkbenchStartupState,
+  openDirectTab,
   openMenuTab,
   restoreWorkbenchStartupStateFromUrl,
 } from '../src/app/workbenchStartup.ts';
@@ -607,6 +608,31 @@ test('activeTabUrlOf returns undefined when no active tab remains', () => {
     }),
     undefined,
   );
+});
+
+test('openDirectTab keeps authorization pages for different roles separate', () => {
+  const first = openDirectTab([], {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    title: '授权 - 角色 A',
+    target: { route: '/iam/role-authorization', query: { roleId: 'role-a' } },
+    params: { roleId: 'role-a' },
+    tabPolicy: { identity: 'by-params' },
+  });
+  const second = openDirectTab(first.tabs, {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    title: '授权 - 角色 B',
+    target: { route: '/iam/role-authorization', query: { roleId: 'role-b' } },
+    params: { roleId: 'role-b' },
+    tabPolicy: { identity: 'by-params' },
+  });
+
+  assert.equal(second.tabs.length, 2);
+  assert.notEqual(first.activeTabKey, second.activeTabKey);
+  assert.equal(second.activeTabKey, 'business-route:/iam/role-authorization:roleId=role-b');
 });
 
 test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no menu match', () => {

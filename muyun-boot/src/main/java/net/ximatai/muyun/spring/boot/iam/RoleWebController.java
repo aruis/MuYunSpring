@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.boot.web.BusinessMutation;
@@ -28,6 +29,8 @@ import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
 import net.ximatai.muyun.spring.iam.role.Role;
+import net.ximatai.muyun.spring.iam.role.RoleDataGrantActionMatrix;
+import net.ximatai.muyun.spring.iam.role.RoleDataScopePolicyCatalog;
 import net.ximatai.muyun.spring.iam.role.RoleOwnerScopeType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
@@ -35,6 +38,8 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,6 +47,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -63,23 +69,34 @@ public class RoleWebController extends WebSupport<RoleService> implements
         StaticModuleUiContributor {
     private final RoleGrantableActionResolver grantableActionResolver;
     private final MenuService menuService;
+    private final PlatformModuleService platformModuleService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
 
     public RoleWebController(RoleGrantableActionResolver grantableActionResolver) {
-        this(grantableActionResolver, (MenuService) null);
+        this(grantableActionResolver, (MenuService) null, (PlatformModuleService) null);
+    }
+
+    /** Kept for direct controller tests and embedders that only provide menu support. */
+    public RoleWebController(RoleGrantableActionResolver grantableActionResolver,
+                             ObjectProvider<MenuService> menuServiceProvider) {
+        this(grantableActionResolver, menuServiceProvider == null ? null : menuServiceProvider.getIfAvailable(), null);
     }
 
     @Autowired
     public RoleWebController(RoleGrantableActionResolver grantableActionResolver,
-                             ObjectProvider<MenuService> menuServiceProvider) {
+                             ObjectProvider<MenuService> menuServiceProvider,
+                             ObjectProvider<PlatformModuleService> platformModuleServiceProvider) {
         this(grantableActionResolver,
-                menuServiceProvider == null ? null : menuServiceProvider.getIfAvailable());
+                menuServiceProvider == null ? null : menuServiceProvider.getIfAvailable(),
+                platformModuleServiceProvider == null ? null : platformModuleServiceProvider.getIfAvailable());
     }
 
     private RoleWebController(RoleGrantableActionResolver grantableActionResolver,
-                              MenuService menuService) {
+                              MenuService menuService,
+                              PlatformModuleService platformModuleService) {
         this.grantableActionResolver = grantableActionResolver;
         this.menuService = menuService;
+        this.platformModuleService = platformModuleService;
     }
 
     @Autowired(required = false)
@@ -137,7 +154,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @CustomActionEndpoint(value = "accountRoleGrants", title = "账号角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public List<AccountRoleGrant> accountRoleGrants(@PathVariable String roleId) {
-        return roleRecordScope(roleId, () -> service().accountRoleGrants(roleId));
+        return roleReadScope(roleId, () -> service().accountRoleGrants(roleId));
     }
 
     @PostMapping("/{roleId}/account-grants")
@@ -174,7 +191,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @CustomActionEndpoint(value = "employmentRoleGrants", title = "任职角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public List<EmploymentRoleGrant> employmentRoleGrants(@PathVariable String roleId) {
-        return roleRecordScope(roleId, () -> service().employmentRoleGrants(roleId));
+        return roleReadScope(roleId, () -> service().employmentRoleGrants(roleId));
     }
 
     @PostMapping("/{roleId}/employment-selector/query")
@@ -183,7 +200,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     public WebPageResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentSelector(@PathVariable String roleId,
                                                                         @RequestBody(required = false)
                                                                         EmploymentSelectorRequest request) {
-        return roleRecordScope(roleId, () -> {
+        return roleReadScope(roleId, () -> {
             if (employeeEmploymentReadService == null) throw new IllegalStateException("employment selector is not available");
             EmploymentSelectorRequest normalized = request == null ? EmploymentSelectorRequest.EMPTY : request;
             WebPageRequest page = normalized.pageOrDefault();
@@ -304,10 +321,60 @@ public class RoleWebController extends WebSupport<RoleService> implements
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public RolePermissionMatrix permissionMatrix(@PathVariable String roleId,
                                                  @RequestBody PermissionMatrixRequest request) {
-        return roleRecordScope(roleId, () -> service().permissionMatrix(
-                roleId,
-                grantableActionResolver.resolve(request.moduleAliases())
-        ));
+        requireReadableRole(roleId);
+        return service().permissionMatrix(roleId, grantableActionResolver.resolve(request.moduleAliases()));
+    }
+
+    @GetMapping("/authorizationModules/{roleId}")
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public WebListResponse<RoleAuthorizationModule> authorizationModules(@PathVariable String roleId) {
+        // Read catalog access is already protected by the record-level custom action. It must not enter the
+        // mutation-only tenant scope, which is unavailable for tenant read contexts.
+        if (service().select(roleId) == null) {
+            throw new IllegalArgumentException("role does not exist: " + roleId);
+        }
+        if (platformModuleService == null) {
+            throw new IllegalStateException("platform module service is not available");
+        }
+        List<RoleAuthorizationModule> modules = platformModuleService.listVisibleModules()
+                .stream()
+                .map(module -> new RoleAuthorizationModule(module.getId(), module.getTitle(),
+                        module.getApplicationAlias(), module.getParentId()))
+                .toList();
+        return new WebListResponse<>(modules);
+    }
+
+    @GetMapping("/dataGrantActionMatrix/{roleId}")
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public RoleDataGrantActionMatrix dataGrantActionMatrix(@PathVariable String roleId) {
+        requireReadableRole(roleId);
+        return service().dataGrantActionMatrix(roleId);
+    }
+
+    @GetMapping("/dataScopePolicyCatalog/{roleId}")
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    public RoleDataScopePolicyCatalog dataScopePolicyCatalog(@PathVariable String roleId,
+                                                             @RequestParam(required = false) String moduleAlias) {
+        requireReadableRole(roleId);
+        return service().dataScopePolicyCatalog(roleId, moduleAlias);
+    }
+
+    @PostMapping("/dataGrantActions/{roleId}")
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutation
+    public int replaceDataGrantActions(@PathVariable String roleId,
+                                       @RequestBody DataGrantActionsRequest request) {
+        return roleRecordScope(roleId, () -> {
+            int changed = service().replaceDataGrantActions(roleId, request.actions().stream()
+                    .map(DataGrantActionRequest::toCommand)
+                    .toList());
+            reportGrantMutation("iam.role.data-grant-actions.changed", "数据授权模板已保存", changed > 0);
+            return changed;
+        });
     }
 
     @GetMapping("/menuMatrix/{roleId}/{schemeId}")
@@ -315,7 +382,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebListResponse<RoleMenuNode> menuMatrix(@PathVariable String roleId,
                                                     @PathVariable String schemeId) {
-        return roleRecordScope(roleId, () -> {
+        return roleReadScope(roleId, () -> {
             if (menuService == null) {
                 throw new IllegalStateException("menu service is not available");
             }
@@ -395,6 +462,21 @@ public class RoleWebController extends WebSupport<RoleService> implements
     public record PermissionMatrixRequest(List<String> moduleAliases) {
     }
 
+    public record RoleAuthorizationModule(String moduleAlias, String title, String applicationAlias, String parentId) {
+    }
+
+    public record DataGrantActionRequest(String actionCode, DataScopePolicy dataScopePolicy, boolean enabled) {
+        RoleService.DataGrantActionCommand toCommand() {
+            return new RoleService.DataGrantActionCommand(actionCode, dataScopePolicy, enabled);
+        }
+    }
+
+    public record DataGrantActionsRequest(List<DataGrantActionRequest> actions) {
+        public DataGrantActionsRequest {
+            actions = actions == null ? List.of() : List.copyOf(actions);
+        }
+    }
+
     public record RoleMenuNode(
             Menu menu,
             boolean granted,
@@ -454,7 +536,18 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     private <T> T roleRecordScope(String roleId, Supplier<T> action) {
-        return MutationTenantScopeExecutor.forExistingRecord(this, roleId, () -> webScope(action));
+        return MutationTenantScopeExecutor.forExistingRecord(this, roleId, action);
+    }
+
+    private <T> T roleReadScope(String roleId, Supplier<T> action) {
+        requireReadableRole(roleId);
+        return action.get();
+    }
+
+    private void requireReadableRole(String roleId) {
+        if (service().select(roleId) == null) {
+            throw new IllegalArgumentException("role does not exist: " + roleId);
+        }
     }
 
     private List<Menu> flattenMenus(List<Menu> menus) {

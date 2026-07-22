@@ -59,6 +59,7 @@ import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.EmploymentRoleGrant;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.ManagementScopeType;
+import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -840,6 +841,7 @@ class IamWebControllerIT {
     void shouldBindRoleManagementEndpointsInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(roleService.select(any())).thenAnswer(invocation -> readableRole((String) invocation.getArgument(0)));
         AccountRoleGrant accountGrant = accountRoleGrant("grant-1", "role-1", "user-2",
                 ManagementScopeType.TENANT, "tenant_a");
         EmploymentRoleGrant employmentGrant = employmentRoleGrant("grant-2", "role-2", "position-1");
@@ -961,6 +963,7 @@ class IamWebControllerIT {
     void shouldResolveRolePermissionMatrixInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(roleService.select("role-1")).thenReturn(readableRole("role-1"));
         List<GrantableAction> grantableActions = List.of(
                 new GrantableAction("sales.contract", "query", "view", "Query", true, true)
         );
@@ -1035,6 +1038,12 @@ class IamWebControllerIT {
         grant.setEmployeePositionId(employeePositionId);
         grant.setEnabled(Boolean.TRUE);
         return grant;
+    }
+
+    private Role readableRole(String id) {
+        Role role = new Role();
+        role.setId(id);
+        return role;
     }
 
     private EmployeeAccount employeeAccount(String id, String employeeId, String userId) {

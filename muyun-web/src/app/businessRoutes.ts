@@ -9,6 +9,7 @@ import OrganizationManagementView from '../views/OrganizationManagementView.vue'
 import PasswordManagementView from '../views/PasswordManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
 import RoleManagementView from '../views/RoleManagementView.vue';
+import RoleAuthorizationView from '../views/RoleAuthorizationView.vue';
 import SystemUserManagementView from '../views/SystemUserManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
 import UserManagementView from '../views/UserManagementView.vue';
@@ -17,6 +18,8 @@ export interface StaticBusinessRoute {
   route: string;
   moduleAlias: string;
   component: Component;
+  /** Internal pages share a module context but must not replace that module's menu route. */
+  menuEntry?: boolean;
 }
 
 export const staticBusinessRoutes: StaticBusinessRoute[] = [
@@ -76,6 +79,12 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     component: RoleManagementView,
   },
   {
+    route: '/iam/role-authorization',
+    moduleAlias: 'iam.role',
+    component: RoleAuthorizationView,
+    menuEntry: false,
+  },
+  {
     route: '/iam/positions',
     moduleAlias: 'iam.position_category',
     component: PositionManagementView,
@@ -84,7 +93,9 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
 
 export const businessRoutePrefixes = Array.from(new Set(staticBusinessRoutes.map((route) => route.route)));
 export const businessModuleRoutes = Object.fromEntries(
-  staticBusinessRoutes.map((route) => [route.moduleAlias, route.route]),
+  staticBusinessRoutes
+    .filter((route) => route.menuEntry !== false)
+    .map((route) => [route.moduleAlias, route.route]),
 );
 
 export function resolveStaticBusinessRoute(

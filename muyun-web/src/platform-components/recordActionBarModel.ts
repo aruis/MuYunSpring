@@ -8,6 +8,8 @@ export interface RecordActionItem {
   before?: string;
   after?: string;
   visible?: boolean;
+  /** Keep the row action visible beside the default row action instead of placing it in “more”. */
+  pinned?: boolean;
   disabled?: boolean;
   loading?: boolean;
   primary?: boolean;

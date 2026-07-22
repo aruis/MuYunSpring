@@ -6,58 +6,60 @@ import java.util.List;
 import java.util.Optional;
 
 public enum PlatformAction {
-    MENU(PlatformActionGroup.MENU, "menu", "Menu",
+    MENU(PlatformActionGroup.MENU, "menu", "platform.action.menu", "菜单访问", "Menu",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
 
-    CREATE(PlatformActionGroup.CRUD, "create", "Create",
+    CREATE(PlatformActionGroup.CRUD, "create", "platform.action.create", "新建", "Create",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
-    VIEW(PlatformActionGroup.CRUD, "view", "View",
+    VIEW(PlatformActionGroup.CRUD, "view", "platform.action.view", "查看", "View",
             PlatformActionLevel.RECORD, 20,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
-    UPDATE(PlatformActionGroup.CRUD, "update", "Update",
+    UPDATE(PlatformActionGroup.CRUD, "update", "platform.action.update", "编辑", "Update",
             PlatformActionLevel.RECORD, 30,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
-    DELETE(PlatformActionGroup.CRUD, "delete", "Delete",
+    DELETE(PlatformActionGroup.CRUD, "delete", "platform.action.delete", "删除", "Delete",
             PlatformActionLevel.RECORD, 40,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
-    BATCH_DELETE(PlatformActionGroup.CRUD, "batchDelete", "Batch Delete",
+    BATCH_DELETE(PlatformActionGroup.CRUD, "batchDelete", "platform.action.batch-delete", "批量删除", "Batch Delete",
             PlatformActionLevel.BATCH, 45,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, DELETE),
-    QUERY(PlatformActionGroup.CRUD, "query", "Query",
+    QUERY(PlatformActionGroup.CRUD, "query", "platform.action.query", "查询", "Query",
             PlatformActionLevel.LIST, 50,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
-    SORT(PlatformActionGroup.SORT, "sort", "Sort",
+    SORT(PlatformActionGroup.SORT, "sort", "platform.action.sort", "排序", "Sort",
             PlatformActionLevel.RECORD, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
 
-    TREE(PlatformActionGroup.TREE, "tree", "Tree",
+    TREE(PlatformActionGroup.TREE, "tree", "platform.action.tree", "查看树", "Tree",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
-    REFERENCE(PlatformActionGroup.REFERENCE, "reference", "Reference",
+    REFERENCE(PlatformActionGroup.REFERENCE, "reference", "platform.action.reference", "引用选择", "Reference",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
-    ENABLE(PlatformActionGroup.ENABLE, "enable", "Enable",
+    ENABLE(PlatformActionGroup.ENABLE, "enable", "platform.action.enable", "启用", "Enable",
             PlatformActionLevel.RECORD, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
-    DISABLE(PlatformActionGroup.ENABLE, "disable", "Disable",
+    DISABLE(PlatformActionGroup.ENABLE, "disable", "platform.action.disable", "停用", "Disable",
             PlatformActionLevel.RECORD, 20,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, ENABLE),
 
-    IMPORT(PlatformActionGroup.EXCHANGE, "import", "Import",
+    IMPORT(PlatformActionGroup.EXCHANGE, "import", "platform.action.import", "导入", "Import",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
-    EXPORT(PlatformActionGroup.EXCHANGE, "export", "Export",
+    EXPORT(PlatformActionGroup.EXCHANGE, "export", "platform.action.export", "导出", "Export",
             PlatformActionLevel.LIST, 20,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW);
 
     private final PlatformActionGroup group;
     private final String code;
+    private final String titleKey;
     private final String title;
+    private final String legacyTitle;
     private final PlatformActionLevel level;
     private final int order;
     private final ActionAccessMode accessMode;
@@ -68,16 +70,20 @@ public enum PlatformAction {
 
     PlatformAction(PlatformActionGroup group,
                    String code,
+                   String titleKey,
                    String title,
+                   String legacyTitle,
                    PlatformActionLevel level,
                    int order) {
-        this(group, code, title, level, order,
+        this(group, code, titleKey, title, legacyTitle, level, order,
                 ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null);
     }
 
     PlatformAction(PlatformActionGroup group,
                    String code,
+                   String titleKey,
                    String title,
+                   String legacyTitle,
                    PlatformActionLevel level,
                    int order,
                    ActionAccessMode accessMode,
@@ -87,7 +93,9 @@ public enum PlatformAction {
                    PlatformAction permissionAction) {
         this.group = group;
         this.code = code;
+        this.titleKey = titleKey;
         this.title = title;
+        this.legacyTitle = legacyTitle;
         this.level = level;
         this.order = order;
         this.accessMode = accessMode;
@@ -107,6 +115,16 @@ public enum PlatformAction {
 
     public String title() {
         return title;
+    }
+
+    public String titleKey() {
+        return titleKey;
+    }
+
+    public boolean usesDefaultTitle(String candidate) {
+        return candidate == null || candidate.isBlank()
+                || title.equals(candidate.trim())
+                || legacyTitle.equals(candidate.trim());
     }
 
     public PlatformActionLevel level() {
