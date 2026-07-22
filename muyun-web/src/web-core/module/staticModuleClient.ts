@@ -16,6 +16,10 @@ export interface StaticRecordMutationResult<TRecord> extends WebActionResultFact
 
 export type StaticCountMutationResult = number | WebActionResultEnvelope<number>;
 
+export interface RecordActionRequest {
+  version: number;
+}
+
 export interface QuerySchemaRequestOptions {
   uiConfigId?: string;
 }
@@ -26,9 +30,9 @@ export interface StaticModuleCrudClient<TRecord> {
   view(id: string): Promise<TRecord>;
   insert(record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
   update(id: string, record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
-  delete(id: string): Promise<StaticCountMutationResult>;
-  enable(id: string): Promise<StaticCountMutationResult>;
-  disable(id: string): Promise<StaticCountMutationResult>;
+  delete(id: string, request: RecordActionRequest): Promise<StaticCountMutationResult>;
+  enable(id: string, request: RecordActionRequest): Promise<StaticCountMutationResult>;
+  disable(id: string, request: RecordActionRequest): Promise<StaticCountMutationResult>;
 }
 
 export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
@@ -39,8 +43,8 @@ export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<
 }
 
 export interface ModuleEnableClient {
-  enable(id: string): Promise<StaticCountMutationResult>;
-  disable(id: string): Promise<StaticCountMutationResult>;
+  enable(id: string, request: RecordActionRequest): Promise<StaticCountMutationResult>;
+  disable(id: string, request: RecordActionRequest): Promise<StaticCountMutationResult>;
 }
 
 export function createStaticModuleCrudClient<TRecord>(
@@ -86,25 +90,28 @@ export function createStaticResourceCrudClient<TRecord>(
           body: record,
         }),
       ),
-    delete: async (id) =>
+    delete: async (id, request) =>
       normalizeCountMutationResponse(
         await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/delete/${encodeURIComponent(id)}`,
+          body: request,
         }),
       ),
-    enable: async (id) =>
+    enable: async (id, request) =>
       normalizeCountMutationResponse(
         await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/enable/${encodeURIComponent(id)}`,
+          body: request,
         }),
       ),
-    disable: async (id) =>
+    disable: async (id, request) =>
       normalizeCountMutationResponse(
         await http.request<StaticCountMutationResult>({
           method: 'POST',
           path: `${modulePath}/disable/${encodeURIComponent(id)}`,
+          body: request,
         }),
       ),
   };

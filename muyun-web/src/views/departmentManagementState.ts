@@ -172,7 +172,9 @@ export function createDepartmentManagementState(
       execute: async (department) => {
         await departmentContext.runtime.ready;
         const enable = departmentContext.abilities.enable();
-        return department.enabled === false ? enable.enable(department.id!) : enable.disable(department.id!);
+        return department.enabled === false
+          ? enable.enable(department.id!, { version: department.version! })
+          : enable.disable(department.id!, { version: department.version! });
       },
       onExecuted: async (_, department) => {
         const refreshed = await departmentContext.abilities.crud().view(department.id!);
@@ -196,7 +198,8 @@ export function createDepartmentManagementState(
           okText: '删除',
           danger: true,
         }),
-      execute: (department) => departmentContext.abilities.crud().delete(department.id!),
+      execute: (department) =>
+        departmentContext.abilities.crud().delete(department.id!, { version: department.version! }),
       onExecuted: () => {
         departmentEditor.clearSelection();
         mode.value = 'view';

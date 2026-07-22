@@ -56,7 +56,7 @@ test('static tree resource context keeps runtime tree availability for optional 
 test('empty static tree client is mutation-safe for unavailable scopes', async () => {
   const client = createEmptyStaticTreeClient<DictionaryCategory>('platform.dictionary_item');
 
-  assert.equal(await client.delete('missing'), 0);
+  assert.equal(await client.delete('missing', { version: 0 }), 0);
   assert.equal(await client.sort('missing', { beforeId: 'other' }), 0);
 });
 

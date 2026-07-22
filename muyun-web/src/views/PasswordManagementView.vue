@@ -221,8 +221,10 @@ async function toggleEnabled(enabled: boolean) {
     await ruleContext.runtime.ready;
     const result =
       selected.value.enabled === false
-        ? await ruleContext.abilities.enable().enable(selected.value.id)
-        : await ruleContext.abilities.enable().disable(selected.value.id);
+        ? await ruleContext.abilities.enable().enable(selected.value.id, { version: selected.value.version! })
+        : await ruleContext.abilities
+            .enable()
+            .disable(selected.value.id, { version: selected.value.version! });
     const refreshed = await ruleContext.abilities.crud().view(selected.value.id);
     selected.value = refreshed;
     draft.value = copyRule(refreshed);
@@ -257,7 +259,9 @@ async function removeSelected() {
   saving.value = true;
   try {
     await ruleContext.runtime.ready;
-    const result = await ruleContext.abilities.crud().delete(selected.value.id);
+    const result = await ruleContext.abilities
+      .crud()
+      .delete(selected.value.id, { version: selected.value.version! });
     await handlePasswordActionSuccess(result, [
       platformActionResultReactions.clearSelection(),
       platformActionResultReactions.refreshList(),

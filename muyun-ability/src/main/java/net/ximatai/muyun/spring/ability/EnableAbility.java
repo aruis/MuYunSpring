@@ -13,8 +13,16 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
         return updateEnabled(id, Boolean.TRUE);
     }
 
+    default int enable(String id, Integer expectedVersion) {
+        return updateEnabled(id, Boolean.TRUE, expectedVersion);
+    }
+
     default int disable(String id) {
         return updateEnabled(id, Boolean.FALSE);
+    }
+
+    default int disable(String id, Integer expectedVersion) {
+        return updateEnabled(id, Boolean.FALSE, expectedVersion);
     }
 
     default boolean isEnabled(String id) {
@@ -52,11 +60,18 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
     }
 
     private int updateEnabled(String id, Boolean enabled) {
+        return updateEnabled(id, enabled, null);
+    }
+
+    private int updateEnabled(String id, Boolean enabled, Integer expectedVersion) {
         T entity = selectActiveRaw(id);
         if (entity == null) {
             return 0;
         }
         entity.setEnabled(enabled);
+        if (expectedVersion != null) {
+            entity.setVersion(expectedVersion);
+        }
         return update(entity);
     }
 }

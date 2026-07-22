@@ -185,7 +185,8 @@ class WorkflowDelegationWebControllerTest {
                 WebQueryRequest.class);
         assertCustomAction("manageQuery", "manageQuery", PlatformActionLevel.LIST, false,
                 WebQueryRequest.class);
-        assertCustomAction("manageEnable", "manageEnable", PlatformActionLevel.RECORD, true, String.class);
+        assertCustomAction("manageEnable", "manageEnable", PlatformActionLevel.RECORD, true,
+                String.class, net.ximatai.muyun.spring.boot.web.RecordActionWebRequest.class);
     }
 
     private WorkflowDelegation delegation(String title, String principal, String delegate) {

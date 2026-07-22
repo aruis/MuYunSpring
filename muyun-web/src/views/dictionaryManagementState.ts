@@ -235,8 +235,8 @@ export function createDictionaryManagementState(
       const enable = categoryClientOf();
       const result =
         selectedCategory.value.enabled === false
-          ? await enable.enable(selectedCategory.value.id)
-          : await enable.disable(selectedCategory.value.id);
+          ? await enable.enable(selectedCategory.value.id, { version: selectedCategory.value.version! })
+          : await enable.disable(selectedCategory.value.id, { version: selectedCategory.value.version! });
       categoryEditor.select(await categoryClientOf().view(selectedCategory.value.id));
       await presentCategorySuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
@@ -267,7 +267,9 @@ export function createDictionaryManagementState(
     categorySaving.value = true;
     try {
       await categoryContext.runtime.ready;
-      const result = await categoryClientOf().delete(selectedCategory.value.id);
+      const result = await categoryClientOf().delete(selectedCategory.value.id, {
+        version: selectedCategory.value.version!,
+      });
       await presentCategorySuccess(result, [
         platformActionResultReactions.clearSelection(),
         platformActionResultReactions.refreshList(),
@@ -413,8 +415,8 @@ export function createDictionaryManagementState(
     try {
       const result =
         selectedItem.value.enabled === false
-          ? await itemClient().enable(selectedItem.value.id)
-          : await itemClient().disable(selectedItem.value.id);
+          ? await itemClient().enable(selectedItem.value.id, { version: selectedItem.value.version! })
+          : await itemClient().disable(selectedItem.value.id, { version: selectedItem.value.version! });
       itemEditor.select(await itemClient().view(selectedItem.value.id));
       await presentItemSuccess(result, [platformActionResultReactions.refreshList()]);
     } catch (cause) {
@@ -444,7 +446,9 @@ export function createDictionaryManagementState(
     clearItemFeedback();
     itemSaving.value = true;
     try {
-      const result = await itemClient().delete(selectedItem.value.id);
+      const result = await itemClient().delete(selectedItem.value.id, {
+        version: selectedItem.value.version!,
+      });
       itemEditor.clearSelection();
       if (selectedCategoryIsDictionary.value && canCreateItem.value) {
         itemEditor.startCreate();

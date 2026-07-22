@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -38,8 +39,16 @@ public class WorkflowPublishFacade {
 
     @Transactional
     public WorkflowVersion publish(String definitionId, String versionId, String operatorId) {
+        return publish(definitionId, versionId, null, null, operatorId);
+    }
+
+    @Transactional
+    public WorkflowVersion publish(String definitionId, String versionId, Integer expectedDefinitionVersion,
+                                   Integer expectedWorkflowVersion, String operatorId) {
         WorkflowDefinition definition = requireDefinition(definitionId);
         WorkflowVersion version = requireVersion(versionId);
+        requireExpectedVersion(definition, expectedDefinitionVersion, "workflow definition");
+        requireExpectedVersion(version, expectedWorkflowVersion, "workflow version");
         if (!definition.getId().equals(version.getDefinitionId())) {
             throw new PlatformException("workflow version does not belong to definition: " + versionId);
         }
@@ -65,16 +74,28 @@ public class WorkflowPublishFacade {
 
     @Transactional
     public WorkflowDefinition disable(String definitionId) {
-        return changeDefinitionStatus(definitionId, WorkflowDefinitionStatus.DISABLED);
+        return disable(definitionId, null);
+    }
+
+    @Transactional
+    public WorkflowDefinition disable(String definitionId, Integer expectedVersion) {
+        return changeDefinitionStatus(definitionId, expectedVersion, WorkflowDefinitionStatus.DISABLED);
     }
 
     @Transactional
     public WorkflowDefinition archive(String definitionId) {
-        return changeDefinitionStatus(definitionId, WorkflowDefinitionStatus.ARCHIVED);
+        return archive(definitionId, null);
     }
 
-    private WorkflowDefinition changeDefinitionStatus(String definitionId, WorkflowDefinitionStatus status) {
+    @Transactional
+    public WorkflowDefinition archive(String definitionId, Integer expectedVersion) {
+        return changeDefinitionStatus(definitionId, expectedVersion, WorkflowDefinitionStatus.ARCHIVED);
+    }
+
+    private WorkflowDefinition changeDefinitionStatus(String definitionId, Integer expectedVersion,
+                                                      WorkflowDefinitionStatus status) {
         WorkflowDefinition definition = requireDefinition(definitionId);
+        requireExpectedVersion(definition, expectedVersion, "workflow definition");
         definition.setDefinitionStatus(status);
         definitionService.update(definition);
         actionContributor.disableWorkflowActions(definition);
@@ -95,6 +116,13 @@ public class WorkflowPublishFacade {
             throw new PlatformException("workflow version not found: " + versionId);
         }
         return version;
+    }
+
+    private void requireExpectedVersion(net.ximatai.muyun.spring.common.model.contract.EntityContract entity,
+                                        Integer expectedVersion, String recordType) {
+        if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
+            throw new OptimisticLockException(recordType + " version conflict: " + entity.getId());
+        }
     }
 
     private void validateOvertimeDefinitions(WorkflowVersion version) {

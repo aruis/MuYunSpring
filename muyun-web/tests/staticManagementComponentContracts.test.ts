@@ -920,15 +920,24 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /当前用户无权保存职员/);
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
   assert.match(employeeViewSource, /canExecute: \(\) => canToggleEmployee\.value/);
-  assert.match(employeeViewSource, /employeeContext\.crud\.enable\(employee\.id!\)/);
-  assert.match(employeeViewSource, /employeeContext\.crud\.disable\(employee\.id!\)/);
+  assert.match(
+    employeeViewSource,
+    /employeeContext\.crud\.enable\(employee\.id!, \{ version: employee\.version! \}\)/,
+  );
+  assert.match(
+    employeeViewSource,
+    /employeeContext\.crud\.disable\(employee\.id!, \{ version: employee\.version! \}\)/,
+  );
   assert.match(
     employeeViewSource,
     /const refreshed = await employeeContext\.crud\.view\(employee\.id!\);\s*const requestSeq = commitEmployeeDetailRecord\(refreshed\);\s*await loadEmployeeDetailDepartment\(refreshed, requestSeq\)/,
   );
   assert.match(employeeViewSource, /confirm: \(target\) =>[\s\S]*title: '删除职员'/);
   assert.match(employeeViewSource, /content: `确认删除职员/);
-  assert.match(employeeViewSource, /employeeContext\.crud\.delete\(String\(target\.id\)\)/);
+  assert.match(
+    employeeViewSource,
+    /employeeContext\.crud\.delete\(String\(target\.id\), \{ version: \(target as \{ version: number \}\)\.version \}\)/,
+  );
   assert.match(employeeViewSource, /:disabled="savingEmployee \|\| !canToggleEmployee"/);
   assert.doesNotMatch(employeeViewSource, /:disabled="employeeFormFieldDisabled\('employeeNo'\)"/);
   assert.doesNotMatch(

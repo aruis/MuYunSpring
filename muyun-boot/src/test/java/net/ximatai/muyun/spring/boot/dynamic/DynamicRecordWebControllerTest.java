@@ -2152,7 +2152,7 @@ class DynamicRecordWebControllerTest {
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
         when(mainEntity.select("contract-1")).thenReturn(record);
-        when(mainEntity.delete("contract-1")).thenReturn(1);
+        when(mainEntity.delete("contract-1", 0)).thenReturn(1);
         when(service.actions(MODULE)).thenReturn(List.of(
                 action("export", EntityActionLevel.LIST),
                 action("submit", EntityActionLevel.RECORD, "view"),
@@ -2164,7 +2164,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.id").value("contract-1"))
                 .andExpect(jsonPath("$.values.code").value("C-001"));
 
-        mvc.perform(post("/{moduleAlias}/delete/{recordId}", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/delete/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{\"version\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
 
@@ -2181,7 +2183,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
         verify(mainEntity).select("contract-1");
-        verify(mainEntity).delete("contract-1");
+        verify(mainEntity).delete("contract-1", 0);
         verify(service).actions(MODULE);
     }
 
@@ -2369,26 +2371,48 @@ class DynamicRecordWebControllerTest {
 
     @Test
     void shouldExposeDynamicEnableThroughStandardEnableWebContract() throws Exception {
-        when(mainEntity.enable("contract-1")).thenReturn(1);
-        when(mainEntity.disable("contract-1")).thenReturn(1);
+        when(mainEntity.enable("contract-1", 0)).thenReturn(1);
+        when(mainEntity.disable("contract-1", 0)).thenReturn(1);
 
-        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{\"version\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
-        mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{\"version\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
 
-        verify(mainEntity).enable("contract-1");
-        verify(mainEntity).disable("contract-1");
+        verify(mainEntity).enable("contract-1", 0);
+        verify(mainEntity).disable("contract-1", 0);
+    }
+
+    @Test
+    void shouldRequireVersionForDynamicStandardRecordActions() throws Exception {
+        mvc.perform(post("/{moduleAlias}/delete/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldRejectEnableWebWhenDynamicMainEntityDoesNotSupportEnable() throws Exception {
-        when(mainEntity.enable("contract-1"))
+        when(mainEntity.enable("contract-1", 0))
                 .thenThrow(new PlatformException("dynamic entity does not support capability: ENABLE"));
 
-        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("{\"version\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: ENABLE"));

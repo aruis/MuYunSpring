@@ -547,12 +547,14 @@ class IamWebControllerTest {
         existing.setOwnerScopeType(RoleOwnerScopeType.ORGANIZATION);
         existing.setOwnerScopeId("demo_org");
         when(roleService.select("role-1")).thenReturn(existing);
-        when(roleService.delete("role-1")).thenAnswer(invocation -> {
+        when(roleService.delete("role-1", 0)).thenAnswer(invocation -> {
             assertThat(TenantContext.currentTenantId()).contains("demo");
             return 1;
         });
 
-        mvc.perform(post("/iam.role/delete/{id}", "role-1"))
+        mvc.perform(post("/iam.role/delete/{id}", "role-1")
+                        .contentType("application/json")
+                        .content("{\"version\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
     }
@@ -749,7 +751,9 @@ class IamWebControllerTest {
             return 1;
         });
 
-        mvc.perform(post("/iam.tenant/disable/{tenantAlias}", "tenant_a"))
+        mvc.perform(post("/iam.tenant/disable/{tenantAlias}", "tenant_a")
+                        .contentType("application/json")
+                        .content("{\"version\":2}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1));
 

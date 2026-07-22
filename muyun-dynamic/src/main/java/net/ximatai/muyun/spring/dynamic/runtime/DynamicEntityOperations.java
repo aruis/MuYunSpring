@@ -138,6 +138,11 @@ public final class DynamicEntityOperations implements
     }
 
     @Override
+    public int delete(String id, Integer expectedVersion) {
+        return service.delete(moduleAlias, entityAlias, id, expectedVersion);
+    }
+
+    @Override
     public int deleteBatch(Collection<String> ids) {
         return service.deleteBatch(moduleAlias, entityAlias, ids);
     }
@@ -207,8 +212,18 @@ public final class DynamicEntityOperations implements
     }
 
     @Override
+    public int enable(String id, Integer expectedVersion) {
+        return service.enable(moduleAlias, entityAlias, id, expectedVersion);
+    }
+
+    @Override
     public int disable(String id) {
         return service.disable(moduleAlias, entityAlias, id);
+    }
+
+    @Override
+    public int disable(String id, Integer expectedVersion) {
+        return service.disable(moduleAlias, entityAlias, id, expectedVersion);
     }
 
     @Override

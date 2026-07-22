@@ -7,26 +7,27 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends EnableAbility<T>>
         extends ScopedWeb<S>, RecordLabelWeb<T> {
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
     @StandardMutation(StandardMutationKind.ENABLE)
-    default int enable(@PathVariable String id) {
+    default int enable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.ENABLE, id);
-            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id));
+            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id, request.version()));
         }));
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
     @StandardMutation(StandardMutationKind.DISABLE)
-    default int disable(@PathVariable String id) {
+    default int disable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DISABLE, id);
-            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id));
+            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id, request.version()));
         }));
     }
 }

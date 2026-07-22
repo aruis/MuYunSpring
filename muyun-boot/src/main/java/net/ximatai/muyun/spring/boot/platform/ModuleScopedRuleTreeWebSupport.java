@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
+import net.ximatai.muyun.spring.boot.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.boot.web.StandardMutation;
 import net.ximatai.muyun.spring.boot.web.StandardMutationKind;
 import net.ximatai.muyun.spring.boot.web.StandardMutationResultSupport;
@@ -89,30 +90,33 @@ abstract class ModuleScopedRuleTreeWebSupport<
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     @StandardMutation(StandardMutationKind.DELETE)
-    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id,
+                      @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StandardMutationResultSupport.deleted(this, id, () -> service().delete(id));
+            return StandardMutationResultSupport.deleted(this, id, () -> service().delete(id, request.version()));
         });
     }
 
     @PostMapping("/enable/{id}")
     @ActionEndpoint(PlatformAction.ENABLE)
     @StandardMutation(StandardMutationKind.ENABLE)
-    public int enable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int enable(HttpServletRequest servletRequest, @PathVariable String id,
+                      @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StandardMutationResultSupport.enabled(this, id, () -> service().enable(id));
+            return StandardMutationResultSupport.enabled(this, id, () -> service().enable(id, request.version()));
         });
     }
 
     @PostMapping("/disable/{id}")
     @ActionEndpoint(PlatformAction.DISABLE)
     @StandardMutation(StandardMutationKind.DISABLE)
-    public int disable(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int disable(HttpServletRequest servletRequest, @PathVariable String id,
+                       @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StandardMutationResultSupport.disabled(this, id, () -> service().disable(id));
+            return StandardMutationResultSupport.disabled(this, id, () -> service().disable(id, request.version()));
         });
     }
 

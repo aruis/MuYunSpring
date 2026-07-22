@@ -109,10 +109,11 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     @StandardMutation(StandardMutationKind.DELETE)
-    public int delete(HttpServletRequest servletRequest, @PathVariable String id) {
+    public int delete(HttpServletRequest servletRequest, @PathVariable String id,
+                      @RequestBody RecordActionWebRequest request) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id));
+            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id, request.version()));
         });
     }
 

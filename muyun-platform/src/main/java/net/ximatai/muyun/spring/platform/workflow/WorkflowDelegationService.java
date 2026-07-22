@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
@@ -72,39 +73,64 @@ public class WorkflowDelegationService extends AbstractAbilityService<WorkflowDe
     }
 
     public int deleteForPrincipal(String id, String principalUserId) {
+        return deleteForPrincipal(id, null, principalUserId);
+    }
+
+    public int deleteForPrincipal(String id, Integer expectedVersion, String principalUserId) {
         WorkflowDelegation existing = requireExisting(id);
         String currentPrincipal = requireText(principalUserId, "workflow delegation principal user id must not be blank");
         if (!currentPrincipal.equals(existing.getPrincipalUserId())) {
             throw new PlatformException("workflow delegation does not belong to current principal: " + id);
         }
-        return delete(id);
+        requireExpectedVersion(existing, expectedVersion);
+        return delete(id, expectedVersion);
     }
 
     public WorkflowDelegation enable(String id) {
+        return enable(id, null);
+    }
+
+    public WorkflowDelegation enable(String id, Integer expectedVersion) {
         WorkflowDelegation existing = requireExisting(id);
+        requireExpectedVersion(existing, expectedVersion);
         if (Boolean.TRUE.equals(existing.getEnabled())) {
             return existing;
         }
         rejectEnabledConflict(existing);
+        existing.setVersion(expectedVersion == null ? existing.getVersion() : expectedVersion);
         return updateEnabled(existing, Boolean.TRUE);
     }
 
     public WorkflowDelegation disable(String id) {
+        return disable(id, null);
+    }
+
+    public WorkflowDelegation disable(String id, Integer expectedVersion) {
         WorkflowDelegation existing = requireExisting(id);
+        requireExpectedVersion(existing, expectedVersion);
         if (!Boolean.TRUE.equals(existing.getEnabled())) {
             return existing;
         }
+        existing.setVersion(expectedVersion == null ? existing.getVersion() : expectedVersion);
         return updateEnabled(existing, Boolean.FALSE);
     }
 
     public WorkflowDelegation enableForPrincipal(String id, String principalUserId) {
+        return enableForPrincipal(id, null, principalUserId);
+    }
+
+    public WorkflowDelegation enableForPrincipal(String id, Integer expectedVersion, String principalUserId) {
         requirePrincipal(id, principalUserId);
-        return enable(id);
+        return enable(id, expectedVersion);
     }
 
     public WorkflowDelegation disableForPrincipal(String id, String principalUserId) {
+        return disableForPrincipal(id, null, principalUserId);
+    }
+
+    public WorkflowDelegation disableForPrincipal(String id, Integer expectedVersion, String principalUserId) {
         requirePrincipal(id, principalUserId);
-        return disable(id);
+        return disable(id, expectedVersion);
     }
 
     public List<WorkflowDelegation> queryByPrincipal(String principalUserId, PageRequest pageRequest) {
@@ -194,6 +220,12 @@ public class WorkflowDelegationService extends AbstractAbilityService<WorkflowDe
             throw new PlatformException("workflow delegation version conflict: " + delegation.getId());
         }
         return select(delegation.getId());
+    }
+
+    private void requireExpectedVersion(WorkflowDelegation delegation, Integer expectedVersion) {
+        if (expectedVersion != null && !expectedVersion.equals(delegation.getVersion())) {
+            throw new OptimisticLockException("workflow delegation version conflict: " + delegation.getId());
+        }
     }
 
     private void rejectEnabledConflict(WorkflowDelegation delegation) {

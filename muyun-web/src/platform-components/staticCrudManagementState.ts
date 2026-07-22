@@ -24,6 +24,7 @@ export interface StaticCrudRecord {
   id?: string;
   title?: string;
   enabled?: boolean;
+  version?: number;
 }
 
 export type StaticCrudConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
@@ -213,8 +214,8 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const enable = options.context.abilities.enable();
       const result =
         selected.value.enabled === false
-          ? await enable.enable(selected.value.id)
-          : await enable.disable(selected.value.id);
+          ? await enable.enable(selected.value.id, { version: requiredVersion(selected.value) })
+          : await enable.disable(selected.value.id, { version: requiredVersion(selected.value) });
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
@@ -257,7 +258,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     try {
       await options.context.runtime.ready;
       const crud = options.context.abilities.crud();
-      const result = await crud.delete(record.id);
+      const result = await crud.delete(record.id, { version: requiredVersion(record) });
       await presentActionSuccess(result, [
         platformActionResultReactions.clearSelection(),
         platformActionResultReactions.refreshList(),
@@ -359,6 +360,13 @@ function requiredId(record: StaticCrudRecord, recordName: string) {
     throw new Error(`${recordName} ID 不能为空`);
   }
   return record.id;
+}
+
+function requiredVersion(record: StaticCrudRecord) {
+  if (record.version == null) {
+    throw new Error('记录版本不能为空，请重新加载后再操作');
+  }
+  return record.version;
 }
 
 function matchesActionErrorHandler<TRecord extends StaticCrudRecord>(
