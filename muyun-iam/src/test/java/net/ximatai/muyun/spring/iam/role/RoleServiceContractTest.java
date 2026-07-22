@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCandidate;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.employee.Employee;
@@ -393,6 +394,48 @@ class RoleServiceContractTest {
                 "r1", "sales.contract", "query", DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("account role action cannot configure data scope");
+    }
+
+    @Test
+    void shouldExposeBackendOwnedDataScopeCatalogAndValidateReferenceDependency() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("action-1");
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), actionDao);
+        service.setReferenceDependencyScopeCatalogResolver(moduleAlias -> "sales.score".equals(moduleAlias)
+                ? List.of(new ReferenceDependencyScopeCandidate(
+                        "score.studentId", "学生", "school.student", "学生", "view", "查看"))
+                : List.of());
+
+        RoleDataScopePolicyCatalog catalog = service.dataScopePolicyCatalog("r1", "sales.score");
+
+        assertThat(catalog.options()).extracting(RoleDataScopePolicyCatalog.Option::code)
+                .contains(DataScopePolicy.NONE, DataScopePolicy.INHERIT_DATA_GRANT,
+                        DataScopePolicy.REFERENCE_DEPENDENCY);
+        assertThat(catalog.options()).filteredOn(option -> option.code() == DataScopePolicy.ALL)
+                .singleElement().extracting(RoleDataScopePolicyCatalog.Option::title)
+                .isEqualTo("全部数据（当前租户）");
+        assertThat(catalog.referenceDependencies()).singleElement()
+                .extracting(RoleDataScopePolicyCatalog.ReferenceDependency::referenceFieldId)
+                .isEqualTo("score.studentId");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantAction("r1", "sales.score", "query",
+                    DataScopePolicy.REFERENCE_DEPENDENCY, TenantScopePolicy.CURRENT_TENANT,
+                    null, "score.studentId", "view")).isEqualTo(1);
+        }
+        verify(actionDao).insert(argThat(action -> action.getDataScopePolicy() == DataScopePolicy.REFERENCE_DEPENDENCY
+                && "score.studentId".equals(action.getReferenceFieldId())
+                && "view".equals(action.getReferenceActionCode())));
+        assertThatThrownBy(() -> service.grantAction("r1", "sales.score", "query",
+                DataScopePolicy.REFERENCE_DEPENDENCY, TenantScopePolicy.CURRENT_TENANT,
+                null, "score.otherId", "view"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("reference dependency is not available");
     }
 
     @Test

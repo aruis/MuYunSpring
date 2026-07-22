@@ -35,9 +35,11 @@ import {
   activeTabUrlOf,
   closeMenuTab,
   menuTargetUrl,
+  openDirectTab,
   openMenuTab,
   restoreWorkbenchStartupStateFromUrl,
 } from './app/workbenchStartup';
+import { provideWorkbenchNavigation } from './app/workbenchNavigation';
 
 const startup = ref<WorkbenchStartupState>();
 const currentUser = computed(() => startup.value?.session.currentUser);
@@ -65,6 +67,7 @@ configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
 provideCurrentUserContext(currentUser);
 providePlatformTimeZoneContext(currentTimeZone);
+provideWorkbenchNavigation({ openPage: handleOpenPage });
 
 const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 
@@ -331,6 +334,17 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     tabs: result.tabs,
     activeTabKey: result.activeTabKey,
   };
+  activeTabKey.value = result.activeTabKey;
+  syncBrowserUrl(startup.value);
+}
+
+function handleOpenPage(descriptor: import('@muyun/web-contracts').PageDescriptor) {
+  const current = startup.value;
+  if (!current) {
+    return;
+  }
+  const result = openDirectTab(current.tabs ?? [], descriptor);
+  startup.value = { ...current, tabs: result.tabs, activeTabKey: result.activeTabKey };
   activeTabKey.value = result.activeTabKey;
   syncBrowserUrl(startup.value);
 }

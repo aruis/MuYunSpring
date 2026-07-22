@@ -6,6 +6,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PlatformActionTest {
     @Test
+    void shouldExposeStableChineseDefaultTitlesAndLocalizationKeys() {
+        assertThat(PlatformAction.MENU.title()).isEqualTo("菜单访问");
+        assertThat(PlatformAction.CREATE.title()).isEqualTo("新建");
+        assertThat(PlatformAction.VIEW.title()).isEqualTo("查看");
+        assertThat(PlatformAction.UPDATE.title()).isEqualTo("编辑");
+        assertThat(PlatformAction.DELETE.title()).isEqualTo("删除");
+        assertThat(PlatformAction.ENABLE.title()).isEqualTo("启用");
+        assertThat(PlatformAction.DISABLE.title()).isEqualTo("停用");
+        assertThat(PlatformAction.VIEW.titleKey()).isEqualTo("platform.action.view");
+        assertThat(PlatformAction.VIEW.usesDefaultTitle("View")).isTrue();
+        assertThat(PlatformAction.VIEW.usesDefaultTitle("查看")).isTrue();
+        assertThat(PlatformAction.VIEW.usesDefaultTitle("查看合同")).isFalse();
+    }
+
+    @Test
     void shouldMergeReadAndStatePermissionActionsWithoutChangingExecutionCodes() {
         assertThat(PlatformAction.VIEW.permissionActionCode()).isEqualTo("view");
         assertThat(PlatformAction.QUERY.permissionActionCode()).isEqualTo("view");

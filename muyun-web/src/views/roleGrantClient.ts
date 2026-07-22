@@ -1,10 +1,16 @@
 import type {
   AccountRoleGrant,
+  DataScopePolicy,
   EmploymentRoleGrant,
   EmploymentSelectorItem,
   ManagementScopeType,
+  RoleAuthorizationModule,
+  RoleDataGrantActionMatrix,
+  RoleDataScopePolicyCatalog,
+  RolePermissionMatrix,
   UserSelectorItem,
   WebActionResultEnvelope,
+  WebListResponse,
   WebPageResponse,
 } from '@muyun/web-contracts';
 import type { HttpClient } from '@muyun/web-core';
@@ -31,6 +37,20 @@ export interface EmploymentSelectorRequest {
   departmentId?: string;
   enabledOnly?: boolean;
   page?: { pageNum: number; pageSize: number };
+}
+
+export interface RoleActionGrantRequest {
+  moduleAlias: string;
+  actionCode: string;
+  dataScopePolicy?: DataScopePolicy;
+  referenceFieldId?: string;
+  referenceActionCode?: string;
+}
+
+export interface DataGrantActionRequest {
+  actionCode: string;
+  dataScopePolicy?: DataScopePolicy;
+  enabled: boolean;
 }
 
 export function createRoleGrantClient(http: HttpClient) {
@@ -83,6 +103,50 @@ export function createRoleGrantClient(http: HttpClient) {
         method: 'POST',
         path: `/iam.role/${encodeURIComponent(roleId)}/employment-selector/query`,
         body: request,
+      });
+    },
+    authorizationModules(roleId: string) {
+      return http.request<WebListResponse<RoleAuthorizationModule>>({
+        path: `/iam.role/authorizationModules/${encodeURIComponent(roleId)}`,
+      });
+    },
+    permissionMatrix(roleId: string, moduleAliases: string[]) {
+      return http.request<RolePermissionMatrix>({
+        method: 'POST',
+        path: `/iam.role/permissionMatrix/${encodeURIComponent(roleId)}`,
+        body: { moduleAliases },
+      });
+    },
+    grantAction(roleId: string, request: RoleActionGrantRequest) {
+      return http.request<WebActionResultEnvelope<number> | number>({
+        method: 'POST',
+        path: `/iam.role/grant/${encodeURIComponent(roleId)}`,
+        body: request,
+      });
+    },
+    revokeAction(roleId: string, moduleAlias: string, actionCode: string) {
+      return http.request<WebActionResultEnvelope<number> | number>({
+        method: 'POST',
+        path: `/iam.role/revoke/${encodeURIComponent(roleId)}`,
+        body: { moduleAlias, actionCode },
+      });
+    },
+    dataGrantActionMatrix(roleId: string) {
+      return http.request<RoleDataGrantActionMatrix>({
+        path: `/iam.role/dataGrantActionMatrix/${encodeURIComponent(roleId)}`,
+      });
+    },
+    dataScopePolicyCatalog(roleId: string, moduleAlias?: string) {
+      return http.request<RoleDataScopePolicyCatalog>({
+        path: `/iam.role/dataScopePolicyCatalog/${encodeURIComponent(roleId)}`,
+        query: moduleAlias ? { moduleAlias } : undefined,
+      });
+    },
+    replaceDataGrantActions(roleId: string, actions: DataGrantActionRequest[]) {
+      return http.request<WebActionResultEnvelope<number> | number>({
+        method: 'POST',
+        path: `/iam.role/dataGrantActions/${encodeURIComponent(roleId)}`,
+        body: { actions },
       });
     },
   };

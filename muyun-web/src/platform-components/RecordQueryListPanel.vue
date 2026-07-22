@@ -52,7 +52,7 @@ interface QueryListRow {
   [key: string]: unknown;
   key: string;
   record: QueryListRecord;
-  primaryAction?: ResolvedRecordActionItem;
+  primaryActions: ResolvedRecordActionItem[];
   secondaryActions: ResolvedRecordActionItem[];
   dropdownItems: UiDropdownItem[];
 }
@@ -396,11 +396,12 @@ function handleAction(action: RecordActionItem, event: MouseEvent) {
 function resolveRow(record: QueryListRecord): QueryListRow {
   const configuredActions = rowActions(record).map((action) => rowActionWithState(record, action));
   const actions = resolveRecordActions(props.context, configuredActions);
-  const secondaryActions = actions.slice(1);
+  const primaryActions = actions.filter((action, index) => index === 0 || action.pinned === true);
+  const secondaryActions = actions.filter((action, index) => index !== 0 && action.pinned !== true);
   return {
     key: recordKey(record),
     record,
-    primaryAction: actions[0],
+    primaryActions,
     secondaryActions,
     dropdownItems: secondaryActions.map(rowActionDropdownItem),
   };
@@ -437,11 +438,11 @@ function rowActionDropdownItem(action: ResolvedRecordActionItem): UiDropdownItem
   };
 }
 
-function handlePrimaryRowAction(row: QueryListRow, event: MouseEvent) {
-  if (!row.primaryAction || row.primaryAction.disabled) {
+function handlePrimaryRowAction(row: QueryListRow, action: ResolvedRecordActionItem, event: MouseEvent) {
+  if (action.disabled) {
     return;
   }
-  emit('rowAction', row.primaryAction, row.record, event);
+  emit('rowAction', action, row.record, event);
 }
 
 function handleSecondaryRowAction(row: QueryListRow, key: string) {
@@ -863,14 +864,15 @@ defineExpose({ refresh });
         <template #rowActions="{ record }">
           <div class="record-query-list-row-actions" @click.stop @dblclick.stop>
             <UiButton
-              v-if="(record as QueryListRow).primaryAction"
+              v-for="action in (record as QueryListRow).primaryActions"
+              :key="action.key"
               class="record-query-list-primary-action"
               type="text"
-              :disabled="(record as QueryListRow).primaryAction?.disabled"
-              :icon-name="(record as QueryListRow).primaryAction?.iconName"
-              @click="handlePrimaryRowAction(record as QueryListRow, $event)"
+              :disabled="action.disabled"
+              :icon-name="action.iconName"
+              @click="handlePrimaryRowAction(record as QueryListRow, action, $event)"
             >
-              {{ (record as QueryListRow).primaryAction?.title }}
+              {{ action.title }}
             </UiButton>
             <UiDropdown
               v-if="(record as QueryListRow).secondaryActions.length > 0"

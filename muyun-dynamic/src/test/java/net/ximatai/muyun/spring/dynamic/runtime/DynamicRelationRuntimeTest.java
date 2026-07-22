@@ -566,6 +566,13 @@ class DynamicRelationRuntimeTest {
                 "sales.score", "studentId", "view"))).isPresent();
         assertThat(resolver.resolve(new net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest(
                 "sales.score", "line.studentId", "view"))).isEmpty();
+        assertThat(resolver.resolveCandidates("sales.score"))
+                .singleElement()
+                .satisfies(candidate -> {
+                    assertThat(candidate.referenceFieldId()).isEqualTo("score.studentId");
+                    assertThat(candidate.targetModuleAlias()).isEqualTo("school.student");
+                    assertThat(candidate.referenceActionCode()).isEqualTo("view");
+                });
     }
 
     @Test
@@ -580,6 +587,7 @@ class DynamicRelationRuntimeTest {
                 .get()
                 .satisfies(plan -> assertThatThrownBy(() -> plan.resolveTargetColumn("authUserId"))
                         .isInstanceOf(IllegalArgumentException.class));
+        assertThat(resolver.resolveCandidates("sales.score")).isEmpty();
     }
 
     @Test

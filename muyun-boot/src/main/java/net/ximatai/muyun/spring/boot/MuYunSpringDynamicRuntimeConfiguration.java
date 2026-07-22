@@ -11,7 +11,6 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
-import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
 import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
@@ -152,7 +151,7 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    ReferenceDependencyScopeResolver dynamicReferenceDependencyScopeResolver(DynamicRecordRuntime runtime) {
+    DynamicReferenceDependencyScopeResolver dynamicReferenceDependencyScopeResolver(DynamicRecordRuntime runtime) {
         return new DynamicReferenceDependencyScopeResolver(runtime);
     }
 

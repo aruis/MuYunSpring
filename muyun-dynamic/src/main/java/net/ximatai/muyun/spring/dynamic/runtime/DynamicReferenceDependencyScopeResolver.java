@@ -2,8 +2,11 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopePlan;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCandidate;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCatalogResolver;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -12,10 +15,12 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class DynamicReferenceDependencyScopeResolver implements ReferenceDependencyScopeResolver {
+public class DynamicReferenceDependencyScopeResolver implements ReferenceDependencyScopeResolver,
+        ReferenceDependencyScopeCatalogResolver {
     private final DynamicRecordRuntime runtime;
 
     public DynamicReferenceDependencyScopeResolver(DynamicRecordRuntime runtime) {
@@ -55,6 +60,43 @@ public class DynamicReferenceDependencyScopeResolver implements ReferenceDepende
                 fieldToColumn(targetEntity),
                 runtime.operations().getDBInfo().getDatabaseType()
         ));
+    }
+
+    @Override
+    public List<ReferenceDependencyScopeCandidate> resolveCandidates(String moduleAlias) {
+        ModuleDefinition sourceModule = runtime.registry().findModule(moduleAlias).orElse(null);
+        if (sourceModule == null || sourceModule.mainEntityAlias() == null) {
+            return List.of();
+        }
+        return sourceModule.references().stream()
+                .filter(reference -> sourceModule.mainEntityAlias().equals(reference.sourceEntityAlias()))
+                .map(reference -> candidate(sourceModule, reference))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    private ReferenceDependencyScopeCandidate candidate(ModuleDefinition sourceModule,
+                                                        EntityReferenceDefinition reference) {
+        ModuleDefinition targetModule = runtime.registry().findModule(reference.target().moduleAlias()).orElse(null);
+        if (targetModule == null || targetModule.mainEntityAlias() == null) {
+            return null;
+        }
+        EntityDefinition targetEntity = targetModule.entities().stream()
+                .filter(entity -> reference.target().entityAlias().equals(entity.alias()))
+                .findFirst()
+                .orElse(null);
+        if (targetEntity == null || !targetEntity.supports(EntityCapability.DATA_SCOPE)) {
+            return null;
+        }
+        String fieldId = sourceModule.mainEntityAlias() + "." + reference.sourceField();
+        return new ReferenceDependencyScopeCandidate(
+                fieldId,
+                reference.sourceField(),
+                targetModule.moduleAlias(),
+                targetModule.name(),
+                PlatformAction.VIEW.code(),
+                PlatformAction.VIEW.title()
+        );
     }
 
     private String sourceField(String referenceFieldId, String mainEntityAlias) {

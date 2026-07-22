@@ -24,6 +24,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCandidate;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCatalogResolver;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
@@ -35,10 +37,12 @@ import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -67,12 +71,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private final AccountRoleGrantDao accountRoleGrantDao;
     private final EmploymentRoleGrantDao employmentRoleGrantDao;
     private final RoleActionDao roleActionDao;
+    private final RoleDataGrantActionDao roleDataGrantActionDao;
     private final RoleActionGrantVerifier grantVerifier;
     private final UserAccountService userAccountService;
     private final EmployeeService employeeService;
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
     private final OrganizationService organizationService;
+    private ReferenceDependencyScopeCatalogResolver referenceDependencyScopeCatalogResolver;
 
     public RoleService(RoleDao roleDao,
                        AccountRoleGrantDao accountRoleGrantDao,
@@ -81,7 +87,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        ActiveTenantVerifier activeTenantVerifier) {
         this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
                 RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null,
-                (OrganizationService) null);
+                (OrganizationService) null, null);
     }
 
     @Autowired
@@ -89,16 +95,17 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        AccountRoleGrantDao accountRoleGrantDao,
                        EmploymentRoleGrantDao employmentRoleGrantDao,
                        RoleActionDao roleActionDao,
-                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleDataGrantActionDao roleDataGrantActionDao,
+                       TenantService tenantService,
                        RoleActionGrantVerifier grantVerifier,
                        UserAccountService userAccountService,
                        EmployeeService employeeService,
                        EmployeePositionService employeePositionService,
                        EmployeeAccountService employeeAccountService,
                        ObjectProvider<OrganizationService> organizationService) {
-        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
+        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, tenantService,
                 grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
-                organizationService == null ? null : organizationService.getIfAvailable());
+                organizationService == null ? null : organizationService.getIfAvailable(), roleDataGrantActionDao);
     }
 
     public RoleService(RoleDao roleDao,
@@ -113,7 +120,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        EmployeeAccountService employeeAccountService) {
         this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
                 grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
-                (OrganizationService) null);
+                (OrganizationService) null, null);
     }
 
     public RoleService(RoleDao roleDao,
@@ -127,17 +134,41 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        EmployeePositionService employeePositionService,
                        EmployeeAccountService employeeAccountService,
                        OrganizationService organizationService) {
+        this(roleDao, accountRoleGrantDao, employmentRoleGrantDao, roleActionDao, activeTenantVerifier,
+                grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
+                organizationService, null);
+    }
+
+    public RoleService(RoleDao roleDao,
+                       AccountRoleGrantDao accountRoleGrantDao,
+                       EmploymentRoleGrantDao employmentRoleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService,
+                       EmployeeAccountService employeeAccountService,
+                       OrganizationService organizationService,
+                       RoleDataGrantActionDao roleDataGrantActionDao) {
         super(MODULE_ALIAS, Role.class, roleDao, activeTenantVerifier);
         this.accountRoleGrantDao = Objects.requireNonNull(accountRoleGrantDao, "accountRoleGrantDao must not be null");
         this.employmentRoleGrantDao = Objects.requireNonNull(employmentRoleGrantDao,
                 "employmentRoleGrantDao must not be null");
         this.roleActionDao = Objects.requireNonNull(roleActionDao, "roleActionDao must not be null");
+        this.roleDataGrantActionDao = roleDataGrantActionDao;
         this.grantVerifier = Objects.requireNonNull(grantVerifier, "grantVerifier must not be null");
         this.userAccountService = userAccountService;
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
         this.organizationService = organizationService;
+    }
+
+    @Autowired(required = false)
+    void setReferenceDependencyScopeCatalogResolver(
+            ReferenceDependencyScopeCatalogResolver referenceDependencyScopeCatalogResolver) {
+        this.referenceDependencyScopeCatalogResolver = referenceDependencyScopeCatalogResolver;
     }
 
     @Override
@@ -428,8 +459,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String requestedActionCode = requireActionCode(actionCode);
         String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, requestedActionCode);
-        DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(role, dataScopePolicy, scopeCondition,
-                referenceFieldId);
+        DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(role, validModuleAlias, dataScopePolicy,
+                scopeCondition, referenceFieldId, referenceActionCode);
 
         RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
         boolean exists = roleAction != null;
@@ -442,8 +473,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         roleAction.setDataScopePolicy(validDataScopePolicy);
         roleAction.setTenantScopePolicy(normalizeTenantScopePolicy(tenantScopePolicy));
         roleAction.setScopeCondition(normalizeBlank(scopeCondition));
-        roleAction.setReferenceFieldId(normalizeBlank(referenceFieldId));
-        roleAction.setReferenceActionCode(normalizeBlank(referenceActionCode));
+        roleAction.setReferenceFieldId(validDataScopePolicy == DataScopePolicy.REFERENCE_DEPENDENCY
+                ? normalizeBlank(referenceFieldId) : null);
+        roleAction.setReferenceActionCode(validDataScopePolicy == DataScopePolicy.REFERENCE_DEPENDENCY
+                ? normalizeReferenceActionCode(referenceActionCode) : null);
         roleAction.setEnabled(true);
 
         if (exists) {
@@ -578,14 +611,19 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (roleGrant == null || roleGrant.employeePositionId() == null) {
             return null;
         }
-        String validModuleAlias = requireModuleAlias(moduleAlias);
+        requireModuleAlias(moduleAlias);
         List<String> dataGrantRoleIds = effectiveDataGrantRoleIds(roleGrant.employeePositionId(), null);
         if (dataGrantRoleIds.isEmpty()) {
             return null;
         }
-        List<RoleAction> grants = roleActionDao.query(Criteria.of()
+        // Legacy constructor wiring is retained for focused contract tests and older embedders.
+        // Runtime beans always receive the dedicated template store.
+        if (roleDataGrantActionDao == null) {
+            return inheritedDataGrantActionFromLegacyRoleAction(dataGrantRoleIds, moduleAlias, actionCode,
+                    roleGrant.employeePositionId());
+        }
+        List<RoleDataGrantAction> grants = roleDataGrantActionDao.query(Criteria.of()
                         .in("roleId", dataGrantRoleIds)
-                        .eq("moduleAlias", validModuleAlias)
                         .eq("actionCode", permissionActionCode(actionCode))
                         .eq("enabled", Boolean.TRUE),
                 ALL);
@@ -593,7 +631,90 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             throw new PlatformException("employment has more than one inherited data grant action: "
                     + roleGrant.employeePositionId());
         }
+        return grants.stream().findFirst().map(this::asInheritedDataGrantAction).orElse(null);
+    }
+
+    private RoleAction inheritedDataGrantActionFromLegacyRoleAction(List<String> dataGrantRoleIds,
+                                                                      String moduleAlias,
+                                                                      String actionCode,
+                                                                      String employeePositionId) {
+        List<RoleAction> grants = roleActionDao.query(Criteria.of()
+                        .in("roleId", dataGrantRoleIds)
+                        .eq("moduleAlias", moduleAlias)
+                        .eq("actionCode", permissionActionCode(actionCode))
+                        .eq("enabled", Boolean.TRUE),
+                ALL);
+        if (grants.size() > 1) {
+            throw new PlatformException("employment has more than one inherited data grant action: " + employeePositionId);
+        }
         return grants.stream().findFirst().orElse(null);
+    }
+
+    public RoleDataGrantActionMatrix dataGrantActionMatrix(String roleId) {
+        Role role = requireDataGrantRole(roleId);
+        Map<String, RoleDataGrantAction> configuredByAction = dataGrantActionTemplates(role.getId()).stream()
+                .collect(java.util.stream.Collectors.toMap(RoleDataGrantAction::getActionCode,
+                        action -> action, (left, right) -> left, LinkedHashMap::new));
+        List<RoleDataGrantActionMatrix.Action> actions = standardDataGrantActions().stream()
+                .map(action -> {
+                    RoleDataGrantAction configured = configuredByAction.get(action.permissionActionCode());
+                    return new RoleDataGrantActionMatrix.Action(
+                            action.permissionActionCode(), action.title(), Boolean.TRUE.equals(configured == null ? null : configured.getEnabled()),
+                            configured == null ? null : configured.getDataScopePolicy());
+                })
+                .toList();
+        return new RoleDataGrantActionMatrix(role.getId(), actions);
+    }
+
+    @Transactional
+    public int replaceDataGrantActions(String roleId, List<DataGrantActionCommand> commands) {
+        Role role = requireDataGrantRole(roleId);
+        requireSystemManagedMutationAllowed(role, "replace data grant actions");
+        if (roleDataGrantActionDao == null) {
+            throw new IllegalStateException("role data grant action storage is not available");
+        }
+        LinkedHashMap<String, DataScopePolicy> desired = new LinkedHashMap<>();
+        for (DataGrantActionCommand command : commands == null ? List.<DataGrantActionCommand>of() : commands) {
+            if (command == null || command.enabled() == false) {
+                continue;
+            }
+            String actionCode = requireStandardDataGrantAction(command.actionCode());
+            desired.put(actionCode, requireConcreteDataGrantScope(command.dataScopePolicy()));
+        }
+        Map<String, RoleDataGrantAction> existingByAction = dataGrantActionTemplates(role.getId()).stream()
+                .collect(java.util.stream.Collectors.toMap(RoleDataGrantAction::getActionCode,
+                        action -> action, (left, right) -> left, LinkedHashMap::new));
+        int changed = 0;
+        for (RoleDataGrantAction existing : existingByAction.values()) {
+            if (desired.containsKey(existing.getActionCode()) || !Boolean.TRUE.equals(existing.getEnabled())) {
+                continue;
+            }
+            existing.setEnabled(false);
+            prepareChildUpdate(existing);
+            changed += roleDataGrantActionDao.updateById(existing);
+        }
+        for (Map.Entry<String, DataScopePolicy> entry : desired.entrySet()) {
+            RoleDataGrantAction action = existingByAction.get(entry.getKey());
+            if (action == null) {
+                action = new RoleDataGrantAction();
+                action.setRoleId(role.getId());
+                action.setActionCode(entry.getKey());
+                action.setDataScopePolicy(entry.getValue());
+                action.setEnabled(true);
+                prepareRoleActionInsert(role, action);
+                roleDataGrantActionDao.insert(action);
+                changed++;
+                continue;
+            }
+            if (Boolean.TRUE.equals(action.getEnabled()) && action.getDataScopePolicy() == entry.getValue()) {
+                continue;
+            }
+            action.setDataScopePolicy(entry.getValue());
+            action.setEnabled(true);
+            prepareChildUpdate(action);
+            changed += roleDataGrantActionDao.updateById(action);
+        }
+        return changed;
     }
 
     public Set<String> effectiveRoleIds(String userId) {
@@ -733,6 +854,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .forEach(binding -> employmentRoleGrantDao.deleteById(binding.getId()));
         roleActionDao.query(activeCriteria(Criteria.of().eq("roleId", id)), ALL)
                 .forEach(action -> roleActionDao.deleteById(action.getId()));
+        if (roleDataGrantActionDao != null) {
+            roleDataGrantActionDao.query(activeCriteria(Criteria.of().eq("roleId", id)), ALL)
+                    .forEach(action -> roleDataGrantActionDao.deleteById(action.getId()));
+        }
         removeRoleFromGroups(id);
     }
 
@@ -1359,10 +1484,60 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return moduleAlias + ":" + actionCode;
     }
 
+    public RoleDataScopePolicyCatalog dataScopePolicyCatalog(String roleId, String moduleAlias) {
+        Role role = requireConfigurableRole(roleId);
+        List<RoleDataScopePolicyCatalog.Option> options = dataScopeOptions(role);
+        if (role.getRoleKind() == RoleKind.GROUP || role.getAssignmentType() != RoleAssignmentType.EMPLOYMENT
+                || role.getRoleKind() == RoleKind.DATA_GRANT || moduleAlias == null || moduleAlias.isBlank()) {
+            return new RoleDataScopePolicyCatalog(role.getId(), options, List.of());
+        }
+        List<ReferenceDependencyScopeCandidate> candidates = referenceDependencyScopeCatalogResolver == null
+                ? List.of()
+                : referenceDependencyScopeCatalogResolver.resolveCandidates(requireModuleAlias(moduleAlias));
+        if (candidates.isEmpty()) {
+            options = options.stream()
+                    .filter(option -> option.code() != DataScopePolicy.REFERENCE_DEPENDENCY)
+                    .toList();
+        }
+        return new RoleDataScopePolicyCatalog(role.getId(), options, candidates.stream()
+                .map(candidate -> new RoleDataScopePolicyCatalog.ReferenceDependency(
+                        candidate.referenceFieldId(), candidate.title(), candidate.targetModuleAlias(),
+                        candidate.targetModuleTitle(), candidate.referenceActionCode(), candidate.referenceActionTitle()))
+                .toList());
+    }
+
+    private List<RoleDataScopePolicyCatalog.Option> dataScopeOptions(Role role) {
+        if (role.getRoleKind() == RoleKind.GROUP) {
+            return List.of();
+        }
+        if (role.getRoleKind() == RoleKind.DATA_GRANT) {
+            return List.of(DataScopePolicy.ALL, DataScopePolicy.OWNER, DataScopePolicy.ASSIGNEE,
+                            DataScopePolicy.MEMBER, DataScopePolicy.ORGANIZATION,
+                            DataScopePolicy.ORGANIZATION_AND_CHILDREN, DataScopePolicy.DEPARTMENT,
+                            DataScopePolicy.DEPARTMENT_AND_CHILDREN)
+                    .stream().map(this::dataScopeOption).toList();
+        }
+        if (role.getAssignmentType() == RoleAssignmentType.ACCOUNT) {
+            return List.of(dataScopeOption(DataScopePolicy.NONE));
+        }
+        return List.of(DataScopePolicy.NONE, DataScopePolicy.INHERIT_DATA_GRANT, DataScopePolicy.ALL,
+                        DataScopePolicy.OWNER, DataScopePolicy.ASSIGNEE, DataScopePolicy.MEMBER,
+                        DataScopePolicy.ORGANIZATION, DataScopePolicy.ORGANIZATION_AND_CHILDREN,
+                        DataScopePolicy.DEPARTMENT, DataScopePolicy.DEPARTMENT_AND_CHILDREN,
+                        DataScopePolicy.REFERENCE_DEPENDENCY)
+                .stream().map(this::dataScopeOption).toList();
+    }
+
+    private RoleDataScopePolicyCatalog.Option dataScopeOption(DataScopePolicy policy) {
+        return new RoleDataScopePolicyCatalog.Option(policy, policy.getTitle());
+    }
+
     private DataScopePolicy normalizeDataScopePolicy(Role role,
+                                                     String moduleAlias,
                                                      DataScopePolicy dataScopePolicy,
                                                      String scopeCondition,
-                                                     String referenceFieldId) {
+                                                     String referenceFieldId,
+                                                     String referenceActionCode) {
         DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
         if (role.getAssignmentType() == RoleAssignmentType.ACCOUNT && policy != DataScopePolicy.NONE) {
             throw BusinessExceptions.warning("iam.role.account-role-data-scope-denied",
@@ -1379,9 +1554,83 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                     "custom data scope policy is not supported yet");
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
-            Preconditions.requireText(referenceFieldId, "referenceFieldId");
+            String validReferenceFieldId = Preconditions.requireText(referenceFieldId, "referenceFieldId");
+            String validReferenceActionCode = normalizeReferenceActionCode(referenceActionCode);
+            boolean supported = referenceDependencyScopeCatalogResolver != null
+                    && referenceDependencyScopeCatalogResolver.resolveCandidates(moduleAlias).stream()
+                    .anyMatch(candidate -> candidate.referenceFieldId().equals(validReferenceFieldId)
+                            && candidate.referenceActionCode().equals(validReferenceActionCode));
+            if (!supported) {
+                throw BusinessExceptions.warning("iam.role.reference-dependency-unavailable",
+                        "reference dependency is not available for module: " + moduleAlias);
+            }
         }
         return policy;
+    }
+
+    private String normalizeReferenceActionCode(String referenceActionCode) {
+        String value = normalizeBlank(referenceActionCode);
+        if (value == null) {
+            return PlatformAction.VIEW.code();
+        }
+        if (!PlatformAction.VIEW.code().equals(value)) {
+            throw BusinessExceptions.warning("iam.role.reference-dependency-action-unsupported",
+                    "reference dependency currently only supports view action");
+        }
+        return value;
+    }
+
+    private Role requireDataGrantRole(String roleId) {
+        Role role = requireConfigurableRole(roleId);
+        if (role.getRoleKind() != RoleKind.DATA_GRANT) {
+            throw BusinessExceptions.warning("iam.role.not-data-grant-role",
+                    "role is not a data grant role: " + roleId);
+        }
+        return role;
+    }
+
+    private List<RoleDataGrantAction> dataGrantActionTemplates(String roleId) {
+        if (roleDataGrantActionDao == null) {
+            return List.of();
+        }
+        return roleDataGrantActionDao.query(activeCriteria(Criteria.of().eq("roleId", roleId)), ALL);
+    }
+
+    private List<PlatformAction> standardDataGrantActions() {
+        return java.util.Arrays.stream(PlatformAction.values())
+                .filter(PlatformAction::dataAuth)
+                .collect(java.util.stream.Collectors.toMap(PlatformAction::permissionActionCode,
+                        action -> action, (left, right) -> left, LinkedHashMap::new))
+                .values().stream().toList();
+    }
+
+    private String requireStandardDataGrantAction(String actionCode) {
+        String permissionActionCode = permissionActionCode(actionCode);
+        boolean supported = standardDataGrantActions().stream()
+                .anyMatch(action -> action.permissionActionCode().equals(permissionActionCode));
+        if (!supported) {
+            throw BusinessExceptions.warning("iam.role.data-grant-action-unsupported",
+                    "data grant role only supports standard data actions: " + actionCode);
+        }
+        return permissionActionCode;
+    }
+
+    private DataScopePolicy requireConcreteDataGrantScope(DataScopePolicy policy) {
+        if (policy == null || policy == DataScopePolicy.NONE || policy == DataScopePolicy.INHERIT_DATA_GRANT
+                || policy == DataScopePolicy.CUSTOM || policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
+            throw BusinessExceptions.warning("iam.role.data-grant-scope-required",
+                    "data grant role must configure a concrete standard data scope");
+        }
+        return policy;
+    }
+
+    private RoleAction asInheritedDataGrantAction(RoleDataGrantAction action) {
+        RoleAction adapted = new RoleAction();
+        adapted.setRoleId(action.getRoleId());
+        adapted.setActionCode(action.getActionCode());
+        adapted.setDataScopePolicy(action.getDataScopePolicy());
+        adapted.setEnabled(action.getEnabled());
+        return adapted;
     }
 
     private TenantScopePolicy normalizeTenantScopePolicy(TenantScopePolicy tenantScopePolicy) {
@@ -1477,6 +1726,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public record ActionRevokeCommand(String moduleAlias, String actionCode) {
+    }
+
+    public record DataGrantActionCommand(String actionCode, DataScopePolicy dataScopePolicy, boolean enabled) {
     }
 
     public record RoleGrantMutationResult(String grantId, boolean changed) {

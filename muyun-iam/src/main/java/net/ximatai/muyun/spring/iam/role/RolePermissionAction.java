@@ -5,6 +5,7 @@ public record RolePermissionAction(
         String actionCode,
         String permissionActionCode,
         String title,
+        String titleKey,
         boolean actionAuth,
         boolean dataAuth,
         boolean granted,
@@ -14,6 +15,22 @@ public record RolePermissionAction(
         String referenceFieldId,
         String referenceActionCode
 ) {
+    public RolePermissionAction(String moduleAlias,
+                                String actionCode,
+                                String permissionActionCode,
+                                String title,
+                                boolean actionAuth,
+                                boolean dataAuth,
+                                boolean granted,
+                                DataScopePolicy dataScopePolicy,
+                                TenantScopePolicy tenantScopePolicy,
+                                String scopeCondition,
+                                String referenceFieldId,
+                                String referenceActionCode) {
+        this(moduleAlias, actionCode, permissionActionCode, title, null, actionAuth, dataAuth, granted,
+                dataScopePolicy, tenantScopePolicy, scopeCondition, referenceFieldId, referenceActionCode);
+    }
+
     public static RolePermissionAction of(GrantableAction action, RoleAction grant) {
         boolean granted = grant != null && Boolean.TRUE.equals(grant.getEnabled());
         return new RolePermissionAction(
@@ -21,6 +38,7 @@ public record RolePermissionAction(
                 action.actionCode(),
                 action.permissionActionCode(),
                 action.title(),
+                action.titleKey(),
                 action.actionAuth(),
                 action.dataAuth(),
                 granted,

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class RoleGrantableActionResolver {
@@ -68,11 +69,16 @@ public class RoleGrantableActionResolver {
     }
 
     private GrantableAction toGrantableAction(String moduleAlias, PlatformModuleAction action) {
+        Optional<PlatformAction> platformAction = PlatformAction.fromCode(action.getActionCode());
+        boolean usesPlatformDefaultTitle = platformAction
+                .map(candidate -> candidate.usesDefaultTitle(action.getTitle()))
+                .orElse(false);
         return new GrantableAction(
                 moduleAlias,
                 action.getActionCode(),
                 action.getPermissionActionCode(),
-                action.getTitle(),
+                usesPlatformDefaultTitle ? platformAction.orElseThrow().title() : action.getTitle(),
+                usesPlatformDefaultTitle ? platformAction.orElseThrow().titleKey() : null,
                 action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()),
                 Boolean.TRUE.equals(action.getDataAuth())
         );

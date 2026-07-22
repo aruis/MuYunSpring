@@ -21,6 +21,7 @@ export { default as RecordModeDrawer } from './RecordModeDrawer.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
 export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
+export { default as RecordTreeSelector } from './RecordTreeSelector.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
 export { default as StaticManagementLayout } from './StaticManagementLayout.vue';
 export { default as TreeRecordExplorer } from './TreeRecordExplorer.vue';
