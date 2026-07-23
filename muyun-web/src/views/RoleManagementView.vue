@@ -51,7 +51,6 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
-import { useWorkbenchNavigation } from '../app/workbenchNavigation';
 import { useWorkspaceViewHost } from '../app/workspaceViewHost';
 import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
@@ -63,6 +62,7 @@ import {
 } from './roleDetailWorkspaceSession';
 import RoleEmploymentGrantDrawer from './RoleEmploymentGrantDrawer.vue';
 import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
+import RoleAuthorizationView from './RoleAuthorizationView.vue';
 
 defineOptions({ name: 'RoleManagementView' });
 
@@ -100,7 +100,6 @@ const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const roleContext = useModuleContext<Role>({ moduleAlias: 'iam.role' });
 const currentUser = useCurrentUserContext();
-const workbenchNavigation = useWorkbenchNavigation();
 const tenantSearchKeyword = ref('');
 const organizationSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
@@ -118,6 +117,8 @@ const savingRole = ref(false);
 const bindingRole = ref<Role>();
 const bindingDrawerOpen = ref(false);
 const employmentBindingDrawerOpen = ref(false);
+const authorizationRole = ref<Role>();
+const authorizationDrawerOpen = ref(false);
 const roleDetailRequestSeq = ref(0);
 const roleDraft = ref<Partial<Role>>(createRoleDraft(undefined));
 const roleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
@@ -635,15 +636,13 @@ function openRoleAuthorization(record: QueryListRecord) {
   if (!id || record.roleKind === 'group') {
     return;
   }
-  workbenchNavigation?.openPage({
-    pageType: 'business-route',
-    openMode: 'workbench-route',
-    hostType: 'business-route-host',
-    title: `授权 - ${roleTitle(record as Role)}`,
-    target: { route: '/iam/role-authorization', moduleAlias: 'iam.role', query: { roleId: id } },
-    params: { roleId: id },
-    tabPolicy: { identity: 'by-params' },
-  });
+  authorizationRole.value = copyRole(record as Role) as Role;
+  authorizationDrawerOpen.value = true;
+}
+
+function closeRoleAuthorization() {
+  authorizationDrawerOpen.value = false;
+  authorizationRole.value = undefined;
 }
 
 function handleRoleRowDblclick(record: QueryListRecord) {
@@ -1536,6 +1535,12 @@ function parseRoleIds(value: unknown) {
       :role="bindingRole"
       @close="closeRoleBinding"
       @saved="roleReloadKey += 1"
+    />
+    <RoleAuthorizationView
+      v-if="authorizationDrawerOpen && authorizationRole?.id"
+      :role-id="authorizationRole.id"
+      drawer
+      @close="closeRoleAuthorization"
     />
   </section>
 </template>

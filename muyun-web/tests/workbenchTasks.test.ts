@@ -9,6 +9,7 @@ import {
 } from '../src/app/workspaceViews.ts';
 import { canPromoteWorkspaceView } from '../src/app/useWorkspaceViewPromotion.ts';
 import { roleDetailWorkspaceView } from '../src/views/roleDetailWorkspaceView.ts';
+import { roleAuthorizationWorkspaceView } from '../src/views/roleAuthorizationWorkspaceView.ts';
 import { systemUserDetailWorkspaceView } from '../src/views/systemUserDetailWorkspaceView.ts';
 
 const view = defineWorkspaceView({
@@ -145,4 +146,28 @@ test('system user detail workspace has an independent stable identity', () => {
     recordId: 'system-user-1',
   });
   assert.deepEqual(registry.resolve(descriptor)?.input, { recordId: 'system-user-1' });
+});
+
+test('role authorization workspace is a wide work drawer with role-only identity', () => {
+  const descriptor = createWorkspaceViewDescriptor(
+    roleAuthorizationWorkspaceView,
+    { roleId: 'role-1' },
+    'drawer',
+  );
+  const registry = createWorkspaceViewRegistry([roleAuthorizationWorkspaceView]);
+
+  assert.equal(roleAuthorizationWorkspaceView.drawerProfile, 'wide-work');
+  assert.deepEqual(descriptor.target.query, {
+    workspaceView: 'iam.role.authorization',
+    workspacePresentation: 'drawer',
+    roleId: 'role-1',
+  });
+  assert.deepEqual(registry.resolve(descriptor)?.input, { roleId: 'role-1' });
+  assert.equal(
+    registry.resolve({
+      ...descriptor,
+      target: { ...descriptor.target, query: { ...descriptor.target.query, roleId: '' } },
+    }),
+    undefined,
+  );
 });

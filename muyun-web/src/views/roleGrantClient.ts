@@ -47,6 +47,10 @@ export interface RoleActionGrantRequest {
   referenceActionCode?: string;
 }
 
+export interface RolePermissionMatrixActionRequest extends RoleActionGrantRequest {
+  granted: boolean;
+}
+
 export interface DataGrantActionRequest {
   actionCode: string;
   dataScopePolicy?: DataScopePolicy;
@@ -129,6 +133,13 @@ export function createRoleGrantClient(http: HttpClient) {
         method: 'POST',
         path: `/iam.role/revoke/${encodeURIComponent(roleId)}`,
         body: { moduleAlias, actionCode },
+      });
+    },
+    replacePermissionMatrix(roleId: string, actions: RolePermissionMatrixActionRequest[]) {
+      return http.request<WebActionResultEnvelope<number> | number>({
+        method: 'POST',
+        path: `/iam.role/permissionMatrix/${encodeURIComponent(roleId)}/replace`,
+        body: { actions },
       });
     },
     dataGrantActionMatrix(roleId: string) {

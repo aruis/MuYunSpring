@@ -1,4 +1,4 @@
 export interface DrawerPromotion {
   title?: string;
-  promote(): void;
+  promote(): void | Promise<void>;
 }

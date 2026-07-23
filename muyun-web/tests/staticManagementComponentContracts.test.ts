@@ -1125,9 +1125,12 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
   assert.match(roleViewSource, /key: 'authorize'[\s\S]*actionCode: 'rolePermissions'[\s\S]*title: '授权'/);
-  assert.match(roleViewSource, /route: '\/iam\/role-authorization'/);
-  assert.match(roleViewSource, /params: \{ roleId: id \}[\s\S]*tabPolicy: \{ identity: 'by-params' \}/);
+  assert.match(roleViewSource, /authorizationDrawerOpen\.value = true/);
+  assert.match(roleViewSource, /<RoleAuthorizationView[\s\S]*:role-id="authorizationRole\.id"[\s\S]*drawer/);
+  assert.doesNotMatch(roleViewSource, /createWorkspaceViewDescriptor\([\s\S]*roleAuthorizationWorkspaceView/);
   const roleAuthorizationViewSource = readSource('src/views/RoleAuthorizationView.vue');
+  const roleAuthorizationWorkspaceViewSource = readSource('src/views/roleAuthorizationWorkspaceView.ts');
+  const workspaceDrawerSource = readSource('src/app/WorkspaceViewDrawer.vue');
   assert.match(roleAuthorizationViewSource, /角色组不独立授权/);
   assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);
   assert.match(roleAuthorizationViewSource, /dataScopePolicyCatalog/);
@@ -1139,16 +1142,26 @@ test('role management keeps basic scope management separate from binding and aut
     roleAuthorizationViewSource,
     /record\.dataAuth && isEmploymentRole && Boolean\(record\.granted\)/,
   );
-  assert.match(
-    roleAuthorizationViewSource,
-    /column\.key === 'dataScopePolicy' && record\.dataAuth && isEmploymentRole/,
-  );
+  assert.match(roleAuthorizationViewSource, /isEmploymentDataScopeColumn\(column, record\)/);
   assert.match(roleAuthorizationViewSource, /displayedDataScopePolicy/);
   assert.match(roleAuthorizationViewSource, /referenceDependencyOptions/);
   assert.match(roleAuthorizationViewSource, /handlePlatformActionSuccess\(result/);
   assert.doesNotMatch(roleAuthorizationViewSource, /presentPlatformMessage\('授权已保存'/);
   assert.match(roleAuthorizationViewSource, /authorizationModules/);
   assert.match(roleAuthorizationViewSource, /permissionMatrix/);
+  assert.match(roleAuthorizationViewSource, /WorkspaceViewDrawer/);
+  assert.match(roleAuthorizationViewSource, /handOffRoleAuthorizationWorkspaceSession/);
+  assert.match(roleAuthorizationViewSource, /registerRoleAuthorizationWorkspaceHandoffRecipient/);
+  assert.match(roleAuthorizationViewSource, /onPromoted: dismissPromotedDrawer/);
+  assert.match(roleAuthorizationViewSource, /onPromotionRejected/);
+  assert.match(roleAuthorizationViewSource, /UiCheckbox/);
+  assert.match(roleAuthorizationViewSource, /#header="\{ column \}"/);
+  assert.match(roleAuthorizationViewSource, /updateAllActions/);
+  assert.match(roleAuthorizationViewSource, /replacePermissionMatrix/);
+  assert.match(roleAuthorizationViewSource, /确认/);
+  assert.match(roleAuthorizationViewSource, /props\.drawer === true/);
+  assert.match(roleAuthorizationWorkspaceViewSource, /drawerProfile: 'wide-work'/);
+  assert.match(workspaceDrawerSource, /min\(600px, 100vw\)/);
   assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
@@ -1680,6 +1693,8 @@ test('side panels use an explicit tab host and fixed drawer action regions', () 
   assert.match(viewPromotionSource, /canPromoteWorkspaceView/);
   assert.match(viewPromotionSource, /hasStableIdentity/);
   assert.match(viewPromotionSource, /navigation\.openPage\([\s\S]*createWorkspaceViewDescriptor/);
+  assert.match(viewPromotionSource, /onPromotionRejected/);
+  assert.match(viewPromotionSource, /accepted === false/);
   assert.match(viewPromotionSource, /title\?: MaybeRefOrGetter<string \| undefined>/);
   assert.match(workspaceViewOutletSource, /setTitle\(title\)/);
   assert.match(readSource('src/app/StaticBusinessRouteOutlet.vue'), /workspaceViewPresentation === 'drawer'/);

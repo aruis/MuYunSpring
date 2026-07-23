@@ -535,6 +535,45 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return changed;
     }
 
+    /**
+     * Applies one complete permission-matrix draft in a single transaction.
+     *
+     * <p>The web layer submits every visible action of the edited modules. Keeping
+     * grant and revoke decisions in one service operation prevents a partially
+     * applied matrix when one action fails validation.</p>
+     */
+    @Transactional
+    public int replacePermissionActions(String roleId, List<PermissionActionCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        Map<String, PermissionActionCommand> commandsByAction = new LinkedHashMap<>();
+        for (PermissionActionCommand command : commands.stream().filter(Objects::nonNull).toList()) {
+            String key = actionKey(command.moduleAlias(), command.actionCode());
+            if (commandsByAction.putIfAbsent(key, command) != null) {
+                throw new IllegalArgumentException("duplicate permission action: " + key);
+            }
+        }
+        int changed = 0;
+        for (PermissionActionCommand command : commandsByAction.values()) {
+            if (command.granted()) {
+                changed += grantAction(
+                        roleId,
+                        command.moduleAlias(),
+                        command.actionCode(),
+                        command.dataScopePolicy(),
+                        command.tenantScopePolicy(),
+                        command.scopeCondition(),
+                        command.referenceFieldId(),
+                        command.referenceActionCode()
+                );
+                continue;
+            }
+            changed += revokeAction(roleId, command.moduleAlias(), command.actionCode());
+        }
+        return changed;
+    }
+
     public boolean hasActionPermission(String userId, String moduleAlias, String actionCode) {
         return !effectiveActionGrants(userId, moduleAlias, actionCode).isEmpty();
     }
@@ -1789,6 +1828,16 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                      String scopeCondition,
                                      String referenceFieldId,
                                      String referenceActionCode) {
+    }
+
+    public record PermissionActionCommand(String moduleAlias,
+                                          String actionCode,
+                                          boolean granted,
+                                          DataScopePolicy dataScopePolicy,
+                                          TenantScopePolicy tenantScopePolicy,
+                                          String scopeCondition,
+                                          String referenceFieldId,
+                                          String referenceActionCode) {
     }
 
     public record ActionRevokeCommand(String moduleAlias, String actionCode) {

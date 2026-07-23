@@ -25,9 +25,10 @@ export function useWorkspaceViewPromotion<TInput extends WorkspaceViewInput>(opt
   /** A source host can provide its resolved business identity for the new tab label. */
   title?: MaybeRefOrGetter<string | undefined>;
   eligibility: MaybeRefOrGetter<WorkspaceViewPromotionEligibility>;
-  /** Runs only when the destination host will mount and consume the hand-off. */
-  beforePromote?: (input: TInput) => void;
+  /** Transfers source state before the target opens; return false when an existing target rejects it. */
+  beforePromote?: (input: TInput) => boolean | void | Promise<boolean | void>;
   onPromoted?: (result: { created: boolean }) => void;
+  onPromotionRejected?: () => void;
 }) {
   const navigation = useWorkbenchNavigation();
   return computed<DrawerPromotion | undefined>(() => {
@@ -35,11 +36,15 @@ export function useWorkspaceViewPromotion<TInput extends WorkspaceViewInput>(opt
     if (!input || !canPromoteWorkspaceView(toValue(options.eligibility)) || !navigation) return undefined;
     return {
       title: '固定为页签',
-      promote: () => {
+      promote: async () => {
+        const accepted = await options.beforePromote?.(input);
+        if (accepted === false) {
+          options.onPromotionRejected?.();
+          return;
+        }
         const result = navigation.openPage(
           createWorkspaceViewDescriptor(options.view, input, 'tab', toValue(options.title)),
         );
-        if (result.created) options.beforePromote?.(input);
         options.onPromoted?.(result);
       },
     };

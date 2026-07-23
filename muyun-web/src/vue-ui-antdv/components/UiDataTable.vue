@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, h } from 'vue';
 import { Table as ATable } from 'ant-design-vue';
 import UiEmpty from './UiEmpty.vue';
 import { resolveUiDataTableScroll } from '../dataTableModel';
@@ -60,6 +60,7 @@ const emit = defineEmits<{
 }>();
 
 const slots = defineSlots<{
+  header?: (props: { column: UiDataTableColumn }) => unknown;
   cell?: (props: { column: UiDataTableColumn; record: UiDataTableRecord; value: unknown }) => unknown;
   rowActions?: (props: { record: UiDataTableRecord; rowKey: string }) => unknown;
   expandedRow?: (props: { record: UiDataTableRecord; rowKey: string }) => unknown;
@@ -67,7 +68,7 @@ const slots = defineSlots<{
 
 const tableColumns = computed(() => {
   const columns = props.columns.map((column) => ({
-    title: column.title,
+    title: slots.header ? () => h('span', slots.header?.({ column }) ?? column.title) : column.title,
     dataIndex: column.dataIndex ?? column.key,
     key: column.key,
     width: column.width,

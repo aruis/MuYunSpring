@@ -889,6 +889,33 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldReplaceRolePermissionMatrixAtomically() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(roleService.replacePermissionActions(any(), any())).thenReturn(2);
+
+        mvc.perform(post("/iam.role/permissionMatrix/{roleId}/replace", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "actions":[
+                                    {"moduleAlias":"sales.contract","actionCode":"query","granted":true,
+                                     "dataScopePolicy":"owner"},
+                                    {"moduleAlias":"sales.contract","actionCode":"export","granted":false}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(2));
+
+        ArgumentCaptor<List<RoleService.PermissionActionCommand>> actionsCaptor = ArgumentCaptor.captor();
+        verify(roleService).replacePermissionActions(any(), actionsCaptor.capture());
+        assertThat(actionsCaptor.getValue()).hasSize(2);
+        assertThat(actionsCaptor.getValue().get(0).granted()).isTrue();
+        assertThat(actionsCaptor.getValue().get(0).dataScopePolicy()).isEqualTo(DataScopePolicy.OWNER);
+        assertThat(actionsCaptor.getValue().get(1).granted()).isFalse();
+    }
+
+    @Test
     void shouldExposeRolePermissionMatrixFromModuleAliases() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         List<GrantableAction> grantableActions = List.of(
