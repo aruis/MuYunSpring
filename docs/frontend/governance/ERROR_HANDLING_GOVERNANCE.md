@@ -94,6 +94,8 @@
 
 `messageArgs` 只允许安全、可展示且可翻译的业务参数；排查数据继续进入 `details`，关联日志继续使用 `traceId`。后续国际化落地时，UI 可按 `code + messageArgs` 选择本地翻译，未命中时回退服务端 `message`。领域 service 不读取 `Accept-Language`，避免业务规则依赖 Web 语言环境。
 
+应用壳当前通过本地 `zh-CN` 默认字典解析少量全局认证提示，键仍然使用错误 `code`；未命中或当前没有对应语言包时回退服务端 `message`。这个入口是后续语言包接入边界，不让认证恢复链路依赖中文文案。
+
 第一阶段不建议对前端暴露以下字段作为稳定展示契约：
 
 ```text
@@ -115,6 +117,7 @@ exceptionType
 ```text
 AUTH_REQUIRED
 AUTH_EXPIRED
+PASSWORD_CHANGE_REQUIRED
 ACCESS_DENIED
 VALIDATION_FAILED
 CONFLICT_VERSION
@@ -249,6 +252,7 @@ interface ErrorUiContext {
 | 条件                | 兜底展示                                    |
 | ------------------- | ------------------------------------------- |
 | `401`               | 登录恢复或跳转登录页。                      |
+| `PASSWORD_CHANGE_REQUIRED` | 打开改密入口，保留当前登录会话。          |
 | `403` + `page-load` | 页面级无权限错误。                          |
 | `403` + `action`    | 全局 toast。                                |
 | `404` + `page-load` | 页面级不存在错误。                          |
@@ -273,6 +277,10 @@ AUTH_REQUIRED
 ```
 
 能消费时展示在登录表单顶部或对应输入项；不能消费时交给全局兜底。
+
+### 强制修改密码
+
+`PASSWORD_CHANGE_REQUIRED` 表示当前 Bearer token 仍然有效，但只允许访问身份确认、登出和修改本人密码入口。前端应打开改密入口，不得清除本地会话或跳回登录页。
 
 ### 动态表单保存
 

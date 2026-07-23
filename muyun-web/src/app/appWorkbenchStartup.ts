@@ -1,6 +1,6 @@
-import { createHttpClient, createMenuClient, createSessionClient } from '@muyun/web-core';
+import { createMenuClient, createSessionClient } from '@muyun/web-core';
 import type { WorkbenchStartupState } from '@muyun/web-contracts';
-import { effectiveAuthToken } from './authSession';
+import { createBackendHttpClient } from './backendHttp';
 import { businessModuleRoutes, businessRoutePrefixes } from './businessRoutes';
 import { loadWorkbenchStartupState } from './workbenchStartup';
 
@@ -16,11 +16,7 @@ export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupSt
     return loadDevWorkbenchStartupState();
   }
 
-  const httpClient = createHttpClient({
-    baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
-    token: effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN),
-    credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
-  });
+  const httpClient = createBackendHttpClient();
   return loadWorkbenchStartupState(
     {
       sessionClient: createSessionClient(httpClient),
@@ -31,10 +27,6 @@ export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupSt
       businessRoutePrefixes,
     },
   );
-}
-
-function credentialsOf(value: string | undefined) {
-  return value === 'include' || value === 'omit' || value === 'same-origin' ? value : undefined;
 }
 
 export function usesMockStartup() {

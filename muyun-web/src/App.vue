@@ -6,6 +6,7 @@ import {
   configureModuleContext,
   createAuthClient,
   provideModuleContextConfig,
+  type AppError,
   type RealtimeConnectionState,
 } from '@muyun/web-core';
 import type {
@@ -23,6 +24,8 @@ import {
   saveAuthToken,
   storedAuthSessionId,
 } from './app/authSession';
+import { configureAuthenticationRecovery } from './app/sessionRecovery';
+import { platformMessage } from './app/platformMessage';
 import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
@@ -71,6 +74,14 @@ provideWorkbenchNavigation({ openPage: handleOpenPage });
 
 const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 
+configureAuthenticationRecovery((error) => {
+  scheduleLocalLogout({
+    code: error.code,
+    message: platformMessage(error.code, error.message),
+    logoutRequired: true,
+  });
+});
+
 onMounted(async () => {
   if (!usesMockStartup() && !effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN)) {
     loginRequired.value = true;
@@ -101,11 +112,13 @@ async function loadWorkbench() {
     syncBrowserUrl(state);
   } catch (cause) {
     if (requiresLogin(cause)) {
-      clearAuthToken();
-      startup.value = undefined;
-      activeTabKey.value = undefined;
-      loginRequired.value = true;
-      disconnectRealtime();
+      const error = cause as AppError;
+      scheduleLocalLogout({
+        code: error.code,
+        message: platformMessage(error.code, error.message),
+        logoutRequired: true,
+      });
+      return;
     }
     error.value = cause instanceof Error ? cause.message : 'Workbench startup failed';
   } finally {
@@ -117,6 +130,11 @@ async function handleAuthenticated(result: LoginResult) {
   saveAuthToken(result.token);
   saveAuthSessionId(result.sessionId);
   loginRequired.value = false;
+  if (result.passwordChangeRequired) {
+    loading.value = false;
+    openChangeOwnPasswordDialog();
+    return;
+  }
   loginLoading.value = true;
   try {
     await loadWorkbench();
@@ -267,7 +285,11 @@ function workbenchRealtimeStatusOf(state: RealtimeConnectionState): WorkbenchRea
 }
 
 function handleRealtimeUnauthorized() {
-  forceLocalLogout();
+  scheduleLocalLogout({
+    code: 'AUTH_REQUIRED',
+    message: platformMessage('AUTH_REQUIRED', '登录状态已失效，请重新登录'),
+    logoutRequired: true,
+  });
 }
 
 function handleSecurityNotification(notification: WebUserNotification) {
@@ -277,7 +299,15 @@ function handleSecurityNotification(notification: WebUserNotification) {
   if (!notification.logoutRequired) {
     return;
   }
+  scheduleLocalLogout(notification);
+}
+
+function scheduleLocalLogout(notification: WebUserNotification) {
+  if (securityNotification.value || (loginRequired.value && !startup.value)) {
+    return;
+  }
   securityNotification.value = notification;
+  disconnectRealtime();
   startSecurityLogoutCountdown(5);
 }
 
@@ -302,6 +332,9 @@ function clearSecurityLogoutTimer() {
 }
 
 function forceLocalLogout() {
+  if (loginRequired.value && !startup.value) {
+    return;
+  }
   clearSecurityLogoutTimer();
   clearAuthToken();
   startup.value = undefined;

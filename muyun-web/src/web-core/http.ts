@@ -7,6 +7,7 @@ export interface RequestContext {
   traceId?: string;
   credentials?: RequestCredentials;
   headers?: Record<string, string>;
+  onAuthenticationRequired?: (error: AppError) => void;
 }
 
 export interface HttpRequestOptions {
@@ -41,7 +42,9 @@ export function createHttpClient(context: RequestContext = {}): HttpClient {
 
       if (!response.ok) {
         try {
-          throw await appErrorFromResponse(response);
+          const error = await appErrorFromResponse(response);
+          notifyAuthenticationRequired(context, error);
+          throw error;
         } catch (error) {
           if (error instanceof AppError) {
             throw error;
@@ -58,6 +61,13 @@ export function createHttpClient(context: RequestContext = {}): HttpClient {
       return (await responseBody(response)) as T;
     },
   };
+}
+
+function notifyAuthenticationRequired(context: RequestContext, error: AppError) {
+  if (error.status !== 401 || error.code === platformErrorCodes.loginBadCredentials) {
+    return;
+  }
+  context.onAuthenticationRequired?.(error);
 }
 
 function urlOf(baseUrl: string | undefined, options: HttpRequestOptions) {
