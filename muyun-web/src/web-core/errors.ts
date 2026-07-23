@@ -53,6 +53,7 @@ export class AppError extends Error {
   readonly details?: Record<string, unknown>;
   readonly messageArgs?: Record<string, unknown>;
   readonly actionMessage?: WebActionMessage;
+  globallyHandled = false;
 
   constructor(
     message: string,

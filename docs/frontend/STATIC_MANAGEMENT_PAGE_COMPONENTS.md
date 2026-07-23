@@ -152,7 +152,7 @@ RecordPicker
 
 ### RecordDetailPanel
 
-`RecordDetailPanel` 是右侧详情/编辑区域的外壳组件，不访问业务数据。
+`RecordDetailPanel` 是工作区右侧详情/编辑区域的卡片外壳组件，不访问业务数据。标准抽屉复用同一详情骨架，但使用无内层边框、无圆角的抽屉表面，以弱分割线界定标题区与内容区，不复用工作区卡片表面。
 
 它适合承载：
 
@@ -233,3 +233,11 @@ RecordDetailPanel
 4. 不要用“当前 selected 是否为空”隐式决定取消行为，除非该页面已经明确没有返回对象。
 5. 空列表、删除最后一条记录、切换 scope 或重新加载后，默认回到 `view`；新增必须由用户显式点击新增动作触发，除非页面明确设计为连续录入。
 6. 复杂主子页面应为 create/edit/cancel、空列表和 scope 切换补状态测试。
+
+## 抽屉承载与动作分区
+
+管理页的记录详情、编辑与配置任务统一使用 `RecordDetailDrawer` 或 `RecordModeDrawer`。它们默认在当前 workbench tab 内展开，不覆盖导航、顶部栏或其他 tab；只有全局任务才允许显式使用 viewport 侧栏。
+
+抽屉 header 只放标题、状态和关闭；可滚动内容进入 body；编辑、删除、刷新、取消、保存、确认等所有业务操作进入固定“操作区域”（`operation` 插槽）。页面不得依赖自身容器定位来改变抽屉高度或覆盖范围。静态管理页对外使用 `explorer` 与 `detail` 表达记录浏览和详情维护职责，不使用 `sidebar`、`card` 等视觉位置词。
+
+操作区域由 `DrawerOperationBar` 提供统一的主操作排序、对齐和窄屏换行；业务页面仅提供操作内容。标准抽屉受控支持 `width` 与 `scope`，默认 `520` 和 `tab`；`viewport` 必须显式声明。

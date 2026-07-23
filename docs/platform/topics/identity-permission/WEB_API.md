@@ -68,6 +68,17 @@
 | `POST` | `/iam.tenant/disable/{id}` | 停用租户。                               |
 | `POST` | `/iam.tenant/sort/{id}`    | 调整租户排序。                           |
 
+### 租户已开通应用
+
+根路径：`/iam.tenant/{tenantId}/applications`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/iam.tenant/{tenantId}/applications/query` | 查询租户已开通应用。 |
+| `POST` | `/iam.tenant/{tenantId}/applications/configure` | 以 `applicationAliases` 全量配置租户可用应用。应用必须全局启用且允许分配给租户；`iam` 为不可移除基线应用。 |
+
+应用开通是模块动作的前置门禁。移除应用后，普通租户用户访问该应用模块会返回 `APPLICATION_NOT_OPENED`；角色授权、菜单和配置事实保留。
+
 ## 组织机构
 
 根路径：`/iam.organization`

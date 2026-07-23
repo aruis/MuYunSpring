@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
   type CrudRecordListBase,
   ModuleActionButton,
+  RecordDetailDrawer,
   RecordActionBar,
   RecordMetaSection,
   RecordStatusSwitch,
@@ -11,15 +12,25 @@ import {
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
-import type { Tenant } from '@muyun/web-contracts';
+import type { Application, Tenant, TenantApplication, WebPageResponse } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import { confirmAction, UiInput } from '@muyun/vue-ui-antdv';
+import { confirmAction, UiButton, UiDataTable, UiInput } from '@muyun/vue-ui-antdv';
+import type { UiDataTableColumn, UiDataTableRecord } from '@muyun/vue-ui-antdv';
 import { createTenantManagementState } from './tenantManagementState';
 
 defineOptions({ name: 'TenantManagementView' });
 
 const tenantContext = useModuleContext<Tenant>();
+const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
 const explorerSearchKeyword = ref('');
+const applications = ref<Application[]>([]);
+const applicationsLoading = ref(false);
+const tenantApplications = ref<TenantApplication[]>([]);
+const tenantApplicationsLoading = ref(false);
+const applicationConfigurationOpen = ref(false);
+const applicationConfigurationSaving = ref(false);
+const configuredApplicationAliases = ref<Set<string>>(new Set());
+let tenantApplicationsLoadVersion = 0;
 const {
   selected,
   draft,
@@ -42,6 +53,32 @@ const {
 } = createTenantManagementState(tenantContext, confirmAction);
 
 const enabledReadonly = computed(() => false);
+const tenantApplicationColumns: UiDataTableColumn[] = [{ key: 'applicationAlias', title: '已开通应用' }];
+const tenantApplicationRows = computed(() => tenantApplications.value as unknown as UiDataTableRecord[]);
+const applicationRows = computed(() => applications.value as unknown as UiDataTableRecord[]);
+const applicationConfigurationSelection = computed(() => ({
+  selectedRowKeys: [...configuredApplicationAliases.value],
+  preserveSelectedRowKeys: true,
+  disabledOf: (record: UiDataTableRecord) => applicationConfigurationSaving.value || record.alias === 'iam',
+  onChange: (keys: (string | number)[]) => {
+    configuredApplicationAliases.value = new Set(keys.map((key) => String(key)));
+  },
+}));
+const applicationConfigurationColumns: UiDataTableColumn[] = [
+  { key: 'title', title: '应用名称', width: 260 },
+  { key: 'alias', title: '应用 alias', width: 220 },
+];
+
+watch(
+  () => selected.value?.id,
+  (tenantId) => {
+    applicationConfigurationOpen.value = false;
+    configuredApplicationAliases.value = new Set();
+    void loadTenantApplications(tenantId);
+  },
+  { immediate: true },
+);
+onMounted(() => void loadApplications());
 
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -85,36 +122,101 @@ function handleTenantSelect(record: CrudRecordListBase) {
   handleSelect(record as Tenant);
 }
 
-function handleCardAction(action: RecordActionItem) {
-  if (action.key === 'edit') {
-    startEdit();
+async function handleCardAction(action: RecordActionItem) {
+  if (action.key === 'edit') return startEdit();
+  if (action.key === 'delete') return removeSelected();
+  if (action.key === 'cancel') return cancelEdit();
+  if (action.key === 'save') await save();
+}
+
+async function loadApplications() {
+  applicationsLoading.value = true;
+  try {
+    await applicationContext.runtime.ready;
+    const response = await applicationContext.abilities.crud().query({ page: { pageNum: 1, pageSize: 200 } });
+    applications.value = response.records.filter((application) => application.enabled !== false);
+  } finally {
+    applicationsLoading.value = false;
+  }
+}
+
+async function loadTenantApplications(tenantId?: string) {
+  const loadVersion = ++tenantApplicationsLoadVersion;
+  if (!tenantId) {
+    tenantApplications.value = [];
     return;
   }
-  if (action.key === 'delete') {
-    void removeSelected();
-    return;
+  tenantApplicationsLoading.value = true;
+  try {
+    const response = await tenantContext.http.request<WebPageResponse<TenantApplication>>({
+      method: 'POST',
+      path: `${tenantApplicationsPath(tenantId)}/query`,
+      body: { page: { pageNum: 1, pageSize: 200 } },
+    });
+    if (loadVersion === tenantApplicationsLoadVersion && selected.value?.id === tenantId) {
+      tenantApplications.value = response.records;
+    }
+  } finally {
+    if (loadVersion === tenantApplicationsLoadVersion) tenantApplicationsLoading.value = false;
   }
-  if (action.key === 'cancel') {
-    cancelEdit();
-    return;
+}
+
+async function openApplicationConfiguration() {
+  const tenantId = selected.value?.id;
+  if (!tenantId) return;
+  await Promise.all([loadApplications(), loadTenantApplications(tenantId)]);
+  const activeApplicationAliases = new Set<string>();
+  for (const application of applications.value) {
+    if (application.alias) activeApplicationAliases.add(application.alias);
   }
-  if (action.key === 'save') {
-    void save();
+  configuredApplicationAliases.value = new Set([
+    'iam',
+    ...tenantApplications.value
+      .map((application) => application.applicationAlias)
+      .filter((applicationAlias): applicationAlias is string => {
+        return typeof applicationAlias === 'string' && activeApplicationAliases.has(applicationAlias);
+      }),
+  ]);
+  applicationConfigurationOpen.value = true;
+}
+
+async function saveApplicationConfiguration() {
+  const tenantId = selected.value?.id;
+  if (!tenantId) return;
+  applicationConfigurationSaving.value = true;
+  try {
+    await tenantContext.http.request<{ records: string[] }>({
+      method: 'POST',
+      path: `${tenantApplicationsPath(tenantId)}/configure`,
+      body: { applicationAliases: [...configuredApplicationAliases.value] },
+    });
+    await loadTenantApplications(tenantId);
+    applicationConfigurationOpen.value = false;
+  } finally {
+    applicationConfigurationSaving.value = false;
   }
+}
+
+function closeApplicationConfiguration() {
+  if (!applicationConfigurationSaving.value) applicationConfigurationOpen.value = false;
+}
+
+function tenantApplicationsPath(tenantId: string) {
+  return `/iam.tenant/${encodeURIComponent(tenantId)}/applications`;
 }
 </script>
 
 <template>
   <StaticManagementLayout
-    v-model:sidebar-search-keyword="explorerSearchKeyword"
-    sidebar-title="租户列表"
+    v-model:explorer-search-keyword="explorerSearchKeyword"
+    explorer-title="租户列表"
     refresh-title="刷新租户列表"
-    sidebar-search-placeholder="搜索租户名称、alias 或 ID"
+    explorer-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
-    :card-title="cardTitle"
+    :detail-title="cardTitle"
     @refresh="reloadKey += 1"
   >
-    <template #sidebar-actions>
+    <template #explorer-actions>
       <ModuleActionButton
         class="record-panel-create-button"
         :context="tenantContext"
@@ -124,7 +226,6 @@ function handleCardAction(action: RecordActionItem) {
         @click="startCreate"
       />
     </template>
-
     <template #explorer>
       <CrudRecordListExplorer
         :context="tenantContext"
@@ -139,11 +240,10 @@ function handleCardAction(action: RecordActionItem) {
         @loaded="handleLoaded"
       />
     </template>
-
-    <template #card-actions>
+    <template #detail-actions>
       <RecordActionBar :context="tenantContext" :actions="cardActions" @action="handleCardAction" />
     </template>
-    <template #card-status>
+    <template #detail-status>
       <RecordStatusSwitch
         v-if="mode !== 'view'"
         :enabled="draft.enabled"
@@ -162,16 +262,93 @@ function handleCardAction(action: RecordActionItem) {
     </template>
 
     <form class="static-record-form" @submit.prevent="save">
-      <label>
-        <span>租户 alias</span>
-        <UiInput v-model:value="draft.alias" :disabled="aliasReadonly" />
-      </label>
-      <label>
-        <span>租户名称</span>
-        <UiInput v-model:value="draft.title" :disabled="readonly" />
-      </label>
+      <label><span>租户 alias</span><UiInput v-model:value="draft.alias" :disabled="aliasReadonly" /></label>
+      <label><span>租户名称</span><UiInput v-model:value="draft.title" :disabled="readonly" /></label>
     </form>
 
+    <section v-if="selected && mode === 'view'" class="tenant-applications">
+      <div class="tenant-applications-header">
+        <div>
+          <h3>已开通应用</h3>
+          <p>应用是否可用以“是否开通”为准，不再维护租户侧启停状态。</p>
+        </div>
+        <UiButton type="primary" :loading="applicationsLoading" @click="openApplicationConfiguration">
+          配置应用
+        </UiButton>
+      </div>
+      <UiDataTable
+        :columns="tenantApplicationColumns"
+        :rows="tenantApplicationRows"
+        :loading="tenantApplicationsLoading"
+        :pagination="false"
+        empty-description="暂未开通应用"
+      />
+    </section>
     <RecordMetaSection :record="draft" show-sort-order />
   </StaticManagementLayout>
+
+  <RecordDetailDrawer
+    :open="applicationConfigurationOpen"
+    title="配置应用"
+    close-title="取消"
+    @close="closeApplicationConfiguration"
+  >
+    <template #operation>
+      <UiButton :disabled="applicationConfigurationSaving" @click="closeApplicationConfiguration">
+        取消
+      </UiButton>
+      <UiButton
+        type="primary"
+        :loading="applicationConfigurationSaving"
+        @click="saveApplicationConfiguration"
+      >
+        确认
+      </UiButton>
+    </template>
+    <section class="tenant-application-configuration">
+      <p>勾选表示向当前租户开通应用；取消勾选将移除该租户的应用开通记录。</p>
+      <UiDataTable
+        :columns="applicationConfigurationColumns"
+        :rows="applicationRows"
+        :loading="applicationsLoading"
+        :pagination="false"
+        :selection="applicationConfigurationSelection"
+        :row-key="(record) => String(record.alias ?? record.id ?? '')"
+        empty-description="暂无可配置应用"
+      />
+    </section>
+  </RecordDetailDrawer>
 </template>
+
+<style scoped>
+.tenant-applications {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.tenant-applications-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tenant-applications-header {
+  justify-content: space-between;
+}
+.tenant-applications h3,
+.tenant-applications p {
+  margin: 0;
+}
+.tenant-applications p {
+  margin-top: 4px;
+  color: var(--ui-text-muted, #8c8c8c);
+  font-size: 13px;
+}
+.tenant-application-configuration {
+  display: grid;
+  gap: 12px;
+}
+.tenant-application-configuration p {
+  margin: 0;
+  color: var(--ui-text-muted, #8c8c8c);
+}
+</style>

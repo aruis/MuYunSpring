@@ -59,6 +59,10 @@ export function isAuthenticationRequiredError(cause: unknown) {
   );
 }
 
+export function isPasswordChangeRequiredError(cause: unknown) {
+  return cause instanceof AppError && cause.code === platformErrorCodes.passwordChangeRequired;
+}
+
 function normalizeToken(token?: string | null) {
   const value = token?.trim();
   return value ? value : undefined;

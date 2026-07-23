@@ -635,6 +635,27 @@ test('openDirectTab keeps authorization pages for different roles separate', () 
   assert.equal(second.activeTabKey, 'business-route:/iam/role-authorization:roleId=role-b');
 });
 
+test('openDirectTab reports reuse when the stable work view tab already exists', () => {
+  const descriptor = {
+    pageType: 'business-route' as const,
+    openMode: 'workbench-route' as const,
+    hostType: 'business-route-host' as const,
+    title: '职员详情',
+    target: {
+      route: '/iam/employees',
+      query: { workspaceView: 'iam.employee.detail', recordId: 'employee-1' },
+    },
+    params: { workspaceView: 'iam.employee.detail', recordId: 'employee-1' },
+    tabPolicy: { identity: 'by-params' as const },
+  };
+  const first = openDirectTab([], descriptor);
+  const reused = openDirectTab(first.tabs, descriptor);
+
+  assert.equal(first.created, true);
+  assert.equal(reused.created, false);
+  assert.equal(reused.tabs.length, 1);
+});
+
 test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no menu match', () => {
   const state = {
     session: { currentUser },
@@ -647,6 +668,40 @@ test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no men
   assert.equal(restored.activeTabKey, 'platform-route:/crm/customer/list');
   assert.equal(restored.tabs?.[0]?.target, undefined);
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
+});
+
+test('restoreWorkbenchStartupStateFromUrl restores a declared workspace view ahead of its menu route', () => {
+  const state = {
+    session: { currentUser },
+    menus: [
+      {
+        record: {
+          id: 'iam.employee.menu',
+          schemeId: 'default',
+          title: '职员管理',
+          openMode: 'tab' as const,
+          route: '/iam/employees',
+          moduleAlias: 'iam.employee',
+        },
+        children: [],
+      },
+    ],
+    tabs: [],
+  };
+
+  const restored = restoreWorkbenchStartupStateFromUrl(
+    state,
+    '/iam/employees?recordId=employee-1&workspacePresentation=tab&workspaceView=iam.employee.detail&_muyunTitle=Alice',
+    { businessRoutePrefixes: ['/iam/employees'] },
+  );
+
+  assert.equal(
+    restored.activeTabKey,
+    'business-route:/iam/employees:recordId=employee-1&workspacePresentation=tab&workspaceView=iam.employee.detail',
+  );
+  assert.equal(restored.tabs?.[0]?.title, 'Alice');
+  assert.equal(restored.tabs?.[0]?.target, undefined);
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.query?.workspaceView, 'iam.employee.detail');
 });
 
 test('restoreWorkbenchStartupStateFromUrl does not restore window menus as workbench menu tabs', () => {

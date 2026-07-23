@@ -304,7 +304,7 @@ function roleTitle(record: Partial<Role>) {
 
 <template>
   <RecordDetailDrawer :open="open" :title="title" close-title="关闭" @close="handleClose">
-    <template #actions>
+    <template #operation>
       <UiButton :disabled="saving || loading" @click="handleClose">取消</UiButton>
       <UiButton type="primary" :loading="saving" :disabled="loading || !changed" @click="save">
         确定

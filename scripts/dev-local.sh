@@ -9,7 +9,8 @@ FRONTEND_PORT="${MUYUN_FRONTEND_PORT:-5173}"
 FORCE_RESTART=false
 
 PROCESS_PIDS=()
-PROCESS_STATUS_DIR=""
+PROCESS_NAMES=()
+CLEANING_UP=false
 
 usage() {
   cat <<USAGE
@@ -31,17 +32,16 @@ USAGE
 }
 
 cleanup() {
+  if [[ "$CLEANING_UP" == "true" ]]; then
+    return
+  fi
+  CLEANING_UP=true
   if ((${#PROCESS_PIDS[@]} > 0)); then
     echo
     echo "Stopping local development processes..."
     for pid in "${PROCESS_PIDS[@]}"; do
-      if kill -0 "$pid" 2>/dev/null; then
-        kill "$pid" 2>/dev/null || true
-      fi
+      stop_process_tree "$pid"
     done
-  fi
-  if [[ -n "$PROCESS_STATUS_DIR" && -d "$PROCESS_STATUS_DIR" ]]; then
-    rm -rf "$PROCESS_STATUS_DIR"
   fi
 }
 
@@ -80,6 +80,24 @@ stop_pid() {
   wait_until_stopped "$pid" || true
 }
 
+child_pids() {
+  local pid="$1"
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -P "$pid" 2>/dev/null || true
+  fi
+}
+
+stop_process_tree() {
+  local pid="$1"
+  local child
+  while IFS= read -r child; do
+    if [[ -n "$child" ]]; then
+      stop_process_tree "$child"
+    fi
+  done < <(child_pids "$pid")
+  stop_pid "$pid"
+}
+
 force_stop_port() {
   local port="$1"
   local label="$2"
@@ -99,6 +117,39 @@ force_stop_port() {
   done
 }
 
+force_stop_project_processes() {
+  local label="$1"
+  shift
+  local needles=("$@")
+  local pids=()
+  local pid
+  local command
+  while IFS=$'\t' read -r pid command; do
+    if [[ -n "$pid" ]]; then
+      local matches=true
+      local needle
+      for needle in "${needles[@]}"; do
+        if [[ "$command" != *"$needle"* ]]; then
+          matches=false
+          break
+        fi
+      done
+      if [[ "$matches" == "true" ]]; then
+        pids+=("$pid")
+      fi
+    fi
+  done < <(ps -axo pid=,command= | awk -v root="$ROOT_DIR" '
+    index($0, root) > 0 { sub(/^[[:space:]]+/, ""); pid = $1; sub(/^[^[:space:]]+[[:space:]]+/, ""); print pid "\t" $0 }
+  ')
+  if ((${#pids[@]} == 0)); then
+    return
+  fi
+  echo "Stopping existing $label process(es): ${pids[*]}"
+  for pid in "${pids[@]}"; do
+    stop_process_tree "$pid"
+  done
+}
+
 force_stop_existing_processes() {
   if [[ "$FORCE_RESTART" != "true" ]]; then
     return
@@ -109,31 +160,17 @@ force_stop_existing_processes() {
   fi
   force_stop_port "$BACKEND_PORT" "backend"
   force_stop_port "$FRONTEND_PORT" "frontend"
+  force_stop_project_processes "continuous compiler" ":muyun-boot:classes" "--continuous"
+  force_stop_project_processes "boot runner" ":muyun-boot:bootRun"
+  force_stop_project_processes "frontend dev server" "node_modules/.bin/vite" "--port $FRONTEND_PORT"
 }
 
 start_process() {
   local name="$1"
   shift
-  (
-    set +e
-    "$@"
-    local status=$?
-    set -e
-    printf '%s\n' "$status" >"$PROCESS_STATUS_DIR/$name.status"
-    exit "$status"
-  ) &
+  "$@" &
   PROCESS_PIDS+=("$!")
-}
-
-first_status_file() {
-  local file
-  for file in "$PROCESS_STATUS_DIR"/*.status; do
-    if [[ -f "$file" ]]; then
-      printf '%s\n' "$file"
-      return 0
-    fi
-  done
-  return 1
+  PROCESS_NAMES+=("$name")
 }
 
 backend_args() {
@@ -159,27 +196,33 @@ ensure_frontend_dependencies() {
 
 start_backend() {
   cd "$ROOT_DIR"
-  ./gradlew :muyun-boot:bootRun --args="$(backend_args)"
+  exec ./gradlew :muyun-boot:bootRun --args="$(backend_args)"
 }
 
 watch_backend_classes() {
   cd "$ROOT_DIR"
-  ./gradlew :muyun-boot:classes --continuous
+  exec ./gradlew :muyun-boot:classes --continuous
 }
 
 start_frontend() {
   cd "$ROOT_DIR"
-  npm run dev:backend --prefix muyun-web -- --port "$FRONTEND_PORT"
+  exec npm run dev:backend --prefix muyun-web -- --port "$FRONTEND_PORT"
 }
 
 wait_for_children() {
-  local status_file
+  local index
+  local pid
+  local status
   while true; do
-    status_file="$(first_status_file || true)"
-    if [[ -n "$status_file" ]]; then
-      cat "$status_file"
-      return
-    fi
+    for index in "${!PROCESS_PIDS[@]}"; do
+      pid="${PROCESS_PIDS[$index]}"
+      if ! kill -0 "$pid" 2>/dev/null; then
+        wait "$pid" || status=$?
+        status="${status:-0}"
+        echo "${PROCESS_NAMES[$index]} exited with status $status" >&2
+        return "$status"
+      fi
+    done
     sleep 2
   done
 }
@@ -204,7 +247,6 @@ done
 trap cleanup INT TERM EXIT
 
 cd "$ROOT_DIR"
-PROCESS_STATUS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/muyun-dev.XXXXXX")"
 force_stop_existing_processes
 echo "Starting PostgreSQL..."
 docker compose up -d
@@ -220,4 +262,5 @@ echo "Backend:  http://127.0.0.1:${BACKEND_PORT}"
 echo "Frontend: http://127.0.0.1:${FRONTEND_PORT}/"
 echo "Press Ctrl-C to stop backend and frontend."
 
-exit "$(wait_for_children)"
+wait_for_children
+exit $?

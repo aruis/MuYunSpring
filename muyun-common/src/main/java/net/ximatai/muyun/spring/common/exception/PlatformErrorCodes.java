@@ -6,6 +6,7 @@ public final class PlatformErrorCodes {
     public static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
     public static final String LOGIN_BAD_CREDENTIALS = "LOGIN_BAD_CREDENTIALS";
     public static final String ACCESS_DENIED = "ACCESS_DENIED";
+    public static final String APPLICATION_NOT_OPENED = "APPLICATION_NOT_OPENED";
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String CONFLICT_VERSION = "CONFLICT_VERSION";
     public static final String RESOURCE_IN_USE = "RESOURCE_IN_USE";

@@ -7,7 +7,7 @@ export interface RequestContext {
   traceId?: string;
   credentials?: RequestCredentials;
   headers?: Record<string, string>;
-  onAuthenticationRequired?: (error: AppError) => void;
+  onAuthenticationRequired?: (error: AppError, token?: string) => boolean | void;
 }
 
 export interface HttpRequestOptions {
@@ -67,7 +67,7 @@ function notifyAuthenticationRequired(context: RequestContext, error: AppError) 
   if (error.status !== 401 || error.code === platformErrorCodes.loginBadCredentials) {
     return;
   }
-  context.onAuthenticationRequired?.(error);
+  error.globallyHandled = context.onAuthenticationRequired?.(error, context.token) === true;
 }
 
 function urlOf(baseUrl: string | undefined, options: HttpRequestOptions) {

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.ApplicationNotOpenedException;
 import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
@@ -13,6 +14,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -51,6 +53,42 @@ class RoleActionExecutionPolicyServiceTest {
         assertThat(result.operatorId()).isEqualTo("user-1");
         assertThat(result.operatorType()).isEqualTo(ActionAuthorizationResult.OPERATOR_USER);
         verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldRejectTenantActionBeforeRoleLookupWhenApplicationIsNotOpened() {
+        RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        org.mockito.Mockito.doThrow(new ApplicationNotOpenedException("tenant_a", "sales"))
+                .when(tenantApplicationService).requireApplicationOpened("tenant_a", "sales");
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService,
+                tenantApplicationService);
+
+        assertThatThrownBy(() -> policy.authorize(context(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))))
+                .isInstanceOf(ApplicationNotOpenedException.class)
+                .satisfies(cause -> assertThat(((ApplicationNotOpenedException) cause).code())
+                        .isEqualTo("APPLICATION_NOT_OPENED"));
+
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldCheckApplicationOpeningBeforeGrantingLoginOnlyAction() {
+        RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService,
+                tenantApplicationService);
+
+        policy.authorize(ActionExecutionContext.ofPolicy(
+                "sales.contract",
+                new ActionExecutionPolicy("profile", PlatformActionLevel.RECORD,
+                        ActionAccessMode.LOGIN_REQUIRED, false, false, ActionDefaultGrantPolicy.NONE, null),
+                Set.of("contract-1"),
+                Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
+        ));
+
+        verify(tenantApplicationService).requireApplicationOpened("tenant_a", "sales");
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "profile");
     }
 
     @Test

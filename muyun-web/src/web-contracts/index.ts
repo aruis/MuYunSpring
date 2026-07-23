@@ -571,6 +571,10 @@ export interface EmployeeAccountProvisionResponse {
 
 export interface UserAccount extends StandardEnabledSortableEntity {
   username?: string;
+  /** Read projection of the employee currently bound to this account. */
+  employeeId?: string;
+  employeeNo?: string;
+  employeeTitle?: string;
   password?: string;
   passwordStatus?: UserPasswordStatus;
   passwordStatusTitle?: string;
@@ -821,6 +825,11 @@ export interface PlatformModule extends StandardEnabledTreeEntity {
 
 export interface Tenant extends StandardEnabledSortableEntity {
   alias?: string;
+}
+
+export interface TenantApplication extends StandardTitledEntity {
+  tenantId?: string;
+  applicationAlias?: string;
 }
 
 export interface PositionCategory extends StandardEnabledTreeEntity {

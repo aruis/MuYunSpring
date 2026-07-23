@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
-  DateTimeText,
   RecordActionBar,
   RecordDetailFields,
+  RecordDetailPanel,
   RecordFormFields,
   RecordMetaSection,
   RecordModeDrawer,
   RecordQueryListPanel,
   RecordStatusSwitch,
+  UserSessionExpandedSubtable,
   executeStaticFormSave,
   executeStaticRecordAction,
   normalizeRecordDraft,
@@ -23,7 +24,7 @@ import {
   type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
-import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
+import { UiButton, UiInput, confirmAction } from '@muyun/vue-ui-antdv';
 import type {
   ResetPasswordResponse,
   UserAccount,
@@ -32,14 +33,28 @@ import type {
 } from '@muyun/web-contracts';
 import { platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageBusinessEventHandler, usePageRecordExternalChange } from '../app/pageRealtime';
-import { useUserSessionRows, userSessionPresenceTitle } from './useUserSessionRows';
+import { useWorkspaceViewHost } from '../app/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import { systemUserDetailWorkspaceView } from './systemUserDetailWorkspaceView';
+import {
+  handOffSystemUserDetailWorkspaceSession,
+  takeSystemUserDetailWorkspaceSession,
+  type SystemUserDetailWorkspaceSession,
+} from './systemUserDetailWorkspaceSession';
+import { useUserSessionRows } from './useUserSessionRows';
 
 defineOptions({ name: 'SystemUserManagementView' });
+
+const props = defineProps<{
+  recordId?: string;
+  mode?: 'view' | 'edit';
+}>();
 
 type SystemUserDetailMode = 'view' | 'edit' | 'resetPassword';
 type SystemUserFormFieldName = 'username' | 'enabled';
 
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
+const workspaceViewHost = useWorkspaceViewHost();
 const selectedUserKey = ref<string>();
 const selectedUser = ref<UserAccount>();
 const detailOpen = ref(false);
@@ -53,6 +68,11 @@ const userDraft = ref<Partial<UserAccount>>(createSystemUserDraft());
 const passwordDraft = ref('');
 const resetPasswordResult = ref<ResetPasswordResponse>();
 const formFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const isWorkspaceTask = computed(() => Boolean(props.recordId));
+const isDrawerWorkspaceTask = computed(
+  () => isWorkspaceTask.value && workspaceViewHost?.presentation === 'drawer',
+);
+const shouldRenderDetailDrawer = computed(() => !isWorkspaceTask.value || isDrawerWorkspaceTask.value);
 const {
   expandedUserKeys,
   handleUserListLoaded,
@@ -81,11 +101,9 @@ const columns = computed<RecordQueryListColumn[]>(() => [
   { key: 'enabled', title: '登录状态', type: 'enabledStatus', width: '14%' },
 ]);
 const detailTitle = computed(() => {
-  if (detailMode.value === 'resetPassword') {
-    return `修改密码 - ${systemUserTitle(selectedUser.value ?? userDraft.value)}`;
-  }
   return systemUserTitle(selectedUser.value ?? userDraft.value);
 });
+const detailSubtitle = computed(() => (detailMode.value === 'resetPassword' ? '修改密码' : '系统账号'));
 const formDisabled = computed(() => savingUser.value || loadingDetail.value);
 const canSaveUser = computed(() => {
   if (loadingDetail.value) {
@@ -142,6 +160,42 @@ const detailActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+const detailOperationActions = computed(() => detailActions.value);
+const systemUserDetailPromotion = useWorkspaceViewPromotion({
+  view: systemUserDetailWorkspaceView,
+  input: computed(() => {
+    const recordId = selectedUser.value?.id;
+    return recordId && (detailMode.value === 'view' || detailMode.value === 'edit')
+      ? { recordId }
+      : undefined;
+  }),
+  title: computed(() => systemUserTitle(selectedUser.value)),
+  eligibility: computed(() => ({
+    hasStableIdentity: Boolean(selectedUser.value?.id) && !loadingDetail.value,
+    busy: savingUser.value,
+  })),
+  beforePromote: (input) => {
+    const selected = selectedUser.value;
+    if (!selected) return;
+    handOffSystemUserDetailWorkspaceSession(input, {
+      selectedUser: selected,
+      draft: userDraft.value,
+      mode: detailMode.value === 'edit' ? 'edit' : 'view',
+      password: passwordDraft.value,
+      resetPasswordResult: resetPasswordResult.value,
+    });
+  },
+  onPromoted: closeDetail,
+});
+
+watch(
+  selectedUser,
+  (user) => {
+    if (!isWorkspaceTask.value || !user) return;
+    workspaceViewHost?.setTitle(systemUserTitle(user));
+  },
+  { immediate: true },
+);
 const formFieldFallback = computed<Record<SystemUserFormFieldName, RecordFormFieldFallback>>(() => ({
   username: { label: '账号', required: true, visible: true, placeholder: '请输入登录账号' },
   enabled: { label: '允许登录', visible: true, controlType: 'enabledStatus' },
@@ -150,6 +204,15 @@ const formFieldNames = computed<SystemUserFormFieldName[]>(() => ['username', 'e
 
 onMounted(() => {
   void loadFormDefinition();
+  if (props.recordId) {
+    const input = { recordId: props.recordId } as const;
+    const session = takeSystemUserDetailWorkspaceSession(input);
+    if (session) {
+      restoreSystemUserDetailWorkspaceSession(session);
+      return;
+    }
+    void openDetail({ id: props.recordId }, props.mode ?? 'view');
+  }
 });
 
 usePageBusinessEventHandler(handleUserSessionBusinessEvent);
@@ -232,6 +295,15 @@ async function openDetail(record: QueryListRecord, mode: SystemUserDetailMode) {
     if (!canCommitDetailRequest(id, requestSeq)) {
       return;
     }
+    if (!fullRecord?.id) {
+      detailLoadFailed.value = true;
+      presentPlatformMessage('未找到指定系统账号', { source: 'system-user-management', phase: 'load' });
+      return;
+    }
+    if (fullRecord.tenantId) {
+      rejectTenantUserWorkspace();
+      return;
+    }
     commitDetailRecord(fullRecord, mode);
   } catch (cause) {
     if (canCommitDetailRequest(id, requestSeq)) {
@@ -258,6 +330,27 @@ function closeDetail() {
   resetPasswordResult.value = undefined;
   userExternalChange.clearExternalChanged();
   userDraft.value = selectedUser.value ? copySystemUser(selectedUser.value) : createSystemUserDraft();
+  if (isDrawerWorkspaceTask.value) {
+    workspaceViewHost?.dismiss();
+  }
+}
+
+/** A system-account URL must never become an alternate entry for a tenant user. */
+function rejectTenantUserWorkspace() {
+  detailRequestSeq.value += 1;
+  loadingDetail.value = false;
+  detailLoadFailed.value = false;
+  detailOpen.value = false;
+  selectedUser.value = undefined;
+  selectedUserKey.value = undefined;
+  userDraft.value = createSystemUserDraft();
+  presentPlatformMessage('指定账号不属于系统账号管理范围', {
+    source: 'system-user-management',
+    phase: 'validation',
+  });
+  if (isWorkspaceTask.value) {
+    workspaceViewHost?.dismiss();
+  }
 }
 
 function cancelDetail() {
@@ -502,6 +595,18 @@ function commitDetailRecord(record: UserAccount, nextMode: SystemUserDetailMode 
   detailRequestSeq.value += 1;
 }
 
+function restoreSystemUserDetailWorkspaceSession(session: SystemUserDetailWorkspaceSession) {
+  selectedUserKey.value = session.selectedUser.id;
+  selectedUser.value = { ...session.selectedUser };
+  userDraft.value = copySystemUser(session.draft);
+  detailMode.value = session.mode;
+  passwordDraft.value = session.password;
+  resetPasswordResult.value = session.resetPasswordResult;
+  detailOpen.value = true;
+  loadingDetail.value = false;
+  detailLoadFailed.value = false;
+}
+
 function revokableUserSessions(userId: string | undefined) {
   if (!userId || userContext.can('revokeSession', userId) !== true) {
     return [];
@@ -511,22 +616,6 @@ function revokableUserSessions(userId: string | undefined) {
 
 function canRevokeUserSession(userId: string | undefined, session: UserSessionView) {
   return Boolean(userId) && !session.current && userContext.can('revokeSession', userId) === true;
-}
-
-function sessionTitle(session: UserSessionView) {
-  return session.loginUserAgent || session.loginIp || session.id;
-}
-
-function sessionTerminalTitle(session: UserSessionView) {
-  const terminal = session.terminalTypeTitle || '其他终端';
-  const platform = session.platformTypeTitle;
-  return platform ? `${terminal} / ${platform}` : terminal;
-}
-
-function sessionPresenceTitle(session: UserSessionView) {
-  const status = userSessionPresenceTitle(session);
-  const count = session.connectionCount ?? 0;
-  return `${status}，实时连接数 ${count}`;
 }
 
 function createSystemUserDraft(): Partial<UserAccount> {
@@ -588,6 +677,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
 <template>
   <section class="system-user-management-page">
     <RecordQueryListPanel
+      v-if="!isWorkspaceTask || isDrawerWorkspaceTask"
       class="system-user-list-panel"
       :context="systemUserContext"
       title="系统账号"
@@ -607,106 +697,31 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       @select="selectedUserKey = String($event.id ?? '')"
     >
       <template #expandedRow="{ record }">
-        <section class="system-user-session-section">
-          <div class="system-user-session-header">
-            <h3>在线会话</h3>
-            <div class="system-user-session-actions">
-              <UiButton
-                type="text"
-                icon-name="reload"
-                :disabled="userSessionState(String(record.id ?? '')).loading"
-                @click="loadUserSessions(String(record.id ?? ''))"
-              >
-                刷新
-              </UiButton>
-              <UiButton
-                v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
-                danger
-                icon-name="power"
-                :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
-                @click="revokeAllUserSessions(record)"
-              >
-                全部下线
-              </UiButton>
-            </div>
-          </div>
-          <UiSpin
-            v-if="userSessionState(String(record.id ?? '')).loading"
-            class="system-user-session-state"
-            tip="加载在线会话"
-          />
-          <UiError
-            v-else-if="userSessionState(String(record.id ?? '')).error"
-            title="在线会话加载失败"
-            :message="userSessionState(String(record.id ?? '')).error ?? '无法加载在线会话，请重试'"
-          />
-          <p
-            v-else-if="userSessionState(String(record.id ?? '')).records.length === 0"
-            class="system-user-session-empty"
-          >
-            当前无在线会话
-          </p>
-          <div v-else class="system-user-session-list">
-            <article
-              v-for="session in userSessionState(String(record.id ?? '')).records"
-              :key="session.id"
-              class="system-user-session-item"
-            >
-              <div class="system-user-session-main">
-                <strong :title="sessionTitle(session)">{{ sessionTitle(session) }}</strong>
-                <span
-                  class="system-user-session-presence"
-                  :class="{ 'is-present': session.present, 'is-idle': session.presenceStatus === 'idle' }"
-                  :title="sessionPresenceTitle(session)"
-                >
-                  {{ userSessionPresenceTitle(session) }}
-                </span>
-                <span v-if="session.current" class="system-user-session-badge">当前会话</span>
-              </div>
-              <dl class="system-user-session-meta">
-                <div>
-                  <dt>登录</dt>
-                  <dd><DateTimeText :value="session.issuedAt" /></dd>
-                </div>
-                <div>
-                  <dt>最近请求</dt>
-                  <dd><DateTimeText :value="session.lastSeenAt" /></dd>
-                </div>
-                <div>
-                  <dt>连接</dt>
-                  <dd :title="sessionPresenceTitle(session)">{{ session.connectionCount ?? 0 }}</dd>
-                </div>
-                <div>
-                  <dt>IP</dt>
-                  <dd :title="session.loginIp || '-'">{{ session.loginIp || '-' }}</dd>
-                </div>
-                <div>
-                  <dt>终端</dt>
-                  <dd :title="sessionTerminalTitle(session)">{{ sessionTerminalTitle(session) }}</dd>
-                </div>
-              </dl>
-              <UiButton
-                danger
-                icon-name="power"
-                :disabled="savingUser || !canRevokeUserSession(String(record.id ?? ''), session)"
-                @click="revokeUserSession(record, session)"
-              >
-                下线
-              </UiButton>
-            </article>
-          </div>
-        </section>
+        <UserSessionExpandedSubtable
+          :sessions="userSessionState(String(record.id ?? '')).records"
+          :loading="userSessionState(String(record.id ?? '')).loading"
+          :error="userSessionState(String(record.id ?? '')).error"
+          :actions-disabled="savingUser"
+          :can-revoke="(session) => canRevokeUserSession(String(record.id ?? ''), session)"
+          :can-revoke-all="revokableUserSessions(String(record.id ?? '')).length > 1"
+          @refresh="loadUserSessions(String(record.id ?? ''))"
+          @revoke="revokeUserSession(record, $event)"
+          @revoke-all="revokeAllUserSessions(record)"
+        />
       </template>
     </RecordQueryListPanel>
 
     <RecordModeDrawer
+      v-if="shouldRenderDetailDrawer"
       :open="detailOpen"
       :title="detailTitle"
+      :subtitle="detailSubtitle"
       :mode="detailMode"
       :form-modes="['edit', 'resetPassword']"
       :loading="loadingDetail"
       :load-failed="detailLoadFailed"
       :externally-changed="userExternalChange.externallyChanged.value"
+      :promotion="systemUserDetailPromotion"
       error-title="详情加载失败"
       error-message="无法加载系统账号详情，请重试"
       @close="closeDetail"
@@ -724,10 +739,10 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
           @change="toggleUserEnabled"
         />
       </template>
-      <template #actions>
+      <template #operation>
         <RecordActionBar
           :context="systemUserContext"
-          :actions="detailActions"
+          :actions="detailOperationActions"
           :record-id="selectedUser?.id"
           @action="handleDetailAction"
         />
@@ -789,6 +804,75 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
         <RecordMetaSection v-if="detailMode !== 'resetPassword'" :record="userDraft" />
       </template>
     </RecordModeDrawer>
+
+    <RecordDetailPanel v-else :title="detailTitle" :subtitle="detailSubtitle" scrollable-content>
+      <template #status>
+        <RecordStatusSwitch
+          v-if="detailMode === 'view' && selectedUser"
+          :enabled="selectedUser.enabled !== false"
+          :disabled="savingUser || !canToggleUser"
+          :loading="savingUser"
+          :show-label="false"
+          @change="toggleUserEnabled"
+        />
+      </template>
+
+      <UiSpin v-if="loadingDetail" class="system-user-detail-state" tip="加载系统账号详情" />
+      <div v-else-if="detailLoadFailed" class="system-user-detail-state">
+        <UiError title="详情加载失败" message="无法加载系统账号详情，请重试" />
+        <UiButton type="primary" icon-name="reload" @click="retryDetail">重试</UiButton>
+      </div>
+      <template v-else-if="detailMode === 'view'">
+        <RecordDetailFields
+          :record="userDraft as RecordFormRecord"
+          :fields="formFieldDefinitions"
+          :fallback="formFieldFallback"
+        />
+        <div v-if="resetPasswordResult?.temporaryPassword" class="system-user-password-reset-result">
+          <span>临时密码</span>
+          <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
+          <small v-if="resetPasswordResult.expiresAt">
+            有效期至 <DateTimeText :value="resetPasswordResult.expiresAt" />
+          </small>
+        </div>
+        <RecordMetaSection :record="userDraft" />
+      </template>
+      <template v-else>
+        <form class="system-user-form" @submit.prevent="saveUser">
+          <RecordFormFields
+            v-if="detailMode !== 'resetPassword'"
+            :record="userDraft as RecordFormRecord"
+            :field-names="formFieldNames"
+            :fields="formFieldDefinitions"
+            :fallback="formFieldFallback"
+            :disabled="formDisabled"
+            :disabled-of="systemUserFormFieldDisabled"
+            @update:field="updateUserDraftField"
+          />
+          <label v-else>
+            <span class="system-user-form-label">新密码</span>
+            <UiInput
+              :value="passwordDraft"
+              type="password"
+              :disabled="formDisabled"
+              placeholder="请输入密码"
+              allow-clear
+              @update:value="passwordDraft = $event"
+            />
+          </label>
+        </form>
+        <RecordMetaSection v-if="detailMode !== 'resetPassword'" :record="userDraft" />
+      </template>
+
+      <template #operation>
+        <RecordActionBar
+          :context="systemUserContext"
+          :actions="detailOperationActions"
+          :record-id="selectedUser?.id"
+          @action="handleDetailAction"
+        />
+      </template>
+    </RecordDetailPanel>
   </section>
 </template>
 
@@ -839,144 +923,6 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
 
 .system-user-password-reset-result small {
   color: var(--muyun-text-muted);
-}
-
-.system-user-session-section {
-  display: grid;
-  gap: 8px;
-  padding: 12px 16px 14px 46px;
-  border-top: 1px solid var(--muyun-border-subtle);
-  background: #fbfcfe;
-}
-
-.system-user-session-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.system-user-session-header h3 {
-  margin: 0;
-  color: var(--muyun-text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.system-user-session-actions {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.system-user-session-state {
-  min-height: 56px;
-}
-
-.system-user-session-empty {
-  margin: 0;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.system-user-session-list {
-  display: grid;
-  gap: 0;
-  border: 1px solid var(--muyun-border-subtle);
-  border-radius: 6px;
-  background: var(--muyun-surface);
-}
-
-.system-user-session-item {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.1fr) minmax(460px, 2fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--muyun-border-subtle);
-}
-
-.system-user-session-item:last-child {
-  border-bottom: 0;
-}
-
-.system-user-session-main {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.system-user-session-main strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muyun-text);
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.system-user-session-badge {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-}
-
-.system-user-session-presence {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-}
-
-.system-user-session-presence.is-present {
-  background: rgba(22, 163, 74, 0.1);
-  color: #047857;
-}
-
-.system-user-session-presence.is-idle {
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
-}
-
-.system-user-session-meta {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.system-user-session-meta div {
-  min-width: 0;
-}
-
-.system-user-session-meta dt {
-  color: var(--muyun-text-muted);
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.system-user-session-meta dd {
-  margin: 2px 0 0;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  color: var(--muyun-text);
-  font-size: 12px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.system-user-session-item > :deep(.ant-btn) {
-  min-width: 64px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
 }
 
 .system-user-detail-state {

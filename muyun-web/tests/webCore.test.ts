@@ -124,13 +124,17 @@ test('http client delegates expired authentication to the application boundary',
   try {
     const http = createHttpClient({
       baseUrl: 'http://api.local',
-      onAuthenticationRequired: (error) => recovered.push(error),
+      onAuthenticationRequired: (error) => {
+        recovered.push(error);
+        return true;
+      },
     });
 
     await assert.rejects(() => http.request({ path: '/iam.auth/context' }));
 
     assert.equal(recovered.length, 1);
     assert.equal(recovered[0].code, platformErrorCodes.authRequired);
+    assert.equal(recovered[0].globallyHandled, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

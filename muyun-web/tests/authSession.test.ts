@@ -5,6 +5,7 @@ import {
   clearAuthToken,
   effectiveAuthToken,
   isAuthenticationRequiredError,
+  isPasswordChangeRequiredError,
   saveAuthSessionId,
   saveAuthToken,
   storedAuthSessionId,
@@ -103,4 +104,22 @@ test('isAuthenticationRequiredError uses backend auth-required code for login re
   );
   assert.equal(isAuthenticationRequiredError(new AppError('forbidden', { status: 403 })), false);
   assert.equal(isAuthenticationRequiredError(new AppError('menu scheme missing', { status: 409 })), false);
+});
+
+test('isPasswordChangeRequiredError keeps an authenticated session on the change-password path', () => {
+  assert.equal(
+    isPasswordChangeRequiredError(
+      new AppError('password change required', {
+        code: platformErrorCodes.passwordChangeRequired,
+        status: 403,
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isPasswordChangeRequiredError(
+      new AppError('login required', { code: platformErrorCodes.authRequired, status: 401 }),
+    ),
+    false,
+  );
 });

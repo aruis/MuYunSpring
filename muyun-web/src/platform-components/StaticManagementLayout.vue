@@ -8,26 +8,26 @@ defineOptions({ name: 'StaticManagementLayout' });
 
 withDefaults(
   defineProps<{
-    sidebarTitle: string;
+    explorerTitle: string;
     refreshTitle: string;
     mode: 'view' | 'edit' | 'create';
-    cardTitle: string;
+    detailTitle: string;
     mutedMessage?: string;
-    sidebarSearchKeyword?: string;
-    sidebarSearchPlaceholder?: string;
-    sidebarSearchable?: boolean;
+    explorerSearchKeyword?: string;
+    explorerSearchPlaceholder?: string;
+    explorerSearchable?: boolean;
   }>(),
   {
     mutedMessage: undefined,
-    sidebarSearchKeyword: '',
-    sidebarSearchPlaceholder: '搜索名称、编码或 ID',
-    sidebarSearchable: true,
+    explorerSearchKeyword: '',
+    explorerSearchPlaceholder: '搜索名称、编码或 ID',
+    explorerSearchable: true,
   },
 );
 
 const emit = defineEmits<{
   refresh: [];
-  'update:sidebarSearchKeyword': [keyword: string];
+  'update:explorerSearchKeyword': [keyword: string];
 }>();
 </script>
 
@@ -36,27 +36,27 @@ const emit = defineEmits<{
     <ManagementExplorerColumn>
       <RecordExplorerPanel
         class="static-management-sidebar"
-        :title="sidebarTitle"
+        :title="explorerTitle"
         :refresh-title="refreshTitle"
-        :search-keyword="sidebarSearchKeyword"
-        :search-placeholder="sidebarSearchPlaceholder"
-        :searchable="sidebarSearchable"
-        @update:search-keyword="emit('update:sidebarSearchKeyword', $event)"
+        :search-keyword="explorerSearchKeyword"
+        :search-placeholder="explorerSearchPlaceholder"
+        :searchable="explorerSearchable"
+        @update:search-keyword="emit('update:explorerSearchKeyword', $event)"
         @refresh="emit('refresh')"
       >
         <template #actions>
-          <slot name="sidebar-actions" />
+          <slot name="explorer-actions" />
         </template>
         <slot name="explorer" />
       </RecordExplorerPanel>
     </ManagementExplorerColumn>
 
-    <RecordDetailPanel class="static-management-card" :title="cardTitle">
+    <RecordDetailPanel class="static-management-card" :title="detailTitle">
       <template #status>
-        <slot name="card-status" />
+        <slot name="detail-status" />
       </template>
       <template #actions>
-        <slot name="card-actions" />
+        <slot name="detail-actions" />
       </template>
 
       <div v-if="mutedMessage" class="message muted">{{ mutedMessage }}</div>

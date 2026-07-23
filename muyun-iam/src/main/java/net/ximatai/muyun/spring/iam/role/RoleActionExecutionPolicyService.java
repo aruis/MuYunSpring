@@ -10,6 +10,9 @@ import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,9 +25,17 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
     public static final String DECISION_ROLE_GRANTED = "ROLE_GRANTED";
 
     private final RoleService roleService;
+    private final TenantApplicationService tenantApplicationService;
 
     public RoleActionExecutionPolicyService(RoleService roleService) {
+        this(roleService, null);
+    }
+
+    @Autowired
+    public RoleActionExecutionPolicyService(RoleService roleService,
+                                            TenantApplicationService tenantApplicationService) {
         this.roleService = roleService;
+        this.tenantApplicationService = tenantApplicationService;
     }
 
     @Override
@@ -45,6 +56,7 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
         if (currentUser.system()) {
             return ActionAuthorizationResult.allowed(context, DECISION_SYSTEM_USER);
         }
+        requireOpenedApplication(currentUser, context.moduleAlias());
         if (context.actionPolicy().accessMode() == ActionAccessMode.LOGIN_REQUIRED) {
             return ActionAuthorizationResult.allowed(context, DECISION_LOGIN_REQUIRED);
         }
@@ -75,5 +87,17 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
 
     private boolean grantsAuthenticatedUser(ActionDefaultGrantPolicy policy) {
         return policy != null && policy.grantsAuthenticatedUser();
+    }
+
+    private void requireOpenedApplication(CurrentUser currentUser, String moduleAlias) {
+        if (tenantApplicationService == null) {
+            return;
+        }
+        String tenantId = currentUser.tenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new PlatformAccessDeniedException("tenant user requires tenant context");
+        }
+        tenantApplicationService.requireApplicationOpened(tenantId,
+                PlatformNameRules.applicationAliasOfModuleAlias(moduleAlias));
     }
 }

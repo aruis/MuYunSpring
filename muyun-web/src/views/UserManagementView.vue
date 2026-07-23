@@ -2,16 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
-  DateTimeText,
   RecordActionBar,
   RecordDetailDrawer,
-  RecordDetailFields,
-  RecordExpandedSubtable,
+  RecordDetailPanel,
   RecordExplorerPanel,
-  RecordFormFields,
-  RecordMetaSection,
   RecordQueryListPanel,
   RecordStatusSwitch,
+  UserSessionExpandedSubtable,
   executeStaticFormSave,
   executeStaticRecordAction,
   normalizeRecordDraft,
@@ -24,31 +21,53 @@ import {
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
-  type RecordFormRecord,
   type RecordQueryListColumn,
   type ResolvedRecordActionItem,
 } from '@muyun/platform-components';
-import { UiButton, UiError, UiInput, UiRecordExplorerItem, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
+import { UiRecordExplorerItem, confirmAction } from '@muyun/vue-ui-antdv';
 import type {
   ResetPasswordResponse,
   Tenant,
   UserAccount,
+  UserEmployeeBindingView,
   UserSessionView,
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
+import { createBackendHttpClient } from '../app/backendHttp';
 import { usePageBusinessEventHandler } from '../app/pageRealtime';
-import { useUserSessionRows, userSessionPresenceTitle } from './useUserSessionRows';
+import { useWorkspaceViewHost } from '../app/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import UserDetailContent from './UserDetailContent.vue';
+import { userDetailWorkspaceView } from './userDetailWorkspaceView';
+import {
+  handOffUserDetailWorkspaceSession,
+  takeUserDetailWorkspaceSession,
+  type UserDetailWorkspaceSession,
+} from './userDetailWorkspaceSession';
+import { useUserSessionRows } from './useUserSessionRows';
+import {
+  canSwitchUserDetailContext,
+  persistedUserDetailMode,
+  shouldCommitUserDetailRequest,
+  type UserDetailMode,
+} from './userDetailStateModel';
 
 defineOptions({ name: 'UserManagementView' });
 
-type UserDetailMode = 'view' | 'create' | 'edit' | 'resetPassword';
+const props = defineProps<{
+  /** Present only when this component is restored as a workbench task. */
+  recordId?: string;
+  mode?: 'view' | 'edit';
+}>();
+
 type UserFormFieldName = 'username' | 'enabled';
 
 const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
 const currentUser = useCurrentUserContext();
+const workspaceViewHost = useWorkspaceViewHost();
 const tenantSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
 const userReloadKey = ref(0);
@@ -77,6 +96,11 @@ const {
 } = useUserSessionRows({ context: userContext, source: 'user-management' });
 
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
+const isWorkspaceTask = computed(() => Boolean(props.recordId));
+const isDrawerWorkspaceTask = computed(
+  () => isWorkspaceTask.value && workspaceViewHost?.presentation === 'drawer',
+);
+const shouldRenderUserDetailDrawer = computed(() => !isWorkspaceTask.value || isDrawerWorkspaceTask.value);
 const canBrowseTenants = computed(() => currentUser?.value?.system === true);
 const currentUserTenant = computed<Tenant | undefined>(() => {
   const tenantId = currentUser?.value?.tenantId;
@@ -113,12 +137,12 @@ const userDetailTitle = computed(() => {
   if (userDetailMode.value === 'create') {
     return '新建用户';
   }
-  if (userDetailMode.value === 'resetPassword') {
-    return `修改密码 - ${userTitle(selectedUser.value ?? userDraft.value)}`;
-  }
-  return userTitle(selectedUser.value ?? userDraft.value);
+  return userPrimaryTitle(selectedUser.value ?? userDraft.value);
 });
-const userFormDisabled = computed(() => savingUser.value || loadingUserDetail.value);
+const userDetailSubtitle = computed(() => {
+  if (userDetailMode.value === 'create') return undefined;
+  return userEmployeeSubtitle(selectedUser.value ?? userDraft.value);
+});
 const canSaveUser = computed(() => {
   if (loadingUserDetail.value) {
     return false;
@@ -190,6 +214,63 @@ const userDetailActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+const userDetailOperationActions = computed(() => userDetailActions.value);
+const userWorkspaceOperationActions = computed<RecordActionItem[]>(() => {
+  if (userDetailMode.value === 'view') {
+    return selectedUser.value?.id
+      ? [{ key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit', disabled: savingUser.value }]
+      : [];
+  }
+  return userDetailMode.value === 'edit'
+    ? [
+        { key: 'cancel', title: '取消', iconName: 'close', disabled: savingUser.value },
+        {
+          key: 'save',
+          actionCode: 'update',
+          title: '保存',
+          iconName: 'save',
+          primary: true,
+          loading: savingUser.value,
+          disabled: !canSaveUser.value,
+        },
+      ]
+    : [];
+});
+const userDetailPromotion = useWorkspaceViewPromotion({
+  view: userDetailWorkspaceView,
+  input: computed(() => {
+    const recordId = selectedUser.value?.id;
+    const mode = userDetailMode.value;
+    return recordId && (mode === 'view' || mode === 'edit') ? { recordId } : undefined;
+  }),
+  title: computed(() => userPrimaryTitle(selectedUser.value)),
+  eligibility: computed(() => ({
+    hasStableIdentity: Boolean(selectedUser.value?.id) && !loadingUserDetail.value,
+    busy: savingUser.value,
+  })),
+  beforePromote: (input) => {
+    const selected = selectedUser.value;
+    if (!selected) return;
+    handOffUserDetailWorkspaceSession(input, {
+      selectedUser: selected,
+      draft: userDraft.value,
+      tenant: selectedTenant.value,
+      mode: userDetailMode.value === 'edit' ? 'edit' : 'view',
+      password: passwordDraft.value,
+      resetPasswordResult: resetPasswordResult.value,
+    });
+  },
+  onPromoted: closeUserDetail,
+});
+
+watch(
+  selectedUser,
+  (user) => {
+    if (!isWorkspaceTask.value || !user) return;
+    workspaceViewHost?.setTitle(userPrimaryTitle(user));
+  },
+  { immediate: true },
+);
 const userFormFieldFallback = computed<Record<UserFormFieldName, RecordFormFieldFallback>>(() => ({
   username: { label: '账号', required: true, visible: true, placeholder: '请输入登录账号' },
   enabled: { label: '允许登录', visible: true, controlType: 'enabledStatus' },
@@ -198,6 +279,15 @@ const userFormFieldNames = computed<UserFormFieldName[]>(() => ['username', 'ena
 
 onMounted(() => {
   void loadUserFormDefinition();
+  if (props.recordId) {
+    const input = { recordId: props.recordId } as const;
+    const session = takeUserDetailWorkspaceSession(input);
+    if (session) {
+      restoreUserDetailWorkspaceSession(session);
+      return;
+    }
+    void openUserDetail({ id: props.recordId }, props.mode ?? 'view');
+  }
 });
 
 usePageBusinessEventHandler(handleUserSessionBusinessEvent);
@@ -205,6 +295,9 @@ usePageBusinessEventHandler(handleUserSessionBusinessEvent);
 watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
 
 watch(selectedTenant, () => {
+  if (isWorkspaceTask.value) {
+    return;
+  }
   selectedUserKey.value = undefined;
   selectedUser.value = undefined;
   resetUserSessionRows();
@@ -253,7 +346,7 @@ function handleTenantsLoaded(records: CrudRecordListBase[]) {
 }
 
 function initializeTenantUserScope(record = currentUserTenant.value) {
-  if (!record || canBrowseTenants.value || selectedTenant.value) {
+  if (isWorkspaceTask.value || !record || canBrowseTenants.value || selectedTenant.value) {
     return;
   }
   selectedTenant.value = record;
@@ -339,7 +432,16 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
     if (!canCommitUserDetailRequest(id, requestSeq)) {
       return;
     }
-    commitUserDetailRecord(fullRecord, mode);
+    if (!fullRecord?.id) {
+      userDetailLoadFailed.value = true;
+      presentPlatformMessage('未找到指定用户', { source: 'user-management', phase: 'load' });
+      return;
+    }
+    const binding = await loadUserEmployeeBinding(id);
+    if (!canCommitUserDetailRequest(id, requestSeq)) {
+      return;
+    }
+    commitUserDetailRecord({ ...fullRecord, ...binding }, mode);
   } catch (cause) {
     if (canCommitUserDetailRequest(id, requestSeq)) {
       userDetailLoadFailed.value = true;
@@ -350,6 +452,12 @@ async function openUserDetail(record: QueryListRecord, mode: UserDetailMode) {
       loadingUserDetail.value = false;
     }
   }
+}
+
+function loadUserEmployeeBinding(userId: string) {
+  return createBackendHttpClient().request<UserEmployeeBindingView>({
+    path: `/iam.user/${encodeURIComponent(userId)}/employee-binding`,
+  });
 }
 
 function closeUserDetail() {
@@ -364,6 +472,9 @@ function closeUserDetail() {
   passwordDraft.value = '';
   resetPasswordResult.value = undefined;
   userDraft.value = selectedUser.value ? copyUser(selectedUser.value) : createUserDraft(selectedTenant.value);
+  if (isDrawerWorkspaceTask.value) {
+    workspaceViewHost?.dismiss();
+  }
 }
 
 function cancelUserDetail() {
@@ -603,11 +714,16 @@ async function removeUser(record: Partial<UserAccount> | QueryListRecord | undef
 }
 
 function canLeaveUserDetailContext() {
-  return !savingUser.value;
+  return canSwitchUserDetailContext(savingUser.value);
 }
 
 function canCommitUserDetailRequest(recordId: string, requestSeq: number) {
-  return userDetailRequestSeq.value === requestSeq && selectedUserKey.value === recordId;
+  return shouldCommitUserDetailRequest({
+    activeRequestSeq: userDetailRequestSeq.value,
+    requestSeq,
+    selectedUserKey: selectedUserKey.value,
+    recordId,
+  });
 }
 
 function commitUserDetailRecord(record: UserAccount, nextMode: UserDetailMode = 'view') {
@@ -615,13 +731,27 @@ function commitUserDetailRecord(record: UserAccount, nextMode: UserDetailMode = 
   selectedUserKey.value = record.id;
   userDraft.value = copyUser(record);
   passwordDraft.value = '';
-  userDetailMode.value = nextMode === 'edit' ? 'edit' : 'view';
+  userDetailMode.value = persistedUserDetailMode(nextMode);
   userDetailOpen.value = true;
   loadingUserDetail.value = false;
   userDetailLoadFailed.value = false;
   userDetailRequestSeq.value += 1;
   const requestSeq = userDetailRequestSeq.value;
   return requestSeq;
+}
+
+function restoreUserDetailWorkspaceSession(session: UserDetailWorkspaceSession) {
+  selectedUser.value = session.selectedUser;
+  selectedUserKey.value = session.selectedUser.id;
+  selectedTenant.value = session.tenant;
+  userDraft.value = session.draft;
+  userDetailMode.value = session.mode;
+  passwordDraft.value = session.password;
+  resetPasswordResult.value = session.resetPasswordResult;
+  userDetailOpen.value = true;
+  loadingUserDetail.value = false;
+  userDetailLoadFailed.value = false;
+  userDetailRequestSeq.value += 1;
 }
 
 function revokableUserSessions(userId: string | undefined) {
@@ -633,22 +763,6 @@ function revokableUserSessions(userId: string | undefined) {
 
 function canRevokeUserSession(userId: string | undefined, session: UserSessionView) {
   return Boolean(userId) && !session.current && userContext.can('revokeSession', userId) === true;
-}
-
-function sessionTitle(session: UserSessionView) {
-  return session.loginUserAgent || session.loginIp || session.id;
-}
-
-function sessionTerminalTitle(session: UserSessionView) {
-  const terminal = session.terminalTypeTitle || '其他终端';
-  const platform = session.platformTypeTitle;
-  return platform ? `${terminal} / ${platform}` : terminal;
-}
-
-function sessionPresenceTitle(session: UserSessionView) {
-  const status = userSessionPresenceTitle(session);
-  const count = session.connectionCount ?? 0;
-  return `${status}，实时连接数 ${count}`;
 }
 
 function createUserDraft(tenant: Tenant | undefined): Partial<UserAccount> {
@@ -718,6 +832,15 @@ function userTitle(record: Partial<UserAccount> | QueryListRecord | undefined) {
   return String(record?.username ?? record?.id ?? '用户');
 }
 
+function userPrimaryTitle(record: Partial<UserAccount> | QueryListRecord | undefined) {
+  return userTitle(record);
+}
+
+function userEmployeeSubtitle(record: Partial<UserAccount> | QueryListRecord | undefined) {
+  const employeeTitle = String(record?.employeeTitle ?? '').trim();
+  return employeeTitle ? `职员：${employeeTitle}` : '未关联职员';
+}
+
 function tenantTitle(record: Tenant | CrudRecordListBase | undefined) {
   return String(record?.title ?? record?.alias ?? record?.id ?? '未命名租户');
 }
@@ -734,8 +857,12 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
 </script>
 
 <template>
-  <section class="user-management-page">
+  <section
+    class="user-management-page"
+    :class="{ 'user-management-page--task': isWorkspaceTask && !isDrawerWorkspaceTask }"
+  >
     <RecordExplorerPanel
+      v-if="!isWorkspaceTask || isDrawerWorkspaceTask"
       class="user-scope-panel"
       title="租户"
       refresh-title="刷新租户列表"
@@ -774,6 +901,7 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
     </RecordExplorerPanel>
 
     <RecordQueryListPanel
+      v-if="!isWorkspaceTask || isDrawerWorkspaceTask"
       class="user-list-panel"
       :context="userListContext"
       :title="userListTitle"
@@ -797,95 +925,27 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       @select="selectedUserKey = String($event.id ?? '')"
     >
       <template #expandedRow="{ record }">
-        <RecordExpandedSubtable
-          title="在线会话"
+        <UserSessionExpandedSubtable
+          :sessions="userSessionState(String(record.id ?? '')).records"
           :loading="userSessionState(String(record.id ?? '')).loading"
           :error="userSessionState(String(record.id ?? '')).error"
-          loading-tip="加载在线会话"
-          error-title="在线会话加载失败"
-        >
-          <template #actions>
-            <UiButton
-              type="text"
-              icon-name="reload"
-              :disabled="userSessionState(String(record.id ?? '')).loading"
-              @click="loadUserSessions(String(record.id ?? ''))"
-            >
-              刷新
-            </UiButton>
-            <UiButton
-              v-if="revokableUserSessions(String(record.id ?? '')).length > 1"
-              danger
-              icon-name="power"
-              :disabled="savingUser || userSessionState(String(record.id ?? '')).loading"
-              @click="revokeAllUserSessions(record)"
-            >
-              全部下线
-            </UiButton>
-          </template>
-          <p v-if="userSessionState(String(record.id ?? '')).records.length === 0" class="user-session-empty">
-            当前无在线会话
-          </p>
-          <div v-else class="user-session-list">
-            <header class="user-session-table-header">
-              <span>会话</span><span>登录与活动</span><span>操作</span>
-            </header>
-            <article
-              v-for="session in userSessionState(String(record.id ?? '')).records"
-              :key="session.id"
-              class="user-session-item"
-            >
-              <div class="user-session-main">
-                <strong :title="sessionTitle(session)">{{ sessionTitle(session) }}</strong>
-                <span
-                  class="user-session-presence"
-                  :class="{ 'is-present': session.present, 'is-idle': session.presenceStatus === 'idle' }"
-                  :title="sessionPresenceTitle(session)"
-                >
-                  {{ userSessionPresenceTitle(session) }}
-                </span>
-                <span v-if="session.current" class="user-session-badge">当前会话</span>
-              </div>
-              <dl class="user-session-meta">
-                <div>
-                  <dt>登录</dt>
-                  <dd><DateTimeText :value="session.issuedAt" /></dd>
-                </div>
-                <div>
-                  <dt>最近请求</dt>
-                  <dd><DateTimeText :value="session.lastSeenAt" /></dd>
-                </div>
-                <div>
-                  <dt>连接</dt>
-                  <dd :title="sessionPresenceTitle(session)">{{ session.connectionCount ?? 0 }}</dd>
-                </div>
-                <div>
-                  <dt>IP</dt>
-                  <dd :title="session.loginIp || '-'">{{ session.loginIp || '-' }}</dd>
-                </div>
-                <div>
-                  <dt>终端</dt>
-                  <dd :title="sessionTerminalTitle(session)">{{ sessionTerminalTitle(session) }}</dd>
-                </div>
-              </dl>
-              <UiButton
-                danger
-                icon-name="power"
-                :disabled="savingUser || !canRevokeUserSession(String(record.id ?? ''), session)"
-                @click="revokeUserSession(record, session)"
-              >
-                下线
-              </UiButton>
-            </article>
-          </div>
-        </RecordExpandedSubtable>
+          :actions-disabled="savingUser"
+          :can-revoke="(session) => canRevokeUserSession(String(record.id ?? ''), session)"
+          :can-revoke-all="revokableUserSessions(String(record.id ?? '')).length > 1"
+          @refresh="loadUserSessions(String(record.id ?? ''))"
+          @revoke="revokeUserSession(record, $event)"
+          @revoke-all="revokeAllUserSessions(record)"
+        />
       </template>
     </RecordQueryListPanel>
 
     <RecordDetailDrawer
+      v-if="shouldRenderUserDetailDrawer"
       :open="userDetailOpen"
       :title="userDetailTitle"
+      :subtitle="userDetailSubtitle"
       :close-on-outside="userDetailMode === 'view'"
+      :promotion="userDetailPromotion"
       @close="closeUserDetail"
     >
       <template #status>
@@ -898,73 +958,77 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
           @change="toggleUserEnabled"
         />
       </template>
-      <template #actions>
+      <template #operation>
         <RecordActionBar
           :context="userListContext"
-          :actions="userDetailActions"
+          :actions="userDetailOperationActions"
           :record-id="selectedUser?.id"
           @action="handleUserDetailAction"
         />
       </template>
 
-      <UiSpin v-if="loadingUserDetail" class="user-detail-state" tip="加载用户详情" />
-      <div v-else-if="userDetailLoadFailed" class="user-detail-state">
-        <UiError title="详情加载失败" message="无法加载用户详情，请重试" />
-        <UiButton type="primary" icon-name="reload" @click="retryUserDetail">重试</UiButton>
-      </div>
+      <UserDetailContent
+        :mode="userDetailMode"
+        :draft="userDraft"
+        :selected-user="selectedUser"
+        :loading="loadingUserDetail"
+        :load-failed="userDetailLoadFailed"
+        :saving="savingUser || loadingUserDetail"
+        :tenant-title="tenantTitle(selectedTenant)"
+        :fields="userFormFieldDefinitions"
+        :fallback="userFormFieldFallback"
+        :field-names="userFormFieldNames"
+        :password="passwordDraft"
+        :reset-password-result="resetPasswordResult"
+        :display-of="userDetailDisplayValue"
+        :disabled-of="userFormFieldDisabled"
+        @retry="retryUserDetail"
+        @save="saveUser"
+        @update:field="updateUserDraftField"
+        @update:password="passwordDraft = $event"
+      />
+    </RecordDetailDrawer>
 
-      <template v-else-if="userDetailMode === 'view' || userDetailMode === 'create' || selectedUser">
-        <RecordDetailFields
-          v-if="userDetailMode === 'view'"
-          :record="userDraft as RecordFormRecord"
-          :fields="userFormFieldDefinitions"
-          :fallback="userFormFieldFallback"
-          :display-of="userDetailDisplayValue"
-        />
-        <div
-          v-if="userDetailMode === 'view' && resetPasswordResult?.temporaryPassword"
-          class="user-password-reset-result"
-        >
-          <span>临时密码</span>
-          <UiInput :value="resetPasswordResult.temporaryPassword" disabled />
-          <small v-if="resetPasswordResult.expiresAt">
-            有效期至 <DateTimeText :value="resetPasswordResult.expiresAt" />
-          </small>
-        </div>
-
-        <form v-if="userDetailMode !== 'view'" class="user-form" @submit.prevent="saveUser">
-          <label>
-            <span class="user-form-label">当前租户</span>
-            <UiInput :value="tenantTitle(selectedTenant)" disabled />
-          </label>
-          <RecordFormFields
-            v-if="userDetailMode !== 'resetPassword'"
-            :record="userDraft as RecordFormRecord"
-            :field-names="userFormFieldNames"
-            :fields="userFormFieldDefinitions"
-            :fallback="userFormFieldFallback"
-            :disabled="userFormDisabled"
-            :disabled-of="userFormFieldDisabled"
-            @update:field="updateUserDraftField"
-          />
-          <label v-if="userDetailMode === 'create' || userDetailMode === 'resetPassword'">
-            <span class="user-form-label">{{ userDetailMode === 'create' ? '初始密码' : '新密码' }}</span>
-            <UiInput
-              :value="passwordDraft"
-              type="password"
-              :disabled="userFormDisabled"
-              placeholder="请输入密码"
-              allow-clear
-              @update:value="passwordDraft = $event"
-            />
-          </label>
-        </form>
-        <RecordMetaSection
-          v-if="userDetailMode !== 'create' && userDetailMode !== 'resetPassword'"
-          :record="userDraft"
+    <RecordDetailPanel v-else :title="userDetailTitle" :subtitle="userDetailSubtitle" scrollable-content>
+      <template #status>
+        <RecordStatusSwitch
+          v-if="userDetailMode === 'view' && selectedUser"
+          :enabled="selectedUser.enabled !== false"
+          :disabled="savingUser || !canToggleUser"
+          :loading="savingUser"
+          :show-label="false"
+          @change="toggleUserEnabled"
         />
       </template>
-    </RecordDetailDrawer>
+      <template #operation>
+        <RecordActionBar
+          :context="userContext"
+          :actions="userWorkspaceOperationActions"
+          :record-id="selectedUser?.id"
+          @action="handleUserDetailAction"
+        />
+      </template>
+      <UserDetailContent
+        :mode="userDetailMode"
+        :draft="userDraft"
+        :selected-user="selectedUser"
+        :loading="loadingUserDetail"
+        :load-failed="userDetailLoadFailed"
+        :saving="savingUser || loadingUserDetail"
+        :tenant-title="tenantTitle(selectedTenant ?? ({ id: userDraft.tenantId } as Tenant))"
+        :fields="userFormFieldDefinitions"
+        :fallback="userFormFieldFallback"
+        :field-names="userFormFieldNames"
+        :password="passwordDraft"
+        :reset-password-result="resetPasswordResult"
+        :display-of="userDetailDisplayValue"
+        :disabled-of="userFormFieldDisabled"
+        @retry="retryUserDetail"
+        @save="saveUser"
+        @update:field="updateUserDraftField"
+        @update:password="passwordDraft = $event"
+      />
+    </RecordDetailPanel>
   </section>
 </template>
 
@@ -976,6 +1040,15 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   gap: 12px;
   height: calc(100vh - 116px);
   overflow: hidden;
+}
+
+.user-management-page--task {
+  display: block;
+  height: 100%;
+}
+
+.user-management-page--task :deep(.record-detail-layout) {
+  height: 100%;
 }
 
 .user-scope-panel,
@@ -995,190 +1068,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   color: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-.user-form {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.user-form > label {
-  display: grid;
-  gap: 6px;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.user-form-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.user-password-reset-result {
-  display: grid;
-  gap: 6px;
-  margin: 12px 0;
-  padding: 12px;
-  border: 1px solid var(--muyun-border);
-  border-radius: 8px;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.user-password-reset-result small {
-  color: var(--muyun-text-muted);
-}
-
-.user-session-section {
-  display: grid;
-  gap: 8px;
-  padding: 12px 16px 14px 46px;
-  border-top: 1px solid var(--muyun-border-subtle);
-  background: #fbfcfe;
-}
-
-.user-session-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.user-session-header h3 {
-  margin: 0;
-  color: var(--muyun-text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.user-session-actions {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.user-session-state {
-  min-height: 56px;
-}
-
-.user-session-empty {
-  margin: 0;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.user-session-list {
-  display: grid;
-  gap: 0;
-  border: 1px solid var(--muyun-border-subtle);
-  border-radius: 6px;
-  background: var(--muyun-surface);
-}
-
-.user-session-table-header {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.1fr) minmax(460px, 2fr) auto;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--muyun-border-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.user-session-item {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.1fr) minmax(460px, 2fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--muyun-border-subtle);
-}
-
-.user-session-item:last-child {
-  border-bottom: 0;
-}
-
-.user-session-main {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.user-session-main strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muyun-text);
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-session-badge {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-}
-
-.user-session-presence {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--muyun-hover-subtle);
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-}
-
-.user-session-presence.is-present {
-  background: rgba(22, 163, 74, 0.1);
-  color: #047857;
-}
-
-.user-session-presence.is-idle {
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
-}
-
-.user-session-meta {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.user-session-meta div {
-  min-width: 0;
-}
-
-.user-session-meta dt {
-  color: var(--muyun-text-muted);
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.user-session-meta dd {
-  margin: 2px 0 0;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  color: var(--muyun-text);
-  font-size: 12px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-session-item > :deep(.ant-btn) {
-  min-width: 64px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
 }
 
 .user-detail-state {

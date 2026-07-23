@@ -40,6 +40,11 @@ public final class PlatformNameRules {
         return validModuleAlias;
     }
 
+    public static String applicationAliasOfModuleAlias(String moduleAlias) {
+        String validModuleAlias = requireModuleAlias(moduleAlias);
+        return validModuleAlias.substring(0, validModuleAlias.indexOf('.'));
+    }
+
     public static String requireIdentifier(String value, String name) {
         if (!isIdentifier(value)) {
             throw new IllegalArgumentException("invalid " + name + ": " + value);

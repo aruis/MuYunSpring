@@ -33,9 +33,11 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
@@ -78,7 +80,8 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanIamStaticModulesAndActionsFromControllerAnnotations() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(TenantWebController.class);
+            context.registerBean(TenantWebController.class,
+                    TenantWebController::new);
             context.registerBean(OrganizationWebController.class);
             context.registerBean(DepartmentWebController.class);
             EmployeeService employeeService = new EmployeeService(mock(EmployeeDao.class),

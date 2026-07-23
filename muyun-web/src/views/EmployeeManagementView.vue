@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
   ManagementWorkspace,
   ManagementExplorerColumn,
   RecordActionBar,
   RecordDetailDrawer,
-  RecordDetailFields,
+  RecordDetailPanel,
   RecordExpandedSubtable,
-  RecordExternalChangeNotice,
   RecordExplorerPanel,
-  RecordFormFields,
-  RecordMetaSection,
   RecordQueryListPanel,
   RecordStatusSwitch,
   TreeRecordExplorer,
@@ -20,7 +17,6 @@ import {
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
-  type RecordFormRecord,
   type RecordPickerRecord,
   type ResolvedRecordActionItem,
   executeStaticFormSave,
@@ -32,7 +28,7 @@ import {
   resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
-import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
+import { UiButton, confirmAction } from '@muyun/vue-ui-antdv';
 import type {
   Department,
   Employee,
@@ -44,6 +40,8 @@ import type {
 } from '@muyun/web-contracts';
 import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageDataChange, usePageRecordExternalChange, useRealtimeRefreshQueue } from '../app/pageRealtime';
+import { useWorkspaceViewHost } from '../app/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
 import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
@@ -54,9 +52,21 @@ import {
   type EmployeeDetailMode,
 } from './employeeDetailStateModel';
 import EmployeeEmploymentDrawer from './EmployeeEmploymentDrawer.vue';
+import EmployeeDetailContent from './EmployeeDetailContent.vue';
+import { employeeDetailWorkspaceView } from './employeeDetailWorkspaceView';
+import {
+  handOffEmployeeDetailWorkspaceSession,
+  takeEmployeeDetailWorkspaceSession,
+  type EmployeeDetailWorkspaceSession,
+} from './employeeDetailWorkspaceSession';
 import { useEmployeeEmploymentRows } from './useEmployeeEmploymentRows';
 
 defineOptions({ name: 'EmployeeManagementView' });
+
+const props = defineProps<{
+  recordId?: string;
+  mode?: 'view' | 'edit';
+}>();
 
 type EmployeeFormFieldName =
   | 'organizationId'
@@ -74,12 +84,20 @@ const employeeRequiredFormFieldNames = [
   'employeeNo',
   'title',
 ] as const satisfies readonly EmployeeFormFieldName[];
+const workspaceViewHost = useWorkspaceViewHost();
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
 const employeeContext = useModuleContext<Employee>({ moduleAlias: 'iam.employee' });
 const userContext = useModuleContext<UserAccount>({ moduleAlias: 'iam.user' });
 const employeeFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
+const isWorkspaceView = computed(() => Boolean(props.recordId));
+const isDrawerWorkspaceView = computed(
+  () => isWorkspaceView.value && workspaceViewHost?.presentation === 'drawer',
+);
+const shouldRenderEmployeeDetailDrawer = computed(
+  () => !isWorkspaceView.value || isDrawerWorkspaceView.value,
+);
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
@@ -177,8 +195,13 @@ const employeeDetailTitle = computed(() => {
   if (employeeDetailMode.value === 'create') {
     return '新建职员';
   }
-  return employeeTitle(selectedEmployee.value ?? employeeDraft.value);
+  return employeePrimaryTitle(selectedEmployee.value ?? employeeDraft.value);
 });
+const employeeDetailSubtitle = computed(() =>
+  employeeDetailMode.value === 'create'
+    ? undefined
+    : employeeNoSubtitle(selectedEmployee.value ?? employeeDraft.value),
+);
 const employeeFormDisabled = computed(() =>
   isEmployeeFormDisabled({
     mode: employeeDetailMode.value,
@@ -246,8 +269,86 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+const employeeDetailOperationActions = computed(() => employeeDetailActions.value);
+const employeeWorkspaceOperationActions = computed<RecordActionItem[]>(() => {
+  if (employeeDetailMode.value === 'view') {
+    return selectedEmployee.value?.id
+      ? [
+          {
+            key: 'edit',
+            actionCode: 'update',
+            title: '编辑',
+            iconName: 'edit',
+            disabled: savingEmployee.value,
+          },
+        ]
+      : [];
+  }
+  return employeeDetailMode.value === 'edit'
+    ? [
+        { key: 'cancel', title: '取消', iconName: 'close', disabled: savingEmployee.value },
+        {
+          key: 'save',
+          actionCode: 'update',
+          title: '保存',
+          iconName: 'save',
+          primary: true,
+          loading: savingEmployee.value,
+          disabled: !canSaveEmployee.value,
+        },
+      ]
+    : [];
+});
+const employeeDetailPromotion = useWorkspaceViewPromotion({
+  view: employeeDetailWorkspaceView,
+  input: computed(() => {
+    const recordId = selectedEmployee.value?.id;
+    const mode = employeeDetailMode.value;
+    return recordId && (mode === 'view' || mode === 'edit') ? { recordId } : undefined;
+  }),
+  title: computed(() => employeePrimaryTitle(selectedEmployee.value)),
+  eligibility: computed(() => ({
+    hasStableIdentity: Boolean(selectedEmployee.value?.id) && !loadingEmployeeDetail.value,
+    busy: savingEmployee.value || savingEmployeeAccount.value || loadingEmployeeAccounts.value,
+  })),
+  beforePromote: (input) => {
+    const selected = selectedEmployee.value;
+    if (!selected) return;
+    handOffEmployeeDetailWorkspaceSession(input, {
+      selectedEmployee: selected,
+      draft: employeeDraft.value,
+      organization: selectedOrganization.value,
+      department: employeeDetailDepartment.value,
+      account: employeeAccount.value,
+      accountUser: employeeAccountUser.value,
+      showAccountProvisionForm: showAccountProvisionForm.value,
+      accountProvisionDraft: accountProvisionDraft.value,
+      mode: employeeDetailMode.value === 'edit' ? 'edit' : 'view',
+    });
+  },
+  onPromoted: closeEmployeeDetail,
+});
 
-onMounted(loadEmployeeFormDefinition);
+watch(
+  selectedEmployee,
+  (employee) => {
+    if (!isWorkspaceView.value || !employee) return;
+    workspaceViewHost?.setTitle(employeePrimaryTitle(employee));
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
+  void loadEmployeeFormDefinition();
+  if (!props.recordId) return;
+  const input = { recordId: props.recordId } as const;
+  const session = takeEmployeeDetailWorkspaceSession(input);
+  if (session) {
+    restoreEmployeeDetailWorkspaceSession(session);
+    return;
+  }
+  void openEmployeeDetail({ id: props.recordId }, props.mode ?? 'view');
+});
 
 async function loadEmployeeFormDefinition() {
   try {
@@ -265,16 +366,16 @@ function employeeFormField(fieldName: EmployeeFormFieldName) {
   });
 }
 
-function employeeFormLabel(fieldName: EmployeeFormFieldName) {
-  return employeeFormField(fieldName).label;
+function employeeFormLabel(fieldName: string) {
+  return employeeFormField(fieldName as EmployeeFormFieldName).label;
 }
 
-function employeeFormRequired(fieldName: EmployeeFormFieldName) {
-  return employeeFormField(fieldName).required;
+function employeeFormRequired(fieldName: string) {
+  return employeeFormField(fieldName as EmployeeFormFieldName).required;
 }
 
-function employeeFormVisible(fieldName: EmployeeFormFieldName) {
-  return employeeFormField(fieldName).visible;
+function employeeFormVisible(fieldName: string) {
+  return employeeFormField(fieldName as EmployeeFormFieldName).visible;
 }
 
 function canLeaveEmployeeDetailContext() {
@@ -289,6 +390,10 @@ function updateEmployeeDraftField(
     ...employeeDraft.value,
     [fieldName]: value,
   };
+}
+
+function updateAccountProvisionField(fieldName: 'username' | 'password', value: string) {
+  accountProvisionDraft.value = { ...accountProvisionDraft.value, [fieldName]: value };
 }
 
 function employeeDetailDisplayValue(
@@ -461,6 +566,9 @@ function closeEmployeeDetail() {
   employeeDraft.value = selectedEmployee.value
     ? copyEmployee(selectedEmployee.value)
     : createEmployeeDraft(selectedOrganizationId.value);
+  if (isDrawerWorkspaceView.value) {
+    workspaceViewHost?.dismiss();
+  }
 }
 
 function cancelEmployeeDetail() {
@@ -515,9 +623,15 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
     if (!canCommitRequest()) {
       return;
     }
+    if (!fullRecord?.id) {
+      employeeDetailLoadFailed.value = true;
+      presentPlatformMessage('未找到指定职员', { source: 'employee-management', phase: 'load' });
+      return;
+    }
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
     employeeDetailLoadFailed.value = false;
+    await loadEmployeeDetailOrganization(fullRecord, requestSeq);
     await loadEmployeeDetailDepartment(fullRecord, requestSeq);
     void loadEmployeeAccounts(fullRecord, requestSeq);
   } catch (cause) {
@@ -731,6 +845,24 @@ function commitEmployeeDetailRecord(record: Employee) {
   return requestSeq;
 }
 
+function restoreEmployeeDetailWorkspaceSession(session: EmployeeDetailWorkspaceSession) {
+  selectedEmployee.value = session.selectedEmployee;
+  selectedEmployeeKey.value = session.selectedEmployee.id;
+  selectedOrganization.value = session.organization;
+  employeeDetailDepartment.value = session.department;
+  employeeDraft.value = session.draft;
+  employeeDetailMode.value = session.mode;
+  employeeAccount.value = session.account;
+  employeeAccountUser.value = session.accountUser;
+  showAccountProvisionForm.value = session.showAccountProvisionForm;
+  accountProvisionDraft.value = session.accountProvisionDraft;
+  employeeDetailOpen.value = true;
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+  employeeAccountsLoadFailed.value = false;
+  employeeDetailRequestSeq.value += 1;
+}
+
 function canCommitEmployeeDetailSideEffect(recordId: string | undefined, requestSeq: number) {
   return (
     Boolean(recordId) &&
@@ -757,6 +889,25 @@ async function loadEmployeeDetailDepartment(
     const department = await departmentContext.crud.view(departmentId);
     if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
       employeeDetailDepartment.value = department;
+    }
+  } catch (cause) {
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
+      presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+    }
+  }
+}
+
+async function loadEmployeeDetailOrganization(
+  record: Partial<Employee>,
+  requestSeq = employeeDetailRequestSeq.value,
+) {
+  const employeeId = record.id;
+  const organizationId = record.organizationId;
+  if (!organizationId) return;
+  try {
+    const organization = await organizationContext.crud.view(organizationId);
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
+      selectedOrganization.value = organization;
     }
   } catch (cause) {
     if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
@@ -903,6 +1054,15 @@ function employeeTitle(record: Partial<Employee> | QueryListRecord | undefined) 
   return String(record?.title ?? record?.employeeNo ?? record?.id ?? '职员档案');
 }
 
+function employeePrimaryTitle(record: Partial<Employee> | QueryListRecord | undefined) {
+  return employeeTitle(record);
+}
+
+function employeeNoSubtitle(record: Partial<Employee> | QueryListRecord | undefined) {
+  const employeeNo = String(record?.employeeNo ?? '').trim();
+  return employeeNo ? `工号：${employeeNo}` : undefined;
+}
+
 function employeeToggleActionCode(record: Partial<Employee>) {
   return record.enabled === false ? 'enable' : 'disable';
 }
@@ -1012,7 +1172,7 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 </script>
 
 <template>
-  <ManagementWorkspace class="employee-management-page">
+  <ManagementWorkspace v-if="!isWorkspaceView || isDrawerWorkspaceView" class="employee-management-page">
     <ManagementExplorerColumn>
       <RecordExplorerPanel
         class="employee-scope-panel"
@@ -1104,9 +1264,12 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
     </RecordQueryListPanel>
 
     <RecordDetailDrawer
+      v-if="shouldRenderEmployeeDetailDrawer"
       :open="employeeDetailOpen"
       :title="employeeDetailTitle"
+      :subtitle="employeeDetailSubtitle"
       :close-on-outside="employeeDetailMode === 'view'"
+      :promotion="employeeDetailPromotion"
       @close="closeEmployeeDetail"
     >
       <template #status>
@@ -1119,134 +1282,56 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
           @change="toggleEmployeeEnabled"
         />
       </template>
-      <template #actions>
+      <template #operation>
         <RecordActionBar
           :context="employeeListContext"
-          :actions="employeeDetailActions"
+          :actions="employeeDetailOperationActions"
           @action="handleEmployeeDetailAction"
         />
       </template>
 
-      <UiSpin v-if="loadingEmployeeDetail" class="employee-detail-state" tip="加载职员详情" />
-      <div v-else-if="employeeDetailLoadFailed" class="employee-detail-state">
-        <UiError title="详情加载失败" message="无法加载职员详情，请重试" />
-        <UiButton type="primary" icon-name="reload" @click="retryEmployeeDetail">重试</UiButton>
-      </div>
-
-      <template v-else-if="showEmployeeDetailContent">
-        <template v-if="employeeDetailMode === 'view'">
-          <RecordDetailFields
-            :record="employeeDraft as RecordFormRecord"
-            :fields="employeeFormFieldDefinitions"
-            :fallback="employeeFormFieldFallback"
-            :picker-configs="employeeFormPickerConfigs"
-            :display-of="employeeDetailDisplayValue"
-          />
-
-          <section class="employee-account-section">
-            <div class="employee-account-header">
-              <strong>登录账号</strong>
-              <UiButton
-                v-if="!employeeAccount && !showAccountProvisionForm"
-                type="primary"
-                icon-name="plus"
-                :disabled="!canManageEmployeeAccounts"
-                @click="startAccountProvision"
-              >
-                设置账号
-              </UiButton>
-            </div>
-            <UiSpin v-if="loadingEmployeeAccounts" class="employee-account-state" tip="加载账号绑定" />
-            <div v-else-if="employeeAccountsLoadFailed" class="employee-account-state">
-              <UiError title="账号绑定加载失败" message="无法加载职员账号绑定，请重试" />
-              <UiButton icon-name="reload" @click="loadEmployeeAccounts()">重试</UiButton>
-            </div>
-            <form
-              v-else-if="showAccountProvisionForm"
-              class="employee-account-form"
-              @submit.prevent="provisionEmployeeAccount"
-            >
-              <label>
-                <span>账号</span>
-                <UiInput
-                  v-model:value="accountProvisionDraft.username"
-                  placeholder="请输入登录账号"
-                  :disabled="savingEmployeeAccount"
-                />
-              </label>
-              <label>
-                <span>初始密码</span>
-                <UiInput
-                  v-model:value="accountProvisionDraft.password"
-                  type="password"
-                  placeholder="请输入初始密码"
-                  :disabled="savingEmployeeAccount"
-                />
-              </label>
-              <div class="employee-account-form-actions">
-                <UiButton :disabled="savingEmployeeAccount" @click="cancelAccountProvision">取消</UiButton>
-                <UiButton
-                  type="primary"
-                  html-type="submit"
-                  icon-name="plus"
-                  :loading="savingEmployeeAccount"
-                  :disabled="!canManageEmployeeAccounts"
-                >
-                  创建账号并绑定
-                </UiButton>
-              </div>
-            </form>
-            <div v-else-if="!employeeAccount" class="employee-account-empty">
-              <span>未设置登录账号</span>
-              <small>可从职员档案生成账号并自动完成一对一绑定。</small>
-            </div>
-            <div v-else class="employee-account-card">
-              <div>
-                <strong>{{ employeeAccountUserTitle() }}</strong>
-                <span>{{ employeeAccountUserDescription() }}</span>
-              </div>
-              <span class="employee-account-status">{{ employeeAccountStatusTitle() }}</span>
-              <UiButton
-                danger
-                icon-name="delete"
-                :disabled="savingEmployeeAccount || !canManageEmployeeAccounts"
-                @click="removeEmployeeAccount"
-              >
-                移除账户
-              </UiButton>
-            </div>
-          </section>
-
-          <RecordMetaSection :record="employeeDraft" show-sort-order />
-        </template>
-
-        <template v-else>
-          <RecordExternalChangeNotice
-            v-if="employeeExternalChange.externallyChanged.value"
-            @reload="reloadExternalEmployeeChange"
-            @dismiss="employeeExternalChange.clearExternalChanged"
-          />
-          <form class="employee-form" @submit.prevent="saveEmployee">
-            <label v-if="employeeFormVisible('organizationId')">
-              <span class="employee-form-label">
-                {{ employeeFormLabel('organizationId') }}
-                <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
-              </span>
-              <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
-            </label>
-            <RecordFormFields
-              :record="employeeDraft as RecordFormRecord"
-              :fields="employeeFormFieldDefinitions"
-              :exclude-field-names="['organizationId']"
-              :fallback="employeeFormFieldFallback"
-              :picker-configs="employeeFormPickerConfigs"
-              :disabled="employeeFormDisabled"
-              :option-context="employeeContext"
-              @update:field="updateEmployeeDraftField"
-            />
-          </form>
-        </template>
-      </template>
+      <EmployeeDetailContent
+        :mode="employeeDetailMode"
+        :draft="employeeDraft"
+        :selected-employee="selectedEmployee"
+        :selected-organization="selectedOrganization"
+        :detail-department="employeeDetailDepartment"
+        :loading="loadingEmployeeDetail"
+        :load-failed="employeeDetailLoadFailed"
+        :form-disabled="employeeFormDisabled"
+        :show-content="showEmployeeDetailContent"
+        :fields="employeeFormFieldDefinitions"
+        :fallback="employeeFormFieldFallback"
+        :picker-configs="employeeFormPickerConfigs"
+        :display-of="employeeDetailDisplayValue"
+        :visible-of="employeeFormVisible"
+        :label-of="employeeFormLabel"
+        :required-of="employeeFormRequired"
+        :externally-changed="employeeExternalChange.externallyChanged.value"
+        :account="employeeAccount"
+        :account-user="employeeAccountUser"
+        :loading-accounts="loadingEmployeeAccounts"
+        :accounts-load-failed="employeeAccountsLoadFailed"
+        :saving-account="savingEmployeeAccount"
+        :can-manage-accounts="canManageEmployeeAccounts"
+        :show-account-provision-form="showAccountProvisionForm"
+        :account-provision-draft="accountProvisionDraft"
+        :account-user-title="employeeAccountUserTitle()"
+        :account-user-description="employeeAccountUserDescription()"
+        :account-status-title="employeeAccountStatusTitle()"
+        :option-context="employeeContext"
+        @retry="retryEmployeeDetail"
+        @save="saveEmployee"
+        @reload-external="reloadExternalEmployeeChange"
+        @dismiss-external="employeeExternalChange.clearExternalChanged"
+        @update-field="updateEmployeeDraftField"
+        @retry-accounts="loadEmployeeAccounts()"
+        @start-account-provision="startAccountProvision"
+        @cancel-account-provision="cancelAccountProvision"
+        @provision-account="provisionEmployeeAccount"
+        @remove-account="removeEmployeeAccount"
+        @update-account-provision-field="updateAccountProvisionField"
+      />
     </RecordDetailDrawer>
 
     <EmployeeEmploymentDrawer
@@ -1256,6 +1341,74 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
       @saved="handleEmployeeEmploymentSaved"
     />
   </ManagementWorkspace>
+
+  <RecordDetailPanel
+    v-else
+    :title="employeeDetailTitle"
+    :subtitle="employeeDetailSubtitle"
+    scrollable-content
+  >
+    <template #status>
+      <RecordStatusSwitch
+        v-if="employeeDetailMode === 'view' && selectedEmployee"
+        :enabled="selectedEmployee.enabled !== false"
+        :disabled="savingEmployee || !canToggleEmployee"
+        :loading="savingEmployee"
+        :show-label="false"
+        @change="toggleEmployeeEnabled"
+      />
+    </template>
+    <template #operation>
+      <RecordActionBar
+        :context="employeeContext"
+        :actions="employeeWorkspaceOperationActions"
+        :record-id="selectedEmployee?.id"
+        @action="handleEmployeeDetailAction"
+      />
+    </template>
+    <EmployeeDetailContent
+      :mode="employeeDetailMode"
+      :draft="employeeDraft"
+      :selected-employee="selectedEmployee"
+      :selected-organization="selectedOrganization"
+      :detail-department="employeeDetailDepartment"
+      :loading="loadingEmployeeDetail"
+      :load-failed="employeeDetailLoadFailed"
+      :form-disabled="employeeFormDisabled"
+      :show-content="showEmployeeDetailContent"
+      :fields="employeeFormFieldDefinitions"
+      :fallback="employeeFormFieldFallback"
+      :picker-configs="employeeFormPickerConfigs"
+      :display-of="employeeDetailDisplayValue"
+      :visible-of="employeeFormVisible"
+      :label-of="employeeFormLabel"
+      :required-of="employeeFormRequired"
+      :externally-changed="employeeExternalChange.externallyChanged.value"
+      :account="employeeAccount"
+      :account-user="employeeAccountUser"
+      :loading-accounts="loadingEmployeeAccounts"
+      :accounts-load-failed="employeeAccountsLoadFailed"
+      :saving-account="savingEmployeeAccount"
+      :can-manage-accounts="canManageEmployeeAccounts"
+      :show-account-provision-form="showAccountProvisionForm"
+      :account-provision-draft="accountProvisionDraft"
+      :account-user-title="employeeAccountUserTitle()"
+      :account-user-description="employeeAccountUserDescription()"
+      :account-status-title="employeeAccountStatusTitle()"
+      :option-context="employeeContext"
+      @retry="retryEmployeeDetail"
+      @save="saveEmployee"
+      @reload-external="reloadExternalEmployeeChange"
+      @dismiss-external="employeeExternalChange.clearExternalChanged"
+      @update-field="updateEmployeeDraftField"
+      @retry-accounts="loadEmployeeAccounts()"
+      @start-account-provision="startAccountProvision"
+      @cancel-account-provision="cancelAccountProvision"
+      @provision-account="provisionEmployeeAccount"
+      @remove-account="removeEmployeeAccount"
+      @update-account-provision-field="updateAccountProvisionField"
+    />
+  </RecordDetailPanel>
 </template>
 
 <style scoped>
@@ -1270,120 +1423,6 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 .employee-list-panel {
   min-width: 0;
   min-height: 0;
-}
-
-.employee-form {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.employee-form > label {
-  display: grid;
-  gap: 6px;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.employee-form-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.employee-form-label strong {
-  color: #d92d20;
-  font-weight: 600;
-}
-
-.employee-detail-state {
-  display: grid;
-  place-items: center;
-  gap: 12px;
-  min-height: 180px;
-}
-
-.employee-account-section {
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--muyun-border);
-}
-
-.employee-account-header {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.employee-account-state,
-.employee-account-empty {
-  display: grid;
-  place-items: center;
-  gap: 10px;
-  min-height: 140px;
-  color: var(--muyun-text-muted);
-}
-
-.employee-account-empty small {
-  font-size: 12px;
-}
-
-.employee-account-form {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--muyun-border);
-  border-radius: 8px;
-}
-
-.employee-account-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.employee-account-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.employee-account-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--muyun-border);
-  border-radius: 8px;
-}
-
-.employee-account-card div {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.employee-account-card strong,
-.employee-account-card span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.employee-account-card span {
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-}
-
-.employee-account-status {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--muyun-hover-subtle);
 }
 
 .employee-row-employment-section {
@@ -1463,18 +1502,5 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 .employee-row-employment-list strong {
   color: var(--muyun-text);
   font-size: 13px;
-}
-
-@media (max-width: 900px) {
-  .employee-account-card {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .employee-account-form-actions,
-  .employee-account-header {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
 }
 </style>

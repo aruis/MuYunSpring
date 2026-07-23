@@ -5,6 +5,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
+import net.ximatai.muyun.spring.ability.child.ChildRelation;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 
@@ -121,6 +123,19 @@ class TenantServiceContractTest {
         service.provisionTenant("ximatai");
 
         verify(provisioner, times(2)).afterTenantCreated("ximatai");
+    }
+
+    @Test
+    void shouldTreatApplicationEntitlementsAsCascadeDeletedTenantChildren() {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<TenantCreationProvisioner> provisioners = mock(ObjectProvider.class);
+        TenantApplicationService tenantApplicationService = new TenantApplicationService(mock(TenantApplicationDao.class));
+        TenantService service = new TenantService(mock(TenantDao.class), provisioners, tenantApplicationService);
+
+        List<ChildRelation<? extends EntityContract, Tenant>> relations = service.childRelations();
+
+        assertThat(relations).singleElement().satisfies(relation ->
+                assertThat(relation.isAutoDeleteWithParent()).isTrue());
     }
 
     private Tenant tenant(String alias, String title) {

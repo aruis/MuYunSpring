@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { ModuleContextProvider } from '@muyun/web-core';
 import type { BusinessRoutePageDescriptor } from '@muyun/web-contracts';
 import { resolveStaticBusinessRoute } from './businessRoutes';
+import WorkspaceViewOutlet from './WorkspaceViewOutlet.vue';
 
 defineOptions({ name: 'StaticBusinessRouteOutlet' });
 
@@ -12,10 +13,15 @@ const props = defineProps<{
 
 const route = computed(() => resolveStaticBusinessRoute(props.descriptor));
 const moduleAlias = computed(() => props.descriptor.target.moduleAlias ?? route.value?.moduleAlias);
+const workspaceViewPresentation = computed(() => props.descriptor.target.query?.workspacePresentation);
 </script>
 
 <template>
   <ModuleContextProvider v-if="route && moduleAlias" :module-alias="moduleAlias">
-    <component :is="route.component" />
+    <WorkspaceViewOutlet
+      v-if="workspaceViewPresentation === 'drawer' || workspaceViewPresentation === 'tab'"
+      :descriptor="descriptor"
+    />
+    <component :is="route.component" v-else />
   </ModuleContextProvider>
 </template>

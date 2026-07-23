@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
+export { userSessionPresenceTitle } from '@muyun/platform-components';
 import { createRealtimeRefreshQueue } from '../app/pageRealtime';
 import type {
   UserAccount,
@@ -18,21 +19,6 @@ export interface UserSessionState {
 export interface UserSessionRowsOptions {
   context: ModuleContext<UserAccount>;
   source: string;
-}
-
-export function userSessionPresenceTitle(
-  session: Pick<UserSessionView, 'presenceStatus' | 'presenceStatusTitle'>,
-) {
-  if (session.presenceStatus === 'online' || session.presenceStatusTitle === '在线使用中') {
-    return '使用中';
-  }
-  if (session.presenceStatus === 'idle') {
-    return '闲置';
-  }
-  if (session.presenceStatus === 'offline' || session.presenceStatusTitle === '未连接') {
-    return '离线';
-  }
-  return session.presenceStatusTitle || '离线';
 }
 
 export function useUserSessionRows(options: UserSessionRowsOptions) {

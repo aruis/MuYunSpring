@@ -250,7 +250,7 @@ async function runEmploymentAction(
 
 <template>
   <RecordDetailDrawer :open="open" :title="title" @close="emit('close')">
-    <template #actions>
+    <template #operation>
       <UiButton type="text" icon-name="reload" :disabled="loading || saving" @click="loadEmployments">
         刷新
       </UiButton>

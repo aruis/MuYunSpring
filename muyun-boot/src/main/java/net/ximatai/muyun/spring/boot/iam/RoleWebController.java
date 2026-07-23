@@ -36,6 +36,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -71,6 +72,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     private final MenuService menuService;
     private final PlatformModuleService platformModuleService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
+    private TenantApplicationService tenantApplicationService;
 
     public RoleWebController(RoleGrantableActionResolver grantableActionResolver) {
         this(grantableActionResolver, (MenuService) null, (PlatformModuleService) null);
@@ -102,6 +104,11 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @Autowired(required = false)
     void setEmployeeEmploymentReadService(EmployeeEmploymentReadService employeeEmploymentReadService) {
         this.employeeEmploymentReadService = employeeEmploymentReadService;
+    }
+
+    @Autowired(required = false)
+    void setTenantApplicationService(TenantApplicationService tenantApplicationService) {
+        this.tenantApplicationService = tenantApplicationService;
     }
 
     @Override
@@ -337,12 +344,30 @@ public class RoleWebController extends WebSupport<RoleService> implements
         if (platformModuleService == null) {
             throw new IllegalStateException("platform module service is not available");
         }
+        Role role = service().select(roleId);
+        java.util.Set<String> enabledApplications = enabledApplicationsOf(role);
         List<RoleAuthorizationModule> modules = platformModuleService.listVisibleModules()
                 .stream()
+                .filter(module -> availableForRole(role, enabledApplications, module))
                 .map(module -> new RoleAuthorizationModule(module.getId(), module.getTitle(),
                         module.getApplicationAlias(), module.getParentId()))
                 .toList();
         return new WebListResponse<>(modules);
+    }
+
+    private java.util.Set<String> enabledApplicationsOf(Role role) {
+        if (role == null || role.getTenantId() == null || role.getTenantId().isBlank()
+                || tenantApplicationService == null) {
+            return java.util.Set.of();
+        }
+        return java.util.Set.copyOf(tenantApplicationService.availableApplicationAliases(role.getTenantId()));
+    }
+
+    private boolean availableForRole(Role role, java.util.Set<String> enabledApplications, PlatformModule module) {
+        if (role == null || role.getTenantId() == null || role.getTenantId().isBlank()) {
+            return true;
+        }
+        return enabledApplications.contains(module.getApplicationAlias());
     }
 
     @GetMapping("/dataGrantActionMatrix/{roleId}")

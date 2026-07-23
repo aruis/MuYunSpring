@@ -63,6 +63,7 @@
 | 模块 | `POST` | `/platform.module/delete/{id}` | 删除模块 |
 | 模块 | `POST` | `/platform.module/enable/{id}`、`/disable/{id}` | 启用或停用模块 |
 | 模块 | `POST` | `/platform.module/sort/{id}` | 在应用内调整模块树位置 |
+| 租户应用配置 | `POST` | `/iam.tenant/{tenantId}/applications/query`、`/view/{id}`、`/insert`、`/update/{id}`、`/delete/{id}`、`/configure` | 租户的应用子资源；`configure` 接收勾选应用集合，在事务内按差异新增或删除子记录；租户侧不维护启停状态 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}` | 获取指定应用下的模块树 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}/{parentId}` | 获取指定父模块下的子树或扁平列表 |
 | 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/preview-refresh` | 预览把当前模块配置编译并同步到动态运行态的 schema 变更；dry-run，不更新运行态 registry |

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { UiActionButton } from '@muyun/vue-ui-antdv';
+import { UiActionButton, type UiSidePanelScope } from '@muyun/vue-ui-antdv';
 import RecordDetailDrawer from './RecordDetailDrawer.vue';
 import RecordExternalChangeNotice from './RecordExternalChangeNotice.vue';
+import type { DrawerPromotion } from './drawerPromotion';
 
 defineOptions({ name: 'RecordModeDrawer' });
 
@@ -10,6 +11,10 @@ const props = withDefaults(
   defineProps<{
     open: boolean;
     title: string;
+    /** Secondary business identity rendered by the platform detail header. */
+    subtitle?: string;
+    width?: number | string;
+    scope?: UiSidePanelScope;
     mode: string;
     viewMode?: string;
     formModes?: string[];
@@ -17,6 +22,7 @@ const props = withDefaults(
     loadFailed?: boolean;
     closeOnOutside?: boolean;
     closeTitle?: string;
+    promotion?: DrawerPromotion;
     errorTitle?: string;
     errorMessage?: string;
     retryTitle?: string;
@@ -27,12 +33,16 @@ const props = withDefaults(
     externalChangeDismissTitle?: string;
   }>(),
   {
+    subtitle: undefined,
+    width: 520,
+    scope: 'tab',
     viewMode: 'view',
     formModes: () => ['edit', 'create'],
     loading: false,
     loadFailed: false,
     closeOnOutside: undefined,
     closeTitle: '关闭',
+    promotion: undefined,
     errorTitle: '详情加载失败',
     errorMessage: '无法加载详情，请重试',
     retryTitle: '重试',
@@ -46,13 +56,13 @@ const props = withDefaults(
 
 defineSlots<{
   status(): unknown;
-  actions(): unknown;
   loading(): unknown;
   error(): unknown;
   externalChangeNotice(): unknown;
   view(): unknown;
   form(): unknown;
   default(): unknown;
+  operation(): unknown;
 }>();
 
 const emit = defineEmits<{
@@ -71,15 +81,19 @@ const actualCloseOnOutside = computed(() => props.closeOnOutside ?? viewModeActi
   <RecordDetailDrawer
     :open="open"
     :title="title"
+    :subtitle="subtitle"
+    :width="width"
+    :scope="scope"
     :close-on-outside="actualCloseOnOutside"
     :close-title="closeTitle"
+    :promotion="promotion"
     @close="emit('close')"
   >
     <template #status>
       <slot name="status" />
     </template>
-    <template #actions>
-      <slot name="actions" />
+    <template v-if="$slots.operation" #operation>
+      <slot name="operation" />
     </template>
 
     <slot />

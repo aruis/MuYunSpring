@@ -7,7 +7,8 @@ export function createBackendHttpClient(options: { withAuth?: boolean } = {}) {
     baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
     token: options.withAuth === false ? undefined : effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN),
     credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
-    onAuthenticationRequired: options.withAuth === false ? undefined : recoverAuthentication,
+    onAuthenticationRequired:
+      options.withAuth === false ? undefined : (error, token) => recoverAuthentication(error, token),
   });
 }
 
