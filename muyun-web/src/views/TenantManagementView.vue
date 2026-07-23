@@ -7,6 +7,7 @@ import {
   RecordDetailDrawer,
   RecordActionBar,
   RecordMetaSection,
+  presentPlatformError,
   RecordStatusSwitch,
   StaticManagementLayout,
   type RecordActionItem,
@@ -135,6 +136,8 @@ async function loadApplications() {
     await applicationContext.runtime.ready;
     const response = await applicationContext.abilities.crud().query({ page: { pageNum: 1, pageSize: 200 } });
     applications.value = response.records.filter((application) => application.enabled !== false);
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'tenant-management-applications', phase: 'load' });
   } finally {
     applicationsLoading.value = false;
   }
@@ -156,6 +159,8 @@ async function loadTenantApplications(tenantId?: string) {
     if (loadVersion === tenantApplicationsLoadVersion && selected.value?.id === tenantId) {
       tenantApplications.value = response.records;
     }
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'tenant-management-applications', phase: 'load' });
   } finally {
     if (loadVersion === tenantApplicationsLoadVersion) tenantApplicationsLoading.value = false;
   }
@@ -192,6 +197,8 @@ async function saveApplicationConfiguration() {
     });
     await loadTenantApplications(tenantId);
     applicationConfigurationOpen.value = false;
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'tenant-management-applications', phase: 'action' });
   } finally {
     applicationConfigurationSaving.value = false;
   }

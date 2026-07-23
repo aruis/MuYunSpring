@@ -304,7 +304,7 @@ onMounted(() => {
 onBeforeUnmount(() => disposeUserWorkspaceHandoffRecipient?.());
 
 function receiveUserDetailWorkspaceSession(session: UserDetailWorkspaceSession) {
-  if (userDetailMode.value === 'edit') return false;
+  if (userDetailMode.value !== 'view') return false;
   restoreUserDetailWorkspaceSession(session);
   return true;
 }

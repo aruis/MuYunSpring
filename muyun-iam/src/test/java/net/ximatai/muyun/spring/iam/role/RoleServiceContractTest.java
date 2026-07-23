@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.ApplicationNotOpenedException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -23,6 +24,7 @@ import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -852,6 +855,28 @@ class RoleServiceContractTest {
         }
 
         verify(actionDao).insert(argThat(action -> "create".equals(action.getActionCode())));
+    }
+
+    @Test
+    void shouldRejectTenantRolePermissionForApplicationThatIsNotOpened() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        Role role = employmentRole("r1", RoleKind.STANDARD);
+        role.setTenantId("tenant_a");
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(role));
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        doThrow(new ApplicationNotOpenedException("tenant_a", "sales"))
+                .when(tenantApplicationService).requireApplicationOpened("tenant_a", "sales");
+        RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
+                mock(EmploymentRoleGrantDao.class), actionDao);
+        service.setTenantApplicationService(tenantApplicationService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantAction("r1", "sales.contract", "query"))
+                    .isInstanceOf(ApplicationNotOpenedException.class);
+        }
+
+        verify(actionDao, never()).insert(any());
     }
 
     @Test

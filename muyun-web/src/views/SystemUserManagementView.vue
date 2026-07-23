@@ -229,7 +229,7 @@ onMounted(() => {
 onBeforeUnmount(() => disposeSystemUserWorkspaceHandoffRecipient?.());
 
 function receiveSystemUserDetailWorkspaceSession(session: SystemUserDetailWorkspaceSession) {
-  if (detailMode.value === 'edit') return false;
+  if (detailMode.value !== 'view') return false;
   restoreSystemUserDetailWorkspaceSession(session);
   return true;
 }

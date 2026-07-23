@@ -364,7 +364,7 @@ onMounted(() => {
 onBeforeUnmount(() => disposeEmployeeWorkspaceHandoffRecipient?.());
 
 function receiveEmployeeDetailWorkspaceSession(session: EmployeeDetailWorkspaceSession) {
-  if (employeeDetailMode.value === 'edit') return false;
+  if (employeeDetailMode.value !== 'view' || showAccountProvisionForm.value) return false;
   restoreEmployeeDetailWorkspaceSession(session);
   return true;
 }

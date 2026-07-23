@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.StandardBusinessService;
@@ -33,6 +34,7 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 @Service
 public class ApplicationService extends StandardBusinessService<Application> implements
         SoftDeleteAbility<Application>,
+        GlobalScopedAbility<Application>,
         EnableAbility<Application>,
         SortAbility<Application>,
         InitialDataAbility<Application>,

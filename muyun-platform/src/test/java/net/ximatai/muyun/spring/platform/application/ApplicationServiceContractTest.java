@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -105,6 +106,16 @@ class ApplicationServiceContractTest {
         assertThatThrownBy(() -> service.requireEnabledForTenant("crm"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not active");
+    }
+
+    @Test
+    void shouldReadApplicationCatalogFromGlobalScopeInsideTenantContext() {
+        ApplicationService service = new ApplicationService(new ApplicationMemoryDao());
+        service.insert(application("crm"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.isEnabledForTenant("crm")).isTrue();
+        }
     }
 
     @Test
