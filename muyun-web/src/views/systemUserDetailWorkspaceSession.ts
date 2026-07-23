@@ -1,5 +1,9 @@
 import type { ResetPasswordResponse, UserAccount } from '@muyun/web-contracts';
-import { replaceWorkspaceViewSession, takeWorkspaceViewSession } from '../app/workspaceViewSessions';
+import {
+  handOffWorkspaceViewSession,
+  registerWorkspaceViewHandoffRecipient,
+  takeWorkspaceViewSession,
+} from '../app/workspaceViewSessions';
 import {
   systemUserDetailWorkspaceView,
   type SystemUserDetailWorkspaceViewInput,
@@ -17,11 +21,18 @@ export function handOffSystemUserDetailWorkspaceSession(
   input: SystemUserDetailWorkspaceViewInput,
   session: SystemUserDetailWorkspaceSession,
 ) {
-  replaceWorkspaceViewSession(systemUserDetailWorkspaceView, input, {
+  return handOffWorkspaceViewSession(systemUserDetailWorkspaceView, input, {
     ...session,
     selectedUser: { ...session.selectedUser },
     draft: { ...session.draft },
   });
+}
+
+export function registerSystemUserDetailWorkspaceHandoffRecipient(
+  input: SystemUserDetailWorkspaceViewInput,
+  recipient: (session: SystemUserDetailWorkspaceSession) => boolean,
+) {
+  return registerWorkspaceViewHandoffRecipient(systemUserDetailWorkspaceView, input, recipient);
 }
 
 export function takeSystemUserDetailWorkspaceSession(input: SystemUserDetailWorkspaceViewInput) {

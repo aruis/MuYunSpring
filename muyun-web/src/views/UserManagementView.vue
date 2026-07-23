@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
   RecordActionBar,
@@ -43,6 +43,7 @@ import UserDetailContent from './UserDetailContent.vue';
 import { userDetailWorkspaceView } from './userDetailWorkspaceView';
 import {
   handOffUserDetailWorkspaceSession,
+  registerUserDetailWorkspaceHandoffRecipient,
   takeUserDetailWorkspaceSession,
   type UserDetailWorkspaceSession,
 } from './userDetailWorkspaceSession';
@@ -248,17 +249,19 @@ const userDetailPromotion = useWorkspaceViewPromotion({
     hasStableIdentity: Boolean(selectedUser.value?.id) && !loadingUserDetail.value,
     busy: savingUser.value,
   })),
-  beforePromote: (input) => {
+  beforePromote: async (input) => {
     const selected = selectedUser.value;
     if (!selected) return;
-    handOffUserDetailWorkspaceSession(input, {
-      selectedUser: selected,
-      draft: userDraft.value,
-      tenant: selectedTenant.value,
-      mode: userDetailMode.value === 'edit' ? 'edit' : 'view',
-      password: passwordDraft.value,
-      resetPasswordResult: resetPasswordResult.value,
-    });
+    return (
+      (await handOffUserDetailWorkspaceSession(input, {
+        selectedUser: selected,
+        draft: userDraft.value,
+        tenant: selectedTenant.value,
+        mode: userDetailMode.value === 'edit' ? 'edit' : 'view',
+        password: passwordDraft.value,
+        resetPasswordResult: resetPasswordResult.value,
+      })) === 'accepted'
+    );
   },
   onPromoted: closeUserDetail,
 });
@@ -277,10 +280,18 @@ const userFormFieldFallback = computed<Record<UserFormFieldName, RecordFormField
 }));
 const userFormFieldNames = computed<UserFormFieldName[]>(() => ['username', 'enabled']);
 
+let disposeUserWorkspaceHandoffRecipient: (() => void) | undefined;
+
 onMounted(() => {
   void loadUserFormDefinition();
   if (props.recordId) {
     const input = { recordId: props.recordId } as const;
+    if (!isDrawerWorkspaceTask.value) {
+      disposeUserWorkspaceHandoffRecipient = registerUserDetailWorkspaceHandoffRecipient(
+        input,
+        receiveUserDetailWorkspaceSession,
+      );
+    }
     const session = takeUserDetailWorkspaceSession(input);
     if (session) {
       restoreUserDetailWorkspaceSession(session);
@@ -289,6 +300,14 @@ onMounted(() => {
     void openUserDetail({ id: props.recordId }, props.mode ?? 'view');
   }
 });
+
+onBeforeUnmount(() => disposeUserWorkspaceHandoffRecipient?.());
+
+function receiveUserDetailWorkspaceSession(session: UserDetailWorkspaceSession) {
+  if (userDetailMode.value === 'edit') return false;
+  restoreUserDetailWorkspaceSession(session);
+  return true;
+}
 
 usePageBusinessEventHandler(handleUserSessionBusinessEvent);
 

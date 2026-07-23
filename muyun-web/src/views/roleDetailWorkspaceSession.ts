@@ -1,5 +1,9 @@
 import type { Organization, Role, RoleOwnerScopeType, Tenant } from '@muyun/web-contracts';
-import { replaceWorkspaceViewSession, takeWorkspaceViewSession } from '../app/workspaceViewSessions';
+import {
+  handOffWorkspaceViewSession,
+  registerWorkspaceViewHandoffRecipient,
+  takeWorkspaceViewSession,
+} from '../app/workspaceViewSessions';
 import { roleDetailWorkspaceView, type RoleDetailWorkspaceViewInput } from './roleDetailWorkspaceView';
 
 export interface RoleDetailWorkspaceScope {
@@ -22,7 +26,7 @@ export function handOffRoleDetailWorkspaceSession(
   input: RoleDetailWorkspaceViewInput,
   session: RoleDetailWorkspaceSession,
 ) {
-  replaceWorkspaceViewSession(roleDetailWorkspaceView, input, {
+  return handOffWorkspaceViewSession(roleDetailWorkspaceView, input, {
     ...session,
     selectedRole: { ...session.selectedRole },
     draft: { ...session.draft },
@@ -32,6 +36,13 @@ export function handOffRoleDetailWorkspaceSession(
       organization: session.scope.organization ? { ...session.scope.organization } : undefined,
     },
   });
+}
+
+export function registerRoleDetailWorkspaceHandoffRecipient(
+  input: RoleDetailWorkspaceViewInput,
+  recipient: (session: RoleDetailWorkspaceSession) => boolean,
+) {
+  return registerWorkspaceViewHandoffRecipient(roleDetailWorkspaceView, input, recipient);
 }
 
 export function takeRoleDetailWorkspaceSession(input: RoleDetailWorkspaceViewInput) {

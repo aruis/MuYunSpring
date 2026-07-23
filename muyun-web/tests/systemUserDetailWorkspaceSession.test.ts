@@ -5,9 +5,9 @@ import {
   takeSystemUserDetailWorkspaceSession,
 } from '../src/views/systemUserDetailWorkspaceSession.ts';
 
-test('system user detail workspace hand-off preserves an edit draft and consumes it once', () => {
+test('system user detail workspace hand-off preserves an edit draft and consumes it once', async () => {
   const input = { recordId: 'system-user-1' } as const;
-  handOffSystemUserDetailWorkspaceSession(input, {
+  await handOffSystemUserDetailWorkspaceSession(input, {
     selectedUser: { id: 'system-user-1', username: 'admin', enabled: true },
     draft: { id: 'system-user-1', username: 'admin', enabled: false },
     mode: 'edit',

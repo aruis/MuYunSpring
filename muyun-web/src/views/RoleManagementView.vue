@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
   RecordActionBar,
@@ -57,6 +57,7 @@ import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
 import { roleDetailWorkspaceView } from './roleDetailWorkspaceView';
 import {
   handOffRoleDetailWorkspaceSession,
+  registerRoleDetailWorkspaceHandoffRecipient,
   takeRoleDetailWorkspaceSession,
   type RoleDetailWorkspaceSession,
 } from './roleDetailWorkspaceSession';
@@ -283,16 +284,18 @@ const roleDetailPromotion = useWorkspaceViewPromotion({
     hasStableIdentity: Boolean(selectedRole.value?.id && selectedScope.value) && !loadingRoleDetail.value,
     busy: savingRole.value,
   })),
-  beforePromote: (input) => {
+  beforePromote: async (input) => {
     const selected = selectedRole.value;
     const scope = selectedScope.value;
     if (!selected || !scope) return;
-    handOffRoleDetailWorkspaceSession(input, {
-      selectedRole: selected,
-      draft: roleDraft.value,
-      scope,
-      mode: roleDetailMode.value === 'edit' ? 'edit' : 'view',
-    });
+    return (
+      (await handOffRoleDetailWorkspaceSession(input, {
+        selectedRole: selected,
+        draft: roleDraft.value,
+        scope,
+        mode: roleDetailMode.value === 'edit' ? 'edit' : 'view',
+      })) === 'accepted'
+    );
   },
   onPromoted: closeRoleDetail,
 });
@@ -358,11 +361,28 @@ const roleDetailFieldNames = computed<RoleFormFieldName[]>(() => {
   return names;
 });
 
+let disposeRoleWorkspaceHandoffRecipient: (() => void) | undefined;
+
 onMounted(() => {
   void loadRoleFormDefinition();
   if (!isWorkspaceView.value || !props.recordId || !props.scopeKind) return;
+  const input = roleWorkspaceInput();
+  if (input && !isDrawerWorkspaceView.value) {
+    disposeRoleWorkspaceHandoffRecipient = registerRoleDetailWorkspaceHandoffRecipient(
+      input,
+      receiveRoleDetailWorkspaceSession,
+    );
+  }
   void restoreRoleWorkspaceView();
 });
+
+onBeforeUnmount(() => disposeRoleWorkspaceHandoffRecipient?.());
+
+function receiveRoleDetailWorkspaceSession(session: RoleDetailWorkspaceSession) {
+  if (roleDetailMode.value === 'edit') return false;
+  restoreRoleDetailWorkspaceSession(session);
+  return true;
+}
 
 watch(
   selectedRole,

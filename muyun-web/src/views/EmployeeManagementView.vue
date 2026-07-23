@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   ManagementWorkspace,
   ManagementExplorerColumn,
@@ -56,6 +56,7 @@ import EmployeeDetailContent from './EmployeeDetailContent.vue';
 import { employeeDetailWorkspaceView } from './employeeDetailWorkspaceView';
 import {
   handOffEmployeeDetailWorkspaceSession,
+  registerEmployeeDetailWorkspaceHandoffRecipient,
   takeEmployeeDetailWorkspaceSession,
   type EmployeeDetailWorkspaceSession,
 } from './employeeDetailWorkspaceSession';
@@ -311,20 +312,22 @@ const employeeDetailPromotion = useWorkspaceViewPromotion({
     hasStableIdentity: Boolean(selectedEmployee.value?.id) && !loadingEmployeeDetail.value,
     busy: savingEmployee.value || savingEmployeeAccount.value || loadingEmployeeAccounts.value,
   })),
-  beforePromote: (input) => {
+  beforePromote: async (input) => {
     const selected = selectedEmployee.value;
     if (!selected) return;
-    handOffEmployeeDetailWorkspaceSession(input, {
-      selectedEmployee: selected,
-      draft: employeeDraft.value,
-      organization: selectedOrganization.value,
-      department: employeeDetailDepartment.value,
-      account: employeeAccount.value,
-      accountUser: employeeAccountUser.value,
-      showAccountProvisionForm: showAccountProvisionForm.value,
-      accountProvisionDraft: accountProvisionDraft.value,
-      mode: employeeDetailMode.value === 'edit' ? 'edit' : 'view',
-    });
+    return (
+      (await handOffEmployeeDetailWorkspaceSession(input, {
+        selectedEmployee: selected,
+        draft: employeeDraft.value,
+        organization: selectedOrganization.value,
+        department: employeeDetailDepartment.value,
+        account: employeeAccount.value,
+        accountUser: employeeAccountUser.value,
+        showAccountProvisionForm: showAccountProvisionForm.value,
+        accountProvisionDraft: accountProvisionDraft.value,
+        mode: employeeDetailMode.value === 'edit' ? 'edit' : 'view',
+      })) === 'accepted'
+    );
   },
   onPromoted: closeEmployeeDetail,
 });
@@ -338,10 +341,18 @@ watch(
   { immediate: true },
 );
 
+let disposeEmployeeWorkspaceHandoffRecipient: (() => void) | undefined;
+
 onMounted(() => {
   void loadEmployeeFormDefinition();
   if (!props.recordId) return;
   const input = { recordId: props.recordId } as const;
+  if (!isDrawerWorkspaceView.value) {
+    disposeEmployeeWorkspaceHandoffRecipient = registerEmployeeDetailWorkspaceHandoffRecipient(
+      input,
+      receiveEmployeeDetailWorkspaceSession,
+    );
+  }
   const session = takeEmployeeDetailWorkspaceSession(input);
   if (session) {
     restoreEmployeeDetailWorkspaceSession(session);
@@ -349,6 +360,14 @@ onMounted(() => {
   }
   void openEmployeeDetail({ id: props.recordId }, props.mode ?? 'view');
 });
+
+onBeforeUnmount(() => disposeEmployeeWorkspaceHandoffRecipient?.());
+
+function receiveEmployeeDetailWorkspaceSession(session: EmployeeDetailWorkspaceSession) {
+  if (employeeDetailMode.value === 'edit') return false;
+  restoreEmployeeDetailWorkspaceSession(session);
+  return true;
+}
 
 async function loadEmployeeFormDefinition() {
   try {

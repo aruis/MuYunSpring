@@ -1,5 +1,9 @@
 import type { Department, Employee, EmployeeAccount, Organization, UserAccount } from '@muyun/web-contracts';
-import { replaceWorkspaceViewSession, takeWorkspaceViewSession } from '../app/workspaceViewSessions';
+import {
+  handOffWorkspaceViewSession,
+  registerWorkspaceViewHandoffRecipient,
+  takeWorkspaceViewSession,
+} from '../app/workspaceViewSessions';
 import type { EmployeeDetailWorkspaceViewInput } from './employeeDetailWorkspaceView';
 import { employeeDetailWorkspaceView } from './employeeDetailWorkspaceView';
 
@@ -19,7 +23,7 @@ export function handOffEmployeeDetailWorkspaceSession(
   input: EmployeeDetailWorkspaceViewInput,
   session: EmployeeDetailWorkspaceSession,
 ) {
-  replaceWorkspaceViewSession(employeeDetailWorkspaceView, input, {
+  return handOffWorkspaceViewSession(employeeDetailWorkspaceView, input, {
     ...session,
     selectedEmployee: { ...session.selectedEmployee },
     draft: { ...session.draft },
@@ -29,6 +33,13 @@ export function handOffEmployeeDetailWorkspaceSession(
     accountUser: session.accountUser ? { ...session.accountUser } : undefined,
     accountProvisionDraft: { ...session.accountProvisionDraft },
   });
+}
+
+export function registerEmployeeDetailWorkspaceHandoffRecipient(
+  input: EmployeeDetailWorkspaceViewInput,
+  recipient: (session: EmployeeDetailWorkspaceSession) => boolean,
+) {
+  return registerWorkspaceViewHandoffRecipient(employeeDetailWorkspaceView, input, recipient);
 }
 
 export function takeEmployeeDetailWorkspaceSession(input: EmployeeDetailWorkspaceViewInput) {

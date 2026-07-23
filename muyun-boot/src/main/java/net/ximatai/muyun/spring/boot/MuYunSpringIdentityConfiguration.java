@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.boot.platform.DefaultTenantRoleProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
+import net.ximatai.muyun.spring.boot.platform.TenantApplicationReconciliationTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -155,6 +156,15 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(InitialDataBootstrapTask.class)
     public InitialDataBootstrapTask initialDataBootstrapTask(InitialDataExecutor initialDataExecutor) {
         return new InitialDataBootstrapTask(initialDataExecutor);
+    }
+
+    @Bean
+    @ConditionalOnBean({TenantService.class, TenantApplicationService.class})
+    @ConditionalOnMissingBean(TenantApplicationReconciliationTask.class)
+    public TenantApplicationReconciliationTask tenantApplicationReconciliationTask(
+            TenantService tenantService,
+            TenantApplicationService tenantApplicationService) {
+        return new TenantApplicationReconciliationTask(tenantService, tenantApplicationService);
     }
 
     @Bean

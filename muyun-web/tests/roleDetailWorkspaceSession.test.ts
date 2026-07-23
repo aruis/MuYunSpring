@@ -5,9 +5,9 @@ import {
   takeRoleDetailWorkspaceSession,
 } from '../src/views/roleDetailWorkspaceSession.ts';
 
-test('role detail workspace hand-off preserves the scope identity and draft once', () => {
+test('role detail workspace hand-off preserves the scope identity and draft once', async () => {
   const input = { recordId: 'role-1', scopeKind: 'organization' as const, scopeId: 'org-1' };
-  handOffRoleDetailWorkspaceSession(input, {
+  await handOffRoleDetailWorkspaceSession(input, {
     selectedRole: {
       id: 'role-1',
       title: '机构管理员',

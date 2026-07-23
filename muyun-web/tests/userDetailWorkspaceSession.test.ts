@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   handOffUserDetailWorkspaceSession,
+  registerUserDetailWorkspaceHandoffRecipient,
   takeUserDetailWorkspaceSession,
 } from '../src/views/userDetailWorkspaceSession.ts';
 
-test('user detail workspace hand-off preserves an edit draft and consumes it once', () => {
+test('user detail workspace hand-off preserves an edit draft and consumes it once', async () => {
   const input = { recordId: 'user-1' } as const;
-  handOffUserDetailWorkspaceSession(input, {
+  await handOffUserDetailWorkspaceSession(input, {
     selectedUser: { id: 'user-1', username: 'alice', enabled: true },
     draft: { id: 'user-1', username: 'alice-renamed', enabled: true },
     mode: 'edit',
@@ -18,4 +19,24 @@ test('user detail workspace hand-off preserves an edit draft and consumes it onc
   assert.equal(restored?.draft.username, 'alice-renamed');
   assert.equal(restored?.mode, 'edit');
   assert.equal(takeUserDetailWorkspaceSession(input), undefined);
+});
+
+test('user detail workspace sends a hand-off to a mounted recipient', async () => {
+  const input = { recordId: 'user-mounted' } as const;
+  let received = '';
+  const dispose = registerUserDetailWorkspaceHandoffRecipient(input, (session) => {
+    received = session.draft.username ?? '';
+    return true;
+  });
+  assert.equal(
+    await handOffUserDetailWorkspaceSession(input, {
+      selectedUser: { id: input.recordId, username: 'alice', enabled: true },
+      draft: { id: input.recordId, username: 'alice-new', enabled: true },
+      mode: 'edit',
+      password: '',
+    }),
+    'accepted',
+  );
+  assert.equal(received, 'alice-new');
+  dispose();
 });
