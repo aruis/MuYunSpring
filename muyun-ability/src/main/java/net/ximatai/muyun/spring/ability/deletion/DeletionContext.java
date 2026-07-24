@@ -17,7 +17,8 @@ public record DeletionContext(String operationId,
                               DeletionResource parent,
                               String parentEntryId,
                               DeletionTrigger trigger,
-                              Set<DeletionResource> ancestry) {
+                              Set<DeletionResource> ancestry,
+                              DeletionLifecycleSession lifecycleSession) {
     public DeletionContext {
         if (operationId == null || operationId.isBlank()) {
             throw new IllegalArgumentException("operationId must not be blank");
@@ -29,11 +30,23 @@ public record DeletionContext(String operationId,
             throw new IllegalArgumentException("trigger must not be null");
         }
         ancestry = ancestry == null ? Set.of() : Set.copyOf(new LinkedHashSet<>(ancestry));
+        lifecycleSession = lifecycleSession == null ? DeletionLifecycleSession.NONE : lifecycleSession;
     }
 
     public static DeletionContext root(String moduleAlias, String recordId) {
+        return root(moduleAlias, recordId, DeletionLifecycleSession.NONE);
+    }
+
+    public static DeletionContext root(String moduleAlias,
+                                       String recordId,
+                                       DeletionLifecycleSession lifecycleSession) {
         DeletionResource resource = new DeletionResource(moduleAlias, recordId);
-        return new DeletionContext(Ids.newId(), resource, null, null, DeletionTrigger.DIRECT, Set.of(resource));
+        return new DeletionContext(Ids.newId(), resource, null, null, DeletionTrigger.DIRECT,
+                Set.of(resource), lifecycleSession);
+    }
+
+    public boolean hasLifecycleSession() {
+        return lifecycleSession != DeletionLifecycleSession.NONE;
     }
 
     public void requireAllowed(DeletionResource resource) {
@@ -50,6 +63,7 @@ public record DeletionContext(String operationId,
         requireAllowed(child);
         LinkedHashSet<DeletionResource> nextAncestry = new LinkedHashSet<>(ancestry);
         nextAncestry.add(child);
-        return new DeletionContext(operationId, root, node.resource(), node.entryId(), DeletionTrigger.CASCADE, nextAncestry);
+        return new DeletionContext(operationId, root, node.resource(), node.entryId(), DeletionTrigger.CASCADE,
+                nextAncestry, lifecycleSession);
     }
 }

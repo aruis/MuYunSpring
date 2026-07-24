@@ -79,7 +79,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (id == null || id.isBlank()) {
             return 0;
         }
-        return delete(id, expectedVersion, DeletionContext.root(getModuleAlias(), id));
+        return delete(id, expectedVersion, PlatformAbilityDispatcher.rootDeletionContext(getModuleAlias(), id));
     }
 
     @Override
@@ -87,9 +87,8 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (id == null || id.isBlank()) {
             return 0;
         }
-        DeletionContext context = deletionContext == null
-                ? DeletionContext.root(getModuleAlias(), id)
-                : deletionContext;
+        DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
+                getModuleAlias(), id, deletionContext);
         beforeDelete(id, context);
         T entity = selectIgnoreSoftDelete(id);
         if (isSoftDeleted(entity)) {

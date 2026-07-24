@@ -10,6 +10,11 @@ public final class PlatformErrorCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String CONFLICT_VERSION = "CONFLICT_VERSION";
     public static final String RESOURCE_IN_USE = "RESOURCE_IN_USE";
+    /**
+     * A create command reused the identifier of a record retained by soft deletion.
+     * The caller can recover the original resource through its business recycle bin.
+     */
+    public static final String RESOURCE_SOFT_DELETED_CONFLICT = "RESOURCE_SOFT_DELETED_CONFLICT";
     public static final String RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
     public static final String CONFIG_MISSING = "CONFIG_MISSING";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";

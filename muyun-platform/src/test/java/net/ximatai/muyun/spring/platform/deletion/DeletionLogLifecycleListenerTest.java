@@ -2,8 +2,10 @@ package net.ximatai.muyun.spring.platform.deletion;
 
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleSession;
 import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionResource;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
@@ -18,13 +20,15 @@ class DeletionLogLifecycleListenerTest {
         TestOperationService service = new TestOperationService();
         DeletionOperation rootEntity = entity("tenant-1");
         DeletionOperation childEntity = entity("application-1");
-        DeletionContext rootContext = DeletionContext.root(service.getModuleAlias(), rootEntity.getId());
+        DeletionResource rootResource = new DeletionResource(service.getModuleAlias(), rootEntity.getId());
+        DeletionLifecycleSession journal = listener.open(rootResource);
+        DeletionContext rootContext = DeletionContext.root(service.getModuleAlias(), rootEntity.getId(), journal);
 
-        DeletionNode rootNode = listener.started(service, rootEntity, rootContext, DeletionMode.SOFT);
+        DeletionNode rootNode = journal.started(service, rootEntity, rootContext, DeletionMode.SOFT);
         DeletionContext childContext = rootContext.child(rootNode, service.getModuleAlias(), childEntity.getId());
-        DeletionNode childNode = listener.started(service, childEntity, childContext, DeletionMode.HARD);
-        listener.succeeded(service, childEntity, childContext, childNode, DeletionMode.HARD);
-        listener.succeeded(service, rootEntity, rootContext, rootNode, DeletionMode.SOFT);
+        DeletionNode childNode = journal.started(service, childEntity, childContext, DeletionMode.HARD);
+        journal.succeeded(service, childEntity, childContext, childNode, DeletionMode.HARD);
+        journal.succeeded(service, rootEntity, rootContext, rootNode, DeletionMode.SOFT);
 
         assertThat(operationDao.findById(rootContext.operationId()))
                 .extracting(DeletionOperation::getStatus, DeletionOperation::getRootRecordId)

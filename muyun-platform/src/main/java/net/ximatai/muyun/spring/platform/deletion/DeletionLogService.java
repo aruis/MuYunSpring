@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.deletion;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
@@ -67,8 +70,15 @@ public class DeletionLogService {
         if (entry.getStatus() != DeletionEntryStatus.IN_PROGRESS) {
             throw new PlatformException("Deletion entry must start in progress");
         }
-        if (entry.getParentEntryId() != null && entryDao.findById(entry.getParentEntryId()) == null) {
-            throw new PlatformException("Deletion entry parentEntryId does not exist: " + entry.getParentEntryId());
+        if (entry.getParentEntryId() != null) {
+            DeletionEntry parent = entryDao.findById(entry.getParentEntryId());
+            if (parent == null) {
+                throw new PlatformException("Deletion entry parentEntryId does not exist: " + entry.getParentEntryId());
+            }
+            if (!entry.getOperationId().equals(parent.getOperationId())) {
+                throw new PlatformException("Deletion entry parentEntryId belongs to another operation: "
+                        + entry.getParentEntryId());
+            }
         }
         if (entry.getStartedAt() == null) {
             entry.setStartedAt(Instant.now());
@@ -128,6 +138,31 @@ public class DeletionLogService {
 
     public Criteria operationEntriesCriteria(String operationId) {
         return Criteria.of().eq("operationId", requireText(operationId, "operationId"));
+    }
+
+    /**
+     * Returns the persisted impact tree of one lifecycle operation.
+     *
+     * <p>This is a narrow read API for lifecycle coordinators. The log service
+     * remains an audit repository rather than a general resource repository.</p>
+     */
+    public List<DeletionEntry> operationEntries(String operationId) {
+        requireOperation(operationId);
+        return entryDao.query(operationEntriesCriteria(operationId), PageRequest.of(1, Integer.MAX_VALUE));
+    }
+
+    public DeletionLifecycleEntry latestTerminalEntry(String moduleAlias, String recordId) {
+        List<DeletionEntry> entries = entryDao.query(Criteria.of()
+                        .eq("resourceModuleAlias", requireText(moduleAlias, "moduleAlias"))
+                        .eq("resourceRecordId", requireText(recordId, "recordId")),
+                PageRequest.of(1, Integer.MAX_VALUE));
+        return entries.stream()
+                .filter(entry -> entry.getStatus() != DeletionEntryStatus.IN_PROGRESS)
+                .map(entry -> new DeletionLifecycleEntry(requireOperation(entry.getOperationId()), entry))
+                .filter(item -> item.operation().getStatus() != DeletionOperationStatus.IN_PROGRESS)
+                .max(Comparator.comparing((DeletionLifecycleEntry item) -> item.entry().getCompletedAt(),
+                        Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(item -> item.entry().getId()))
+                .orElse(null);
     }
 
     private void requireOperationInProgress(String operationId) {

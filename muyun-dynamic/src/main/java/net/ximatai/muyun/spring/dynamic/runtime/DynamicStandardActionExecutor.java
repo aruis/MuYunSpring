@@ -47,7 +47,8 @@ final class DynamicStandardActionExecutor {
                         request.afterId(), traceId);
                 yield DynamicActionResultBody.refreshed();
             }
-            case MENU, TREE, REFERENCE, IMPORT, EXPORT -> throw new IllegalArgumentException(
+            case MENU, TREE, REFERENCE, IMPORT, EXPORT,
+                    RECYCLE_BIN_QUERY, RECYCLE_BIN_RESTORE -> throw new IllegalArgumentException(
                     "standard action is only exposed through web endpoint: " + actionCode);
             case ENABLE -> countResult(service.enableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
             case DISABLE -> countResult(service.disableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));

@@ -3,9 +3,11 @@ package net.ximatai.muyun.spring.iam.tenant;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
@@ -76,6 +78,47 @@ class TenantServiceContractTest {
             assertThatThrownBy(() -> service.insert(tenant("tenant-a", "Tenant A")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("tenantAlias");
+        }
+    }
+
+    @Test
+    void shouldExplainConflictWithSoftDeletedTenantInsteadOfLeakingPrimaryKeyFailure() {
+        TenantDao dao = mock(TenantDao.class);
+        Tenant deleted = tenant("demo", "演示租户");
+        deleted.setDeleted(Boolean.TRUE);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(deleted));
+        TenantService service = new TenantService(dao);
+
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
+            assertThatThrownBy(() -> service.insert(tenant("demo", "新的演示租户")))
+                    .isInstanceOf(PlatformException.class)
+                    .satisfies(exception -> {
+                        PlatformException platformException = (PlatformException) exception;
+                        assertThat(platformException.code())
+                                .isEqualTo(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT);
+                        assertThat(platformException.details())
+                                .containsEntry("resourceModuleAlias", TenantService.MODULE_ALIAS)
+                                .containsEntry("resourceRecordId", "demo")
+                                .containsEntry("recoveryAvailable", Boolean.TRUE);
+                    });
+        }
+    }
+
+    @Test
+    void shouldExposeRecycleBinOnlyThroughTenantSystemBoundary() {
+        TenantDao dao = mock(TenantDao.class);
+        Tenant deleted = tenant("demo", "演示租户");
+        deleted.setDeleted(Boolean.TRUE);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(deleted));
+        TenantService service = new TenantService(dao);
+
+        assertThat(service).isInstanceOf(RecycleBinAbility.class);
+        assertThatThrownBy(() -> service.listRecycleBin(PageRequest.of(1, 20)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
+            assertThat(service.listRecycleBin(PageRequest.of(1, 20))).containsExactly(deleted);
         }
     }
 

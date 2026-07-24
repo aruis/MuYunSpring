@@ -125,9 +125,11 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("租户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactly("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable");
+                                "sort", "enable", "disable", "recycleBinQuery", "recycleBinRestore");
             });
             assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .doesNotContain("recycleBinQuery", "recycleBinRestore");
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("机构管理");
                 assertThat(definition.entryType()).isEqualTo(ModuleEntryType.ROUTE);

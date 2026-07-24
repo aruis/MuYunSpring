@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
+import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleSession;
 import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
@@ -406,14 +407,19 @@ class AbilityContractTest {
         List<RecordedDeletion> recorded = new ArrayList<>();
         PlatformAbilityRuntime.configureDeletionLifecycleListener(new DeletionLifecycleListener() {
             @Override
-            public DeletionNode started(CrudAbility<?> ability,
-                                        EntityContract entity,
-                                        DeletionContext context,
-                                        DeletionMode mode) {
-                String entryId = "entry-" + (recorded.size() + 1);
-                recorded.add(new RecordedDeletion(ability.getModuleAlias(), entity.getId(), context, entryId, mode));
-                return new DeletionNode(entryId, new net.ximatai.muyun.spring.ability.deletion.DeletionResource(
-                        ability.getModuleAlias(), entity.getId()));
+            public DeletionLifecycleSession open(net.ximatai.muyun.spring.ability.deletion.DeletionResource root) {
+                return new DeletionLifecycleSession() {
+                    @Override
+                    public DeletionNode started(CrudAbility<?> ability,
+                                                EntityContract entity,
+                                                DeletionContext context,
+                                                DeletionMode mode) {
+                        String entryId = "entry-" + (recorded.size() + 1);
+                        recorded.add(new RecordedDeletion(ability.getModuleAlias(), entity.getId(), context, entryId, mode));
+                        return new DeletionNode(entryId, new net.ximatai.muyun.spring.ability.deletion.DeletionResource(
+                                ability.getModuleAlias(), entity.getId()));
+                    }
+                };
             }
         });
 

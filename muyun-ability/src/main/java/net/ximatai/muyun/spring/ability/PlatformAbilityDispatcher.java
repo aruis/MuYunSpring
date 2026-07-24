@@ -34,11 +34,30 @@ final class PlatformAbilityDispatcher {
         deletionLifecycleListener = DeletionLifecycleListener.NONE;
     }
 
+    static DeletionContext rootDeletionContext(String moduleAlias, String recordId) {
+        net.ximatai.muyun.spring.ability.deletion.DeletionResource root =
+                new net.ximatai.muyun.spring.ability.deletion.DeletionResource(moduleAlias, recordId);
+        return DeletionContext.root(moduleAlias, recordId, deletionLifecycleListener.open(root));
+    }
+
+    static DeletionContext resolveDeletionContext(String moduleAlias,
+                                                  String recordId,
+                                                  DeletionContext requestedContext) {
+        if (requestedContext == null) {
+            return rootDeletionContext(moduleAlias, recordId);
+        }
+        if (requestedContext.trigger() == net.ximatai.muyun.spring.ability.deletion.DeletionTrigger.DIRECT
+                && !requestedContext.hasLifecycleSession()) {
+            return rootDeletionContext(moduleAlias, recordId);
+        }
+        return requestedContext;
+    }
+
     static <T extends EntityContract> DeletionNode deletionStarted(CrudAbility<T> ability,
                                                                     T entity,
                                                                     DeletionContext context,
                                                                     DeletionMode mode) {
-        return deletionLifecycleListener.started(ability, entity, context, mode);
+        return context.lifecycleSession().started(ability, entity, context, mode);
     }
 
     static <T extends EntityContract> void deletionSucceeded(CrudAbility<T> ability,
@@ -46,7 +65,7 @@ final class PlatformAbilityDispatcher {
                                                               DeletionContext context,
                                                               DeletionNode node,
                                                               DeletionMode mode) {
-        deletionLifecycleListener.succeeded(ability, entity, context, node, mode);
+        context.lifecycleSession().succeeded(ability, entity, context, node, mode);
     }
 
     static <T extends EntityContract> void deletionFailed(CrudAbility<T> ability,
@@ -55,7 +74,7 @@ final class PlatformAbilityDispatcher {
                                                            DeletionNode node,
                                                            DeletionMode mode,
                                                            RuntimeException failure) {
-        deletionLifecycleListener.failed(ability, entity, context, node, mode, failure);
+        context.lifecycleSession().failed(ability, entity, context, node, mode, failure);
     }
 
     static <T extends EntityContract> void beforeSave(CrudAbility<T> ability, T entity) {

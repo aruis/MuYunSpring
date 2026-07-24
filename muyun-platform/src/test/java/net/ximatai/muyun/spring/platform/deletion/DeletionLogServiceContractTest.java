@@ -57,6 +57,30 @@ class DeletionLogServiceContractTest {
                 .hasMessageContaining("parentEntryId does not exist");
     }
 
+    @Test
+    void shouldRejectParentEntryFromAnotherOperation() {
+        String firstOperationId = service.startOperation(deleteOperation());
+        String parentEntryId = service.startEntry(entry(firstOperationId, null, DeletionEntryTrigger.DIRECT, "tenant-1"));
+        String secondOperationId = service.startOperation(deleteOperation());
+
+        assertThatThrownBy(() -> service.startEntry(entry(secondOperationId, parentEntryId,
+                DeletionEntryTrigger.CASCADE, "app-1")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("belongs to another operation");
+    }
+
+    @Test
+    void shouldReadOnlyEntriesBelongingToOneOperation() {
+        String firstOperationId = service.startOperation(deleteOperation());
+        String secondOperationId = service.startOperation(deleteOperation());
+        String firstEntryId = service.startEntry(entry(firstOperationId, null, DeletionEntryTrigger.DIRECT, "tenant-1"));
+        service.startEntry(entry(secondOperationId, null, DeletionEntryTrigger.DIRECT, "tenant-2"));
+
+        assertThat(service.operationEntries(firstOperationId))
+                .extracting(DeletionEntry::getId)
+                .containsExactly(firstEntryId);
+    }
+
     private DeletionOperation deleteOperation() {
         DeletionOperation operation = new DeletionOperation();
         operation.setTenantId("tenant-1");
