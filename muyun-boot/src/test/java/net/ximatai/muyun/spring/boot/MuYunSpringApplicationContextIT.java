@@ -12,11 +12,15 @@ import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.tenant.Tenant;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.iam.user.UserSession;
 import net.ximatai.muyun.spring.iam.user.UserSessionDao;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +85,12 @@ class MuYunSpringApplicationContextIT {
     @Autowired
     private EmployeeService employeeService;
 
+    @Autowired
+    private TenantService tenantService;
+
+    @Autowired
+    private TenantApplicationService tenantApplicationService;
+
     private TestRestTemplate restTemplate;
 
     @LocalServerPort
@@ -103,6 +113,22 @@ class MuYunSpringApplicationContextIT {
 
     @Test
     void shouldLoadApplicationContextWithRealDatabase() {
+    }
+
+    @Test
+    void shouldDeleteTenantWithItsRequiredIamApplicationThroughParentCascade() {
+        String tenantId = "tenant_delete_cascade_it";
+        try (TenantContext.Scope ignored = TenantContext.system("integration test tenant deletion")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias(tenantId);
+            tenant.setTitle("Tenant delete cascade integration test");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+
+            assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isTrue();
+            assertThat(tenantService.delete(tenantId, tenant.getVersion())).isEqualTo(1);
+            assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isFalse();
+        }
     }
 
     @Test

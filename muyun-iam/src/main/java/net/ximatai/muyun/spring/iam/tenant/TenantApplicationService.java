@@ -28,6 +28,7 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
     public static final String IAM_APPLICATION_ALIAS = "iam";
 
     private final TenantApplicationCatalog applicationCatalog;
+    private final ThreadLocal<Boolean> parentCascadeDelete = new ThreadLocal<>();
 
     public TenantApplicationService(TenantApplicationDao dao) {
         this(dao, null);
@@ -152,8 +153,30 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
     @Override
     public void beforeDelete(String id) {
         TenantApplication existing = select(id);
-        if (existing != null && IAM_APPLICATION_ALIAS.equals(existing.getApplicationAlias())) {
+        if (existing != null && IAM_APPLICATION_ALIAS.equals(existing.getApplicationAlias())
+                && !Boolean.TRUE.equals(parentCascadeDelete.get())) {
             throw new IllegalArgumentException("iam application must remain opened for a tenant");
+        }
+    }
+
+    /**
+     * Removes tenant application records as part of deleting their tenant. The
+     * mandatory IAM entitlement protects a living tenant, not an already
+     * deleted parent, so the ordinary child-delete guard is intentionally
+     * bypassed only for this scoped cascade.
+     */
+    @Override
+    public int deleteBatchFromParentCascade(Collection<String> ids) {
+        Boolean previous = parentCascadeDelete.get();
+        parentCascadeDelete.set(Boolean.TRUE);
+        try {
+            return CascadeDeleteChildAbility.super.deleteBatchFromParentCascade(ids);
+        } finally {
+            if (previous == null) {
+                parentCascadeDelete.remove();
+            } else {
+                parentCascadeDelete.set(previous);
+            }
         }
     }
 
