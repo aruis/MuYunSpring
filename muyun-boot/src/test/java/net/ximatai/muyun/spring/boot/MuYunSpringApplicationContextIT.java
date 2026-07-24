@@ -167,8 +167,9 @@ class MuYunSpringApplicationContextIT {
 
         ResponseEntity<JsonNode> menus = restTemplate.exchange(
                 "/platform.menu/mine", HttpMethod.GET, bearerRequest, JsonNode.class);
-        assertThat(menus.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(menus.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(menus.getBody()).isNotNull();
+        assertThat(menus.getBody().path("code").asText()).isEqualTo("PASSWORD_CHANGE_REQUIRED");
         assertThat(menus.getBody().path("message").asText()).isEqualTo("password change required");
 
         ResponseEntity<Void> logout = restTemplate.exchange(
