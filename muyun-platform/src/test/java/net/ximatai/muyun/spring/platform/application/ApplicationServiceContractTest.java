@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -80,6 +81,41 @@ class ApplicationServiceContractTest {
         assertThat(service.sortedList(Criteria.of()))
                 .extracting(Application::getAlias)
                 .containsExactly("sales", "crm");
+    }
+
+    @Test
+    void shouldOnlyExposeEnabledNonSystemApplicationsToTenantEntitlements() {
+        ApplicationService service = new ApplicationService(new ApplicationMemoryDao());
+        service.insert(application("crm"));
+        Application platform = application(ApplicationService.PLATFORM_APPLICATION_ALIAS);
+        service.insert(platform);
+
+        service.requireEnabledForTenant("crm");
+        assertThat(service.isEnabledForTenant("crm")).isTrue();
+        assertThatThrownBy(() -> service.requireEnabledForTenant("missing"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not active");
+        assertThatThrownBy(() -> service.requireEnabledForTenant(ApplicationService.PLATFORM_APPLICATION_ALIAS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be opened");
+
+        Application crm = service.select("crm");
+        crm.setEnabled(false);
+        service.update(crm);
+        assertThat(service.isEnabledForTenant("crm")).isFalse();
+        assertThatThrownBy(() -> service.requireEnabledForTenant("crm"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not active");
+    }
+
+    @Test
+    void shouldReadApplicationCatalogFromGlobalScopeInsideTenantContext() {
+        ApplicationService service = new ApplicationService(new ApplicationMemoryDao());
+        service.insert(application("crm"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.isEnabledForTenant("crm")).isTrue();
+        }
     }
 
     @Test

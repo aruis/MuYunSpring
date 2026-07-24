@@ -13,6 +13,7 @@ test('static business route registry exposes route prefixes for navigation resol
   assert.deepEqual(businessRoutePrefixes, [
     '/config/applications',
     '/config/dictionaries',
+    '/config/modules',
     '/config/menus',
     '/platform/security/passwords',
     '/iam/tenants',
@@ -28,6 +29,7 @@ test('static business route registry exposes route prefixes for navigation resol
   assert.deepEqual(businessModuleRoutes, {
     'platform.application': '/config/applications',
     'platform.dictionary_category': '/config/dictionaries',
+    'platform.module': '/config/modules',
     'platform.menu_scheme': '/config/menus',
     'iam.password_policy_rule': '/platform/security/passwords',
     'iam.tenant': '/iam/tenants',

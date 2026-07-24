@@ -1,12 +1,14 @@
 package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,8 +16,10 @@ class RoleMenuVisibilityPolicyServiceTest {
     @Test
     void shouldUseMenuActionPermissionForModuleMenuVisibility() {
         RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
         when(roleService.hasActionPermission("user-1", "crm.customer", "menu")).thenReturn(true);
-        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService);
+        when(tenantApplicationService.isApplicationAvailable("tenant-a", "crm")).thenReturn(true);
+        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService, tenantApplicationService);
 
         assertThat(service.canViewModuleMenu(
                 "crm.customer",
@@ -29,8 +33,10 @@ class RoleMenuVisibilityPolicyServiceTest {
     @Test
     void shouldNotTreatViewPermissionAsMenuVisibilityPermission() {
         RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
         when(roleService.hasActionPermission("user-1", "crm.customer", "view")).thenReturn(true);
-        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService);
+        when(tenantApplicationService.isApplicationAvailable("tenant-a", "crm")).thenReturn(true);
+        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService, tenantApplicationService);
 
         assertThat(service.canViewModuleMenu(
                 "crm.customer",
@@ -45,5 +51,18 @@ class RoleMenuVisibilityPolicyServiceTest {
                 "crm.customer",
                 Optional.of(CurrentUser.systemUser("system", "System")))).isTrue();
         assertThat(service.canViewModuleMenu("crm.customer", Optional.empty())).isFalse();
+    }
+
+    @Test
+    void shouldHideTenantMenuWhenItsApplicationIsNotEnabled() {
+        RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        when(tenantApplicationService.isApplicationAvailable("tenant-a", "crm")).thenReturn(false);
+        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService, tenantApplicationService);
+
+        assertThat(service.canViewModuleMenu(
+                "crm.customer",
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a")))).isFalse();
+        verify(roleService, never()).hasActionPermission("user-1", "crm.customer", "menu");
     }
 }

@@ -5,11 +5,13 @@ import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
 import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.DefaultTenantMenuProvisioner;
+import net.ximatai.muyun.spring.boot.platform.DefaultTenantApplicationProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DefaultOrganizationRoleProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DefaultTenantRoleProvisioner;
 import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
+import net.ximatai.muyun.spring.boot.platform.TenantApplicationReconciliationTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -25,6 +27,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
@@ -156,11 +159,28 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean({TenantService.class, TenantApplicationService.class})
+    @ConditionalOnMissingBean(TenantApplicationReconciliationTask.class)
+    public TenantApplicationReconciliationTask tenantApplicationReconciliationTask(
+            TenantService tenantService,
+            TenantApplicationService tenantApplicationService) {
+        return new TenantApplicationReconciliationTask(tenantService, tenantApplicationService);
+    }
+
+    @Bean
     @ConditionalOnBean({MenuSchemeService.class, MenuService.class})
     @ConditionalOnMissingBean(DefaultTenantMenuProvisioner.class)
     public DefaultTenantMenuProvisioner defaultTenantMenuProvisioner(MenuSchemeService menuSchemeService,
                                                                     MenuService menuService) {
         return new DefaultTenantMenuProvisioner(menuSchemeService, menuService);
+    }
+
+    @Bean
+    @ConditionalOnBean(TenantApplicationService.class)
+    @ConditionalOnMissingBean(DefaultTenantApplicationProvisioner.class)
+    public DefaultTenantApplicationProvisioner defaultTenantApplicationProvisioner(
+            TenantApplicationService tenantApplicationService) {
+        return new DefaultTenantApplicationProvisioner(tenantApplicationService);
     }
 
     @Bean

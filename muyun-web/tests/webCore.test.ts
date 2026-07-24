@@ -112,6 +112,59 @@ test('http client sends platform trace header', async () => {
   }
 });
 
+test('http client delegates expired authentication to the application boundary', async () => {
+  const originalFetch = globalThis.fetch;
+  const recovered: AppError[] = [];
+  globalThis.fetch = async () =>
+    Response.json(
+      { code: 'AUTH_REQUIRED', status: 401, message: 'current user context is not available' },
+      { status: 401 },
+    );
+
+  try {
+    const http = createHttpClient({
+      baseUrl: 'http://api.local',
+      onAuthenticationRequired: (error) => {
+        recovered.push(error);
+        return true;
+      },
+    });
+
+    await assert.rejects(() => http.request({ path: '/iam.auth/context' }));
+
+    assert.equal(recovered.length, 1);
+    assert.equal(recovered[0].code, platformErrorCodes.authRequired);
+    assert.equal(recovered[0].globallyHandled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('http client does not recover a failed login as an expired session', async () => {
+  const originalFetch = globalThis.fetch;
+  let recoveries = 0;
+  globalThis.fetch = async () =>
+    Response.json(
+      { code: 'LOGIN_BAD_CREDENTIALS', status: 401, message: 'invalid username or password' },
+      { status: 401 },
+    );
+
+  try {
+    const http = createHttpClient({
+      baseUrl: 'http://api.local',
+      onAuthenticationRequired: () => {
+        recoveries += 1;
+      },
+    });
+
+    await assert.rejects(() => http.request({ path: '/iam.auth/login', method: 'POST' }));
+
+    assert.equal(recoveries, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('http client prefers backend action message on error responses', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>

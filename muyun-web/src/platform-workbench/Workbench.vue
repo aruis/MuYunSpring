@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { UiDropdown, UiError, UiIcon, UiSpin, UiTabs } from '@muyun/vue-ui-antdv';
+import { UiDropdown, UiError, UiIcon, UiSidePanelHost, UiSpin, UiTabs } from '@muyun/vue-ui-antdv';
 import type {
   MenuNavigationTarget,
   MenuRecord,
@@ -41,17 +41,13 @@ const emit = defineEmits<{
   userCommand: [key: string];
 }>();
 
-const tabs = computed<UiTabItem[]>(() => (props.startup?.tabs ?? []).map(toTabItem));
+const openedTabs = computed(() => props.startup?.tabs ?? []);
+const tabs = computed<UiTabItem[]>(() => openedTabs.value.map(toTabItem));
 const activeTabKey = computed(
   () => props.activeTabKey ?? props.startup?.activeTabKey ?? tabs.value[0]?.key ?? '',
 );
-const activeTab = computed(() => (props.startup?.tabs ?? []).find((tab) => tab.key === activeTabKey.value));
-const activePageDescriptor = computed(() => {
-  const tab = activeTab.value;
-  return (
-    tab?.pageDescriptor ?? (tab?.target ? resolvePageDescriptor(tab.target, { title: tab.title }) : undefined)
-  );
-});
+const activeTab = computed(() => openedTabs.value.find((tab) => tab.key === activeTabKey.value));
+const activePageDescriptor = computed(() => pageDescriptorOf(activeTab.value));
 const currentUser = computed(() => props.startup?.session.currentUser);
 const userDisplayName = computed(() => currentUser.value?.username ?? currentUser.value?.userId ?? '未登录');
 const userInitial = computed(() => userDisplayName.value.trim().slice(0, 1).toUpperCase() || 'M');
@@ -64,6 +60,19 @@ const userMenuItems: UiDropdownItem[] = [
   { key: 'settings', title: '偏好设置' },
   { key: 'logout', title: '退出登录', danger: true },
 ];
+
+function pageDescriptorOf(tab: MenuTab | undefined): PageDescriptor | undefined {
+  if (!tab) {
+    return undefined;
+  }
+  return (
+    tab?.pageDescriptor ?? (tab?.target ? resolvePageDescriptor(tab.target, { title: tab.title }) : undefined)
+  );
+}
+
+function shouldKeepTabMounted(tab: MenuTab) {
+  return tab.key === activeTabKey.value || pageDescriptorOf(tab)?.tabPolicy.cacheable !== false;
+}
 
 function toTabItem(tab: MenuTab): UiTabItem {
   return {
@@ -179,12 +188,19 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
       <section class="app-content">
         <UiSpin v-if="loading" />
         <UiError v-else-if="error" :message="error" />
-        <slot
-          v-else
-          :active-tab="activeTab"
-          :target="activeTab?.target"
-          :page-descriptor="activePageDescriptor"
-        />
+        <template v-else>
+          <template v-for="tab in openedTabs" :key="tab.key">
+            <UiSidePanelHost
+              v-if="shouldKeepTabMounted(tab)"
+              v-show="tab.key === activeTabKey"
+              class="tab-panel-host"
+            >
+              <div class="tab-page">
+                <slot :active-tab="tab" :target="tab.target" :page-descriptor="pageDescriptorOf(tab)" />
+              </div>
+            </UiSidePanelHost>
+          </template>
+        </template>
       </section>
     </section>
   </main>
@@ -400,7 +416,21 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
 }
 
 .app-content {
+  position: relative;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.tab-panel-host {
+  height: 100%;
+  min-height: 0;
+}
+
+.tab-page {
+  box-sizing: border-box;
+  height: 100%;
   min-height: 0;
   padding: 14px;
   overflow: auto;
@@ -425,6 +455,12 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
   }
 
   .app-content {
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .tab-page {
+    height: auto;
     overflow: visible;
     overscroll-behavior: auto;
   }

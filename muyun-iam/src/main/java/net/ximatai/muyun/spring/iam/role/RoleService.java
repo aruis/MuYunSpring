@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeCatalogR
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
@@ -38,6 +39,7 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -79,6 +81,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private final EmployeeAccountService employeeAccountService;
     private final OrganizationService organizationService;
     private ReferenceDependencyScopeCatalogResolver referenceDependencyScopeCatalogResolver;
+    private TenantApplicationService tenantApplicationService;
 
     public RoleService(RoleDao roleDao,
                        AccountRoleGrantDao accountRoleGrantDao,
@@ -169,6 +172,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     void setReferenceDependencyScopeCatalogResolver(
             ReferenceDependencyScopeCatalogResolver referenceDependencyScopeCatalogResolver) {
         this.referenceDependencyScopeCatalogResolver = referenceDependencyScopeCatalogResolver;
+    }
+
+    @Autowired(required = false)
+    void setTenantApplicationService(TenantApplicationService tenantApplicationService) {
+        this.tenantApplicationService = tenantApplicationService;
     }
 
     @Override
@@ -457,6 +465,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         requireSystemManagedMutationAllowed(role, "grant action");
 
         String validModuleAlias = requireModuleAlias(moduleAlias);
+        requireTenantApplicationOpenedForRole(role, validModuleAlias);
         String requestedActionCode = requireActionCode(actionCode);
         String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, requestedActionCode);
         DataScopePolicy requestedDataScopePolicy = defaultDataScopePolicy(role, validModuleAlias,
@@ -533,6 +542,54 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             changed += revokeAction(roleId, command.moduleAlias(), command.actionCode());
         }
         return changed;
+    }
+
+    /**
+     * Applies one complete permission-matrix draft in a single transaction.
+     *
+     * <p>The web layer submits every visible action of the edited modules. Keeping
+     * grant and revoke decisions in one service operation prevents a partially
+     * applied matrix when one action fails validation.</p>
+     */
+    @Transactional
+    public int replacePermissionActions(String roleId, List<PermissionActionCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        Map<String, PermissionActionCommand> commandsByAction = new LinkedHashMap<>();
+        for (PermissionActionCommand command : commands.stream().filter(Objects::nonNull).toList()) {
+            String key = actionKey(command.moduleAlias(), command.actionCode());
+            if (commandsByAction.putIfAbsent(key, command) != null) {
+                throw new IllegalArgumentException("duplicate permission action: " + key);
+            }
+        }
+        int changed = 0;
+        for (PermissionActionCommand command : commandsByAction.values()) {
+            if (command.granted()) {
+                changed += grantAction(
+                        roleId,
+                        command.moduleAlias(),
+                        command.actionCode(),
+                        command.dataScopePolicy(),
+                        command.tenantScopePolicy(),
+                        command.scopeCondition(),
+                        command.referenceFieldId(),
+                        command.referenceActionCode()
+                );
+                continue;
+            }
+            changed += revokeAction(roleId, command.moduleAlias(), command.actionCode());
+        }
+        return changed;
+    }
+
+    private void requireTenantApplicationOpenedForRole(Role role, String moduleAlias) {
+        if (tenantApplicationService == null || role.getOwnerScopeType() == RoleOwnerScopeType.PLATFORM) {
+            return;
+        }
+        tenantApplicationService.requireApplicationOpened(
+                Preconditions.requireText(role.getTenantId(), "role.tenantId"),
+                PlatformNameRules.applicationAliasOfModuleAlias(moduleAlias));
     }
 
     public boolean hasActionPermission(String userId, String moduleAlias, String actionCode) {
@@ -1789,6 +1846,16 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                      String scopeCondition,
                                      String referenceFieldId,
                                      String referenceActionCode) {
+    }
+
+    public record PermissionActionCommand(String moduleAlias,
+                                          String actionCode,
+                                          boolean granted,
+                                          DataScopePolicy dataScopePolicy,
+                                          TenantScopePolicy tenantScopePolicy,
+                                          String scopeCondition,
+                                          String referenceFieldId,
+                                          String referenceActionCode) {
     }
 
     public record ActionRevokeCommand(String moduleAlias, String actionCode) {

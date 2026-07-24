@@ -86,11 +86,11 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
     }
 
     private void rejectPasswordChangeRequired(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
         response.getWriter().write("""
-                {"code":"AUTH_REQUIRED","status":401,"message":"password change required"}
+                {"code":"PASSWORD_CHANGE_REQUIRED","status":403,"message":"password change required"}
                 """);
     }
 }

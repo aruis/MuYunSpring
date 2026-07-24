@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Workbench, WorkbenchOutlet, type WorkbenchRealtimeStatus } from '@muyun/platform-workbench';
+import {
+  Workbench,
+  WorkbenchOutlet,
+  pageDescriptorToUrl,
+  type WorkbenchRealtimeStatus,
+} from '@muyun/platform-workbench';
 import { presentPlatformError, providePlatformTimeZoneContext } from '@muyun/platform-components';
 import {
   configureModuleContext,
   createAuthClient,
   provideModuleContextConfig,
+  type AppError,
   type RealtimeConnectionState,
 } from '@muyun/web-core';
 import type {
@@ -19,10 +25,13 @@ import {
   clearAuthToken,
   effectiveAuthToken,
   isAuthenticationRequiredError,
+  isPasswordChangeRequiredError,
   saveAuthSessionId,
   saveAuthToken,
   storedAuthSessionId,
 } from './app/authSession';
+import { configureAuthenticationRecovery } from './app/sessionRecovery';
+import { platformMessage } from './app/platformMessage';
 import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
@@ -67,9 +76,21 @@ configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
 provideCurrentUserContext(currentUser);
 providePlatformTimeZoneContext(currentTimeZone);
-provideWorkbenchNavigation({ openPage: handleOpenPage });
+provideWorkbenchNavigation({ openPage: handleOpenPage, replacePage: handleReplacePage });
 
 const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
+
+configureAuthenticationRecovery((error, token) => {
+  if (!isCurrentAuthToken(token)) {
+    return false;
+  }
+  scheduleLocalLogout({
+    code: error.code,
+    message: platformMessage(error.code, error.message),
+    logoutRequired: true,
+  });
+  return true;
+});
 
 onMounted(async () => {
   if (!usesMockStartup() && !effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN)) {
@@ -100,12 +121,18 @@ async function loadWorkbench() {
     reconnectRealtime();
     syncBrowserUrl(state);
   } catch (cause) {
+    if (isPasswordChangeRequiredError(cause)) {
+      openChangeOwnPasswordDialog();
+      return;
+    }
     if (requiresLogin(cause)) {
-      clearAuthToken();
-      startup.value = undefined;
-      activeTabKey.value = undefined;
-      loginRequired.value = true;
-      disconnectRealtime();
+      const error = cause as AppError;
+      scheduleLocalLogout({
+        code: error.code,
+        message: platformMessage(error.code, error.message),
+        logoutRequired: true,
+      });
+      return;
     }
     error.value = cause instanceof Error ? cause.message : 'Workbench startup failed';
   } finally {
@@ -117,6 +144,11 @@ async function handleAuthenticated(result: LoginResult) {
   saveAuthToken(result.token);
   saveAuthSessionId(result.sessionId);
   loginRequired.value = false;
+  if (result.passwordChangeRequired) {
+    loading.value = false;
+    openChangeOwnPasswordDialog();
+    return;
+  }
   loginLoading.value = true;
   try {
     await loadWorkbench();
@@ -236,8 +268,9 @@ async function handleLogout() {
 function reconnectRealtime() {
   disconnectRealtime();
   if (!usesMockStartup()) {
+    const token = effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN);
     realtimeConnection = connectAppRealtime({
-      onUnauthorized: handleRealtimeUnauthorized,
+      onUnauthorized: () => handleRealtimeUnauthorized(token),
       onUserNotification: handleSecurityNotification,
       onStateChange: (state) => {
         realtimeStatus.value = workbenchRealtimeStatusOf(state);
@@ -266,8 +299,15 @@ function workbenchRealtimeStatusOf(state: RealtimeConnectionState): WorkbenchRea
   return 'disconnected';
 }
 
-function handleRealtimeUnauthorized() {
-  forceLocalLogout();
+function handleRealtimeUnauthorized(token?: string) {
+  if (!isCurrentAuthToken(token)) {
+    return;
+  }
+  scheduleLocalLogout({
+    code: 'AUTH_REQUIRED',
+    message: platformMessage('AUTH_REQUIRED', '登录状态已失效，请重新登录'),
+    logoutRequired: true,
+  });
 }
 
 function handleSecurityNotification(notification: WebUserNotification) {
@@ -277,8 +317,20 @@ function handleSecurityNotification(notification: WebUserNotification) {
   if (!notification.logoutRequired) {
     return;
   }
+  scheduleLocalLogout(notification);
+}
+
+function scheduleLocalLogout(notification: WebUserNotification) {
+  if (securityNotification.value || (loginRequired.value && !startup.value)) {
+    return;
+  }
   securityNotification.value = notification;
+  disconnectRealtime();
   startSecurityLogoutCountdown(5);
+}
+
+function isCurrentAuthToken(token?: string) {
+  return !!token && token === effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN);
 }
 
 function startSecurityLogoutCountdown(seconds: number) {
@@ -302,6 +354,9 @@ function clearSecurityLogoutTimer() {
 }
 
 function forceLocalLogout() {
+  if (loginRequired.value && !startup.value) {
+    return;
+  }
   clearSecurityLogoutTimer();
   clearAuthToken();
   startup.value = undefined;
@@ -341,11 +396,31 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
 function handleOpenPage(descriptor: import('@muyun/web-contracts').PageDescriptor) {
   const current = startup.value;
   if (!current) {
-    return;
+    return { created: false };
   }
   const result = openDirectTab(current.tabs ?? [], descriptor);
   startup.value = { ...current, tabs: result.tabs, activeTabKey: result.activeTabKey };
   activeTabKey.value = result.activeTabKey;
+  syncBrowserUrl(startup.value);
+  return { created: result.created };
+}
+
+function handleReplacePage(pageKey: string, descriptor: import('@muyun/web-contracts').PageDescriptor) {
+  const current = startup.value;
+  if (!current || !(current.tabs ?? []).some((tab) => tab.key === pageKey)) {
+    return;
+  }
+  const tabs = (current.tabs ?? []).map((tab) =>
+    tab.key === pageKey
+      ? {
+          ...tab,
+          title: descriptor.title ?? tab.title,
+          pageDescriptor: descriptor,
+          restoreState: { url: pageDescriptorToUrl(descriptor) },
+        }
+      : tab,
+  );
+  startup.value = { ...current, tabs };
   syncBrowserUrl(startup.value);
 }
 

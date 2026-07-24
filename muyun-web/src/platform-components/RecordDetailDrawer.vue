@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { UiActionButton, UiSidePanel } from '@muyun/vue-ui-antdv';
-import RecordDetailPanel from './RecordDetailPanel.vue';
+import { UiActionButton, UiSidePanel, type UiSidePanelScope } from '@muyun/vue-ui-antdv';
+import RecordDetailLayout from './RecordDetailLayout.vue';
+import type { DrawerPromotion } from './drawerPromotion';
 
 defineOptions({ name: 'RecordDetailDrawer' });
 
@@ -8,19 +9,27 @@ withDefaults(
   defineProps<{
     open: boolean;
     title: string;
+    subtitle?: string;
+    width?: number | string;
+    scope?: UiSidePanelScope;
     closeOnOutside?: boolean;
     closeTitle?: string;
+    promotion?: DrawerPromotion;
   }>(),
   {
+    subtitle: undefined,
+    width: 520,
+    scope: 'tab',
     closeOnOutside: false,
     closeTitle: '关闭',
+    promotion: undefined,
   },
 );
 
 defineSlots<{
   status(): unknown;
-  actions(): unknown;
   default(): unknown;
+  operation(): unknown;
 }>();
 
 const emit = defineEmits<{
@@ -29,23 +38,33 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <UiSidePanel :open="open" :close-on-outside="closeOnOutside" @close="emit('close')">
-    <RecordDetailPanel class="record-detail-drawer-panel" :title="title" scrollable-content>
+  <UiSidePanel
+    :open="open"
+    :width="width"
+    :scope="scope"
+    :close-on-outside="closeOnOutside"
+    @close="emit('close')"
+  >
+    <RecordDetailLayout surface="drawer" :title="title" :subtitle="subtitle" scrollable-content>
       <template #status>
         <slot name="status" />
       </template>
+      <template #title-actions>
+        <UiActionButton
+          v-if="promotion"
+          emphasis="quiet"
+          icon-name="export"
+          :title="promotion.title ?? '固定为页签'"
+          @click="promotion.promote()"
+        />
+      </template>
       <template #actions>
-        <slot name="actions" />
         <UiActionButton emphasis="quiet" icon-name="close" :title="closeTitle" @click="emit('close')" />
       </template>
       <slot />
-    </RecordDetailPanel>
+      <template v-if="$slots.operation" #operation>
+        <slot name="operation" />
+      </template>
+    </RecordDetailLayout>
   </UiSidePanel>
 </template>
-
-<style scoped>
-.record-detail-drawer-panel {
-  height: 100%;
-  border-radius: 8px;
-}
-</style>

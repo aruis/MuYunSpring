@@ -107,15 +107,15 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
-    v-model:sidebar-search-keyword="explorerSearchKeyword"
-    sidebar-title="机构树"
+    v-model:explorer-search-keyword="explorerSearchKeyword"
+    explorer-title="机构树"
     refresh-title="刷新机构树"
-    sidebar-search-placeholder="搜索机构名称、编码或 ID"
+    explorer-search-placeholder="搜索机构名称、编码或 ID"
     :mode="mode"
-    :card-title="cardTitle"
+    :detail-title="cardTitle"
     @refresh="reloadKey += 1"
   >
-    <template #sidebar-actions>
+    <template #explorer-actions>
       <ModuleActionButton
         class="record-panel-create-button"
         :context="organizationContext"
@@ -143,10 +143,10 @@ function handleCardAction(action: RecordActionItem) {
       />
     </template>
 
-    <template #card-actions>
+    <template #detail-actions>
       <RecordActionBar :context="organizationContext" :actions="cardActions" @action="handleCardAction" />
     </template>
-    <template #card-status>
+    <template #detail-status>
       <RecordStatusSwitch
         v-if="mode !== 'view'"
         :enabled="draft.enabled"

@@ -5,12 +5,17 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.SystemManagedAbility;
+import net.ximatai.muyun.spring.ability.child.ChildRelation;
+import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class TenantService extends AbstractAbilityService<Tenant> implements
@@ -18,20 +23,32 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         GlobalScopedAbility<Tenant>,
         EnableAbility<Tenant>,
         SortAbility<Tenant>,
+        ChildrenAbility<Tenant>,
         ActiveTenantVerifier {
 
     public static final String MODULE_ALIAS = "iam.tenant";
     private final ObjectProvider<TenantCreationProvisioner> creationProvisioners;
+    private final TenantApplicationService tenantApplicationService;
 
     public TenantService(TenantDao tenantDao) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
         this.creationProvisioners = null;
+        this.tenantApplicationService = null;
     }
 
-    @Autowired
     public TenantService(TenantDao tenantDao, ObjectProvider<TenantCreationProvisioner> creationProvisioners) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
         this.creationProvisioners = creationProvisioners;
+        this.tenantApplicationService = null;
+    }
+
+    @Autowired
+    public TenantService(TenantDao tenantDao,
+                         ObjectProvider<TenantCreationProvisioner> creationProvisioners,
+                         TenantApplicationService tenantApplicationService) {
+        super(MODULE_ALIAS, Tenant.class, tenantDao);
+        this.creationProvisioners = creationProvisioners;
+        this.tenantApplicationService = tenantApplicationService;
     }
 
     @Override
@@ -70,6 +87,15 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     @Override
     public void verifyActiveTenant(String tenantId) {
         requireActiveTenant(tenantId);
+    }
+
+    @Override
+    public List<ChildRelation<? extends EntityContract, Tenant>> childRelations() {
+        if (tenantApplicationService == null) {
+            return List.of();
+        }
+        return List.of(tenantApplicationService.<Tenant>toChildRelation(TenantApplication::setTenantId,
+                "tenantId", tenant -> null).autoDeleteWithParent());
     }
 
     private String requireTenantAlias(String alias) {

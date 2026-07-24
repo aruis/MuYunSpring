@@ -5,10 +5,12 @@ import {
   clearAuthToken,
   effectiveAuthToken,
   isAuthenticationRequiredError,
+  isPasswordChangeRequiredError,
   saveAuthSessionId,
   saveAuthToken,
   storedAuthSessionId,
 } from '../src/app/authSession.ts';
+import { platformMessage } from '../src/app/platformMessage.ts';
 
 test('effectiveAuthToken falls back to env token outside browser storage', () => {
   assert.equal(effectiveAuthToken(' env-token '), 'env-token');
@@ -16,6 +18,21 @@ test('effectiveAuthToken falls back to env token outside browser storage', () =>
 
 test('effectiveAuthToken ignores blank env token', () => {
   assert.equal(effectiveAuthToken('   '), undefined);
+});
+
+test('authentication recovery message resolves stable codes through the zh-CN dictionary', () => {
+  assert.equal(
+    platformMessage(platformErrorCodes.authRequired, 'current user context is not available'),
+    '登录状态已失效，请重新登录',
+  );
+  assert.equal(
+    platformMessage(platformErrorCodes.authExpired, 'Session expired'),
+    '登录会话已过期，请重新登录',
+  );
+  assert.equal(
+    platformMessage(platformErrorCodes.authRequired, 'Session expired', 'en-US'),
+    'Session expired',
+  );
 });
 
 test('auth session storage keeps token and session id together', () => {
@@ -60,6 +77,15 @@ test('isAuthenticationRequiredError uses backend auth-required code for login re
   );
   assert.equal(
     isAuthenticationRequiredError(
+      new AppError('password change required', {
+        code: platformErrorCodes.passwordChangeRequired,
+        status: 403,
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    isAuthenticationRequiredError(
       new AppError('token expired', { code: platformErrorCodes.authExpired, status: 401 }),
     ),
     true,
@@ -78,4 +104,22 @@ test('isAuthenticationRequiredError uses backend auth-required code for login re
   );
   assert.equal(isAuthenticationRequiredError(new AppError('forbidden', { status: 403 })), false);
   assert.equal(isAuthenticationRequiredError(new AppError('menu scheme missing', { status: 409 })), false);
+});
+
+test('isPasswordChangeRequiredError keeps an authenticated session on the change-password path', () => {
+  assert.equal(
+    isPasswordChangeRequiredError(
+      new AppError('password change required', {
+        code: platformErrorCodes.passwordChangeRequired,
+        status: 403,
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isPasswordChangeRequiredError(
+      new AppError('login required', { code: platformErrorCodes.authRequired, status: 401 }),
+    ),
+    false,
+  );
 });

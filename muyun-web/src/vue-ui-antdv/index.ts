@@ -1,6 +1,7 @@
 export { default as ActionBar } from './components/ActionBar.vue';
 export { default as UiActionButton } from './components/UiActionButton.vue';
 export { default as UiButton } from './components/UiButton.vue';
+export { default as UiCheckbox } from './components/UiCheckbox.vue';
 export { default as UiForm } from './components/UiForm.vue';
 export { default as UiInput } from './components/UiInput.vue';
 export { default as UiTextArea } from './components/UiTextArea.vue';
@@ -14,6 +15,7 @@ export { default as UiDataTable } from './components/UiDataTable.vue';
 export { default as UiDropdown } from './components/UiDropdown.vue';
 export { default as UiModal } from './components/UiModal.vue';
 export { default as UiSidePanel } from './components/UiSidePanel.vue';
+export { default as UiSidePanelHost } from './components/UiSidePanelHost.vue';
 export { default as UiRecordExplorerItem } from './components/UiRecordExplorerItem.vue';
 export { default as UiSpin } from './components/UiSpin.vue';
 export { default as UiEmpty } from './components/UiEmpty.vue';
@@ -27,6 +29,7 @@ export { showErrorMessage, showFeedback, showSuccessMessage } from './feedback';
 export type { UiFeedbackOptions, UiFeedbackTone } from './feedback';
 export { resolveFieldComponent } from './registry';
 export type { UiIconName } from './components/UiIcon.vue';
+export type { UiSidePanelScope } from './components/sidePanelHost';
 export type {
   UiConfirmOptions,
   UiDataTableColumn,

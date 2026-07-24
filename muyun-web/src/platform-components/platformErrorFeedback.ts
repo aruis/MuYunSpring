@@ -15,6 +15,9 @@ export interface PlatformErrorFeedbackContext {
 
 export function presentPlatformError(cause: unknown, context: PlatformErrorFeedbackContext = {}) {
   const error = normalizeError(cause);
+  if (error.globallyHandled) {
+    return error;
+  }
   const presentation = resolveGlobalErrorPresentation(error, toErrorUiContext(context));
   presentGlobalErrorPresentation(presentation);
   return error;

@@ -87,7 +87,8 @@ class PlatformModelSchemaTest {
         assertThat(table.getName()).isEqualTo("platform_module");
         assertThat(columnNames(table))
                 .contains("id", "application_alias", "title", "parent_id", "sort_order", "enabled",
-                        "module_kind", "system_managed");
+                        "module_kind", "system_managed")
+                .doesNotContain("tenant_exposure");
         assertThat(table.getPrimaryKey().getLength()).isEqualTo(128);
         assertThat(table.getColumns().stream().filter(column -> "parent_id".equals(column.getName())).findFirst())
                 .get()

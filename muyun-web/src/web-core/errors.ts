@@ -31,6 +31,7 @@ export const platformErrorCodes = {
   httpError: 'HTTP_ERROR',
   authRequired: 'AUTH_REQUIRED',
   authExpired: 'AUTH_EXPIRED',
+  passwordChangeRequired: 'PASSWORD_CHANGE_REQUIRED',
   loginBadCredentials: 'LOGIN_BAD_CREDENTIALS',
   accessDenied: 'ACCESS_DENIED',
   validationFailed: 'VALIDATION_FAILED',
@@ -52,6 +53,7 @@ export class AppError extends Error {
   readonly details?: Record<string, unknown>;
   readonly messageArgs?: Record<string, unknown>;
   readonly actionMessage?: WebActionMessage;
+  globallyHandled = false;
 
   constructor(
     message: string,

@@ -116,8 +116,11 @@ test('record mode drawer owns detail mode branch switching', () => {
   const drawerSource = readSource('src/platform-components/RecordModeDrawer.vue');
   const detailDrawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const detailPanelSource = readSource('src/platform-components/RecordDetailPanel.vue');
+  const detailLayoutSource = readSource('src/platform-components/RecordDetailLayout.vue');
+  const operationBarSource = readSource('src/platform-components/DrawerOperationBar.vue');
   const indexSource = readSource('src/platform-components/index.ts');
   const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
+  const employeeDetailContentSource = readSource('src/views/EmployeeDetailContent.vue');
 
   assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
   assert.match(indexSource, /export \{ default as RecordExternalChangeNotice \}/);
@@ -129,6 +132,7 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(drawerSource, /dismissExternalChange/);
   assert.match(drawerSource, /viewMode: 'view'/);
   assert.match(drawerSource, /formModes: \(\) => \['edit', 'create'\]/);
+  assert.match(employeeDetailContentSource, /RecordExternalChangeNotice/);
   assert.match(drawerSource, /const viewModeActive = computed\(\(\) => props\.mode === props\.viewMode\)/);
   assert.match(
     drawerSource,
@@ -142,11 +146,33 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.doesNotMatch(drawerSource, /<template v-else>\s*<slot name="form"/);
   assert.match(drawerSource, /<slot name="view" \/>/);
   assert.match(drawerSource, /<slot name="form" \/>/);
-  assert.match(detailDrawerSource, /scrollable-content/);
-  assert.match(detailPanelSource, /scrollableContent\?: boolean/);
-  assert.match(detailPanelSource, /record-detail-panel-content/);
-  assert.match(detailPanelSource, /grid-template-rows: auto minmax\(0, 1fr\)/);
-  assert.match(detailPanelSource, /overflow: auto/);
+  assert.match(detailDrawerSource, /<RecordDetailLayout surface="drawer"[\s\S]*scrollable-content/);
+  assert.match(detailDrawerSource, /subtitle\?: string/);
+  assert.doesNotMatch(detailDrawerSource, /RecordDetailPanel/);
+  assert.match(detailDrawerSource, /<slot name="operation" \/>/);
+  assert.doesNotMatch(detailDrawerSource, /<slot name="actions" \/>/);
+  assert.match(detailPanelSource, /<RecordDetailLayout[\s\S]*surface="workspace"/);
+  assert.match(detailPanelSource, /:subtitle="subtitle"/);
+  assert.match(detailLayoutSource, /record-detail-layout-title-copy/);
+  assert.match(detailLayoutSource, /<p v-if="subtitle">/);
+  assert.match(detailLayoutSource, /surface\?: 'workspace' \| 'drawer'/);
+  assert.match(detailLayoutSource, /record-detail-layout--workspace/);
+  assert.match(detailLayoutSource, /record-detail-layout--drawer/);
+  assert.match(
+    detailLayoutSource,
+    /\.record-detail-layout--drawer \.record-detail-layout-header[\s\S]*border-bottom: 1px solid var\(--muyun-border\)/,
+  );
+  assert.match(detailLayoutSource, /grid-template-rows: auto minmax\(0, 1fr\) auto/);
+  assert.match(detailLayoutSource, /record-detail-layout-operation/);
+  assert.match(detailLayoutSource, /<DrawerOperationBar>/);
+  assert.match(operationBarSource, /defineOptions\(\{ name: 'DrawerOperationBar' \}\)/);
+  assert.match(operationBarSource, /\.ant-btn-primary/);
+  assert.match(operationBarSource, /@media \(max-width: 480px\)/);
+  assert.match(detailDrawerSource, /scope\?: UiSidePanelScope/);
+  assert.match(detailDrawerSource, /:scope="scope"/);
+  assert.match(drawerSource, /scope\?: UiSidePanelScope/);
+  assert.match(drawerSource, /:scope="scope"/);
+  assert.match(detailLayoutSource, /overflow: auto/);
   assert.match(pageRealtimeSource, /subscribeAppModuleDataChanges\(options\.moduleAlias\)/);
 
   const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
@@ -162,12 +188,15 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(systemUserSource, /code: platformErrorCodes\.conflictVersion/);
   assert.match(systemUserSource, /userExternalChange\.markExternalRecordChanged\(record\.id\)/);
 
-  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  const employeeSource = [
+    readSource('src/views/EmployeeManagementView.vue'),
+    readSource('src/views/EmployeeDetailContent.vue'),
+  ].join('\n');
   assert.match(employeeSource, /RecordExternalChangeNotice/);
   assert.match(employeeSource, /usePageRecordExternalChange\(\{\s*moduleAlias: 'iam\.employee'/);
-  assert.match(employeeSource, /v-if="employeeExternalChange\.externallyChanged\.value"/);
-  assert.match(employeeSource, /@reload="reloadExternalEmployeeChange"/);
-  assert.match(employeeSource, /@dismiss="employeeExternalChange\.clearExternalChanged"/);
+  assert.match(employeeSource, /v-if="props\.externallyChanged"/);
+  assert.match(employeeSource, /@reload-external="reloadExternalEmployeeChange"/);
+  assert.match(employeeSource, /@dismiss-external="employeeExternalChange\.clearExternalChanged"/);
   assert.match(
     employeeSource,
     /usePageRecordExternalChange\(\{[\s\S]*recordId: \(\) => selectedEmployee\.value\?\.id[\s\S]*editing: \(\) => employeeDetailMode\.value === 'edit'[\s\S]*saving: \(\) => savingEmployee\.value/,
@@ -297,8 +326,14 @@ test('management workspace fixes explorer and detail width contracts without los
   assert.match(staticLayoutSource, /<ManagementWorkspace class="static-management-page">/);
   assert.match(staticLayoutSource, /<ManagementExplorerColumn>/);
   assert.match(positionViewSource, /<ManagementWorkspace[\s\S]*:explorer-count="canBrowseTenants \? 3 : 2"/);
-  const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
-  assert.match(employeeViewSource, /<ManagementWorkspace class="employee-management-page">/);
+  const employeeViewSource = [
+    readSource('src/views/EmployeeManagementView.vue'),
+    readSource('src/views/EmployeeDetailContent.vue'),
+  ].join('\n');
+  assert.match(
+    employeeViewSource,
+    /<ManagementWorkspace[\s\S]*v-if="!isWorkspaceView \|\| isDrawerWorkspaceView"[\s\S]*class="employee-management-page"/,
+  );
   assert.match(employeeViewSource, /<ManagementExplorerColumn>[\s\S]*employee-scope-panel/);
   assert.doesNotMatch(employeeViewSource, /grid-template-columns: minmax\(260px, 320px\)/);
   assert.doesNotMatch(positionViewSource, /management-workspace-explorer/);
@@ -505,11 +540,16 @@ test('three-column management pages use the platform detail panel', () => {
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordDetailPanel' \}\)/);
   assert.match(panelSource, /<slot name="status" \/>/);
   assert.match(panelSource, /<slot name="actions" \/>/);
-  assert.match(layoutSource, /<RecordDetailPanel[\s\S]*:title="cardTitle"/);
-  assert.match(layoutSource, /<slot name="card-status" \/>/);
+  assert.match(layoutSource, /<RecordDetailPanel[\s\S]*:title="detailTitle"/);
+  assert.match(layoutSource, /<slot name="detail-status" \/>/);
+  assert.match(layoutSource, /explorerTitle: string/);
+  assert.match(layoutSource, /detailTitle: string/);
+  assert.doesNotMatch(layoutSource, /sidebarTitle|cardTitle/);
+  assert.match(layoutSource, /<slot name="explorer-actions" \/>/);
+  assert.match(layoutSource, /<slot name="detail-actions" \/>/);
   assert.doesNotMatch(layoutSource, /RecordStatusTag|card-header|title-line/);
   for (const source of [applicationViewSource, tenantViewSource, organizationViewSource]) {
-    assert.match(source, /<template #card-status>/);
+    assert.match(source, /<template #detail-status>/);
     assert.match(source, /<RecordStatusSwitch/);
     assert.doesNotMatch(source, /EnabledSelect|启用状态|toggle-enabled|show-status/);
   }
@@ -592,7 +632,10 @@ test('employee management uses organization scope and platform query list panel'
   const formFieldModelSource = readSource('src/platform-components/recordFormFieldModel.ts');
   const runtimeContextSource = readSource('src/web-core/module/runtimeContext.ts');
   const dropdownSource = readSource('src/vue-ui-antdv/components/UiDropdown.vue');
-  const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
+  const employeeViewSource = [
+    readSource('src/views/EmployeeManagementView.vue'),
+    readSource('src/views/EmployeeDetailContent.vue'),
+  ].join('\n');
   const contractsSource = readSource('src/web-contracts/index.ts');
 
   assert.match(indexSource, /RecordQueryListPanel/);
@@ -759,8 +802,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employmentRowsSource, /handleEmployeeRowExpand/);
   assert.match(employeeViewSource, /<RecordExpandedSubtable[\s\S]*title="任职信息"/);
   const userViewSource = readSource('src/views/UserManagementView.vue');
-  assert.match(userViewSource, /<RecordExpandedSubtable[\s\S]*title="在线会话"/);
-  assert.match(userViewSource, /user-session-table-header/);
+  assert.match(userViewSource, /<UserSessionExpandedSubtable/);
   const expandedSubtableSource = readSource('src/platform-components/RecordExpandedSubtable.vue');
   assert.match(expandedSubtableSource, /defineOptions\(\{ name: 'RecordExpandedSubtable' \}\)/);
   assert.match(expandedSubtableSource, /record-expanded-subtable-header/);
@@ -771,7 +813,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(uiIndexSource, /UiSidePanel/);
   assert.match(drawerSource, /UiSidePanel/);
   assert.match(sidePanelSource, /Drawer as ADrawer/);
-  assert.match(sidePanelSource, /get-container="false"/);
+  assert.match(sidePanelSource, /:get-container="container"/);
+  assert.match(sidePanelSource, /scope: 'tab'/);
   assert.doesNotMatch(drawerSource, /document\.addEventListener/);
   assert.match(indexSource, /RecordDetailFields/);
   assert.match(drawerSource, /closeOnOutside\?: boolean/);
@@ -785,7 +828,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /employeeColumns/);
   assert.doesNotMatch(employeeViewSource, /:columns="employeeColumns"/);
   assert.doesNotMatch(employeeViewSource, /type: 'enabledStatus'/);
-  assert.match(employeeViewSource, /onMounted\(loadEmployeeFormDefinition\)/);
+  assert.match(employeeViewSource, /void loadEmployeeFormDefinition\(\)/);
+  assert.match(employeeViewSource, /useWorkspaceViewPromotion/);
+  assert.match(employeeViewSource, /EmployeeDetailContent/);
   assert.match(employeeViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(
     employeeViewSource,
@@ -793,7 +838,7 @@ test('employee management uses organization scope and platform query list panel'
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
   assert.match(employeeViewSource, /<RecordDetailFields/);
-  assert.match(employeeViewSource, /v-if="employeeDetailMode === 'view'"/);
+  assert.match(employeeViewSource, /v-if="props\.mode === 'view'"/);
   assert.match(employeeViewSource, /<template v-else>/);
   assert.match(employeeViewSource, /<form class="employee-form"/);
   assert.match(employeeViewSource, /:display-of="employeeDetailDisplayValue"/);
@@ -825,7 +870,7 @@ test('employee management uses organization scope and platform query list panel'
     /context: scopedDepartmentContext\.value as unknown as ModuleContext<RecordPickerRecord>/,
   );
   assert.match(employeeViewSource, /:picker-configs="employeeFormPickerConfigs"/);
-  assert.match(employeeViewSource, /@update:field="updateEmployeeDraftField"/);
+  assert.match(employeeViewSource, /@update-field="updateEmployeeDraftField"/);
   assert.match(employeeViewSource, /employeeDetailMode === 'view' && selectedEmployee/);
   assert.doesNotMatch(employeeViewSource, /employeeDetailMode !== 'view'[\s\S]*employeeDraft\.enabled/);
   assert.doesNotMatch(employeeViewSource, /<RecordPicker[\s\S]*v-model:value="employeeDraft\.departmentId"/);
@@ -896,11 +941,11 @@ test('employee management uses organization scope and platform query list panel'
   );
   assert.match(employeeViewSource, /if \(!selectedEmployee\.value \|\| loadingEmployeeDetail\.value\)/);
   assert.match(employeeViewSource, /function retryEmployeeDetail/);
-  assert.match(employeeViewSource, /<UiSpin v-if="loadingEmployeeDetail"/);
-  assert.match(employeeViewSource, /v-else-if="employeeDetailLoadFailed"/);
+  assert.match(employeeViewSource, /<UiSpin v-if="props\.loading"/);
+  assert.match(employeeViewSource, /v-else-if="props\.loadFailed"/);
   assert.match(employeeViewSource, /<UiError title="详情加载失败"/);
-  assert.match(employeeViewSource, /@click="retryEmployeeDetail"/);
-  assert.match(employeeViewSource, /v-else-if="showEmployeeDetailContent"/);
+  assert.match(employeeViewSource, /@click="emit\('retry'\)"/);
+  assert.match(employeeViewSource, /v-else-if="props\.showContent"/);
   assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
   assert.match(employeeViewSource, /executeStaticRecordAction/);
   assert.match(
@@ -1004,7 +1049,12 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /createScopedTreeModuleContext/);
   assert.match(roleViewSource, /treePath: '\/iam\.organization\/tree'/);
   assert.match(roleViewSource, /scopeFieldName: 'tenantId'/);
-  assert.match(roleViewSource, /onMounted\(loadRoleFormDefinition\)/);
+  assert.match(roleViewSource, /onMounted\(\(\) => \{/);
+  assert.match(roleViewSource, /void loadRoleFormDefinition\(\)/);
+  assert.match(roleViewSource, /roleDetailWorkspaceView/);
+  assert.match(roleViewSource, /scopeKind: scope\.kind/);
+  assert.match(roleViewSource, /handOffRoleDetailWorkspaceSession/);
+  assert.match(roleViewSource, /<RecordDetailPanel v-else/);
   assert.match(roleViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(roleViewSource, /roleFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
   assert.match(roleViewSource, /:fields="roleFormFieldDefinitions"/);
@@ -1075,9 +1125,12 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /employment-grants/);
   assert.doesNotMatch(roleViewSource, /permissionMatrix/);
   assert.match(roleViewSource, /key: 'authorize'[\s\S]*actionCode: 'rolePermissions'[\s\S]*title: '授权'/);
-  assert.match(roleViewSource, /route: '\/iam\/role-authorization'/);
-  assert.match(roleViewSource, /params: \{ roleId: id \}[\s\S]*tabPolicy: \{ identity: 'by-params' \}/);
+  assert.match(roleViewSource, /authorizationDrawerOpen\.value = true/);
+  assert.match(roleViewSource, /<RoleAuthorizationView[\s\S]*:role-id="authorizationRole\.id"[\s\S]*drawer/);
+  assert.doesNotMatch(roleViewSource, /createWorkspaceViewDescriptor\([\s\S]*roleAuthorizationWorkspaceView/);
   const roleAuthorizationViewSource = readSource('src/views/RoleAuthorizationView.vue');
+  const roleAuthorizationWorkspaceViewSource = readSource('src/views/roleAuthorizationWorkspaceView.ts');
+  const workspaceDrawerSource = readSource('src/app/WorkspaceViewDrawer.vue');
   assert.match(roleAuthorizationViewSource, /角色组不独立授权/);
   assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);
   assert.match(roleAuthorizationViewSource, /dataScopePolicyCatalog/);
@@ -1089,16 +1142,26 @@ test('role management keeps basic scope management separate from binding and aut
     roleAuthorizationViewSource,
     /record\.dataAuth && isEmploymentRole && Boolean\(record\.granted\)/,
   );
-  assert.match(
-    roleAuthorizationViewSource,
-    /column\.key === 'dataScopePolicy' && record\.dataAuth && isEmploymentRole/,
-  );
+  assert.match(roleAuthorizationViewSource, /isEmploymentDataScopeColumn\(column, record\)/);
   assert.match(roleAuthorizationViewSource, /displayedDataScopePolicy/);
   assert.match(roleAuthorizationViewSource, /referenceDependencyOptions/);
   assert.match(roleAuthorizationViewSource, /handlePlatformActionSuccess\(result/);
   assert.doesNotMatch(roleAuthorizationViewSource, /presentPlatformMessage\('授权已保存'/);
   assert.match(roleAuthorizationViewSource, /authorizationModules/);
   assert.match(roleAuthorizationViewSource, /permissionMatrix/);
+  assert.match(roleAuthorizationViewSource, /WorkspaceViewDrawer/);
+  assert.match(roleAuthorizationViewSource, /handOffRoleAuthorizationWorkspaceSession/);
+  assert.match(roleAuthorizationViewSource, /registerRoleAuthorizationWorkspaceHandoffRecipient/);
+  assert.match(roleAuthorizationViewSource, /onPromoted: dismissPromotedDrawer/);
+  assert.match(roleAuthorizationViewSource, /onPromotionRejected/);
+  assert.match(roleAuthorizationViewSource, /UiCheckbox/);
+  assert.match(roleAuthorizationViewSource, /#header="\{ column \}"/);
+  assert.match(roleAuthorizationViewSource, /updateAllActions/);
+  assert.match(roleAuthorizationViewSource, /replacePermissionMatrix/);
+  assert.match(roleAuthorizationViewSource, /确认/);
+  assert.match(roleAuthorizationViewSource, /props\.drawer === true/);
+  assert.match(roleAuthorizationWorkspaceViewSource, /drawerProfile: 'wide-work'/);
+  assert.match(workspaceDrawerSource, /min\(600px, 100vw\)/);
   assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(contractsSource, /export type RoleAssignmentType = 'account' \| 'employment'/);
   assert.match(contractsSource, /export type RoleOwnerScopeType = 'platform' \| 'tenant' \| 'organization'/);
@@ -1110,7 +1173,9 @@ test('role management keeps basic scope management separate from binding and aut
 
 test('user management keeps account basics separate from employment binding and role authorization', () => {
   const userViewSource = readSource('src/views/UserManagementView.vue');
+  const userDetailContentSource = readSource('src/views/UserDetailContent.vue');
   const userSessionRowsSource = readSource('src/views/useUserSessionRows.ts');
+  const userSessionExpandedSource = readSource('src/platform-components/UserSessionExpandedSubtable.vue');
   const routesSource = readSource('src/app/businessRoutes.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
@@ -1141,8 +1206,9 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /void loadUserFormDefinition\(\)/);
   assert.match(userViewSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor\)/);
   assert.match(userViewSource, /userFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/);
-  assert.match(userViewSource, /<RecordFormFields/);
-  assert.match(userViewSource, /<form v-if="userDetailMode !== 'view'" class="user-form"/);
+  assert.match(userViewSource, /<UserDetailContent/);
+  assert.match(userDetailContentSource, /<RecordFormFields/);
+  assert.match(userDetailContentSource, /<form v-if="mode !== 'view'" class="user-form"/);
   assert.match(userViewSource, /:fields="userFormFieldDefinitions"/);
   assert.match(userViewSource, /:fallback="userFormFieldFallback"/);
   assert.match(userViewSource, /username: \{ label: '账号'/);
@@ -1153,13 +1219,13 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /key: 'resetGeneratedPassword'[\s\S]*actionCode: 'resetPassword'/);
   assert.match(userViewSource, /title: '修改密码'/);
   assert.match(userViewSource, /title: '重置密码'/);
-  assert.match(userViewSource, /在线会话/);
-  assert.match(userViewSource, /终端/);
-  assert.match(userViewSource, /terminalTypeTitle/);
-  assert.match(userViewSource, /platformTypeTitle/);
-  assert.match(userViewSource, /sessionTerminalTitle/);
-  assert.match(userViewSource, /<strong :title="sessionTitle\(session\)"/);
-  assert.match(userViewSource, /<dd :title="sessionTerminalTitle\(session\)"/);
+  assert.match(userViewSource, /<UserSessionExpandedSubtable/);
+  assert.match(userViewSource, /@revoke="revokeUserSession\(record, \$event\)"/);
+  assert.match(userSessionExpandedSource, /defineOptions\(\{ name: 'UserSessionExpandedSubtable' \}\)/);
+  assert.match(userSessionExpandedSource, /<RecordExpandedSubtable/);
+  assert.match(userSessionExpandedSource, /user-session-expanded-main strong/);
+  assert.match(userSessionExpandedSource, /text-overflow: ellipsis/);
+  assert.match(userSessionExpandedSource, /@media \(max-width: 980px\)/);
   assert.match(userViewSource, /useUserSessionRows\(\{ context: userContext, source: 'user-management' \}\)/);
   assert.match(userViewSource, /usePageBusinessEventHandler\(handleUserSessionBusinessEvent\)/);
   assert.match(userViewSource, /:cell-renderers="\{ onlineStatus: userOnlineStatusTitle \}"/);
@@ -1183,7 +1249,7 @@ test('user management keeps account basics separate from employment binding and 
   );
   assert.match(userViewSource, /revokeUserSession/);
   assert.match(userViewSource, /revokeAllUserSessions/);
-  assert.match(userViewSource, /temporaryPassword/);
+  assert.match(userDetailContentSource, /temporaryPassword/);
   assert.match(
     userViewSource,
     /userDetailMode\.value === 'resetPassword'[\s\S]*const userId = selectedUser\.value\?\.id[\s\S]*userContext\.can\('changePassword', userId\)/,
@@ -1197,7 +1263,7 @@ test('user management keeps account basics separate from employment binding and 
     userViewSource,
     /path: `\/iam\.user\/\$\{encodeURIComponent\(user\.id!\)\}\/sessions\/revoke`/,
   );
-  assert.match(userViewSource, /type="password"/);
+  assert.match(userDetailContentSource, /type="password"/);
   assert.match(inputSource, /type\?: 'text' \| 'password'/);
   assert.match(iconSource, /LockOutlined/);
   assert.match(contractsSource, /export interface UserAccount extends StandardEnabledSortableEntity/);
@@ -1217,9 +1283,9 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(contractsSource, /password\?: string/);
   assert.doesNotMatch(contractsSource, /passwordHash/);
   assert.doesNotMatch(userViewSource, /iam\.employee_account/);
-  assert.doesNotMatch(userViewSource, /employee-binding/);
-  assert.doesNotMatch(userViewSource, /UserEmployeeBindingView/);
-  assert.doesNotMatch(userViewSource, /loadUserEmployeeBinding/);
+  assert.match(userViewSource, /employee-binding/);
+  assert.match(userViewSource, /UserEmployeeBindingView/);
+  assert.match(userViewSource, /loadUserEmployeeBinding/);
   assert.doesNotMatch(userViewSource, /user-employee-binding/);
   assert.doesNotMatch(userViewSource, /绑定职员/);
   assert.doesNotMatch(userViewSource, /iam\.role_assignment/);
@@ -1274,13 +1340,8 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /:record-id="selectedUser\?\.id"/);
   assert.match(systemUserViewSource, /title: '修改密码'/);
   assert.match(systemUserViewSource, /title: '重置密码'/);
-  assert.match(systemUserViewSource, /在线会话/);
-  assert.match(systemUserViewSource, /终端/);
-  assert.match(systemUserViewSource, /terminalTypeTitle/);
-  assert.match(systemUserViewSource, /platformTypeTitle/);
-  assert.match(systemUserViewSource, /sessionTerminalTitle/);
-  assert.match(systemUserViewSource, /<strong :title="sessionTitle\(session\)"/);
-  assert.match(systemUserViewSource, /<dd :title="sessionTerminalTitle\(session\)"/);
+  assert.match(systemUserViewSource, /<UserSessionExpandedSubtable/);
+  assert.match(systemUserViewSource, /@revoke="revokeUserSession\(record, \$event\)"/);
   assert.match(systemUserViewSource, /key: 'onlineStatus'/);
   assert.match(
     systemUserViewSource,
@@ -1369,7 +1430,7 @@ test('workbench exposes own password change through auth boundary', () => {
   assert.match(workbenchSource, /title: '修改密码'/);
   assert.match(workbenchSource, /\.workbench \{[\s\S]*height: 100dvh;[\s\S]*overflow: hidden;/);
   assert.match(workbenchSource, /\.app-main \{[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/);
-  assert.match(workbenchSource, /\.app-content \{[\s\S]*min-height: 0;[\s\S]*overflow: auto;/);
+  assert.match(workbenchSource, /\.app-content \{[\s\S]*position: relative;[\s\S]*overflow: hidden;/);
   assert.match(appSource, /command === 'changePassword'[\s\S]*openChangeOwnPasswordDialog\(\)/);
   assert.match(appSource, /authClient\.changeOwnPassword/);
   assert.match(appSource, /onUserNotification: handleSecurityNotification/);
@@ -1510,6 +1571,200 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(organizationStateSource, /handlePlatformActionSuccess/);
   assert.match(positionStateSource, /handlePlatformActionSuccess/);
   assert.match(dictionaryStateSource, /handlePlatformActionSuccess/);
+});
+
+test('workbench keeps cacheable tab pages mounted behind their stable tab keys', () => {
+  const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
+
+  assert.match(workbenchSource, /const openedTabs = computed\(\(\) => props\.startup\?\.tabs \?\? \[\]\)/);
+  assert.match(workbenchSource, /function shouldKeepTabMounted\(tab: MenuTab\)/);
+  assert.match(workbenchSource, /pageDescriptorOf\(tab\)\?\.tabPolicy\.cacheable !== false/);
+  assert.match(workbenchSource, /<template v-for="tab in openedTabs" :key="tab\.key">/);
+  assert.match(
+    workbenchSource,
+    /<UiSidePanelHost[\s\S]*v-if="shouldKeepTabMounted\(tab\)"[\s\S]*v-show="tab\.key === activeTabKey"/,
+  );
+  assert.match(workbenchSource, /:active-tab="tab"[\s\S]*:page-descriptor="pageDescriptorOf\(tab\)"/);
+  assert.match(workbenchSource, /\.tab-panel-host \{[\s\S]*height: 100%;[\s\S]*min-height: 0;/);
+  assert.match(workbenchSource, /\.tab-page \{[\s\S]*padding: 14px;[\s\S]*overflow: auto;/);
+});
+
+test('module management keeps application-scoped tree maintenance separate from module child resources', () => {
+  const moduleManagementSource = readSource('src/views/ModuleManagementView.vue');
+  const moduleStateSource = readSource('src/views/moduleManagementState.ts');
+
+  assert.match(moduleManagementSource, /defineOptions\(\{ name: 'ModuleManagementView' \}\)/);
+  assert.match(moduleManagementSource, /<CrudRecordListExplorer/);
+  assert.match(
+    moduleManagementSource,
+    /const treePath = `\/platform\.module\/tree\/\$\{encodeURIComponent\(applicationAlias\)\}`/,
+  );
+  assert.match(moduleManagementSource, /path: treePath/);
+  assert.match(moduleManagementSource, /path: `\/platform\.module\/sort\/\$\{encodeURIComponent\(id\)\}`/);
+  assert.match(moduleManagementSource, /<TreeRecordExplorer/);
+  assert.match(moduleManagementSource, /<RecordDetailPanel/);
+  assert.match(
+    moduleManagementSource,
+    /grid-template-columns: minmax\(220px, 260px\) minmax\(260px, 320px\) minmax\(560px, 1fr\)/,
+  );
+  assert.match(moduleManagementSource, /height: 100%;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/);
+  assert.match(moduleManagementSource, /scrollable-content/);
+  assert.match(moduleManagementSource, /moduleFormFieldNames/);
+  assert.doesNotMatch(moduleManagementSource, /runtime\/refresh/);
+  assert.doesNotMatch(moduleManagementSource, /metadata-relations/);
+  assert.match(
+    moduleStateSource,
+    /applicationAlias: applicationAlias \?\? record\.applicationAlias\?\.trim\(\)/,
+  );
+  assert.match(
+    moduleStateSource,
+    /entryType === 'route' \? normalizeBlank\(record\.entryRoute\) : undefined/,
+  );
+  assert.match(
+    moduleStateSource,
+    /entryType === 'link' \? normalizeBlank\(record\.entryExternalUrl\) : undefined/,
+  );
+  assert.doesNotMatch(moduleManagementSource, /tenantExposure/);
+  assert.doesNotMatch(moduleManagementSource, /租户开放范围/);
+});
+
+test('tenant management governs application entitlements as tenant child records', () => {
+  const tenantSource = readSource('src/views/TenantManagementView.vue');
+
+  assert.match(tenantSource, /TenantApplication/);
+  assert.match(tenantSource, /tenantApplicationsPath\(tenantId\)\}\/query/);
+  assert.match(tenantSource, /tenantApplicationsPath\(tenantId\)\}\/configure/);
+  assert.match(tenantSource, /RecordDetailDrawer/);
+  assert.match(tenantSource, /配置应用/);
+  assert.match(tenantSource, /configuredApplicationAliases/);
+  assert.match(tenantSource, /已开通应用/);
+  assert.doesNotMatch(tenantSource, /draft\.applicationAliases/);
+  assert.doesNotMatch(tenantSource, /enabledApplicationAliases/);
+  assert.doesNotMatch(tenantSource, /toggleTenantApplication/);
+  assert.doesNotMatch(tenantSource, /tenantApplicationsSaving/);
+  assert.match(tenantSource, /\(\) => selected\.value\?\.id/);
+  assert.match(tenantSource, /tenantApplications\.value = \[\]/);
+  assert.match(tenantSource, /tenantApplicationsLoadVersion/);
+  assert.match(tenantSource, /selected\.value\?\.id === tenantId/);
+  assert.match(tenantSource, /'iam',/);
+  assert.match(tenantSource, /record\.alias === 'iam'/);
+});
+
+test('side panels use an explicit tab host and fixed drawer action regions', () => {
+  const uiIndexSource = readSource('src/vue-ui-antdv/index.ts');
+  const sidePanelSource = readSource('src/vue-ui-antdv/components/UiSidePanel.vue');
+  const sidePanelHostSource = readSource('src/vue-ui-antdv/components/UiSidePanelHost.vue');
+  const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
+  const detailDrawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
+  const workspaceViewOutletSource = readSource('src/app/WorkspaceViewOutlet.vue');
+  const workspaceViewContributionsSource = readSource('src/app/workspaceViewContributions.ts');
+  const workspaceViewsSource = readSource('src/app/workspaceViews.ts');
+  const viewPromotionSource = readSource('src/app/useWorkspaceViewPromotion.ts');
+  const tenantSource = readSource('src/views/TenantManagementView.vue');
+  const userSource = readSource('src/views/UserManagementView.vue');
+  const userDetailContentSource = readSource('src/views/UserDetailContent.vue');
+  const roleSource = readSource('src/views/RoleManagementView.vue');
+  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  const roleAccountGrantSource = readSource('src/views/RoleAccountGrantDrawer.vue');
+  const roleEmploymentGrantSource = readSource('src/views/RoleEmploymentGrantDrawer.vue');
+
+  assert.match(uiIndexSource, /UiSidePanelHost/);
+  assert.match(sidePanelSource, /scope: 'tab'/);
+  assert.match(sidePanelSource, /props\.scope === 'viewport'/);
+  assert.match(sidePanelSource, /sidePanelHost\?\.value \?\? false/);
+  assert.match(sidePanelHostSource, /position: relative/);
+  assert.match(workbenchSource, /<UiSidePanelHost[\s\S]*class="tab-panel-host"/);
+  assert.match(detailDrawerSource, /promotion\?: DrawerPromotion/);
+  assert.match(detailDrawerSource, /promotion\.promote\(\)/);
+  assert.match(detailDrawerSource, /<template #title-actions>/);
+  assert.match(detailDrawerSource, /icon-name="export"/);
+  assert.match(workspaceViewOutletSource, /resolveWorkspaceView/);
+  assert.match(workspaceViewOutletSource, /provideWorkspaceViewHost/);
+  assert.match(workspaceViewOutletSource, /dismissWorkspaceViewDescriptor/);
+  assert.match(workspaceViewOutletSource, /tabKeyOf\(props\.descriptor\)/);
+  assert.match(workspaceViewOutletSource, /navigation\.replacePage\(ownerPageKey\.value/);
+  assert.match(workspaceViewsSource, /createWorkspaceViewDescriptor/);
+  assert.match(workspaceViewsSource, /createWorkspaceViewRegistry/);
+  assert.match(workspaceViewsSource, /重复的工作视图类型/);
+  assert.match(workspaceViewsSource, /workspaceViewContributions/);
+  assert.match(workspaceViewContributionsSource, /Application assembly for restorable workspace views/);
+  assert.match(viewPromotionSource, /useWorkspaceViewPromotion/);
+  assert.match(viewPromotionSource, /canPromoteWorkspaceView/);
+  assert.match(viewPromotionSource, /hasStableIdentity/);
+  assert.match(viewPromotionSource, /navigation\.openPage\([\s\S]*createWorkspaceViewDescriptor/);
+  assert.match(viewPromotionSource, /onPromotionRejected/);
+  assert.match(viewPromotionSource, /accepted === false/);
+  assert.match(viewPromotionSource, /title\?: MaybeRefOrGetter<string \| undefined>/);
+  assert.match(workspaceViewOutletSource, /setTitle\(title\)/);
+  assert.match(readSource('src/app/StaticBusinessRouteOutlet.vue'), /workspaceViewPresentation === 'drawer'/);
+  assert.match(userSource, /useWorkspaceViewHost/);
+  assert.match(userSource, /isDrawerWorkspaceTask/);
+  assert.match(employeeSource, /useWorkspaceViewHost/);
+  assert.match(employeeSource, /isDrawerWorkspaceView/);
+  assert.match(tenantSource, /<template #operation>/);
+  assert.doesNotMatch(tenantSource, /useWorkspaceViewPromotion/);
+  assert.doesNotMatch(tenantSource, /:promotion=/);
+  assert.match(tenantSource, />\s*确认\s*<\/UiButton/);
+  assert.doesNotMatch(tenantSource, /确认配置/);
+  assert.match(userSource, /userDetailOperationActions/);
+  assert.match(userSource, /userDetailPromotion/);
+  assert.match(userSource, /<UserDetailContent/);
+  assert.match(userSource, /<RecordDetailPanel v-else/);
+  assert.match(userDetailContentSource, /defineOptions\(\{ name: 'UserDetailContent' \}\)/);
+  assert.doesNotMatch(userSource, /userDetailHeaderActions/);
+  assert.match(roleSource, /roleDetailOperationActions/);
+  assert.doesNotMatch(roleSource, /roleDetailHeaderActions/);
+  assert.match(employeeSource, /employeeDetailOperationActions/);
+  assert.doesNotMatch(employeeSource, /employeeDetailHeaderActions/);
+  assert.match(systemUserSource, /detailOperationActions/);
+  assert.doesNotMatch(systemUserSource, /detailHeaderActions/);
+  assert.match(roleAccountGrantSource, /<template #operation>/);
+  assert.match(roleEmploymentGrantSource, /<template #operation>/);
+});
+
+test('public management and drawer contracts use business roles instead of layout positions', () => {
+  const layoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
+  const recordDetailDrawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
+  const recordModeDrawerSource = readSource('src/platform-components/RecordModeDrawer.vue');
+  const managementPageSources = [
+    readSource('src/views/ApplicationManagementView.vue'),
+    readSource('src/views/OrganizationManagementView.vue'),
+    readSource('src/views/PasswordManagementView.vue'),
+    readSource('src/views/TenantManagementView.vue'),
+  ];
+  const standardDrawerSources = [
+    readSource('src/views/UserManagementView.vue'),
+    readSource('src/views/RoleManagementView.vue'),
+    readSource('src/views/EmployeeManagementView.vue'),
+    readSource('src/views/SystemUserManagementView.vue'),
+    readSource('src/views/EmployeeEmploymentDrawer.vue'),
+    readSource('src/views/RoleAccountGrantDrawer.vue'),
+    readSource('src/views/RoleEmploymentGrantDrawer.vue'),
+    readSource('src/views/TenantManagementView.vue'),
+  ];
+
+  assert.match(layoutSource, /explorerTitle: string/);
+  assert.match(layoutSource, /detailTitle: string/);
+  assert.match(layoutSource, /update:explorerSearchKeyword/);
+  assert.match(layoutSource, /<slot name="explorer-actions" \/>/);
+  assert.match(layoutSource, /<slot name="detail-actions" \/>/);
+  assert.doesNotMatch(layoutSource, /sidebarTitle|cardTitle|sidebar-actions|card-actions|card-status/);
+  for (const source of managementPageSources) {
+    assert.match(source, /v-model:explorer-search-keyword/);
+    assert.match(source, /explorer-title=/);
+    assert.match(source, /:detail-title=/);
+    assert.doesNotMatch(
+      source,
+      /sidebar-search|sidebar-title|card-title|sidebar-actions|card-actions|card-status/,
+    );
+  }
+
+  assert.doesNotMatch(recordDetailDrawerSource, /<slot name="actions" \/>/);
+  assert.doesNotMatch(recordModeDrawerSource, /<slot name="actions" \/>/);
+  for (const source of standardDrawerSources) {
+    assert.match(source, /<template #operation>/);
+  }
 });
 
 function readSource(path: string) {

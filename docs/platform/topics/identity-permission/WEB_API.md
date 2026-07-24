@@ -68,6 +68,17 @@
 | `POST` | `/iam.tenant/disable/{id}` | 停用租户。                               |
 | `POST` | `/iam.tenant/sort/{id}`    | 调整租户排序。                           |
 
+### 租户已开通应用
+
+根路径：`/iam.tenant/{tenantId}/applications`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/iam.tenant/{tenantId}/applications/query` | 查询租户已开通应用。 |
+| `POST` | `/iam.tenant/{tenantId}/applications/configure` | 以 `applicationAliases` 全量配置租户可用应用。应用必须全局启用且允许分配给租户；`iam` 为不可移除基线应用。 |
+
+应用开通是模块动作的前置门禁。移除应用后，普通租户用户访问该应用模块会返回 `APPLICATION_NOT_OPENED`；角色授权、菜单和配置事实保留。
+
 ## 组织机构
 
 根路径：`/iam.organization`
@@ -228,6 +239,7 @@
 | `POST` | `/iam.role/grant/{roleId}/batch`                        | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。                                  |
 | `POST` | `/iam.role/revoke/{roleId}`                             | 撤销角色某个模块动作授权。                                                                |
 | `POST` | `/iam.role/revoke/{roleId}/batch`                       | 批量撤销角色多个模块动作授权。                                                            |
+| `POST` | `/iam.role/permissionMatrix/{roleId}/replace`           | 原子提交角色动作授权矩阵草稿；每项携带目标授予状态及必要的数据范围配置。                 |
 | `POST` | `/iam.role/permissionMatrix/{roleId}`                   | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。                              |
 | `GET`  | `/iam.role/dataScopePolicyCatalog/{roleId}`             | 返回当前角色可配置的数据范围策略；传入 `moduleAlias` 时同时返回该模块可用的引用依赖候选。 |
 | `GET`  | `/iam.role/menuMatrix/{roleId}/{schemeId}`              | 按菜单方案返回菜单树和角色对模块菜单的授权状态。                                          |

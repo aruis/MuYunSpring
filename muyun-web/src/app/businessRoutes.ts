@@ -5,6 +5,7 @@ import DepartmentManagementView from '../views/DepartmentManagementView.vue';
 import DictionaryManagementView from '../views/DictionaryManagementView.vue';
 import EmployeeManagementView from '../views/EmployeeManagementView.vue';
 import MenuManagementView from '../views/MenuManagementView.vue';
+import ModuleManagementView from '../views/ModuleManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 import PasswordManagementView from '../views/PasswordManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
@@ -32,6 +33,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/config/dictionaries',
     moduleAlias: 'platform.dictionary_category',
     component: DictionaryManagementView,
+  },
+  {
+    route: '/config/modules',
+    moduleAlias: 'platform.module',
+    component: ModuleManagementView,
   },
   {
     route: '/config/menus',

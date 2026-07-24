@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   CrudRecordListExplorer,
   RecordActionBar,
   RecordDetailDrawer,
+  RecordDetailPanel,
   RecordDetailFields,
   RecordExplorerPanel,
   RecordFormFields,
@@ -50,12 +51,27 @@ import type {
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { useCurrentUserContext } from '../app/currentUserContext';
-import { useWorkbenchNavigation } from '../app/workbenchNavigation';
+import { useWorkspaceViewHost } from '../app/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
+import { roleDetailWorkspaceView } from './roleDetailWorkspaceView';
+import {
+  handOffRoleDetailWorkspaceSession,
+  registerRoleDetailWorkspaceHandoffRecipient,
+  takeRoleDetailWorkspaceSession,
+  type RoleDetailWorkspaceSession,
+} from './roleDetailWorkspaceSession';
 import RoleEmploymentGrantDrawer from './RoleEmploymentGrantDrawer.vue';
 import RoleGroupMemberSelector from './RoleGroupMemberSelector.vue';
+import RoleAuthorizationView from './RoleAuthorizationView.vue';
 
 defineOptions({ name: 'RoleManagementView' });
+
+const props = defineProps<{
+  recordId?: string;
+  scopeKind?: RoleOwnerScopeType;
+  scopeId?: string;
+}>();
 
 type RoleDetailMode = 'view' | 'create' | 'edit';
 type RoleScopeKind = RoleOwnerScopeType;
@@ -80,11 +96,11 @@ interface RoleScope {
   organization?: Organization;
 }
 
+const workspaceViewHost = useWorkspaceViewHost();
 const tenantContext = useModuleContext<Tenant>({ moduleAlias: 'iam.tenant' });
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const roleContext = useModuleContext<Role>({ moduleAlias: 'iam.role' });
 const currentUser = useCurrentUserContext();
-const workbenchNavigation = useWorkbenchNavigation();
 const tenantSearchKeyword = ref('');
 const organizationSearchKeyword = ref('');
 const tenantReloadKey = ref(0);
@@ -102,11 +118,18 @@ const savingRole = ref(false);
 const bindingRole = ref<Role>();
 const bindingDrawerOpen = ref(false);
 const employmentBindingDrawerOpen = ref(false);
+const authorizationRole = ref<Role>();
+const authorizationDrawerOpen = ref(false);
 const roleDetailRequestSeq = ref(0);
 const roleDraft = ref<Partial<Role>>(createRoleDraft(undefined));
 const roleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const memberRoleCandidates = ref<Role[]>([]);
 
+const isWorkspaceView = computed(() => Boolean(props.recordId && props.scopeKind));
+const isDrawerWorkspaceView = computed(
+  () => isWorkspaceView.value && workspaceViewHost?.presentation === 'drawer',
+);
+const shouldRenderRoleDetailDrawer = computed(() => !isWorkspaceView.value || isDrawerWorkspaceView.value);
 const tenantListContext = computed(() => tenantContext as unknown as ModuleContext<CrudRecordListBase>);
 const selectedTenantId = computed(() => selectedTenant.value?.id);
 const canSelectPlatformScope = computed(() => currentUser?.value?.system === true);
@@ -176,6 +199,7 @@ const roleDetailTitle = computed(() => {
   }
   return roleTitle(selectedRole.value ?? roleDraft.value);
 });
+const roleDetailSubtitle = computed(() => selectedScope.value?.title ?? '角色详情');
 const roleFormDisabled = computed(() => savingRole.value || loadingRoleDetail.value);
 const canSaveRole = computed(() => {
   if (loadingRoleDetail.value || !selectedScope.value) {
@@ -240,6 +264,41 @@ const roleDetailActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+const roleDetailOperationActions = computed(() => roleDetailActions.value);
+const roleWorkspaceOperationActions = computed<RecordActionItem[]>(() => roleDetailActions.value);
+const roleDetailPromotion = useWorkspaceViewPromotion({
+  view: roleDetailWorkspaceView,
+  input: computed(() => {
+    const recordId = selectedRole.value?.id;
+    const scope = selectedScope.value;
+    const mode = roleDetailMode.value;
+    if (!recordId || !scope || (mode !== 'view' && mode !== 'edit')) return undefined;
+    return {
+      recordId,
+      scopeKind: scope.kind,
+      ...(scope.kind === 'platform' ? {} : { scopeId: scope.id }),
+    };
+  }),
+  title: computed(() => roleTitle(selectedRole.value)),
+  eligibility: computed(() => ({
+    hasStableIdentity: Boolean(selectedRole.value?.id && selectedScope.value) && !loadingRoleDetail.value,
+    busy: savingRole.value,
+  })),
+  beforePromote: async (input) => {
+    const selected = selectedRole.value;
+    const scope = selectedScope.value;
+    if (!selected || !scope) return;
+    return (
+      (await handOffRoleDetailWorkspaceSession(input, {
+        selectedRole: selected,
+        draft: roleDraft.value,
+        scope,
+        mode: roleDetailMode.value === 'edit' ? 'edit' : 'view',
+      })) === 'accepted'
+    );
+  },
+  onPromoted: closeRoleDetail,
+});
 const roleFormFieldFallback = computed<Record<RoleFormFieldName, RecordFormFieldFallback>>(() => ({
   title: { label: '角色名称', required: true, visible: true, placeholder: '请输入角色名称' },
   assignmentType: {
@@ -302,11 +361,44 @@ const roleDetailFieldNames = computed<RoleFormFieldName[]>(() => {
   return names;
 });
 
-onMounted(loadRoleFormDefinition);
+let disposeRoleWorkspaceHandoffRecipient: (() => void) | undefined;
+
+onMounted(() => {
+  void loadRoleFormDefinition();
+  if (!isWorkspaceView.value || !props.recordId || !props.scopeKind) return;
+  const input = roleWorkspaceInput();
+  if (input && !isDrawerWorkspaceView.value) {
+    disposeRoleWorkspaceHandoffRecipient = registerRoleDetailWorkspaceHandoffRecipient(
+      input,
+      receiveRoleDetailWorkspaceSession,
+    );
+  }
+  void restoreRoleWorkspaceView();
+});
+
+onBeforeUnmount(() => disposeRoleWorkspaceHandoffRecipient?.());
+
+function receiveRoleDetailWorkspaceSession(session: RoleDetailWorkspaceSession) {
+  if (roleDetailMode.value === 'edit') return false;
+  restoreRoleDetailWorkspaceSession(session);
+  return true;
+}
+
+watch(
+  selectedRole,
+  (role) => {
+    if (!isWorkspaceView.value || !role) return;
+    workspaceViewHost?.setTitle(roleTitle(role));
+  },
+  { immediate: true },
+);
 
 watch(currentUserTenant, initializeTenantUserScope, { immediate: true });
 
 watch(selectedScope, () => {
+  if (isWorkspaceView.value) {
+    return;
+  }
   selectedRoleKey.value = undefined;
   selectedRole.value = undefined;
   roleDraft.value = createRoleDraft(selectedScope.value);
@@ -564,15 +656,13 @@ function openRoleAuthorization(record: QueryListRecord) {
   if (!id || record.roleKind === 'group') {
     return;
   }
-  workbenchNavigation?.openPage({
-    pageType: 'business-route',
-    openMode: 'workbench-route',
-    hostType: 'business-route-host',
-    title: `授权 - ${roleTitle(record as Role)}`,
-    target: { route: '/iam/role-authorization', moduleAlias: 'iam.role', query: { roleId: id } },
-    params: { roleId: id },
-    tabPolicy: { identity: 'by-params' },
-  });
+  authorizationRole.value = copyRole(record as Role) as Role;
+  authorizationDrawerOpen.value = true;
+}
+
+function closeRoleAuthorization() {
+  authorizationDrawerOpen.value = false;
+  authorizationRole.value = undefined;
 }
 
 function handleRoleRowDblclick(record: QueryListRecord) {
@@ -652,6 +742,11 @@ async function openRoleDetail(record: QueryListRecord, mode: RoleDetailMode) {
     if (!canCommitRoleDetailRequest(id, requestSeq)) {
       return;
     }
+    if (!roleMatchesSelectedScope(fullRecord)) {
+      roleDetailLoadFailed.value = true;
+      presentPlatformMessage('角色不属于当前归属范围', { source: 'role-management', phase: 'load' });
+      return;
+    }
     commitRoleDetailRecord(fullRecord, mode);
   } catch (cause) {
     if (canCommitRoleDetailRequest(id, requestSeq)) {
@@ -675,6 +770,9 @@ function closeRoleDetail() {
   roleDetailOpen.value = false;
   roleDetailMode.value = 'view';
   roleDraft.value = selectedRole.value ? copyRole(selectedRole.value) : createRoleDraft(selectedScope.value);
+  if (isDrawerWorkspaceView.value) {
+    workspaceViewHost?.dismiss();
+  }
 }
 
 function cancelRoleDetail() {
@@ -820,6 +918,62 @@ function commitRoleDetailRecord(record: Role, nextMode: RoleDetailMode = 'view')
   selectedRoleKey.value = record.id;
   roleDraft.value = copyRole(record);
   roleDetailMode.value = nextMode === 'edit' && record.systemManaged !== true ? 'edit' : 'view';
+  roleDetailOpen.value = true;
+  loadingRoleDetail.value = false;
+  roleDetailLoadFailed.value = false;
+  roleDetailRequestSeq.value += 1;
+}
+
+async function restoreRoleWorkspaceView() {
+  const input = roleWorkspaceInput();
+  if (!input) return;
+  selectedScope.value = scopeFromWorkspaceInput(input);
+  const session = takeRoleDetailWorkspaceSession(input);
+  if (session) {
+    restoreRoleDetailWorkspaceSession(session);
+    return;
+  }
+  await openRoleDetail({ id: input.recordId }, 'view');
+}
+
+function roleWorkspaceInput() {
+  const recordId = props.recordId;
+  const scopeKind = props.scopeKind;
+  if (!recordId || !scopeKind || (scopeKind !== 'platform' && !props.scopeId)) return undefined;
+  return {
+    recordId,
+    scopeKind,
+    ...(scopeKind === 'platform' ? {} : { scopeId: props.scopeId! }),
+  };
+}
+
+function scopeFromWorkspaceInput(input: { scopeKind: RoleOwnerScopeType; scopeId?: string }): RoleScope {
+  if (input.scopeKind === 'platform') {
+    return { kind: 'platform', key: 'platform', title: '平台角色' };
+  }
+  const id = input.scopeId!;
+  const scopeTitle = input.scopeKind === 'organization' ? `机构：${id}` : `租户：${id}`;
+  return {
+    kind: input.scopeKind,
+    id,
+    key: `${input.scopeKind}:${id}`,
+    title: scopeTitle,
+    ...(input.scopeKind === 'tenant' ? { tenant: { id, title: id, alias: id } as Tenant } : {}),
+  };
+}
+
+function roleMatchesSelectedScope(record: Role) {
+  const scope = selectedScope.value;
+  if (!scope || record.ownerScopeType !== scope.kind) return false;
+  return scope.kind === 'platform' || record.ownerScopeId === scope.id;
+}
+
+function restoreRoleDetailWorkspaceSession(session: RoleDetailWorkspaceSession) {
+  selectedScope.value = session.scope;
+  selectedRole.value = session.selectedRole;
+  selectedRoleKey.value = session.selectedRole.id;
+  roleDraft.value = session.draft;
+  roleDetailMode.value = session.mode;
   roleDetailOpen.value = true;
   loadingRoleDetail.value = false;
   roleDetailLoadFailed.value = false;
@@ -1119,9 +1273,13 @@ function parseRoleIds(value: unknown) {
 <template>
   <section
     class="role-management-page"
-    :class="{ 'role-management-page-platform': !organizationPanelVisible }"
+    :class="{
+      'role-management-page-platform': !organizationPanelVisible,
+      'role-management-page--task': isWorkspaceView && !isDrawerWorkspaceView,
+    }"
   >
     <RecordExplorerPanel
+      v-if="!isWorkspaceView || isDrawerWorkspaceView"
       class="role-scope-panel"
       title="租户"
       refresh-title="刷新租户列表"
@@ -1173,7 +1331,7 @@ function parseRoleIds(value: unknown) {
     </RecordExplorerPanel>
 
     <RecordExplorerPanel
-      v-if="organizationPanelVisible"
+      v-if="(!isWorkspaceView || isDrawerWorkspaceView) && organizationPanelVisible"
       class="role-scope-panel"
       title="归属范围"
       refresh-title="刷新机构树"
@@ -1211,6 +1369,7 @@ function parseRoleIds(value: unknown) {
     </RecordExplorerPanel>
 
     <RecordQueryListPanel
+      v-if="!isWorkspaceView || isDrawerWorkspaceView"
       class="role-list-panel"
       :context="roleListContext"
       :title="selectedScope ? `角色列表 - ${selectedScope.title}` : '角色列表'"
@@ -1233,9 +1392,12 @@ function parseRoleIds(value: unknown) {
     />
 
     <RecordDetailDrawer
+      v-if="shouldRenderRoleDetailDrawer"
       :open="roleDetailOpen"
       :title="roleDetailTitle"
+      :subtitle="roleDetailSubtitle"
       :close-on-outside="roleDetailMode === 'view'"
+      :promotion="roleDetailPromotion"
       @close="closeRoleDetail"
     >
       <template #status>
@@ -1248,10 +1410,10 @@ function parseRoleIds(value: unknown) {
           @change="toggleRoleEnabled(selectedRole)"
         />
       </template>
-      <template #actions>
+      <template #operation>
         <RecordActionBar
           :context="roleListContext"
-          :actions="roleDetailActions"
+          :actions="roleDetailOperationActions"
           @action="handleRoleDetailAction"
         />
       </template>
@@ -1308,6 +1470,78 @@ function parseRoleIds(value: unknown) {
       </template>
     </RecordDetailDrawer>
 
+    <RecordDetailPanel v-else :title="roleDetailTitle" :subtitle="roleDetailSubtitle" scrollable-content>
+      <template #status>
+        <RecordStatusSwitch
+          v-if="roleDetailMode === 'view' && selectedRole"
+          :enabled="selectedRole.enabled !== false"
+          :disabled="savingRole || !canToggleRole"
+          :loading="savingRole"
+          :show-label="false"
+          @change="toggleRoleEnabled(selectedRole)"
+        />
+      </template>
+      <template #operation>
+        <RecordActionBar
+          :context="roleContext"
+          :actions="roleWorkspaceOperationActions"
+          :record-id="selectedRole?.id"
+          @action="handleRoleDetailAction"
+        />
+      </template>
+
+      <UiSpin v-if="loadingRoleDetail" class="role-detail-state" tip="加载角色详情" />
+      <div v-else-if="roleDetailLoadFailed" class="role-detail-state">
+        <UiError title="详情加载失败" message="无法加载角色详情，请重试" />
+        <UiButton type="primary" icon-name="reload" @click="retryRoleDetail">重试</UiButton>
+      </div>
+
+      <template v-else-if="roleDetailMode === 'view' || selectedRole">
+        <RecordDetailFields
+          v-if="roleDetailMode === 'view'"
+          :record="roleDraft as RecordFormRecord"
+          :field-names="roleDetailFieldNames"
+          :fields="roleFormFieldDefinitions"
+          :fallback="roleFormFieldFallback"
+          :display-of="scopeDisplayValue"
+        />
+
+        <form v-else class="role-form" @submit.prevent="saveRole">
+          <label>
+            <span class="role-form-label">当前范围</span>
+            <UiInput :value="selectedScope?.title ?? '-'" disabled />
+          </label>
+          <RecordFormFields
+            :record="roleDraft as RecordFormRecord"
+            :field-names="rolePrimaryFormFieldNames"
+            :fields="roleFormFieldDefinitions"
+            :fallback="roleFormFieldFallback"
+            :disabled="roleFormDisabled"
+            :disabled-of="roleFormFieldDisabled"
+            @update:field="updateRoleDraftField"
+          />
+          <RoleGroupMemberSelector
+            v-if="roleDraft.roleKind === 'group'"
+            :value="roleDraft.memberRoleIds"
+            :candidates="memberRoleCandidates"
+            :current-role-id="selectedRole?.id"
+            :disabled="roleFormDisabled || selectedRole?.systemManaged === true"
+            @update:value="updateRoleDraftField('memberRoleIds', $event)"
+          />
+          <RecordFormFields
+            :record="roleDraft as RecordFormRecord"
+            :field-names="roleSecondaryFormFieldNames"
+            :fields="roleFormFieldDefinitions"
+            :fallback="roleFormFieldFallback"
+            :disabled="roleFormDisabled"
+            :disabled-of="roleFormFieldDisabled"
+            @update:field="updateRoleDraftField"
+          />
+        </form>
+        <RecordMetaSection :record="roleDraft" show-sort-order />
+      </template>
+    </RecordDetailPanel>
+
     <RoleAccountGrantDrawer
       :open="bindingDrawerOpen"
       :context="roleContext"
@@ -1321,6 +1555,12 @@ function parseRoleIds(value: unknown) {
       :role="bindingRole"
       @close="closeRoleBinding"
       @saved="roleReloadKey += 1"
+    />
+    <RoleAuthorizationView
+      v-if="authorizationDrawerOpen && authorizationRole?.id"
+      :role-id="authorizationRole.id"
+      drawer
+      @close="closeRoleAuthorization"
     />
   </section>
 </template>
@@ -1337,6 +1577,15 @@ function parseRoleIds(value: unknown) {
 
 .role-management-page-platform {
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+}
+
+.role-management-page--task {
+  display: block;
+  height: 100%;
+}
+
+.role-management-page--task :deep(.record-detail-layout) {
+  height: 100%;
 }
 
 .role-scope-panel,

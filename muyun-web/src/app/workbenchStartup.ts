@@ -17,6 +17,7 @@ import {
   tryPageDescriptorFromUrl,
   type PageDescriptorResolveOptions,
 } from '@muyun/platform-workbench';
+import { createWorkspaceViewDescriptor, resolveWorkspaceView } from './workspaceViews';
 
 export interface WorkbenchStartupClients {
   sessionClient: SessionClient;
@@ -58,9 +59,10 @@ export function openMenuTab(
 export function openDirectTab(
   tabs: MenuTab[],
   descriptor: PageDescriptor,
-): { tabs: MenuTab[]; activeTabKey: string } {
+): { tabs: MenuTab[]; activeTabKey: string; created: boolean } {
   const tab = createDirectTab(descriptor);
-  return { tabs: upsertTab(tabs, tab), activeTabKey: tab.key };
+  const created = !tabs.some((item) => item.key === tab.key);
+  return { tabs: upsertTab(tabs, tab), activeTabKey: tab.key, created };
 }
 
 export function menuTargetUrl(menu: MenuRecord, target: MenuNavigationTarget): string {
@@ -89,16 +91,20 @@ export function restoreWorkbenchStartupStateFromUrl(
     return state;
   }
 
+  const workspaceDescriptor = restoredWorkspaceViewDescriptor(descriptor);
+  const effectiveDescriptor = workspaceDescriptor ?? descriptor;
+
   const explicitMenu = descriptor.menuId ? findMenuById(state.menus, descriptor.menuId) : undefined;
   const menu =
-    explicitMenu && menuMatchesDescriptor(explicitMenu, descriptor, options)
+    explicitMenu && menuMatchesDescriptor(explicitMenu, effectiveDescriptor, options)
       ? explicitMenu
-      : findMenuByDescriptor(state.menus, descriptor, options);
+      : findMenuByDescriptor(state.menus, effectiveDescriptor, options);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
-  const tab =
-    menu && target && isTabMenuTarget(target)
-      ? createRestoredMenuTab(menu, target, descriptor, options)
-      : createDirectTab(descriptor);
+  const tab = workspaceDescriptor
+    ? createDirectTab(workspaceDescriptor)
+    : menu && target && isTabMenuTarget(target)
+      ? createRestoredMenuTab(menu, target, effectiveDescriptor, options)
+      : createDirectTab(effectiveDescriptor);
   const existingTabs = state.tabs ?? [];
   const tabs = upsertTab(existingTabs, tab);
 
@@ -107,6 +113,19 @@ export function restoreWorkbenchStartupStateFromUrl(
     tabs,
     activeTabKey: tab.key,
   };
+}
+
+function restoredWorkspaceViewDescriptor(descriptor: PageDescriptor) {
+  if (descriptor.pageType !== 'business-route') return undefined;
+  const workspaceView = resolveWorkspaceView(descriptor);
+  return workspaceView
+    ? createWorkspaceViewDescriptor(
+        workspaceView.view,
+        workspaceView.input,
+        workspaceView.presentation,
+        descriptor.title,
+      )
+    : undefined;
 }
 
 export function closeMenuTab(

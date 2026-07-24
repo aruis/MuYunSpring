@@ -1,40 +1,40 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
 @Configuration
 @EnableConfigurationProperties(MuYunSpringCorsProperties.class)
-public class MuYunSpringWebConfiguration implements WebMvcConfigurer {
+public class MuYunSpringWebConfiguration {
     private final MuYunSpringCorsProperties corsProperties;
 
     public MuYunSpringWebConfiguration(MuYunSpringCorsProperties corsProperties) {
         this.corsProperties = corsProperties;
     }
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
+    @Bean
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistration() {
         List<String> allowedOrigins = corsProperties.getAllowedOrigins();
-        if (allowedOrigins == null || allowedOrigins.isEmpty()) {
-            return;
-        }
-        registry.addMapping("/**")
-                .allowedOrigins(allowedOrigins.toArray(String[]::new))
-                .allowedMethods(
-                        HttpMethod.GET.name(),
-                        HttpMethod.POST.name(),
-                        HttpMethod.PUT.name(),
-                        HttpMethod.PATCH.name(),
-                        HttpMethod.DELETE.name(),
-                        HttpMethod.OPTIONS.name())
-                .allowedHeaders("*")
-                .exposedHeaders("Authorization")
-                .allowCredentials(false)
-                .maxAge(3600);
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(allowedOrigins == null ? List.of() : allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.addAllowedHeader(CorsConfiguration.ALL);
+        configuration.setExposedHeaders(List.of("Authorization", "X-MuYun-Trace-Id"));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(source));
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return registration;
     }
 }

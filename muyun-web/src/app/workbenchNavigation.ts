@@ -2,7 +2,14 @@ import { inject, provide, type InjectionKey } from 'vue';
 import type { PageDescriptor } from '@muyun/web-contracts';
 
 export interface WorkbenchNavigation {
-  openPage(descriptor: PageDescriptor): void;
+  /** Opens a page and reports whether the target host was newly created. */
+  openPage(descriptor: PageDescriptor): WorkbenchPageOpenResult;
+  /** Replaces one existing host by its stable tab key without changing that tab's identity. */
+  replacePage(pageKey: string, descriptor: PageDescriptor): void;
+}
+
+export interface WorkbenchPageOpenResult {
+  created: boolean;
 }
 
 const workbenchNavigationKey: InjectionKey<WorkbenchNavigation> = Symbol('workbench-navigation');

@@ -166,7 +166,7 @@ function selectedEmploymentDescription(employment: EmploymentSelectorItem) {
 </script>
 <template>
   <RecordDetailDrawer :open="open" :title="title" close-title="关闭" @close="!saving && emit('close')">
-    <template #actions>
+    <template #operation>
       <UiButton :disabled="saving" @click="emit('close')">取消</UiButton>
       <UiButton
         type="primary"

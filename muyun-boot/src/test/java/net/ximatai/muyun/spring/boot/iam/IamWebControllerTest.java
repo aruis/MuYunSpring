@@ -52,6 +52,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.tenant.TenantDao;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
@@ -61,6 +62,9 @@ import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.application.ApplicationService;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -885,6 +889,33 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldReplaceRolePermissionMatrixAtomically() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(roleService.replacePermissionActions(any(), any())).thenReturn(2);
+
+        mvc.perform(post("/iam.role/permissionMatrix/{roleId}/replace", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "actions":[
+                                    {"moduleAlias":"sales.contract","actionCode":"query","granted":true,
+                                     "dataScopePolicy":"owner"},
+                                    {"moduleAlias":"sales.contract","actionCode":"export","granted":false}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(2));
+
+        ArgumentCaptor<List<RoleService.PermissionActionCommand>> actionsCaptor = ArgumentCaptor.captor();
+        verify(roleService).replacePermissionActions(any(), actionsCaptor.capture());
+        assertThat(actionsCaptor.getValue()).hasSize(2);
+        assertThat(actionsCaptor.getValue().get(0).granted()).isTrue();
+        assertThat(actionsCaptor.getValue().get(0).dataScopePolicy()).isEqualTo(DataScopePolicy.OWNER);
+        assertThat(actionsCaptor.getValue().get(1).granted()).isFalse();
+    }
+
+    @Test
     void shouldExposeRolePermissionMatrixFromModuleAliases() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         List<GrantableAction> grantableActions = List.of(
@@ -912,6 +943,39 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.modules[0].actions[0].actionCode").value("query"))
                 .andExpect(jsonPath("$.modules[0].actions[0].permissionActionCode").value("view"))
                 .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
+    }
+
+    @Test
+    void shouldLimitTenantRoleAuthorizationCatalogToEnabledApplications() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        RoleWebController controller = new RoleWebController(grantableActionResolver,
+                provider((MenuService) null), provider(moduleService));
+        ReflectionTestUtils.setField(controller, "service", roleService);
+        ReflectionTestUtils.setField(controller, "tenantApplicationService", tenantApplicationService);
+        Role tenantRole = new Role();
+        tenantRole.setId("role-1");
+        tenantRole.setTenantId("tenant-a");
+        when(roleService.select("role-1")).thenReturn(tenantRole);
+
+        PlatformModule iamOrganization = new PlatformModule();
+        iamOrganization.setId("iam.organization");
+        iamOrganization.setApplicationAlias("iam");
+        iamOrganization.setTitle("组织管理");
+        PlatformModule crmCustomer = new PlatformModule();
+        crmCustomer.setId("crm.customer");
+        crmCustomer.setApplicationAlias("crm");
+        crmCustomer.setTitle("客户管理");
+        PlatformModule salesOrder = new PlatformModule();
+        salesOrder.setId("sales.order");
+        salesOrder.setApplicationAlias("sales");
+        salesOrder.setTitle("订单管理");
+        when(moduleService.listVisibleModules()).thenReturn(List.of(iamOrganization, crmCustomer, salesOrder));
+        when(tenantApplicationService.availableApplicationAliases("tenant-a")).thenReturn(List.of("iam", "sales"));
+
+        assertThat(controller.authorizationModules("role-1").records())
+                .extracting(RoleWebController.RoleAuthorizationModule::moduleAlias)
+                .containsExactly("iam.organization", "sales.order");
     }
 
     @Test

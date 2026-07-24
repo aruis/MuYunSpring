@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.ApplicationNotOpenedException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
@@ -22,6 +23,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
+import net.ximatai.muyun.spring.iam.role.RoleActionExecutionPolicyService;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -35,6 +39,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ActionEndpointInterceptorTest {
@@ -74,6 +80,27 @@ class ActionEndpointInterceptorTest {
                     handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class)), null);
             assertThat(ActionExecutionContextHolder.current()).isEmpty();
         }
+    }
+
+    @Test
+    void shouldRejectStaticEndpointBeforeRolePermissionWhenApplicationIsNotOpened() throws Exception {
+        RoleService roleService = mock(RoleService.class);
+        TenantApplicationService tenantApplicationService = mock(TenantApplicationService.class);
+        org.mockito.Mockito.doThrow(new ApplicationNotOpenedException("tenant_a", "iam"))
+                .when(tenantApplicationService).requireApplicationOpened("tenant_a", "iam");
+        ActionEndpointInterceptor interceptor = new ActionEndpointInterceptor(
+                new RoleActionExecutionPolicyService(roleService, tenantApplicationService),
+                new ActionEndpointContextResolver());
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/query");
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("user-1", "User", "tenant_a"))) {
+            assertThatThrownBy(() -> interceptor.preHandle(request, new MockHttpServletResponse(),
+                    handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class))))
+                    .isInstanceOf(ApplicationNotOpenedException.class);
+        }
+
+        verify(roleService, never()).hasActionPermission("user-1", "iam.organization", "view");
     }
 
     @Test

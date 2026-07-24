@@ -396,15 +396,15 @@ function blankToUndefined(value: string | undefined) {
 
 <template>
   <StaticManagementLayout
-    v-model:sidebar-search-keyword="searchKeyword"
-    sidebar-title="密码规则"
+    v-model:explorer-search-keyword="searchKeyword"
+    explorer-title="密码规则"
     refresh-title="刷新密码规则"
-    sidebar-search-placeholder="搜索规则名称、正则或提示"
+    explorer-search-placeholder="搜索规则名称、正则或提示"
     :mode="mode"
-    :card-title="cardTitle"
+    :detail-title="cardTitle"
     @refresh="reloadKey += 1"
   >
-    <template #sidebar-actions>
+    <template #explorer-actions>
       <ModuleActionButton
         class="record-panel-create-button"
         :context="ruleContext"
@@ -431,11 +431,11 @@ function blankToUndefined(value: string | undefined) {
       />
     </template>
 
-    <template #card-actions>
+    <template #detail-actions>
       <RecordActionBar :context="ruleContext" :actions="cardActions" @action="handleCardAction" />
     </template>
 
-    <template #card-status>
+    <template #detail-status>
       <RecordStatusSwitch
         v-if="mode !== 'view'"
         :enabled="draft.enabled"

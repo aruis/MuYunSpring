@@ -36,6 +36,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -71,6 +72,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     private final MenuService menuService;
     private final PlatformModuleService platformModuleService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
+    private TenantApplicationService tenantApplicationService;
 
     public RoleWebController(RoleGrantableActionResolver grantableActionResolver) {
         this(grantableActionResolver, (MenuService) null, (PlatformModuleService) null);
@@ -102,6 +104,11 @@ public class RoleWebController extends WebSupport<RoleService> implements
     @Autowired(required = false)
     void setEmployeeEmploymentReadService(EmployeeEmploymentReadService employeeEmploymentReadService) {
         this.employeeEmploymentReadService = employeeEmploymentReadService;
+    }
+
+    @Autowired(required = false)
+    void setTenantApplicationService(TenantApplicationService tenantApplicationService) {
+        this.tenantApplicationService = tenantApplicationService;
     }
 
     @Override
@@ -316,6 +323,21 @@ public class RoleWebController extends WebSupport<RoleService> implements
         ));
     }
 
+    @PostMapping("/permissionMatrix/{roleId}/replace")
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
+    @BusinessMutation
+    public int replacePermissionMatrix(@PathVariable String roleId,
+                                       @RequestBody PermissionMatrixReplaceRequest request) {
+        return roleRecordScope(roleId, () -> {
+            int changed = service().replacePermissionActions(roleId, request.actions().stream()
+                    .map(PermissionMatrixActionRequest::toCommand)
+                    .toList());
+            reportGrantMutation("iam.role.permission-matrix.changed", "角色授权已保存", changed > 0);
+            return changed;
+        });
+    }
+
     @PostMapping("/permissionMatrix/{roleId}")
     @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
@@ -337,12 +359,30 @@ public class RoleWebController extends WebSupport<RoleService> implements
         if (platformModuleService == null) {
             throw new IllegalStateException("platform module service is not available");
         }
+        Role role = service().select(roleId);
+        java.util.Set<String> enabledApplications = enabledApplicationsOf(role);
         List<RoleAuthorizationModule> modules = platformModuleService.listVisibleModules()
                 .stream()
+                .filter(module -> availableForRole(role, enabledApplications, module))
                 .map(module -> new RoleAuthorizationModule(module.getId(), module.getTitle(),
                         module.getApplicationAlias(), module.getParentId()))
                 .toList();
         return new WebListResponse<>(modules);
+    }
+
+    private java.util.Set<String> enabledApplicationsOf(Role role) {
+        if (role == null || role.getTenantId() == null || role.getTenantId().isBlank()
+                || tenantApplicationService == null) {
+            return java.util.Set.of();
+        }
+        return java.util.Set.copyOf(tenantApplicationService.availableApplicationAliases(role.getTenantId()));
+    }
+
+    private boolean availableForRole(Role role, java.util.Set<String> enabledApplications, PlatformModule module) {
+        if (role == null || role.getTenantId() == null || role.getTenantId().isBlank()) {
+            return true;
+        }
+        return enabledApplications.contains(module.getApplicationAlias());
     }
 
     @GetMapping("/dataGrantActionMatrix/{roleId}")
@@ -455,6 +495,36 @@ public class RoleWebController extends WebSupport<RoleService> implements
 
     public record RevokeActionsRequest(List<RevokeActionRequest> actions) {
         public RevokeActionsRequest {
+            actions = actions == null ? List.of() : List.copyOf(actions);
+        }
+    }
+
+    public record PermissionMatrixActionRequest(
+            String moduleAlias,
+            String actionCode,
+            boolean granted,
+            DataScopePolicy dataScopePolicy,
+            TenantScopePolicy tenantScopePolicy,
+            String scopeCondition,
+            String referenceFieldId,
+            String referenceActionCode
+    ) {
+        RoleService.PermissionActionCommand toCommand() {
+            return new RoleService.PermissionActionCommand(
+                    moduleAlias,
+                    actionCode,
+                    granted,
+                    dataScopePolicy,
+                    tenantScopePolicy,
+                    scopeCondition,
+                    referenceFieldId,
+                    referenceActionCode
+            );
+        }
+    }
+
+    public record PermissionMatrixReplaceRequest(List<PermissionMatrixActionRequest> actions) {
+        public PermissionMatrixReplaceRequest {
             actions = actions == null ? List.of() : List.copyOf(actions);
         }
     }
