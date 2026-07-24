@@ -307,6 +307,7 @@ public final class StaticModuleDefinition {
         reservedFields.add(StandardEntitySchema.VERSION_FIELD);
         reservedFields.add(StandardEntitySchema.DELETED_FIELD);
         reservedFields.add(StandardEntitySchema.DELETED_AT_FIELD);
+        reservedFields.add(StandardEntitySchema.DELETED_BY_FIELD);
         reservedFields.add(StandardEntitySchema.CREATED_BY_FIELD);
         reservedFields.add(StandardEntitySchema.CREATED_AT_FIELD);
         reservedFields.add(StandardEntitySchema.UPDATED_BY_FIELD);

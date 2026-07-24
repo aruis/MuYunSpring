@@ -35,7 +35,7 @@ class DynamicTableMapperTest {
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
         assertThat(columnNames(table))
                 .containsExactly(
-                        "tenant_id", "version", "deleted", "deleted_at", "created_by", "created_at", "updated_by", "updated_at",
+                        "tenant_id", "version", "deleted", "deleted_at", "deleted_by", "created_by", "created_at", "updated_by", "updated_at",
                         "code", "name", "amount", "signed_at"
                 );
         assertThat(table.getIndexes())
@@ -95,6 +95,7 @@ class DynamicTableMapperTest {
                         || name.equals("version")
                         || name.equals("deleted")
                         || name.equals("deleted_at")
+                        || name.equals("deleted_by")
                         || name.equals("created_by")
                         || name.equals("created_at")
                         || name.equals("updated_by")

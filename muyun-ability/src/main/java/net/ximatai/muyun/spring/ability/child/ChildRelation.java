@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.ability.child;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -96,6 +98,10 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
         deleteChildren(selectChildren(parentId).stream().map(EntityContract::getId).toList());
     }
 
+    public void clearChildren(String parentId, DeletionContext deletionContext, DeletionNode deletionNode) {
+        deleteChildren(selectChildren(parentId).stream().map(EntityContract::getId).toList(), deletionContext, deletionNode);
+    }
+
     private void validateIncomingChildren(String parentId, List<C> children, List<C> existing) {
         Set<String> existingIds = new HashSet<>(existing.stream().map(EntityContract::getId).toList());
         Set<String> incomingIds = new LinkedHashSet<>();
@@ -126,5 +132,20 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
             return;
         }
         childAbility.deleteBatch(ids);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void deleteChildren(List<String> ids, DeletionContext deletionContext, DeletionNode deletionNode) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
+            ((CascadeDeleteChildAbility<C>) cascadeDeleteChildAbility)
+                    .deleteBatchFromParentCascade(ids, deletionContext, deletionNode);
+            return;
+        }
+        for (String id : ids) {
+            childAbility.delete(id, null, deletionContext.child(deletionNode, childAbility.getModuleAlias(), id));
+        }
     }
 }

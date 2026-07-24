@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -54,6 +57,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         entity.setTenantId(active.getTenantId());
         entity.setDeleted(Boolean.FALSE);
         entity.setDeletedAt(null);
+        entity.setDeletedBy(null);
         return CrudAbility.super.update(entity);
     }
 
@@ -72,7 +76,21 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
 
     @Override
     default int delete(String id, Integer expectedVersion) {
-        beforeDelete(id);
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        return delete(id, expectedVersion, DeletionContext.root(getModuleAlias(), id));
+    }
+
+    @Override
+    default int delete(String id, Integer expectedVersion, DeletionContext deletionContext) {
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        DeletionContext context = deletionContext == null
+                ? DeletionContext.root(getModuleAlias(), id)
+                : deletionContext;
+        beforeDelete(id, context);
         T entity = selectIgnoreSoftDelete(id);
         if (isSoftDeleted(entity)) {
             return 0;
@@ -82,19 +100,26 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             throw new OptimisticLockException("record version conflict: " + id);
         }
         Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
-        EntityLifecycle.prepareDelete(entity, Instant.now());
-        int deleted;
-        try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
-            deleted = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+        DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.SOFT);
+        try {
+            EntityLifecycle.prepareDelete(entity, Instant.now());
+            int deleted;
+            try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+                deleted = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+            }
+            if (deleted <= 0) {
+                throw new OptimisticLockException("record version conflict: " + id);
+            }
+            PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted, context, node);
+            afterDelete(id, entity, deleted);
+            afterChanged(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
+            PlatformAbilityDispatcher.deletionSucceeded(this, entity, context, node, DeletionMode.SOFT);
+            return deleted;
+        } catch (RuntimeException exception) {
+            PlatformAbilityDispatcher.deletionFailed(this, entity, context, node, DeletionMode.SOFT, exception);
+            throw exception;
         }
-        if (deleted <= 0) {
-            throw new OptimisticLockException("record version conflict: " + id);
-        }
-        PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
-        afterDelete(id, entity, deleted);
-        afterChanged(entity);
-        CacheInvalidationSupport.clearAfterChanged(this, entity);
-        return deleted;
     }
 
     @Override

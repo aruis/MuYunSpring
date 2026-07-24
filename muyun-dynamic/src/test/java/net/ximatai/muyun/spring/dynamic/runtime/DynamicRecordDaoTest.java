@@ -81,6 +81,7 @@ class DynamicRecordDaoTest {
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE);
         assertThat(body.getValue()).containsEntry("deleted_at", null);
+        assertThat(body.getValue()).containsEntry("deleted_by", null);
         assertThat(body.getValue()).containsKeys("created_at", "updated_at");
     }
 
@@ -1068,6 +1069,7 @@ class DynamicRecordDaoTest {
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 3);
         assertThat(body.getValue()).containsKey("deleted_at");
+        assertThat(body.getValue()).containsKey("deleted_by");
         assertThat(where.getValue()).containsEntry("version", 2);
         assertThat(body.getValue()).doesNotContainKeys("code", "amount", "created_at", "created_by");
     }

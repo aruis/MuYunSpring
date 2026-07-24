@@ -34,6 +34,7 @@ class EntityLifecycleTest {
         assertThat(model.getVersion()).isZero();
         assertThat(model.getDeleted()).isFalse();
         assertThat(model.getDeletedAt()).isNull();
+        assertThat(model.getDeletedBy()).isNull();
         assertThat(model.getCreatedAt()).isEqualTo(createdAt);
         assertThat(model.getUpdatedAt()).isEqualTo(now);
     }
@@ -53,6 +54,7 @@ class EntityLifecycleTest {
 
         assertThat(model.getDeleted()).isTrue();
         assertThat(model.getDeletedAt()).isEqualTo(now.plusSeconds(1));
+        assertThat(model.getDeletedBy()).isNull();
         assertThat(model.getVersion()).isEqualTo(5);
         assertThat(model.getUpdatedAt()).isEqualTo(now.plusSeconds(1));
     }
@@ -77,6 +79,13 @@ class EntityLifecycleTest {
 
         assertThat(model.getCreatedBy()).isEqualTo("operator-1");
         assertThat(model.getUpdatedBy()).isEqualTo("operator-2");
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("operator-3", "Operator", "tenant-a"))) {
+            EntityLifecycle.prepareDelete(model, now.plusSeconds(2));
+        }
+
+        assertThat(model.getDeletedBy()).isEqualTo("operator-3");
     }
 
     @Test
@@ -114,6 +123,7 @@ class EntityLifecycleTest {
 
         assertThat(model.getCreatedBy()).isEqualTo("assistant-user");
         assertThat(model.getUpdatedBy()).isEqualTo("assistant-user");
+        assertThat(model.getDeletedBy()).isEqualTo("assistant-user");
     }
 
     @Test

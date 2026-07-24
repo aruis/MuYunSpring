@@ -15,6 +15,10 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
 
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -42,6 +46,7 @@ class AbilityContractTest {
         ReferenceDependencyRegistryTestAccess.clearAll();
         CacheRegistry.resetPolicy();
         PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
+        PlatformAbilityRuntime.resetDeletionLifecycleListener();
         TenantContext.clear();
         clearTransactionState();
     }
@@ -374,6 +379,51 @@ class AbilityContractTest {
         assertThat(invoiceService.lineService().selectIgnoreSoftDelete(thirdLine.getId())).isNotNull();
         assertThat(invoiceService.noteService().selectIgnoreSoftDelete(firstNote.getId())).isNotNull();
         assertThat(invoiceService.noteService().selectIgnoreSoftDelete(secondNote.getId())).isNotNull();
+    }
+
+    @Test
+    void deleteLifecycleShouldPropagateOneExplicitContextToCascadedChildren() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine line = new DemoInvoiceLine("Line");
+        DemoInvoiceNote note = new DemoInvoiceNote("Note");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(line));
+        invoice.setNotes(List.of(note));
+        String invoiceId = invoiceService.insert(invoice);
+        List<RecordedDeletion> recorded = new ArrayList<>();
+        PlatformAbilityRuntime.configureDeletionLifecycleListener(new DeletionLifecycleListener() {
+            @Override
+            public DeletionNode started(CrudAbility<?> ability,
+                                        EntityContract entity,
+                                        DeletionContext context,
+                                        DeletionMode mode) {
+                String entryId = "entry-" + (recorded.size() + 1);
+                recorded.add(new RecordedDeletion(ability.getModuleAlias(), entity.getId(), context, entryId, mode));
+                return new DeletionNode(entryId, new net.ximatai.muyun.spring.ability.deletion.DeletionResource(
+                        ability.getModuleAlias(), entity.getId()));
+            }
+        });
+
+        assertThat(invoiceService.delete(invoiceId)).isEqualTo(1);
+
+        assertThat(recorded).hasSize(3);
+        RecordedDeletion root = recorded.getFirst();
+        assertThat(root.moduleAlias()).isEqualTo("demo.invoice");
+        assertThat(root.context().trigger()).isEqualTo(net.ximatai.muyun.spring.ability.deletion.DeletionTrigger.DIRECT);
+        assertThat(root.context().parentEntryId()).isNull();
+        assertThat(recorded.subList(1, recorded.size()))
+                .allSatisfy(child -> {
+                    assertThat(child.context().operationId()).isEqualTo(root.context().operationId());
+                    assertThat(child.context().parent()).isEqualTo(root.context().root());
+                    assertThat(child.context().parentEntryId()).isEqualTo(root.entryId());
+                    assertThat(child.context().trigger()).isEqualTo(net.ximatai.muyun.spring.ability.deletion.DeletionTrigger.CASCADE);
+                });
+    }
+
+    private record RecordedDeletion(String moduleAlias,
+                                    String recordId,
+                                    DeletionContext context,
+                                    String entryId,
+                                    DeletionMode mode) {
     }
 
     @Test

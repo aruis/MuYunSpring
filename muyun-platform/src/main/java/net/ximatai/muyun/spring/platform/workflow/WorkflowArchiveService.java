@@ -163,6 +163,7 @@ public class WorkflowArchiveService {
         target.setVersion(source.getVersion());
         target.setDeleted(source.getDeleted());
         target.setDeletedAt(source.getDeletedAt());
+        target.setDeletedBy(source.getDeletedBy());
         target.setCreatedBy(source.getCreatedBy());
         target.setCreatedAt(source.getCreatedAt());
         target.setUpdatedBy(source.getUpdatedBy());

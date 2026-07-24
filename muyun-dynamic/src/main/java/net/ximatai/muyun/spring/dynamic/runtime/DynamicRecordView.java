@@ -69,6 +69,16 @@ abstract class DynamicRecordView implements EntityContract {
     }
 
     @Override
+    public String getDeletedBy() {
+        return record.getDeletedBy();
+    }
+
+    @Override
+    public void setDeletedBy(String deletedBy) {
+        record.setDeletedBy(deletedBy);
+    }
+
+    @Override
     public String getCreatedBy() {
         return record.getCreatedBy();
     }

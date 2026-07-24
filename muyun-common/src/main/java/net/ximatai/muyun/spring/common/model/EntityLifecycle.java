@@ -19,6 +19,7 @@ public final class EntityLifecycle {
         model.setVersion(model.getVersion() == null ? 0 : model.getVersion());
         model.setDeleted(Boolean.FALSE);
         model.setDeletedAt(null);
+        model.setDeletedBy(null);
         String operatorId = currentOperatorId();
         if (operatorId != null && (model.getCreatedBy() == null || model.getCreatedBy().isBlank())) {
             model.setCreatedBy(operatorId);
@@ -46,6 +47,7 @@ public final class EntityLifecycle {
     public static void prepareDelete(EntityContract model, Instant now) {
         model.setDeleted(Boolean.TRUE);
         model.setDeletedAt(now);
+        model.setDeletedBy(currentOperatorId());
         prepareUpdate(model, now);
     }
 

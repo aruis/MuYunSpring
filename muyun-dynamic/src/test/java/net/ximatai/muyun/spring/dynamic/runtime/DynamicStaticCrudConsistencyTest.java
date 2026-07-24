@@ -80,6 +80,7 @@ class DynamicStaticCrudConsistencyTest {
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE)
                 .containsEntry("deleted_at", null)
+                .containsEntry("deleted_by", null)
                 .containsEntry("created_by", "operator-1")
                 .containsEntry("updated_by", "operator-1")
                 .containsKeys("created_at", "updated_at");
@@ -96,7 +97,8 @@ class DynamicStaticCrudConsistencyTest {
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 1)
                 .containsEntry("updated_by", "operator-1")
-                .containsKeys("deleted_at", "updated_at");
+                .containsEntry("deleted_by", "operator-1")
+                .containsKeys("deleted_at", "deleted_by", "updated_at");
 
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(querySql.capture(), anyMap());

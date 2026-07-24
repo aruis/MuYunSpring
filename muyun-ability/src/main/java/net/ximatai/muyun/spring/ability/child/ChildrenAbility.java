@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.ability.child;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -120,12 +122,22 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     default void afterChildrenDelete(String id, P parent, int deleted) {
+        afterChildrenDelete(id, parent, deleted,
+                DeletionContext.root(getModuleAlias(), id),
+                DeletionNode.transientNode(new net.ximatai.muyun.spring.ability.deletion.DeletionResource(getModuleAlias(), id)));
+    }
+
+    default void afterChildrenDelete(String id,
+                                     P parent,
+                                     int deleted,
+                                     DeletionContext deletionContext,
+                                     DeletionNode deletionNode) {
         if (deleted <= 0) {
             return;
         }
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
             if (relation.isAutoDeleteWithParent()) {
-                relation.clearChildren(id);
+                relation.clearChildren(id, deletionContext, deletionNode);
             }
         }
     }
