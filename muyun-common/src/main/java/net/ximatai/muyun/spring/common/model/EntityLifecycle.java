@@ -51,6 +51,14 @@ public final class EntityLifecycle {
         prepareUpdate(model, now);
     }
 
+    /** Restores a previously soft-deleted record while preserving normal update auditing. */
+    public static void prepareRestore(EntityContract model, Instant now) {
+        model.setDeleted(Boolean.FALSE);
+        model.setDeletedAt(null);
+        model.setDeletedBy(null);
+        prepareUpdate(model, now);
+    }
+
     public static Integer nextVersion(Integer currentVersion) {
         return currentVersion == null ? 1 : currentVersion + 1;
     }

@@ -72,6 +72,20 @@ class AbilityContractTest {
     }
 
     @Test
+    void softDeleteAbilityShouldRestoreOnlyDeletedRecords() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        DemoOrganization organization = new DemoOrganization("Headquarters", TreeAbility.ROOT_ID);
+        String id = service.insert(organization);
+
+        assertThat(service.restore(id)).isZero();
+        assertThat(service.delete(id)).isEqualTo(1);
+        assertThat(service.restore(id)).isEqualTo(1);
+        assertThat(service.select(id)).isNotNull();
+        assertThat(organization.getDeletedAt()).isNull();
+        assertThat(organization.getDeletedBy()).isNull();
+    }
+
+    @Test
     void crudAbilityShouldRunStaticOptionValidationBeforeInsertAndUpdateOnly() {
         DemoOrganizationService service = new DemoOrganizationService();
         List<String> validated = new ArrayList<>();

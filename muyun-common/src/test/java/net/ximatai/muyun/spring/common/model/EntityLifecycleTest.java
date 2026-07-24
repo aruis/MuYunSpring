@@ -60,6 +60,24 @@ class EntityLifecycleTest {
     }
 
     @Test
+    void shouldPrepareRestore() {
+        StandardEntity model = new TestModel();
+        model.setDeleted(Boolean.TRUE);
+        model.setDeletedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        model.setDeletedBy("deleted-by");
+        model.setVersion(3);
+        Instant now = Instant.parse("2026-01-02T00:00:00Z");
+
+        EntityLifecycle.prepareRestore(model, now);
+
+        assertThat(model.getDeleted()).isFalse();
+        assertThat(model.getDeletedAt()).isNull();
+        assertThat(model.getDeletedBy()).isNull();
+        assertThat(model.getVersion()).isEqualTo(4);
+        assertThat(model.getUpdatedAt()).isEqualTo(now);
+    }
+
+    @Test
     void shouldFillAuditOperatorFromCurrentUser() {
         StandardEntity model = new TestModel();
         Instant now = Instant.parse("2026-01-02T00:00:00Z");

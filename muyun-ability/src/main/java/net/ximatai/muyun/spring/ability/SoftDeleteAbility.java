@@ -122,6 +122,48 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         }
     }
 
+    /**
+     * Restores only this resource. Deletion-tree recovery remains the concern
+     * of the platform coordinator, which determines whether a child still
+     * belongs to the source delete operation before invoking this primitive.
+     */
+    default int restore(String id) {
+        return restore(id, null);
+    }
+
+    default int restore(String id, Integer expectedVersion) {
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        beforeRestore(id);
+        T entity = selectIgnoreSoftDelete(id);
+        if (!Boolean.TRUE.equals(entity == null ? null : entity.getDeleted())) {
+            return 0;
+        }
+        if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
+        Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+        EntityLifecycle.prepareRestore(entity, Instant.now());
+        int restored;
+        try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+            restored = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+        }
+        if (restored <= 0) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
+        afterRestore(id, entity, restored);
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
+        return restored;
+    }
+
+    default void beforeRestore(String id) {
+    }
+
+    default void afterRestore(String id, T entity, int restored) {
+    }
+
     @Override
     default Criteria activeCriteria(Criteria criteria) {
         Criteria scoped = CrudAbility.super.activeCriteria(criteria);
