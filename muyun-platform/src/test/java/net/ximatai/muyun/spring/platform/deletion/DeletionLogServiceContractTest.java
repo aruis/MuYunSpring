@@ -4,6 +4,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -79,6 +82,32 @@ class DeletionLogServiceContractTest {
         assertThat(service.operationEntries(firstOperationId))
                 .extracting(DeletionEntry::getId)
                 .containsExactly(firstEntryId);
+    }
+
+    @Test
+    void shouldLoadLatestLifecycleForOneRecordPage() {
+        DeletionOperation first = deleteOperation();
+        first.setRootRecordId("tenant-1");
+        String firstOperationId = service.startOperation(first);
+        String firstEntryId = service.startEntry(entry(firstOperationId, null,
+                DeletionEntryTrigger.DIRECT, "tenant-1"));
+        service.completeEntry(firstEntryId, DeletionEntryStatus.SUCCEEDED, null);
+        service.completeOperation(firstOperationId, DeletionOperationStatus.SUCCEEDED, null);
+
+        DeletionOperation second = deleteOperation();
+        second.setRootRecordId("tenant-2");
+        String secondOperationId = service.startOperation(second);
+        String secondEntryId = service.startEntry(entry(secondOperationId, null,
+                DeletionEntryTrigger.DIRECT, "tenant-2"));
+        service.completeEntry(secondEntryId, DeletionEntryStatus.SUCCEEDED, null);
+        service.completeOperation(secondOperationId, DeletionOperationStatus.SUCCEEDED, null);
+
+        Map<String, DeletionLifecycleEntry> lifecycles = service.latestTerminalEntries(
+                "iam.tenant", "tenant", List.of("tenant-1", "tenant-2"));
+
+        assertThat(lifecycles).containsOnlyKeys("tenant-1", "tenant-2");
+        assertThat(lifecycles.get("tenant-1").operation().getId()).isEqualTo(firstOperationId);
+        assertThat(lifecycles.get("tenant-2").operation().getId()).isEqualTo(secondOperationId);
     }
 
     private DeletionOperation deleteOperation() {

@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryCompiler;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
@@ -18,6 +19,8 @@ import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -115,12 +118,42 @@ public class StaticRecordReadProjectionService {
         return QuerySchema.from(projectionAwareQueryDescriptor(moduleAlias, recordService), modelClass(recordService));
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public <T> Optional<WebPageResponse<T>> queryDefaultList(String moduleAlias,
-                                                            Criteria criteria,
-                                                            PageRequest pageRequest,
-                                                            Object recordService,
-                                                            Sort... sorts) {
+    /**
+     * Executes the shared static list-read pipeline. Standard and recycle-bin reads differ only by
+     * their explicit record visibility and corresponding action policy.
+     */
+    public Optional<WebPageResponse<Map<String, Object>>> queryDefaultList(String moduleAlias,
+                                                                           QueryRequest request,
+                                                                           PageRequest pageRequest,
+                                                                           CrudAbility<?> recordService,
+                                                                           ActionExecutionPolicy actionPolicy,
+                                                                           RecordReadVisibility visibility) {
+        if (moduleAlias == null || recordService == null || actionPolicy == null || visibility == null
+                || !supportsDefaultListQuery(moduleAlias, recordService)) {
+            return Optional.empty();
+        }
+        if (!visibility.action().matches(actionPolicy.actionCode())) {
+            throw new IllegalArgumentException("record visibility does not match query action: "
+                    + visibility + " / " + actionPolicy.actionCode());
+        }
+        Criteria criteria = queryCriteria(moduleAlias, recordService, request);
+        Sort[] sorts = querySorts(moduleAlias, recordService, request);
+        if (recordService instanceof DataScopeAbility<?> dataScopeAbility) {
+            DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(actionPolicy, criteria);
+            return dataScopeAbility.withDataScopeTenant(scope,
+                    () -> queryDefaultList(moduleAlias,
+                            visibility.apply(recordService, scope.criteria()),
+                            pageRequest, recordService, sorts));
+        }
+        return queryDefaultList(
+                moduleAlias, visibility.apply(recordService, criteria), pageRequest, recordService, sorts);
+    }
+
+    public Optional<WebPageResponse<Map<String, Object>>> queryDefaultList(String moduleAlias,
+                                                                           Criteria criteria,
+                                                                           PageRequest pageRequest,
+                                                                           Object recordService,
+                                                                           Sort... sorts) {
         StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
         if (definition == null) {
             return Optional.empty();
@@ -152,7 +185,7 @@ public class StaticRecordReadProjectionService {
                 page.getRecords(),
                 optionSourceRegistry
         );
-        WebPageResponse response = new WebPageResponse(
+        WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
                 page.getPageNum(),
@@ -164,24 +197,23 @@ public class StaticRecordReadProjectionService {
         return Optional.of(response);
     }
 
-    public <T> Optional<WebPageResponse<T>> queryExplicitList(String moduleAlias,
-                                                             List<String> outputFields,
-                                                             Criteria criteria,
-                                                             PageRequest pageRequest,
-                                                             Object recordService,
-                                                             Sort... sorts) {
+    public Optional<WebPageResponse<Map<String, Object>>> queryExplicitList(String moduleAlias,
+                                                                            List<String> outputFields,
+                                                                            Criteria criteria,
+                                                                            PageRequest pageRequest,
+                                                                            Object recordService,
+                                                                            Sort... sorts) {
         return queryExplicitList(moduleAlias, "explicit_list", outputFields, criteria, pageRequest, recordService,
                 sorts);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public <T> Optional<WebPageResponse<T>> queryExplicitList(String moduleAlias,
-                                                             String viewCode,
-                                                             List<String> outputFields,
-                                                             Criteria criteria,
-                                                             PageRequest pageRequest,
-                                                             Object recordService,
-                                                             Sort... sorts) {
+    public Optional<WebPageResponse<Map<String, Object>>> queryExplicitList(String moduleAlias,
+                                                                            String viewCode,
+                                                                            List<String> outputFields,
+                                                                            Criteria criteria,
+                                                                            PageRequest pageRequest,
+                                                                            Object recordService,
+                                                                            Sort... sorts) {
         StaticModuleDefinition definition = staticModuleDefinitionCatalog.find(moduleAlias).orElse(null);
         if (definition == null) {
             return Optional.empty();
@@ -215,7 +247,7 @@ public class StaticRecordReadProjectionService {
                 page.getRecords(),
                 optionSourceRegistry
         );
-        WebPageResponse response = new WebPageResponse(
+        WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
                 page.getPageNum(),

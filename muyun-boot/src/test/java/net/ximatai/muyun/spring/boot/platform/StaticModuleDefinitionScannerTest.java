@@ -125,7 +125,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("租户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactly("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "recycleBinQuery", "recycleBinRestore", "recycleBinPurge");
+                                "sort", "enable", "disable", "recycleBinQuery", "recycleBinRestore");
             });
             assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
@@ -155,7 +155,10 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable", "employeePositions", "employeeAccounts",
-                                "employeeDelegations", "employeeDelegatedToMe");
+                                "employeeDelegations", "employeeDelegatedToMe",
+                                "recycleBinQuery", "recycleBinRestore");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .doesNotContain("recycleBinPurge");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeAccounts"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeAccounts", "职员账号"));

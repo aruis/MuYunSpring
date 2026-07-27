@@ -934,9 +934,10 @@ export interface DynamicPageDescriptor {
 
 export interface RecycleBinItem<T = Record<string, unknown>> {
   record: T;
-  sourceDeleteOperationId: string;
+  sourceDeleteOperationId: string | null;
   deletedAt: string;
   restorable: boolean;
+  purgeable: boolean;
   unavailableReason?: string;
 }
 
@@ -945,6 +946,7 @@ export type RestoreEntryStatus = 'RESTORED' | 'SKIPPED' | 'FAILED';
 export interface RestoreEntryResult {
   sourceEntryId: string;
   moduleAlias: string;
+  entityAlias: string;
   recordId: string;
   status: RestoreEntryStatus;
   message?: string;
@@ -961,6 +963,7 @@ export type PurgeEntryStatus = 'PURGED' | 'SKIPPED' | 'FAILED';
 export interface PurgeEntryResult {
   sourceEntryId: string;
   moduleAlias: string;
+  entityAlias: string;
   recordId: string;
   status: PurgeEntryStatus;
   message?: string;

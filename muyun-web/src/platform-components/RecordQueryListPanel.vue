@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiButton, UiDataTable, UiDropdown, UiEmpty, UiInput, UiSelect, UiSpin } from '@muyun/vue-ui-antdv';
+import {
+  confirmAction,
+  UiButton,
+  UiDataTable,
+  UiDropdown,
+  UiEmpty,
+  UiInput,
+  UiSelect,
+  UiSpin,
+} from '@muyun/vue-ui-antdv';
 import type { UiDataTableColumn, UiDropdownItem } from '@muyun/vue-ui-antdv';
 import type {
   Option,
@@ -13,6 +22,7 @@ import type {
   WebQueryCondition,
   WebQueryRequest,
   WebSort,
+  RecycleBinItem,
 } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
@@ -25,10 +35,12 @@ import {
   type RecordActionItem,
   type ResolvedRecordActionItem,
 } from './recordActionBarModel';
+import { useRecycleBinState } from './recycleBinState';
 
 defineOptions({ name: 'RecordQueryListPanel' });
 
 export type QueryListRecord = Record<string, unknown> & { id?: string; enabled?: boolean };
+export type RecordQueryListMode = 'normal' | 'recycleBin';
 
 export interface RecordQueryListColumn {
   key: string;
@@ -87,6 +99,9 @@ const props = withDefaults(
     quickSearchPlaceholder?: string;
     emptyDescription?: string;
     waitingDescription?: string;
+    mode?: RecordQueryListMode;
+    recycleBinEnabled?: boolean;
+    recycleBinTitle?: string;
   }>(),
   {
     rowKey: 'id',
@@ -112,6 +127,9 @@ const props = withDefaults(
     quickSearchPlaceholder: '搜索',
     emptyDescription: '暂无记录',
     waitingDescription: '请选择查询范围',
+    mode: 'normal',
+    recycleBinEnabled: false,
+    recycleBinTitle: '回收站',
   },
 );
 
@@ -122,6 +140,8 @@ const emit = defineEmits<{
   action: [action: RecordActionItem, event: MouseEvent];
   rowAction: [action: ResolvedRecordActionItem, record: QueryListRecord, event?: MouseEvent];
   rowExpand: [record: QueryListRecord, expanded: boolean];
+  modeChange: [mode: RecordQueryListMode];
+  restored: [];
 }>();
 const slots = defineSlots<{
   expandedRow?: (props: { record: QueryListRecord; rowKey: string }) => unknown;
@@ -130,6 +150,8 @@ const slots = defineSlots<{
 const loading = ref(false);
 const schema = ref<QuerySchema>();
 const records = ref<QueryListRecord[]>([]);
+const recycleBinItems = new Map<string, RecycleBinItem<QueryListRecord>>();
+const recycleBinState = useRecycleBinState({ context: props.context });
 const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(props.pageSize);
@@ -159,6 +181,9 @@ const quickSearchDisabled = computed(() => !queryReady.value || !quickSearchEnab
 const queryActionsDisabled = computed(() => !queryReady.value);
 const conditionsDisabled = computed(() => !queryReady.value || queryFields.value.length === 0);
 const panelActions = computed<RecordActionItem[]>(() => {
+  if (props.mode === 'recycleBin') {
+    return [];
+  }
   if (props.actions && props.actions.length > 0) {
     return props.actions;
   }
@@ -177,15 +202,18 @@ const panelActions = computed<RecordActionItem[]>(() => {
 });
 const hasRowActions = computed(
   () =>
-    props.rowActionsOf !== undefined || props.standardCrudRowActions || props.extraRowActionsOf !== undefined,
+    props.mode === 'recycleBin' ||
+    props.rowActionsOf !== undefined ||
+    props.standardCrudRowActions ||
+    props.extraRowActionsOf !== undefined,
 );
 const hasExpandedRow = computed(() => props.expandedRowKeys.length > 0 || Boolean(slots.expandedRow));
 const rows = computed<QueryListRow[]>(() => records.value.map(resolveRow));
 const tableColumns = computed<RecordQueryListColumn[]>(() => {
   if (props.columns && props.columns.length > 0) {
-    return props.columns;
+    return recycleBinColumns(props.columns);
   }
-  return columnsFromRuntimeListView(runtimeViews.value);
+  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value));
 });
 const dataTableColumns = computed<UiDataTableColumn[]>(() =>
   tableColumns.value.map((column) => ({
@@ -215,6 +243,14 @@ watch(
 watch(
   () => props.context,
   () => loadSchemaAndRecords(),
+);
+
+watch(
+  () => props.mode,
+  () => {
+    pageNum.value = 1;
+    void loadRecords();
+  },
 );
 
 watch(
@@ -309,6 +345,27 @@ async function loadRecords(updateLoading = true) {
     emit('loaded', []);
     if (updateLoading) {
       loading.value = false;
+    }
+    return;
+  }
+  if (props.mode === 'recycleBin') {
+    if (updateLoading) loading.value = true;
+    try {
+      await recycleBinState.load(buildQueryRequest());
+      if (requestSeq !== recordsRequestSeq) return;
+      recycleBinItems.clear();
+      records.value = recycleBinState.items.value.map((item) => {
+        const record = { ...item.record, deletedAt: item.deletedAt };
+        const key = recordKey(record);
+        recycleBinItems.set(key, item);
+        return record;
+      });
+      total.value = recycleBinState.total.value;
+      pageNum.value = recycleBinState.pageNum.value;
+      pageSize.value = recycleBinState.pageSize.value;
+      emit('loaded', records.value);
+    } finally {
+      if (updateLoading && requestSeq === recordsRequestSeq) loading.value = false;
     }
     return;
   }
@@ -408,6 +465,16 @@ function resolveRow(record: QueryListRecord): QueryListRow {
 }
 
 function rowActions(record: QueryListRecord): RecordActionItem[] {
+  if (props.mode === 'recycleBin') {
+    const item = recycleBinItems.get(recordKey(record));
+    if (!item) return [];
+    return [
+      { key: 'restore', actionCode: 'recycleBinRestore', title: '恢复', disabled: !item.restorable },
+      ...(item.purgeable
+        ? [{ key: 'purge', actionCode: 'recycleBinPurge', title: '彻底删除', danger: true }]
+        : []),
+    ];
+  }
   const baseActions = props.rowActionsOf
     ? props.rowActionsOf(record)
     : props.standardCrudRowActions
@@ -438,26 +505,72 @@ function rowActionDropdownItem(action: ResolvedRecordActionItem): UiDropdownItem
   };
 }
 
-function handlePrimaryRowAction(row: QueryListRow, action: ResolvedRecordActionItem, event: MouseEvent) {
+async function handlePrimaryRowAction(
+  row: QueryListRow,
+  action: ResolvedRecordActionItem,
+  event: MouseEvent,
+) {
   if (action.disabled) {
     return;
   }
+  if (await handleRecycleBinAction(row, action)) return;
   emit('rowAction', action, row.record, event);
 }
 
-function handleSecondaryRowAction(row: QueryListRow, key: string) {
+async function handleSecondaryRowAction(row: QueryListRow, key: string) {
   const action = row.secondaryActions.find((item) => item.key === key);
   if (!action || action.disabled) {
     return;
   }
+  if (await handleRecycleBinAction(row, action)) return;
   emit('rowAction', action, row.record);
 }
 
+async function handleRecycleBinAction(row: QueryListRow, action: ResolvedRecordActionItem) {
+  if (props.mode !== 'recycleBin') return false;
+  const item = recycleBinItems.get(row.key);
+  if (!item) return true;
+  const title = recycleBinState.recordTitleOf(item);
+  if (action.key === 'restore') {
+    const confirmed = await confirmAction({
+      title: '恢复记录',
+      content: `确认恢复「${title}」？`,
+      okText: '恢复',
+    });
+    if (confirmed && (await recycleBinState.restore(item, false))) {
+      emit('restored');
+      await loadRecords();
+    }
+    return true;
+  }
+  if (action.key === 'purge') {
+    const confirmed = await confirmAction({
+      title: '彻底删除',
+      content: `彻底删除后数据不可恢复。确认彻底删除「${title}」？`,
+      okText: '彻底删除',
+      danger: true,
+      requiredText: title,
+    });
+    if (confirmed && (await recycleBinState.purge(item, false))) {
+      await loadRecords();
+    }
+    return true;
+  }
+  return false;
+}
+
+function recycleBinColumns(columns: RecordQueryListColumn[]) {
+  if (props.mode !== 'recycleBin' || columns.some((column) => column.key === 'deletedAt')) return columns;
+  return [...columns, { key: 'deletedAt', title: '删除时间', type: 'datetime' as const, width: '170px' }];
+}
+
 function handleTableRowClick(row: QueryListRow) {
+  if (props.mode === 'recycleBin') return;
   emit('select', row.record);
 }
 
 function handleTableRowDblclick(row: QueryListRow, event: MouseEvent) {
+  if (props.mode === 'recycleBin') return;
   emit('rowDblclick', row.record, event);
 }
 
@@ -747,6 +860,14 @@ defineExpose({ refresh });
         <span>{{ title }}</span>
       </UiButton>
       <div class="record-query-list-actions">
+        <UiButton
+          v-if="recycleBinEnabled"
+          type="text"
+          icon-name="delete"
+          @click="emit('modeChange', mode === 'normal' ? 'recycleBin' : 'normal')"
+        >
+          {{ mode === 'normal' ? recycleBinTitle : '返回列表' }}
+        </UiButton>
         <RecordActionBar
           v-if="panelActions.length > 0"
           :context="context"

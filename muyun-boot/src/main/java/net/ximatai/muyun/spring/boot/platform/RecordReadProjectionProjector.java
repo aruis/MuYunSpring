@@ -41,7 +41,11 @@ public final class RecordReadProjectionProjector {
 
     private static List<String> responseFields(RecordReadProjection projection) {
         return java.util.stream.Stream.concat(
-                        java.util.stream.Stream.of(StandardEntitySchema.ID_FIELD),
+                        java.util.stream.Stream.of(
+                                StandardEntitySchema.ID_FIELD,
+                                StandardEntitySchema.VERSION_FIELD,
+                                StandardEntitySchema.DELETED_AT_FIELD
+                        ),
                         projection.outputFields().stream().map(ViewFieldRef::fieldName))
                 .distinct()
                 .toList();

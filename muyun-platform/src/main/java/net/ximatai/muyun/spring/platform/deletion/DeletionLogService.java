@@ -12,6 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Comparator;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -156,21 +160,69 @@ public class DeletionLogService {
     }
 
     public DeletionLifecycleEntry latestTerminalEntry(String moduleAlias, String entityAlias, String recordId) {
+        return latestTerminalEntries(moduleAlias, entityAlias, List.of(recordId)).get(recordId);
+    }
+
+    /** Loads the latest effective lifecycle facts for one page of resource records. */
+    public Map<String, DeletionLifecycleEntry> latestTerminalEntries(String moduleAlias,
+                                                                     String entityAlias,
+                                                                     Collection<String> recordIds) {
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>();
+        if (recordIds != null) {
+            recordIds.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(value -> !value.isEmpty())
+                    .forEach(normalizedIds::add);
+        }
+        if (normalizedIds.isEmpty()) {
+            return Map.of();
+        }
         Criteria criteria = Criteria.of()
                 .eq("resourceModuleAlias", requireText(moduleAlias, "moduleAlias"))
-                .eq("resourceRecordId", requireText(recordId, "recordId"));
+                .in("resourceRecordId", List.copyOf(normalizedIds));
         if (entityAlias != null && !entityAlias.isBlank()) {
             criteria.eq("resourceEntityAlias", entityAlias);
         }
         List<DeletionEntry> entries = entryDao.query(criteria,
                 PageRequest.of(1, Integer.MAX_VALUE));
-        return entries.stream()
-                .filter(entry -> entry.getStatus() != DeletionEntryStatus.IN_PROGRESS)
-                .map(entry -> new DeletionLifecycleEntry(requireOperation(entry.getOperationId()), entry))
-                .filter(item -> item.operation().getStatus() != DeletionOperationStatus.IN_PROGRESS)
-                .max(Comparator.comparing((DeletionLifecycleEntry item) -> item.entry().getCompletedAt(),
-                        Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(item -> item.entry().getId()))
-                .orElse(null);
+        LinkedHashSet<String> operationIds = new LinkedHashSet<>();
+        entries.stream()
+                .filter(entry -> entry.getStatus() == DeletionEntryStatus.SUCCEEDED)
+                .map(DeletionEntry::getOperationId)
+                .filter(Objects::nonNull)
+                .forEach(operationIds::add);
+        if (operationIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, DeletionOperation> operations = new LinkedHashMap<>();
+        operationDao.query(Criteria.of().in("id", List.copyOf(operationIds)),
+                        PageRequest.of(1, Integer.MAX_VALUE))
+                .forEach(operation -> operations.put(operation.getId(), operation));
+        if (operations.size() != operationIds.size()) {
+            operationIds.stream()
+                    .filter(operationId -> !operations.containsKey(operationId))
+                    .findFirst()
+                    .ifPresent(this::requireOperation);
+        }
+
+        Comparator<DeletionLifecycleEntry> recency = Comparator
+                .comparing((DeletionLifecycleEntry item) -> item.entry().getCompletedAt(),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(item -> item.entry().getId());
+        Map<String, DeletionLifecycleEntry> latest = new LinkedHashMap<>();
+        for (DeletionEntry entry : entries) {
+            DeletionOperation operation = operations.get(entry.getOperationId());
+            // Failed or skipped attempts remain audit facts, but do not change the resource lifecycle.
+            if (entry.getStatus() != DeletionEntryStatus.SUCCEEDED || operation == null
+                    || operation.getStatus() == DeletionOperationStatus.IN_PROGRESS) {
+                continue;
+            }
+            DeletionLifecycleEntry candidate = new DeletionLifecycleEntry(operation, entry);
+            latest.merge(entry.getResourceRecordId(), candidate,
+                    (current, next) -> recency.compare(current, next) >= 0 ? current : next);
+        }
+        return Map.copyOf(latest);
     }
 
     private void requireOperationInProgress(String operationId) {

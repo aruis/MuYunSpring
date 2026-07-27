@@ -9,7 +9,11 @@ export interface EmployeeEmploymentRowState {
   error?: string;
 }
 
-export function useEmployeeEmploymentRows(options: { context: ModuleContext<Employee>; source: string }) {
+export function useEmployeeEmploymentRows(options: {
+  context: ModuleContext<Employee>;
+  source: string;
+  pathOf?: (employeeId: string) => string;
+}) {
   const expandedEmployeeKeys = ref<string[]>([]);
   const states = ref<Record<string, EmployeeEmploymentRowState>>({});
 
@@ -20,7 +24,8 @@ export function useEmployeeEmploymentRows(options: { context: ModuleContext<Empl
     setState(employeeId, { ...employmentRowState(employeeId), loading: true, error: undefined });
     try {
       const response = await options.context.http.request<{ records: EmploymentSelectorItem[] }>({
-        path: `/iam.employee/${encodeURIComponent(employeeId)}/employment-view`,
+        path:
+          options.pathOf?.(employeeId) ?? `/iam.employee/${encodeURIComponent(employeeId)}/employment-view`,
       });
       setState(employeeId, { records: response.records, loading: false, error: undefined });
     } catch (cause) {

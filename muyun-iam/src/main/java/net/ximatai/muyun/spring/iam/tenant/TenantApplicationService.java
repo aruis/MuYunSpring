@@ -168,6 +168,11 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
     }
 
     @Override
+    public boolean isRecycleBinPurgeEnabled() {
+        return true;
+    }
+
+    @Override
     public void beforeRecycleBinPurge(String id) {
         // Tenant applications only participate in a root tenant's purge tree.
     }

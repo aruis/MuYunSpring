@@ -180,7 +180,7 @@ public class SoftDeleteRestoreCoordinator {
     }
 
     private RestoreEntryResult result(DeletionEntry entry, RestoreEntryResult.Status status, String message) {
-        return new RestoreEntryResult(entry.getId(), entry.getResourceModuleAlias(), entry.getResourceRecordId(),
+        return new RestoreEntryResult(entry.getId(), entry.getResourceModuleAlias(), entry.getResourceEntityAlias(), entry.getResourceRecordId(),
                 status, message);
     }
 

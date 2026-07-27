@@ -12,11 +12,16 @@ import net.ximatai.muyun.spring.boot.web.BusinessMutation;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
+import net.ximatai.muyun.spring.boot.web.RecycleBinWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
@@ -28,6 +33,7 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,6 +54,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         CrudWeb<Employee, EmployeeService>,
         EnableWeb<Employee, EmployeeService>,
         SortWeb<Employee, EmployeeService>,
+        RecycleBinWeb<Employee, EmployeeService>,
         MutationTenantScopeResolver<Employee>,
         StaticModuleUiContributor {
     private final EmployeePositionService employeePositionService;
@@ -56,6 +63,20 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     private OrganizationService organizationService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
+    private RecycleBinFacade recycleBinFacade;
+
+    @Autowired
+    void setRecycleBinFacade(RecycleBinFacade recycleBinFacade) {
+        this.recycleBinFacade = recycleBinFacade;
+    }
+
+    @Override
+    public RecycleBinFacade recycleBinFacade() {
+        if (recycleBinFacade == null) {
+            throw new IllegalStateException("RecycleBinFacade must be configured for recycle-bin endpoints");
+        }
+        return recycleBinFacade;
+    }
 
     @Autowired
     public EmployeeWebController(EmployeePositionService employeePositionService,
@@ -182,12 +203,14 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗", level = PlatformActionLevel.RECORD,
             dataAuth = true, recordIdPathVariable = "employeeId")
     public WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentView(@PathVariable String employeeId) {
-        return employeeRecordScope(employeeId, () -> {
-            if (employeeEmploymentReadService == null) throw new IllegalStateException("employment view is not available");
-            return new WebListResponse<>(employeeEmploymentReadService.page(
-                    new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE,
-                            new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
-        });
+        return employeeRecordScope(employeeId, () -> employmentViewRecords(employeeId));
+    }
+
+    @GetMapping("/recycle-bin/{employeeId}/employment-view")
+    @ActionEndpoint(PlatformAction.RECYCLE_BIN_QUERY)
+    public WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> recycleBinEmploymentView(
+            @PathVariable String employeeId) {
+        return employeeRecycleBinScope(employeeId, () -> employmentViewRecords(employeeId));
     }
 
     @PostMapping("/{employeeId}/positions")
@@ -327,6 +350,30 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
 
     private <R> R employeeRecordScope(String employeeId, Supplier<R> action) {
         return MutationTenantScopeExecutor.forExistingRecord(this, employeeId, () -> webScope(action));
+    }
+
+    private WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentViewRecords(
+            String employeeId) {
+        if (employeeEmploymentReadService == null) {
+            throw new IllegalStateException("employment view is not available");
+        }
+        return new WebListResponse<>(employeeEmploymentReadService.page(
+                new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE,
+                        new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
+    }
+
+    private <R> R employeeRecycleBinScope(String employeeId, Supplier<R> action) {
+        if (!service().canAccessRecycleBinRecord(employeeId)) {
+            throw new PlatformException("Recycle-bin record is unavailable: " + EmployeeService.MODULE_ALIAS);
+        }
+        Employee retained = service().selectIgnoreSoftDelete(employeeId);
+        Optional<String> tenantId = tenantIdForEmployee(retained);
+        if (!TenantContext.isSystem() || tenantId.isEmpty()) {
+            return webScope(action);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId.get())) {
+            return webScope(action);
+        }
     }
 
     public record AccountProvisionResponse(UserAccount user, EmployeeAccount binding) {

@@ -105,6 +105,7 @@ class RecordReadProjectionPlannerTest {
         );
         ProjectionEmployee record = new ProjectionEmployee();
         record.setId("emp-1");
+        record.setVersion(7);
         record.setEmployeeNo("E001");
         record.setTitle("张三");
         record.setMobile("13800000000");
@@ -113,6 +114,8 @@ class RecordReadProjectionPlannerTest {
         Map<String, Object> output = RecordReadProjectionProjector.project(record, projection);
 
         assertThat(output).containsEntry("id", "emp-1");
+        assertThat(output).containsEntry("version", 7);
+        assertThat(output).containsEntry("deletedAt", null);
         assertThat(output).containsEntry("employeeNo", "E001");
         assertThat(output).containsEntry("title", "张三");
         assertThat(output).containsEntry("enabled", Boolean.TRUE);
@@ -256,6 +259,28 @@ class RecordReadProjectionPlannerTest {
     }
 
     @Test
+    void shouldAttachRecycleBinQueryContextToTheSameListProjection() {
+        ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(staticDefinition(
+                ModuleUiDefinition.builder("iam.employee")
+                        .listView(list -> list.field("employeeNo"))
+                        .build()
+        ));
+        ActionExecutionContext actionContext = ActionExecutionContext.ofPlatformAction(
+                "iam.employee",
+                PlatformAction.RECYCLE_BIN_QUERY,
+                Set.of(),
+                java.util.Optional.empty()
+        );
+
+        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+                compilation.uiDescriptor(), compilation.readModel(), null, actionContext);
+
+        assertThat(projection.actionCode()).isEqualTo("recycleBinQuery");
+        assertThat(projection.outputFields()).extracting(ViewFieldRef::fieldName)
+                .containsExactly("employeeNo");
+    }
+
+    @Test
     void shouldRejectProjectionWhenActionContextIsNotQuery() {
         ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(staticDefinition(
                 ModuleUiDefinition.builder("iam.employee")
@@ -276,7 +301,7 @@ class RecordReadProjectionPlannerTest {
                 actionContext
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("requires query action context");
+                .hasMessageContaining("requires list query action context");
     }
 
     @Test
@@ -316,10 +341,13 @@ class RecordReadProjectionPlannerTest {
         );
         ProjectionEmployee record = new ProjectionEmployee();
         record.setId("emp-1");
+        record.setVersion(7);
 
         Map<String, Object> output = RecordReadProjectionProjector.project(record, projection);
 
         assertThat(output).containsEntry("id", "emp-1");
+        assertThat(output).containsEntry("version", 7);
+        assertThat(output).containsEntry("deletedAt", null);
         assertThat(output).containsEntry("employeeNo", null);
     }
 
@@ -357,6 +385,8 @@ class RecordReadProjectionPlannerTest {
 
     public static final class ProjectionEmployee {
         private String id;
+        private Integer version;
+        private java.time.Instant deletedAt;
         private String employeeNo;
         private String title;
         private String mobile;
@@ -368,6 +398,22 @@ class RecordReadProjectionPlannerTest {
 
         public void setId(String id) {
             this.id = id;
+        }
+
+        public Integer getVersion() {
+            return version;
+        }
+
+        public void setVersion(Integer version) {
+            this.version = version;
+        }
+
+        public java.time.Instant getDeletedAt() {
+            return deletedAt;
+        }
+
+        public void setDeletedAt(java.time.Instant deletedAt) {
+            this.deletedAt = deletedAt;
         }
 
         public String getEmployeeNo() {

@@ -126,11 +126,6 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     }
 
     @Override
-    public void beforeRecycleBinPurge(String id) {
-        requireSystemMutationContext();
-    }
-
-    @Override
     public void verifyActiveTenant(String tenantId) {
         requireActiveTenant(tenantId);
     }

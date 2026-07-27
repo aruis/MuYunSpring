@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -20,10 +22,20 @@ import java.util.List;
 public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteAbility<T>, DeletionRecoveryAbility<T> {
     /** Lists retained records visible to the current recycle-bin boundary. */
     default List<T> listRecycleBin(PageRequest pageRequest) {
-        beforeRecycleBinQuery();
+        return pageRecycleBin(Criteria.of(), pageRequest).getRecords();
+    }
+
+    /** Executes recycle-bin reads with the same criteria, sorting and paging shape as a standard query. */
+    default PageResult<T> pageRecycleBin(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         PageRequest effectivePage = pageRequest == null ? PageRequest.of(1, 20) : pageRequest;
-        return getDao().query(recycleBinCriteria(Criteria.of()
-                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE)), effectivePage);
+        return getDao().pageQuery(recycleBinReadCriteria(criteria), effectivePage, sorts);
+    }
+
+    /** Applies the single data-range fork used by both entity and projected recycle-bin queries. */
+    default Criteria recycleBinReadCriteria(Criteria criteria) {
+        beforeRecycleBinQuery();
+        return recycleBinCriteria(criteria)
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
     }
 
     /**
@@ -52,6 +64,27 @@ public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteA
     default void beforeRecycleBinRestore() {
     }
 
+    /** Checks whether the retained root record is visible to the current operator. */
+    default boolean canAccessRecycleBinRecord(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        return !getDao().query(recycleBinCriteria(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id)
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE)), PageRequest.of(1, 1)).isEmpty();
+    }
+
+    /**
+     * Whether this resource has explicitly enabled irreversible cleanup.
+     *
+     * <p>This is deliberately separate from {@link #beforeRecycleBinPurge(String)} so delivery
+     * surfaces can avoid advertising an operation which the resource does not own. Resource
+     * implementations may still apply retention, authority and dependency checks in the hook.</p>
+     */
+    default boolean isRecycleBinPurgeEnabled() {
+        return false;
+    }
+
     /**
      * Physically removes one retained resource after its recycle-bin policy allows it.
      * This primitive deliberately does not infer or traverse children; the platform
@@ -60,6 +93,9 @@ public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteA
     default int purge(String id) {
         if (id == null || id.isBlank()) {
             return 0;
+        }
+        if (!isRecycleBinPurgeEnabled()) {
+            throw new UnsupportedOperationException("Recycle-bin purge is not enabled for " + getModuleAlias());
         }
         beforeRecycleBinPurge(id);
         T entity = selectIgnoreSoftDelete(id);

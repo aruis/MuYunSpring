@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.platform.RecordReadVisibility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -199,10 +200,17 @@ class IamWebControllerTest {
     void shouldExposeTenantRecycleBinThroughSystemScopedLifecycleFacade() throws Exception {
         Tenant deleted = tenant("tenant_deleted", "Deleted Tenant");
         deleted.setDeleted(true);
-        when(recycleBinFacade.list(eq(tenantService), any(PageRequest.class))).thenAnswer(invocation -> {
+        deleted.setDeletedAt(java.time.Instant.EPOCH);
+        when(tenantDao.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenAnswer(invocation -> {
             assertThat(TenantContext.isSystem()).isTrue();
-            return List.of(new RecycleBinItem<>(deleted, "delete-operation-1", deleted.getDeletedAt(), true, null));
+            return PageResult.of(List.of(deleted), 1, invocation.getArgument(1));
         });
+        RecycleBinItem<Tenant> recycleBinItem = new RecycleBinItem<>(deleted, "delete-operation-1",
+                deleted.getDeletedAt(), true, false, null);
+        when(recycleBinFacade.items(eq(tenantService), eq(List.of(deleted)),
+                any(java.util.function.Function.class), any(java.util.function.Function.class)))
+                .thenReturn((List) List.of(recycleBinItem));
         RestoreReport report = new RestoreReport("delete-operation-1", "restore-operation-1", List.of());
         when(recycleBinFacade.restore(tenantService, "delete-operation-1")).thenAnswer(invocation -> {
             assertThat(TenantContext.isSystem()).isTrue();
@@ -211,7 +219,7 @@ class IamWebControllerTest {
 
         mvc.perform(post("/iam.tenant/recycle-bin/query")
                         .contentType("application/json")
-                        .content(json(Map.of("pageNum", 2, "pageSize", 10))))
+                        .content(json(Map.of("page", Map.of("pageNum", 2, "pageSize", 10)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].sourceDeleteOperationId").value("delete-operation-1"))
                 .andExpect(jsonPath("$.records[0].restorable").value(true));
@@ -221,7 +229,8 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.sourceOperationId").value("delete-operation-1"))
                 .andExpect(jsonPath("$.restoreOperationId").value("restore-operation-1"));
 
-        verify(recycleBinFacade).list(eq(tenantService), any(PageRequest.class));
+        verify(recycleBinFacade).items(eq(tenantService), eq(List.of(deleted)),
+                any(java.util.function.Function.class), any(java.util.function.Function.class));
         verify(recycleBinFacade).restore(tenantService, "delete-operation-1");
     }
 
@@ -1212,6 +1221,45 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldReadEmploymentProjectionForVisibleRecycleBinEmployee() throws Exception {
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeeEmploymentReadService employmentReadService = mock(EmployeeEmploymentReadService.class);
+        EmployeeWebController controller = new EmployeeWebController(
+                mock(EmployeePositionService.class),
+                mock(EmployeeAccountService.class),
+                mock(EmployeeDelegationService.class));
+        ReflectionTestUtils.setField(controller, "service", employeeService);
+        controller.setEmployeeEmploymentReadService(employmentReadService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.systemUser("admin", "Admin"))))
+                .build();
+        Employee retained = employee("employee-1", "org-1", "dept-1", "E001", "Alice");
+        retained.setTenantId("tenant_a");
+        retained.setDeleted(true);
+        EmployeeEmploymentReadService.EmployeeEmploymentView employment =
+                new EmployeeEmploymentReadService.EmployeeEmploymentView(
+                        "employment-1", 2, "employee-1", "E001", "Alice",
+                        "org-1", "Headquarters", "dept-1", "Finance",
+                        "position-1", "Developer", true, true, "alice");
+
+        when(employeeService.canAccessRecycleBinRecord("employee-1")).thenReturn(true);
+        when(employeeService.selectIgnoreSoftDelete("employee-1")).thenReturn(retained);
+        when(employmentReadService.page(any())).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("tenant_a");
+            return PageResult.of(List.of(employment), 1, PageRequest.of(1, 20));
+        });
+
+        mvc.perform(get("/iam.employee/recycle-bin/employee-1/employment-view"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].positionTitle").value("Developer"))
+                .andExpect(jsonPath("$.records[0].organizationTitle").value("Headquarters"))
+                .andExpect(jsonPath("$.records[0].departmentTitle").value("Finance"));
+    }
+
+    @Test
     void shouldExposeUserSelectorQuery() throws Exception {
         RoleService roleService = mock(RoleService.class);
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
@@ -1383,7 +1431,7 @@ class IamWebControllerTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void shouldApplyActiveCriteriaBeforeUserProjectionQuery() throws Exception {
+    void shouldDelegateActiveVisibilityAndActionPolicyToUserProjectionQuery() throws Exception {
         RecordingUserAccountService userAccountService = new RecordingUserAccountService();
         StaticRecordReadProjectionService projectionService = mock(StaticRecordReadProjectionService.class);
         UserAccountWebController controller = new UserAccountWebController();
@@ -1395,15 +1443,13 @@ class IamWebControllerTest {
                 .addFilters(new CurrentUserWebFilter(() ->
                         java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
-        when(projectionService.supportsDefaultListQuery(any(), any())).thenReturn(true);
-        when(projectionService.queryCriteria(any(), any(), any())).thenReturn(Criteria.of());
-        when(projectionService.querySorts(any(), any(), any())).thenReturn(new Sort[0]);
         when(projectionService.queryDefaultList(
                 any(),
-                any(Criteria.class),
+                any(net.ximatai.muyun.spring.ability.query.QueryRequest.class),
                 any(PageRequest.class),
                 any(),
-                any(Sort[].class)
+                any(ActionExecutionPolicy.class),
+                eq(RecordReadVisibility.ACTIVE)
         )).thenReturn(java.util.Optional.of(WebPageResponse.from(PageResult.of(List.of(Map.of(
                 "id", "user-2",
                 "username", "alice"
@@ -1413,18 +1459,16 @@ class IamWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].username").value("alice"));
 
-        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        ArgumentCaptor<ActionExecutionPolicy> policyCaptor = ArgumentCaptor.captor();
         verify(projectionService).queryDefaultList(
                 any(),
-                criteriaCaptor.capture(),
+                any(net.ximatai.muyun.spring.ability.query.QueryRequest.class),
                 any(PageRequest.class),
                 any(),
-                any(Sort[].class)
+                policyCaptor.capture(),
+                eq(RecordReadVisibility.ACTIVE)
         );
-        String sql = compiledCriteria(criteriaCaptor.getValue());
-        assertThat(sql).contains("authUserId");
-        assertThat(sql).contains("tenantId");
-        assertThat(sql).doesNotContain("deleted");
+        assertThat(policyCaptor.getValue().actionCode()).isEqualTo("query");
         verify(userAccountDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 

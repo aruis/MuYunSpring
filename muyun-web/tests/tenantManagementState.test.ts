@@ -238,6 +238,32 @@ test('tenant management state does not enter create mode without create permissi
   assert.equal(state.actionError.value, '当前用户无权新建租户');
 });
 
+test('tenant management state keeps an empty readonly data set in view mode', () => {
+  const context = createContext();
+  const state = createTenantManagementState(context, async () => true);
+
+  state.startCreate();
+  state.draft.value.alias = 'should-not-survive';
+  state.handleReadonlyListLoaded([]);
+
+  assert.equal(state.selected.value, undefined);
+  assert.deepEqual(state.draft.value, { alias: '', title: '', enabled: true });
+  assert.equal(state.mode.value, 'view');
+});
+
+test('tenant management state selects readonly data without enabling editing', () => {
+  const context = createContext();
+  const state = createTenantManagementState(context, async () => true);
+
+  state.handleReadonlyListLoaded([
+    { id: 'deleted_tenant', alias: 'deleted_tenant', title: '已删除租户', enabled: true },
+  ]);
+
+  assert.equal(state.selected.value?.id, 'deleted_tenant');
+  assert.equal(state.draft.value.id, 'deleted_tenant');
+  assert.equal(state.mode.value, 'view');
+});
+
 test('tenant management state stays readonly after deleting last tenant without create permission', async () => {
   const calls: string[] = [];
   const context = createContext(

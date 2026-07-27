@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
+import { confirmAction, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordListExplorer, { type RecordListExplorerRecord } from './RecordListExplorer.vue';
 import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
@@ -10,8 +10,11 @@ import {
   type CrudRecordListBase,
 } from './crudRecordListModel';
 import { presentPlatformError } from './platformErrorFeedback';
+import { useRecycleBinState } from './recycleBinState';
 
 defineOptions({ name: 'CrudRecordListExplorer' });
+
+export type CrudRecordListMode = 'normal' | 'recycleBin';
 
 const props = withDefaults(
   defineProps<{
@@ -29,6 +32,7 @@ const props = withDefaults(
     filterOption?: (record: CrudRecordListBase, normalizedKeyword: string) => boolean;
     tagOf?: (record: CrudRecordListBase) => string | undefined;
     mutedOf?: (record: CrudRecordListBase) => boolean;
+    mode?: CrudRecordListMode;
   }>(),
   {
     selectedId: undefined,
@@ -44,6 +48,7 @@ const props = withDefaults(
     filterOption: undefined,
     tagOf: undefined,
     mutedOf: undefined,
+    mode: 'normal',
   },
 );
 
@@ -51,10 +56,24 @@ const emit = defineEmits<{
   select: [record: CrudRecordListBase];
   action: [action: UiRecordInlineAction, record: CrudRecordListBase];
   loaded: [records: CrudRecordListBase[]];
+  restored: [];
 }>();
 
 const loading = ref(false);
 const records = ref<CrudRecordListBase[]>([]);
+let recordsRequestSeq = 0;
+const recycleBinState = useRecycleBinState({
+  context: props.context,
+  recordTitle: (record) => recordTitle(record),
+});
+const recycleBinItems = computed(
+  () =>
+    new Map(
+      recycleBinState.items.value
+        .filter((item) => Boolean(item.record.id))
+        .map((item) => [String(item.record.id), item] as const),
+    ),
+);
 
 const listRecords = computed<RecordListExplorerRecord[]>(() => records.value);
 
@@ -70,19 +89,34 @@ watch(
   () => loadRecords(),
 );
 
+watch(
+  () => props.mode,
+  () => loadRecords(),
+);
+
 async function loadRecords() {
+  const requestSeq = ++recordsRequestSeq;
   loading.value = true;
   try {
     await props.context.runtime.ready;
+    if (props.mode === 'recycleBin') {
+      await recycleBinState.load();
+      if (requestSeq !== recordsRequestSeq) return;
+      records.value = recycleBinState.items.value.map((item) => item.record);
+      emit('loaded', records.value);
+      return;
+    }
     const response = await props.context.abilities.crud().query({ page: { pageNum: 1, pageSize: 200 } });
+    if (requestSeq !== recordsRequestSeq) return;
     records.value = response.records;
     emit('loaded', response.records);
   } catch (cause) {
+    if (requestSeq !== recordsRequestSeq) return;
     records.value = [];
     emit('loaded', []);
     presentPlatformError(cause, { source: 'crud-record-list-explorer', phase: 'load' });
   } finally {
-    loading.value = false;
+    if (requestSeq === recordsRequestSeq) loading.value = false;
   }
 }
 
@@ -111,8 +145,69 @@ function handleSelect(record: CrudRecordListBase) {
   emit('select', record);
 }
 
-function handleAction(action: UiRecordInlineAction, record: CrudRecordListBase) {
+function recordActions(record: CrudRecordListBase): UiRecordInlineAction[] {
+  if (props.mode !== 'recycleBin') {
+    return props.actionsOf?.(record) ?? [];
+  }
+  const item = recycleBinItems.value.get(String(record.id ?? ''));
+  if (!item) return [];
+  return [
+    {
+      key: 'restore',
+      title: '恢复',
+      iconName: 'reload',
+      disabled: !item.restorable || recycleBinState.acting.value,
+    },
+    ...(item.purgeable
+      ? [
+          {
+            key: 'purge',
+            title: '彻底删除',
+            iconName: 'delete' as const,
+            danger: true,
+            disabled: recycleBinState.acting.value,
+          },
+        ]
+      : []),
+  ];
+}
+
+async function handleAction(action: UiRecordInlineAction, record: CrudRecordListBase) {
+  if (props.mode === 'recycleBin') {
+    await handleRecycleBinAction(action, record);
+    return;
+  }
   emit('action', action, record);
+}
+
+async function handleRecycleBinAction(action: UiRecordInlineAction, record: CrudRecordListBase) {
+  const item = recycleBinItems.value.get(String(record.id ?? ''));
+  if (!item) return;
+  const title = recycleBinState.recordTitleOf(item);
+  if (action.key === 'restore') {
+    const confirmed = await confirmAction({
+      title: '恢复记录',
+      content: `确认恢复「${title}」及其关联资源？`,
+      okText: '恢复',
+    });
+    if (confirmed && (await recycleBinState.restore(item, false))) {
+      emit('restored');
+      await loadRecords();
+    }
+    return;
+  }
+  if (action.key === 'purge') {
+    const confirmed = await confirmAction({
+      title: '彻底删除',
+      content: `彻底删除后数据不可恢复。确认彻底删除「${title}」及其关联资源？`,
+      okText: '彻底删除',
+      danger: true,
+      requiredText: title,
+    });
+    if (confirmed && (await recycleBinState.purge(item, false))) {
+      await loadRecords();
+    }
+  }
 }
 </script>
 
@@ -129,7 +224,7 @@ function handleAction(action: UiRecordInlineAction, record: CrudRecordListBase) 
       :code-of="(record) => recordCode(record as CrudRecordListBase)"
       :item-of="(record) => itemOf?.(record as CrudRecordListBase)"
       :filter-option="(record, normalized) => matchesKeyword(record as CrudRecordListBase, normalized)"
-      :actions-of="(record) => actionsOf?.(record as CrudRecordListBase) ?? []"
+      :actions-of="(record) => recordActions(record as CrudRecordListBase)"
       :tag-of="(record) => tagOf?.(record as CrudRecordListBase)"
       :muted-of="(record) => mutedOf?.(record as CrudRecordListBase) ?? record.enabled === false"
       @select="handleSelect($event as CrudRecordListBase)"

@@ -64,6 +64,20 @@ class RecycleBinPurgeCoordinatorTest {
     }
 
     @Test
+    void shouldAllowPurgeRetryAfterARejectedAttempt() {
+        SourceTree source = completedDeleteTree();
+        PurgeAbility deniedTenant = deniedAbility("iam.tenant", "tenant", "tenant-1");
+        PurgeAbility application = purgeableAbility("iam.tenantApplication", "tenantApplication", "application-1");
+
+        new RecycleBinPurgeCoordinator(logService, resolver(deniedTenant, application)).purge(source.operationId());
+        PurgeReport retry = new RecycleBinPurgeCoordinator(logService,
+                resolver(purgeableAbility("iam.tenant", "tenant", "tenant-1"), application)).purge(source.operationId());
+
+        assertThat(retry.entries()).extracting(PurgeEntryResult::status)
+                .containsExactly(PurgeEntryResult.Status.PURGED, PurgeEntryResult.Status.PURGED);
+    }
+
+    @Test
     void shouldNotMarkAnAllSkippedPurgeAsSucceeded() {
         SourceTree source = completedDeleteTree();
 
@@ -224,6 +238,11 @@ class RecycleBinPurgeCoordinatorTest {
 
         TestMemoryDao<TestRecord> dao() {
             return (TestMemoryDao<TestRecord>) getDao();
+        }
+
+        @Override
+        public boolean isRecycleBinPurgeEnabled() {
+            return !denied;
         }
 
         @Override

@@ -8,7 +8,6 @@ import {
   RecordActionBar,
   RecordMetaSection,
   presentPlatformError,
-  RecycleBinPanel,
   RecordStatusSwitch,
   StaticManagementLayout,
   createSoftDeletedConflictErrorHandler,
@@ -49,6 +48,7 @@ const {
   canDelete,
   canEnable,
   handleListLoaded,
+  handleReadonlyListLoaded,
   handleSelect,
   startCreate,
   startEdit,
@@ -83,17 +83,24 @@ const applicationConfigurationColumns: UiDataTableColumn[] = [
 ];
 
 watch(
-  () => selected.value?.id,
-  (tenantId) => {
+  [() => selected.value?.id, () => viewMode.value] as const,
+  ([tenantId, currentViewMode]) => {
     applicationConfigurationOpen.value = false;
     configuredApplicationAliases.value = new Set();
-    void loadTenantApplications(tenantId);
+    if (currentViewMode === 'list') {
+      void loadTenantApplications(tenantId);
+    } else {
+      tenantApplications.value = [];
+    }
   },
   { immediate: true },
 );
 onMounted(() => void loadApplications());
 
 const cardActions = computed<RecordActionItem[]>(() => {
+  if (viewMode.value === 'recycleBin') {
+    return [];
+  }
   if (mode.value !== 'view') {
     return [
       { key: 'cancel', title: '取消', disabled: saving.value },
@@ -123,12 +130,18 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   return {
     title: record.title ?? record.alias ?? record.id ?? '未命名租户',
     secondary: record.alias ?? record.id,
-    muted: record.enabled === false,
+    tag: viewMode.value === 'recycleBin' ? '已删除' : undefined,
+    muted: viewMode.value === 'recycleBin' || record.enabled === false,
   };
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
-  handleListLoaded(records as Tenant[]);
+  const tenants = records as Tenant[];
+  if (viewMode.value === 'recycleBin') {
+    handleReadonlyListLoaded(tenants);
+    return;
+  }
+  handleListLoaded(tenants);
 }
 
 function handleTenantSelect(record: CrudRecordListBase) {
@@ -140,6 +153,12 @@ async function handleCardAction(action: RecordActionItem) {
   if (action.key === 'delete') return removeSelected();
   if (action.key === 'cancel') return cancelEdit();
   if (action.key === 'save') await save();
+}
+
+async function handleFormSubmit() {
+  if (viewMode.value === 'list') {
+    await save();
+  }
 }
 
 async function loadApplications() {
@@ -224,18 +243,21 @@ function tenantApplicationsPath(tenantId: string) {
   return `/iam.tenant/${encodeURIComponent(tenantId)}/applications`;
 }
 
-function tenantRecordTitle(record: unknown): string {
-  const tenant = record as Tenant;
-  return tenant.title ?? tenant.alias ?? tenant.id ?? '未命名租户';
-}
-
 function switchToRecycleBin() {
+  resetTenantSelection();
   viewMode.value = 'recycleBin';
 }
 
 function switchToList() {
+  resetTenantSelection();
   viewMode.value = 'list';
-  reloadKey.value += 1;
+}
+
+function resetTenantSelection() {
+  selected.value = undefined;
+  draft.value = { alias: '', title: '', enabled: true };
+  mode.value = 'view';
+  tenantApplications.value = [];
 }
 
 function handleRefresh() {
@@ -257,7 +279,7 @@ const recycleBinReloadKey = ref(0);
     explorer-search-placeholder="搜索租户名称、alias 或 ID"
     :explorer-searchable="viewMode === 'list'"
     :mode="mode"
-    :detail-title="viewMode === 'list' ? cardTitle : '回收站'"
+    :detail-title="cardTitle"
     @refresh="handleRefresh"
   >
     <template #explorer-actions>
@@ -281,25 +303,17 @@ const recycleBinReloadKey = ref(0);
     </template>
     <template #explorer>
       <CrudRecordListExplorer
-        v-if="viewMode === 'list'"
         :context="tenantContext"
         :selected-id="selected?.id"
-        :reload-key="reloadKey"
+        :reload-key="viewMode === 'list' ? reloadKey : recycleBinReloadKey"
+        :mode="viewMode === 'list' ? 'normal' : 'recycleBin'"
         :keyword="explorerSearchKeyword"
-        empty-description="暂无租户"
-        loading-tip="加载租户列表"
+        :empty-description="viewMode === 'list' ? '暂无租户' : '回收站为空'"
+        :loading-tip="viewMode === 'list' ? '加载租户列表' : '加载回收站'"
         fallback-title="未命名租户"
         :item-of="tenantItemOf"
         @select="handleTenantSelect"
         @loaded="handleLoaded"
-      />
-      <RecycleBinPanel
-        v-else
-        :context="tenantContext"
-        :record-title="tenantRecordTitle"
-        :reload-key="recycleBinReloadKey"
-        empty-description="回收站为空"
-        @restored="switchToList"
       />
     </template>
     <template #detail-actions>
@@ -330,44 +344,36 @@ const recycleBinReloadKey = ref(0);
       </template>
     </template>
 
-    <template v-if="viewMode === 'recycleBin'">
-      <div class="recycle-bin-detail-hint">
-        <p>回收站中的租户可以恢复或彻底删除。</p>
-        <p>恢复后租户及其关联资源将回到正常状态；彻底删除后数据不可恢复。</p>
-      </div>
-    </template>
-    <template v-else>
-      <form class="static-record-form" @submit.prevent="save">
-        <label>
-          <span>租户 alias</span>
-          <UiInput v-model:value="draft.alias" :disabled="aliasReadonly" />
-        </label>
-        <label>
-          <span>租户名称</span>
-          <UiInput v-model:value="draft.title" :disabled="readonly" />
-        </label>
-      </form>
+    <form class="static-record-form" @submit.prevent="handleFormSubmit">
+      <label>
+        <span>租户 alias</span>
+        <UiInput v-model:value="draft.alias" :disabled="viewMode === 'recycleBin' || aliasReadonly" />
+      </label>
+      <label>
+        <span>租户名称</span>
+        <UiInput v-model:value="draft.title" :disabled="viewMode === 'recycleBin' || readonly" />
+      </label>
+    </form>
 
-      <section v-if="selected && mode === 'view'" class="tenant-applications">
-        <div class="tenant-applications-header">
-          <div>
-            <h3>已开通应用</h3>
-            <p>应用是否可用以“是否开通”为准，不再维护租户侧启停状态。</p>
-          </div>
-          <UiButton type="primary" :loading="applicationsLoading" @click="openApplicationConfiguration">
-            配置应用
-          </UiButton>
+    <section v-if="viewMode === 'list' && selected && mode === 'view'" class="tenant-applications">
+      <div class="tenant-applications-header">
+        <div>
+          <h3>已开通应用</h3>
+          <p>应用是否可用以“是否开通”为准，不再维护租户侧启停状态。</p>
         </div>
-        <UiDataTable
-          :columns="tenantApplicationColumns"
-          :rows="tenantApplicationRows"
-          :loading="tenantApplicationsLoading"
-          :pagination="false"
-          empty-description="暂未开通应用"
-        />
-      </section>
-      <RecordMetaSection :record="draft" show-sort-order />
-    </template>
+        <UiButton type="primary" :loading="applicationsLoading" @click="openApplicationConfiguration">
+          配置应用
+        </UiButton>
+      </div>
+      <UiDataTable
+        :columns="tenantApplicationColumns"
+        :rows="tenantApplicationRows"
+        :loading="tenantApplicationsLoading"
+        :pagination="false"
+        empty-description="暂未开通应用"
+      />
+    </section>
+    <RecordMetaSection :record="draft" show-sort-order />
   </StaticManagementLayout>
 
   <RecordDetailDrawer
@@ -404,20 +410,6 @@ const recycleBinReloadKey = ref(0);
 </template>
 
 <style scoped>
-.recycle-bin-detail-hint {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--muyun-border);
-  border-radius: 6px;
-  background: var(--muyun-hover-subtle);
-}
-.recycle-bin-detail-hint p {
-  margin: 0;
-  color: var(--muyun-text-muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
 .tenant-applications {
   display: grid;
   gap: 12px;

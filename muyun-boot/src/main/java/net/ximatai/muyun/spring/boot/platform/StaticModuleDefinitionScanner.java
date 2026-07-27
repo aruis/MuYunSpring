@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReadOnlyWeb;
 import net.ximatai.muyun.spring.boot.web.RecycleBinWeb;
+import net.ximatai.muyun.spring.boot.web.RecycleBinPurgeWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
@@ -389,6 +390,8 @@ public class StaticModuleDefinitionScanner {
         if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.RECYCLE_BIN_QUERY);
             addPlatform(actions, PlatformAction.RECYCLE_BIN_RESTORE);
+        }
+        if (RecycleBinPurgeWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.RECYCLE_BIN_PURGE);
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
@@ -422,6 +425,8 @@ public class StaticModuleDefinitionScanner {
         if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
             addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_QUERY);
             addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_RESTORE);
+        }
+        if (RecycleBinPurgeWeb.class.isAssignableFrom(beanClass)) {
             addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_PURGE);
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {

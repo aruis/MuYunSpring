@@ -162,7 +162,8 @@ public class RecycleBinPurgeCoordinator {
     }
 
     private PurgeEntryResult result(DeletionEntry entry, PurgeEntryResult.Status status, String message) {
-        return new PurgeEntryResult(entry.getId(), entry.getResourceModuleAlias(), entry.getResourceRecordId(), status, message);
+        return new PurgeEntryResult(entry.getId(), entry.getResourceModuleAlias(), entry.getResourceEntityAlias(),
+                entry.getResourceRecordId(), status, message);
     }
 
     private DeletionOperationStatus status(List<PurgeEntryResult> results) {

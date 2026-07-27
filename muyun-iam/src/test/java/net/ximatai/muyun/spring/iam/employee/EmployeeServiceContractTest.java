@@ -1,9 +1,11 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -14,6 +16,9 @@ import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,6 +40,47 @@ class EmployeeServiceContractTest {
                 organizationService(), departmentService());
 
         assertThat(service.getModuleAlias()).isEqualTo("iam.employee");
+    }
+
+    @Test
+    void shouldExposeRecoverableEmployeeRecycleBinWithoutIrreversiblePurge() {
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService());
+
+        assertThat(service).isInstanceOf(RecycleBinAbility.class);
+        assertThat(service.getDeletionEntityAlias()).isEqualTo("employee");
+        assertThat(service.isRecycleBinPurgeEnabled()).isFalse();
+    }
+
+    @Test
+    void shouldExplainConflictWhenEmployeeNumberIsRetainedBySoftDeletedEmployee() {
+        EmployeeDao dao = mock(EmployeeDao.class);
+        OrganizationService organizationService = organizationService();
+        DepartmentService departmentService = departmentService();
+        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("org-1", "dept-1"));
+        Employee retained = employee("org-1", "dept-1", "E001", "Deleted Alice");
+        retained.setId("employee-deleted");
+        retained.setTenantId("tenant_a");
+        retained.setDeleted(Boolean.TRUE);
+        retained.setDeletedAt(Instant.parse("2026-07-27T00:00:00Z"));
+        when(dao.query(any(), any())).thenReturn(List.of(retained));
+        EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
+                departmentService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.insert(employee("org-1", "dept-1", "E001", "New Alice")))
+                    .isInstanceOf(PlatformException.class)
+                    .satisfies(exception -> {
+                        PlatformException platformException = (PlatformException) exception;
+                        assertThat(platformException.code())
+                                .isEqualTo(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT);
+                        assertThat(platformException.details())
+                                .containsEntry("resourceModuleAlias", EmployeeService.MODULE_ALIAS)
+                                .containsEntry("resourceRecordId", "employee-deleted")
+                                .containsEntry("recoveryAvailable", Boolean.TRUE);
+                    });
+        }
     }
 
     @Test
