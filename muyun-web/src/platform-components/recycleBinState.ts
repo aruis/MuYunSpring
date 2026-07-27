@@ -1,11 +1,19 @@
-import { computed, ref } from 'vue';
-import type { PurgeReport, RecycleBinItem, RestoreReport, WebListResponse } from '@muyun/web-contracts';
+import { computed, ref, watch, type Ref } from 'vue';
+import type {
+  PurgeReport,
+  RecycleBinItem,
+  RestoreReport,
+  WebListResponse,
+  WebPageRequest,
+} from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformSuccess } from './platformErrorFeedback';
 
 export interface RecycleBinStateOptions<TRecord> {
   context: ModuleContext<TRecord>;
   recordTitle?: (record: TRecord) => string;
+  /** 外部刷新信号，变化时重新加载列表 */
+  reloadKey?: Ref<number>;
 }
 
 export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRecord>) {
@@ -14,7 +22,10 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
   const loading = ref(false);
   const acting = ref(false);
   const actingOperationId = ref<string>();
-  const reloadKey = ref(0);
+
+  if (options.reloadKey) {
+    watch(options.reloadKey, () => void load());
+  }
 
   const isEmpty = computed(() => !loading.value && items.value.length === 0);
 
@@ -29,10 +40,11 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
   async function load() {
     loading.value = true;
     try {
+      const page: WebPageRequest = { pageNum: 1, pageSize: 200 };
       const response = await context.http.request<WebListResponse<RecycleBinItem<TRecord>>>({
         method: 'POST',
         path: `/${context.moduleAlias}/recycle-bin/query`,
-        body: { page: { pageNum: 1, pageSize: 200 } },
+        body: page,
       });
       items.value = response.records;
     } catch (cause) {
@@ -84,23 +96,16 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     }
   }
 
-  function refresh() {
-    reloadKey.value += 1;
-    void load();
-  }
-
   return {
     items,
     loading,
     acting,
     actingOperationId,
-    reloadKey,
     isEmpty,
     recordTitleOf,
     load,
     restore,
     purge,
-    refresh,
   };
 }
 

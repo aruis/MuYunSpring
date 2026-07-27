@@ -237,6 +237,16 @@ function switchToList() {
   viewMode.value = 'list';
   reloadKey.value += 1;
 }
+
+function handleRefresh() {
+  if (viewMode.value === 'list') {
+    reloadKey.value += 1;
+  } else {
+    recycleBinReloadKey.value += 1;
+  }
+}
+
+const recycleBinReloadKey = ref(0);
 </script>
 
 <template>
@@ -248,7 +258,7 @@ function switchToList() {
     :explorer-searchable="viewMode === 'list'"
     :mode="mode"
     :detail-title="viewMode === 'list' ? cardTitle : '回收站'"
-    @refresh="viewMode === 'list' ? (reloadKey += 1) : undefined"
+    @refresh="handleRefresh"
   >
     <template #explorer-actions>
       <UiButton
@@ -287,10 +297,9 @@ function switchToList() {
         v-else
         :context="tenantContext"
         :record-title="tenantRecordTitle"
-        title="已删除租户"
+        :reload-key="recycleBinReloadKey"
         empty-description="回收站为空"
         @restored="switchToList"
-        @purged="undefined"
       />
     </template>
     <template #detail-actions>
@@ -329,10 +338,14 @@ function switchToList() {
     </template>
     <template v-else>
       <form class="static-record-form" @submit.prevent="save">
-        <label
-          ><span>租户 alias</span><UiInput v-model:value="draft.alias" :disabled="aliasReadonly"
-        /></label>
-        <label><span>租户名称</span><UiInput v-model:value="draft.title" :disabled="readonly" /></label>
+        <label>
+          <span>租户 alias</span>
+          <UiInput v-model:value="draft.alias" :disabled="aliasReadonly" />
+        </label>
+        <label>
+          <span>租户名称</span>
+          <UiInput v-model:value="draft.title" :disabled="readonly" />
+        </label>
       </form>
 
       <section v-if="selected && mode === 'view'" class="tenant-applications">

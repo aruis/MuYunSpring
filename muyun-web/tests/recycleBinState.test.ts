@@ -27,9 +27,11 @@ test('recycle bin state loads items from backend', async () => {
       unavailableReason: '生命周期已变化',
     },
   ];
+  let capturedBody: unknown;
   const context = createContext({
     request: async (options) => {
       assert.equal(options.path, '/iam.tenant/recycle-bin/query');
+      capturedBody = options.body;
       return { records: items };
     },
   });
@@ -41,6 +43,8 @@ test('recycle bin state loads items from backend', async () => {
   assert.equal(state.items.value[0].sourceDeleteOperationId, 'op-1');
   assert.equal(state.items.value[1].restorable, false);
   assert.equal(state.isEmpty.value, false);
+  // 分页 body 应为扁平结构，对齐后端 WebPageRequest
+  assert.deepEqual(capturedBody, { pageNum: 1, pageSize: 200 });
 });
 
 test('recycle bin state returns empty when no deleted items', async () => {
@@ -194,9 +198,74 @@ test('recycle bin state falls back to default title resolution', () => {
   assert.equal(state.recordTitleOf(itemWithId), 'id_only');
 });
 
+test('recycle bin state handles load failure gracefully', async () => {
+  const context = createContext({
+    request: async () => {
+      throw new Error('Network error');
+    },
+  });
+  const state = useRecycleBinState({ context });
+
+  await state.load();
+
+  assert.equal(state.items.value.length, 0);
+  assert.equal(state.loading.value, false);
+  assert.equal(state.isEmpty.value, true);
+});
+
+test('recycle bin state handles restore failure and resets acting state', async () => {
+  const context = createContext({
+    request: async (options) => {
+      if (options.path.includes('/restore')) {
+        throw new Error('Restore failed');
+      }
+      return { records: [] };
+    },
+  });
+  const state = useRecycleBinState({ context });
+
+  const item: RecycleBinItem<Tenant> = {
+    record: { id: 'tenant_a', title: '租户 A' },
+    sourceDeleteOperationId: 'op-1',
+    deletedAt: '2024-01-15T10:30:00Z',
+    restorable: true,
+  };
+  const report = await state.restore(item);
+
+  assert.equal(report, undefined);
+  assert.equal(state.acting.value, false);
+  assert.equal(state.actingOperationId.value, undefined);
+});
+
+test('recycle bin state handles purge failure and resets acting state', async () => {
+  const context = createContext({
+    request: async (options) => {
+      if (options.path.includes('/purge')) {
+        throw new Error('Purge failed');
+      }
+      return { records: [] };
+    },
+  });
+  const state = useRecycleBinState({ context });
+
+  const item: RecycleBinItem<Tenant> = {
+    record: { id: 'tenant_a', title: '租户 A' },
+    sourceDeleteOperationId: 'op-1',
+    deletedAt: '2024-01-15T10:30:00Z',
+    restorable: true,
+  };
+  const report = await state.purge(item);
+
+  assert.equal(report, undefined);
+  assert.equal(state.acting.value, false);
+  assert.equal(state.actingOperationId.value, undefined);
+});
+
 // --- helpers ---
 
-function createContext(overrides: { request: (options: { path: string }) => Promise<unknown> }) {
+function createContext(overrides: {
+  request: (options: { path: string; body?: unknown }) => Promise<unknown>;
+}) {
   return {
     moduleAlias: 'iam.tenant',
     http: { request: overrides.request },
