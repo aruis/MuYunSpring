@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
 import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
+import net.ximatai.muyun.spring.platform.deletion.PurgeReport;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,5 +40,11 @@ public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbi
     @ActionEndpoint(PlatformAction.RECYCLE_BIN_RESTORE)
     default RestoreReport restoreFromRecycleBin(@PathVariable String sourceDeleteOperationId) {
         return webScope(() -> recycleBinFacade().restore(service(), sourceDeleteOperationId));
+    }
+
+    @PostMapping("/recycle-bin/{sourceDeleteOperationId}/purge")
+    @ActionEndpoint(PlatformAction.RECYCLE_BIN_PURGE)
+    default PurgeReport purgeFromRecycleBin(@PathVariable String sourceDeleteOperationId) {
+        return webScope(() -> recycleBinFacade().purge(service(), sourceDeleteOperationId));
     }
 }

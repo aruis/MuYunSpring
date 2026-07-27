@@ -54,6 +54,9 @@ public enum PlatformAction {
     RECYCLE_BIN_RESTORE(PlatformActionGroup.RECYCLE_BIN, "recycleBinRestore", "platform.action.recycle-bin-restore",
             "恢复回收站数据", "Recycle Bin Restore", PlatformActionLevel.LIST, 20,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
+    RECYCLE_BIN_PURGE(PlatformActionGroup.RECYCLE_BIN, "recycleBinPurge", "platform.action.recycle-bin-purge",
+            "彻底清理回收站数据", "Recycle Bin Purge", PlatformActionLevel.LIST, 30,
+            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
 
     IMPORT(PlatformActionGroup.EXCHANGE, "import", "platform.action.import", "导入", "Import",
             PlatformActionLevel.LIST, 10,

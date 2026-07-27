@@ -63,7 +63,7 @@ public class SoftDeleteRestoreCoordinator {
             return false;
         }
         DeletionLifecycleEntry latest = deletionLogService.latestTerminalEntry(
-                entry.getResourceModuleAlias(), entry.getResourceRecordId());
+                entry.getResourceModuleAlias(), entry.getResourceEntityAlias(), entry.getResourceRecordId());
         if (latest == null || !entry.getId().equals(latest.entry().getId())) {
             skipBranch(entry, children, results, restoreOperationId, restoreEntryIds,
                     restoreEntryId, "resource lifecycle changed after the source deletion");
@@ -211,10 +211,5 @@ public class SoftDeleteRestoreCoordinator {
         children.values().forEach(value -> value.sort(Comparator.comparing(DeletionEntry::getStartedAt,
                 Comparator.nullsLast(Comparator.naturalOrder()))));
         return children;
-    }
-
-    private RestoreEntryResult skipped(DeletionEntry entry, String message) {
-        return new RestoreEntryResult(entry.getId(), entry.getResourceModuleAlias(), entry.getResourceRecordId(),
-                RestoreEntryResult.Status.SKIPPED, message);
     }
 }

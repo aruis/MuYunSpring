@@ -24,13 +24,15 @@ class RecycleBinFacadeTest {
         RecycleBinAbility<StandardEntity> ability = mock(RecycleBinAbility.class);
         DeletionLogService logService = mock(DeletionLogService.class);
         SoftDeleteRestoreCoordinator coordinator = mock(SoftDeleteRestoreCoordinator.class);
+        RecycleBinPurgeCoordinator purgeCoordinator = mock(RecycleBinPurgeCoordinator.class);
         StandardEntity record = deletedRecord("tenant-1");
         when(ability.getModuleAlias()).thenReturn("iam.tenant");
+        when(ability.getDeletionEntityAlias()).thenReturn("tenant");
         when(ability.listRecycleBin(any(PageRequest.class))).thenReturn(List.of(record));
-        when(logService.latestTerminalEntry("iam.tenant", "tenant-1"))
-                .thenReturn(new DeletionLifecycleEntry(successfulDelete("delete-1", "iam.tenant", "tenant-1"), successfulEntry()));
+        when(logService.latestTerminalEntry("iam.tenant", "tenant", "tenant-1"))
+                .thenReturn(new DeletionLifecycleEntry(successfulDelete("delete-1", "iam.tenant", "tenant", "tenant-1"), successfulEntry()));
 
-        RecycleBinItem<StandardEntity> item = new RecycleBinFacade(logService, coordinator)
+        RecycleBinItem<StandardEntity> item = new RecycleBinFacade(logService, coordinator, purgeCoordinator)
                 .list(ability, PageRequest.of(1, 20)).getFirst();
 
         assertThat(item.sourceDeleteOperationId()).isEqualTo("delete-1");
@@ -43,10 +45,12 @@ class RecycleBinFacadeTest {
         RecycleBinAbility<StandardEntity> ability = mock(RecycleBinAbility.class);
         DeletionLogService logService = mock(DeletionLogService.class);
         SoftDeleteRestoreCoordinator coordinator = mock(SoftDeleteRestoreCoordinator.class);
+        RecycleBinPurgeCoordinator purgeCoordinator = mock(RecycleBinPurgeCoordinator.class);
         when(ability.getModuleAlias()).thenReturn("iam.tenant");
-        when(logService.operation("delete-1")).thenReturn(successfulDelete("delete-1", "iam.role", "role-1"));
+        when(ability.getDeletionEntityAlias()).thenReturn("tenant");
+        when(logService.operation("delete-1")).thenReturn(successfulDelete("delete-1", "iam.role", "role", "role-1"));
 
-        assertThatThrownBy(() -> new RecycleBinFacade(logService, coordinator).restore(ability, "delete-1"))
+        assertThatThrownBy(() -> new RecycleBinFacade(logService, coordinator, purgeCoordinator).restore(ability, "delete-1"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("iam.tenant");
         verify(ability).beforeRecycleBinRestore();
@@ -58,12 +62,14 @@ class RecycleBinFacadeTest {
         RecycleBinAbility<StandardEntity> ability = mock(RecycleBinAbility.class);
         DeletionLogService logService = mock(DeletionLogService.class);
         SoftDeleteRestoreCoordinator coordinator = mock(SoftDeleteRestoreCoordinator.class);
+        RecycleBinPurgeCoordinator purgeCoordinator = mock(RecycleBinPurgeCoordinator.class);
         RestoreReport expected = new RestoreReport("delete-1", "restore-1", List.of());
         when(ability.getModuleAlias()).thenReturn("iam.tenant");
-        when(logService.operation("delete-1")).thenReturn(successfulDelete("delete-1", "iam.tenant", "tenant-1"));
+        when(ability.getDeletionEntityAlias()).thenReturn("tenant");
+        when(logService.operation("delete-1")).thenReturn(successfulDelete("delete-1", "iam.tenant", "tenant", "tenant-1"));
         when(coordinator.restore("delete-1")).thenReturn(expected);
 
-        RestoreReport actual = new RecycleBinFacade(logService, coordinator).restore(ability, "delete-1");
+        RestoreReport actual = new RecycleBinFacade(logService, coordinator, purgeCoordinator).restore(ability, "delete-1");
 
         assertThat(actual).isSameAs(expected);
         verify(ability).beforeRecycleBinRestore();
@@ -78,12 +84,13 @@ class RecycleBinFacadeTest {
         return record;
     }
 
-    private static DeletionOperation successfulDelete(String id, String moduleAlias, String recordId) {
+    private static DeletionOperation successfulDelete(String id, String moduleAlias, String entityAlias, String recordId) {
         DeletionOperation operation = new DeletionOperation();
         operation.setId(id);
         operation.setOperationType(DeletionOperationType.DELETE);
         operation.setStatus(DeletionOperationStatus.SUCCEEDED);
         operation.setRootModuleAlias(moduleAlias);
+        operation.setRootEntityAlias(entityAlias);
         operation.setRootRecordId(recordId);
         return operation;
     }

@@ -18,11 +18,14 @@ import java.util.Objects;
 public class RecycleBinFacade {
     private final DeletionLogService deletionLogService;
     private final SoftDeleteRestoreCoordinator restoreCoordinator;
+    private final RecycleBinPurgeCoordinator purgeCoordinator;
 
     public RecycleBinFacade(DeletionLogService deletionLogService,
-                            SoftDeleteRestoreCoordinator restoreCoordinator) {
+                            SoftDeleteRestoreCoordinator restoreCoordinator,
+                            RecycleBinPurgeCoordinator purgeCoordinator) {
         this.deletionLogService = Objects.requireNonNull(deletionLogService, "deletionLogService must not be null");
         this.restoreCoordinator = Objects.requireNonNull(restoreCoordinator, "restoreCoordinator must not be null");
+        this.purgeCoordinator = Objects.requireNonNull(purgeCoordinator, "purgeCoordinator must not be null");
     }
 
     public <T extends EntityContract> List<RecycleBinItem<T>> list(RecycleBinAbility<T> ability,
@@ -37,15 +40,30 @@ public class RecycleBinFacade {
         DeletionOperation source = deletionLogService.operation(sourceDeleteOperationId);
         if (source.getOperationType() != DeletionOperationType.DELETE
                 || source.getStatus() != DeletionOperationStatus.SUCCEEDED
-                || !ability.getModuleAlias().equals(source.getRootModuleAlias())) {
+                || !ability.getModuleAlias().equals(source.getRootModuleAlias())
+                || !ability.getDeletionEntityAlias().equals(source.getRootEntityAlias())) {
             throw new PlatformException("Recycle-bin restore requires a successful root delete operation for "
                     + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
         }
         return restoreCoordinator.restore(sourceDeleteOperationId);
     }
 
+    public PurgeReport purge(RecycleBinAbility<?> ability, String sourceDeleteOperationId) {
+        Objects.requireNonNull(ability, "recycleBinAbility must not be null");
+        DeletionOperation source = deletionLogService.operation(sourceDeleteOperationId);
+        if (source.getOperationType() != DeletionOperationType.DELETE
+                || source.getStatus() != DeletionOperationStatus.SUCCEEDED
+                || !ability.getModuleAlias().equals(source.getRootModuleAlias())
+                || !ability.getDeletionEntityAlias().equals(source.getRootEntityAlias())) {
+            throw new PlatformException("Recycle-bin purge requires a successful root delete operation for "
+                    + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
+        }
+        return purgeCoordinator.purge(sourceDeleteOperationId);
+    }
+
     private <T extends EntityContract> RecycleBinItem<T> item(RecycleBinAbility<T> ability, T record) {
-        DeletionLifecycleEntry lifecycle = deletionLogService.latestTerminalEntry(ability.getModuleAlias(), record.getId());
+        DeletionLifecycleEntry lifecycle = deletionLogService.latestTerminalEntry(
+                ability.getModuleAlias(), ability.getDeletionEntityAlias(), record.getId());
         if (lifecycle == null) {
             return new RecycleBinItem<>(record, null, record.getDeletedAt(), false,
                     "deletion history is unavailable");
@@ -57,6 +75,7 @@ public class RecycleBinFacade {
                 && entry.getStatus() == DeletionEntryStatus.SUCCEEDED
                 && entry.getDeleteMode() == DeletionEntryMode.SOFT
                 && ability.getModuleAlias().equals(operation.getRootModuleAlias())
+                && ability.getDeletionEntityAlias().equals(operation.getRootEntityAlias())
                 && record.getId().equals(operation.getRootRecordId());
         return new RecycleBinItem<>(record, restorable ? operation.getId() : null, record.getDeletedAt(), restorable,
                 restorable ? null : "resource lifecycle changed after deletion");

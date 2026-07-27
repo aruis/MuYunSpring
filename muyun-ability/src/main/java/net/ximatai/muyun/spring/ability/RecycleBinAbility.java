@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 
 import java.util.List;
 
@@ -16,7 +17,7 @@ import java.util.List;
  * recycle-bin lifecycle. Recovery execution and lifecycle audit remain
  * platform concerns.</p>
  */
-public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteAbility<T> {
+public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteAbility<T>, DeletionRecoveryAbility<T> {
     /** Lists retained records visible to the current recycle-bin boundary. */
     default List<T> listRecycleBin(PageRequest pageRequest) {
         beforeRecycleBinQuery();
@@ -49,5 +50,37 @@ public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteA
 
     /** Hook for the resource owner to enforce its recovery boundary. */
     default void beforeRecycleBinRestore() {
+    }
+
+    /**
+     * Physically removes one retained resource after its recycle-bin policy allows it.
+     * This primitive deliberately does not infer or traverse children; the platform
+     * purge coordinator owns source-tree validation, ordering and audit entries.
+     */
+    default int purge(String id) {
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        beforeRecycleBinPurge(id);
+        T entity = selectIgnoreSoftDelete(id);
+        if (entity == null || !Boolean.TRUE.equals(entity.getDeleted())) {
+            return 0;
+        }
+        int purged = getDao().deleteByIdAndVersion(id, entity.getVersion());
+        if (purged <= 0) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
+        afterRecycleBinPurge(id, entity, purged);
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
+        return purged;
+    }
+
+    /** Defaults to deny: irreversible deletion requires an explicit business decision. */
+    default void beforeRecycleBinPurge(String id) {
+        throw new UnsupportedOperationException("Recycle-bin purge is not enabled for " + getModuleAlias());
+    }
+
+    default void afterRecycleBinPurge(String id, T entity, int purged) {
     }
 }

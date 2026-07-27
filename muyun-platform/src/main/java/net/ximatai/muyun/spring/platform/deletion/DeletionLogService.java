@@ -152,9 +152,17 @@ public class DeletionLogService {
     }
 
     public DeletionLifecycleEntry latestTerminalEntry(String moduleAlias, String recordId) {
-        List<DeletionEntry> entries = entryDao.query(Criteria.of()
-                        .eq("resourceModuleAlias", requireText(moduleAlias, "moduleAlias"))
-                        .eq("resourceRecordId", requireText(recordId, "recordId")),
+        return latestTerminalEntry(moduleAlias, null, recordId);
+    }
+
+    public DeletionLifecycleEntry latestTerminalEntry(String moduleAlias, String entityAlias, String recordId) {
+        Criteria criteria = Criteria.of()
+                .eq("resourceModuleAlias", requireText(moduleAlias, "moduleAlias"))
+                .eq("resourceRecordId", requireText(recordId, "recordId"));
+        if (entityAlias != null && !entityAlias.isBlank()) {
+            criteria.eq("resourceEntityAlias", entityAlias);
+        }
+        List<DeletionEntry> entries = entryDao.query(criteria,
                 PageRequest.of(1, Integer.MAX_VALUE));
         return entries.stream()
                 .filter(entry -> entry.getStatus() != DeletionEntryStatus.IN_PROGRESS)

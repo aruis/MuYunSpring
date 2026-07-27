@@ -389,6 +389,7 @@ public class StaticModuleDefinitionScanner {
         if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.RECYCLE_BIN_QUERY);
             addPlatform(actions, PlatformAction.RECYCLE_BIN_RESTORE);
+            addPlatform(actions, PlatformAction.RECYCLE_BIN_PURGE);
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.REFERENCE);
@@ -421,6 +422,7 @@ public class StaticModuleDefinitionScanner {
         if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
             addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_QUERY);
             addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_RESTORE);
+            addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_PURGE);
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
             addContributionPlatform(actions, contribution, PlatformAction.REFERENCE);

@@ -125,7 +125,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("租户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactly("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "recycleBinQuery", "recycleBinRestore");
+                                "sort", "enable", "disable", "recycleBinQuery", "recycleBinRestore", "recycleBinPurge");
             });
             assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)

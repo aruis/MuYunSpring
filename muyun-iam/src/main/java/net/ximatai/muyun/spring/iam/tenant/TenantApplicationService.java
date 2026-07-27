@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.child.CascadeDeleteChildAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
@@ -26,7 +27,7 @@ import java.util.Set;
 @Service
 public class TenantApplicationService extends AbstractAbilityService<TenantApplication> implements
         GlobalScopedAbility<TenantApplication>,
-        DeletionRecoveryAbility<TenantApplication>,
+        RecycleBinAbility<TenantApplication>,
         CascadeDeleteChildAbility<TenantApplication> {
     public static final String MODULE_ALIAS = "iam.tenant_application";
     public static final String IAM_APPLICATION_ALIAS = "iam";
@@ -164,6 +165,11 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
     @Override
     public String getDeletionEntityAlias() {
         return "tenant_application";
+    }
+
+    @Override
+    public void beforeRecycleBinPurge(String id) {
+        // Tenant applications only participate in a root tenant's purge tree.
     }
 
     private void requireEnabledTenantApplication(String applicationAlias) {
