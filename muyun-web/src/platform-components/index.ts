@@ -32,6 +32,19 @@ export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
 export { default as RecordTreeSelector } from './RecordTreeSelector.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
+export { default as RecycleBinPanel } from './RecycleBinPanel.vue';
+export { useRecycleBinState } from './recycleBinState';
+export type { RecycleBinStateOptions } from './recycleBinState';
+export {
+  createSoftDeletedConflictErrorHandler,
+  extractSoftDeletedConflict,
+  useSoftDeletedConflictHandler,
+} from './softDeletedConflictHandler';
+export type {
+  SoftDeletedConflictHandler,
+  SoftDeletedConflictHandlerOptions,
+  SoftDeletedConflictInfo,
+} from './softDeletedConflictHandler';
 export { default as StaticManagementLayout } from './StaticManagementLayout.vue';
 export { default as TreeRecordExplorer } from './TreeRecordExplorer.vue';
 export {
