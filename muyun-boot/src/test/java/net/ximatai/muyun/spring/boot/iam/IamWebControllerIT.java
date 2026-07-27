@@ -511,7 +511,7 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].departmentId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].version").doesNotExist());
+                .andExpect(jsonPath("$.records[0].version").value(7));
     }
 
     @Test
@@ -544,7 +544,7 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].parentId").doesNotExist())
                 .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$.records[0].version").doesNotExist());
+                .andExpect(jsonPath("$.records[0].version").value(3));
     }
 
     @Test

@@ -289,9 +289,11 @@ class MuYunSpringApplicationContextIT {
                 .containsEntry("id", projectionUserId(tenantId, "alice"))
                 .containsEntry("username", projectionUsername(tenantId, "alice"))
                 .containsEntry("employeeNo", "E-PROJ-001")
-                .containsEntry("employeeTitle", "Alice Employee");
+                .containsEntry("employeeTitle", "Alice Employee")
+                .containsEntry("version", 0)
+                .containsEntry("deletedAt", null);
         assertThat(alice).containsEntry("passwordStatus", "ACTIVE");
-        assertThat(alice).doesNotContainKeys("tenantId", "version", "deleted", "createdAt");
+        assertThat(alice).doesNotContainKeys("tenantId", "deleted", "createdAt");
         @SuppressWarnings("unchecked")
         Map<String, Object> bob = (Map<String, Object>) firstPage.records().get(1);
         assertThat(bob)

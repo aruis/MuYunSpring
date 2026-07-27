@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,7 +91,7 @@ class RecordReadProjectionPlannerTest {
     }
 
     @Test
-    void shouldProjectRecordOutputByProjectionFields() {
+    void shouldKeepPlatformFieldsAndOnlyProjectDeclaredBusinessFields() {
         ModuleUiCompilationResult compilation = ModuleUiDescriptorCompiler.compileModule(staticDefinition(
                 ModuleUiDefinition.builder("iam.employee")
                         .listView(list -> list
@@ -106,6 +107,10 @@ class RecordReadProjectionPlannerTest {
         ProjectionEmployee record = new ProjectionEmployee();
         record.setId("emp-1");
         record.setVersion(7);
+        record.setDeletedAt(Instant.EPOCH);
+        record.setTenantId("tenant-a");
+        record.setDeleted(Boolean.FALSE);
+        record.setCreatedAt(Instant.EPOCH);
         record.setEmployeeNo("E001");
         record.setTitle("张三");
         record.setMobile("13800000000");
@@ -115,11 +120,11 @@ class RecordReadProjectionPlannerTest {
 
         assertThat(output).containsEntry("id", "emp-1");
         assertThat(output).containsEntry("version", 7);
-        assertThat(output).containsEntry("deletedAt", null);
+        assertThat(output).containsEntry("deletedAt", Instant.EPOCH);
         assertThat(output).containsEntry("employeeNo", "E001");
         assertThat(output).containsEntry("title", "张三");
         assertThat(output).containsEntry("enabled", Boolean.TRUE);
-        assertThat(output).doesNotContainKey("mobile");
+        assertThat(output).doesNotContainKeys("tenantId", "deleted", "createdAt", "mobile");
     }
 
     @Test
@@ -387,6 +392,9 @@ class RecordReadProjectionPlannerTest {
         private String id;
         private Integer version;
         private java.time.Instant deletedAt;
+        private String tenantId;
+        private Boolean deleted;
+        private java.time.Instant createdAt;
         private String employeeNo;
         private String title;
         private String mobile;
@@ -414,6 +422,30 @@ class RecordReadProjectionPlannerTest {
 
         public void setDeletedAt(java.time.Instant deletedAt) {
             this.deletedAt = deletedAt;
+        }
+
+        public String getTenantId() {
+            return tenantId;
+        }
+
+        public void setTenantId(String tenantId) {
+            this.tenantId = tenantId;
+        }
+
+        public Boolean getDeleted() {
+            return deleted;
+        }
+
+        public void setDeleted(Boolean deleted) {
+            this.deleted = deleted;
+        }
+
+        public java.time.Instant getCreatedAt() {
+            return createdAt;
+        }
+
+        public void setCreatedAt(java.time.Instant createdAt) {
+            this.createdAt = createdAt;
         }
 
         public String getEmployeeNo() {
