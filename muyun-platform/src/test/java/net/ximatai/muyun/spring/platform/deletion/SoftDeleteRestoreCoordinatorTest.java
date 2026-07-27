@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SoftDeleteRestoreCoordinatorTest {
     private final TestMemoryDao<DeletionOperation> operationDao = new TestMemoryDao<>();
@@ -102,10 +101,13 @@ class SoftDeleteRestoreCoordinatorTest {
         DeletionRecoveryResourceResolver first = resolver(tenant).getFirst();
         DeletionRecoveryResourceResolver second = resolver(tenant).getFirst();
 
-        assertThatThrownBy(() -> new SoftDeleteRestoreCoordinator(logService, List.of(first, second))
-                .restore(source.operationId()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Multiple deletion recovery resolvers support iam.tenant.tenant/tenant-1");
+        RestoreReport report = new SoftDeleteRestoreCoordinator(logService, List.of(first, second))
+                .restore(source.operationId());
+
+        assertThat(report.entries()).extracting(RestoreEntryResult::status)
+                .containsExactly(RestoreEntryResult.Status.FAILED, RestoreEntryResult.Status.SKIPPED);
+        assertThat(report.entries().getFirst().message())
+                .contains("Multiple deletion recovery resolvers support iam.tenant.tenant/tenant-1");
     }
 
     private SourceTree completedDeleteTree() {

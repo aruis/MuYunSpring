@@ -127,7 +127,7 @@ A.delete(a)
 一条受影响资源明细，记录一次操作波及的每个资源节点：
 
 - `id`、`operation_id`、`parent_entry_id`；
-- `resource_type`、`resource_id`、资源版本；
+- `resource_module_alias`、`resource_entity_alias`、`resource_record_id`、资源版本；
 - `trigger_type`（`DIRECT` / `CASCADE`）；
 - `delete_mode`（`SOFT` / `HARD`）；
 - 执行状态、失败或跳过原因；
@@ -142,6 +142,21 @@ A.delete(a)
 - 按业务回收站查询需要，可增加 `resource_type + status + occurred_at`。
 
 删除操作日志与影响明细共同构成删除专项流水，不再另建重复的“删除日志表”。平台运行审计只保留动作入口、授权和 trace 线索；删除链负责解释删除影响、策略、恢复和最终清理。
+
+## 恢复资源身份与解析
+
+可恢复资源的稳定身份统一为 `moduleAlias + entityAlias + recordId`。模块 alias 只表达运行时业务边界，不足以在一个模块包含多个实体时定位恢复执行者；`entityAlias` 不是展示字段，也不得由表名或 Java 类名在恢复时临时推断。
+
+静态资源只有实现 `DeletionRecoveryAbility` 后才进入恢复目录，并显式提供稳定 `entityAlias`；普通 `SoftDeleteAbility` 仍可独立使用，不因此承担回收站或恢复责任。动态实体由当前动态运行态提供同一身份，删除日志必须记录其动态实体 alias。级联链上的资源也按相同规则写入完整身份。
+
+恢复解析遵循下列约束：
+
+1. Resolver 必须先声明是否支持该完整资源身份，再返回对应的资源能力。
+2. 零个 Resolver 命中时，该条目不可恢复并返回明确原因。
+3. 恰好一个 Resolver 命中时，平台才执行资源自身的恢复原语。
+4. 多个 Resolver 命中属于平台配置错误，必须中止该分支并报告冲突 Resolver；不得依赖 Spring Bean 注入顺序选择其一。
+
+历史日志若缺少 `resource_entity_alias`，平台不得根据 `moduleAlias` 猜测目标资源；该记录仅保留审计可读性，并应在恢复报告中标记为不可恢复。任何需要治理历史数据的迁移必须显式补齐或确认资源身份，不能在普通恢复请求中隐式完成。
 
 ## 标准删除入口覆盖范围
 

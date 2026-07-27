@@ -69,7 +69,14 @@ public class SoftDeleteRestoreCoordinator {
                     restoreEntryId, "resource lifecycle changed after the source deletion");
             return false;
         }
-        SoftDeleteAbility<?> ability = resolveAbility(entry);
+        final SoftDeleteAbility<?> ability;
+        try {
+            ability = resolveAbility(entry);
+        } catch (RuntimeException exception) {
+            failedBranch(entry, children, results, restoreOperationId, restoreEntryIds, restoreEntryId,
+                    exception.getMessage());
+            return false;
+        }
         if (ability == null) {
             skipBranch(entry, children, results, restoreOperationId, restoreEntryIds,
                     restoreEntryId, "soft-delete ability is unavailable");
