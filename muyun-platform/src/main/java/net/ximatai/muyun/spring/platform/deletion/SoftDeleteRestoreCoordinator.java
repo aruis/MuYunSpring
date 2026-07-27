@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -24,18 +23,12 @@ import java.util.Objects;
 @Service
 public class SoftDeleteRestoreCoordinator {
     private final DeletionLogService deletionLogService;
-    private final Map<String, SoftDeleteAbility<?>> abilities;
+    private final List<DeletionRecoveryResourceResolver> resourceResolvers;
 
     public SoftDeleteRestoreCoordinator(DeletionLogService deletionLogService,
-                                        Collection<SoftDeleteAbility<?>> abilities) {
+                                        List<DeletionRecoveryResourceResolver> resourceResolvers) {
         this.deletionLogService = Objects.requireNonNull(deletionLogService, "deletionLogService must not be null");
-        this.abilities = new HashMap<>();
-        for (SoftDeleteAbility<?> ability : abilities == null ? List.<SoftDeleteAbility<?>>of() : abilities) {
-            SoftDeleteAbility<?> previous = this.abilities.putIfAbsent(ability.getModuleAlias(), ability);
-            if (previous != null) {
-                throw new IllegalArgumentException("Duplicate soft-delete ability: " + ability.getModuleAlias());
-            }
-        }
+        this.resourceResolvers = resourceResolvers == null ? List.of() : List.copyOf(resourceResolvers);
     }
 
     @Transactional
@@ -76,7 +69,7 @@ public class SoftDeleteRestoreCoordinator {
                     restoreEntryId, "resource lifecycle changed after the source deletion");
             return false;
         }
-        SoftDeleteAbility<?> ability = abilities.get(entry.getResourceModuleAlias());
+        SoftDeleteAbility<?> ability = resolveAbility(entry);
         if (ability == null) {
             skipBranch(entry, children, results, restoreOperationId, restoreEntryIds,
                     restoreEntryId, "soft-delete ability is unavailable");
@@ -101,6 +94,16 @@ public class SoftDeleteRestoreCoordinator {
             restoreEntry(child, children, results, restoreOperationId, restoreEntryIds);
         }
         return true;
+    }
+
+    private SoftDeleteAbility<?> resolveAbility(DeletionEntry entry) {
+        for (DeletionRecoveryResourceResolver resolver : resourceResolvers) {
+            SoftDeleteAbility<?> ability = resolver.resolve(entry).orElse(null);
+            if (ability != null) {
+                return ability;
+            }
+        }
+        return null;
     }
 
     private void skipBranch(DeletionEntry entry, Map<String, List<DeletionEntry>> children,
