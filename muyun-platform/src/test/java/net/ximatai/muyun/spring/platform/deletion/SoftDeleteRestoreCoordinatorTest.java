@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.deletion;
 
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SoftDeleteRestoreCoordinatorTest {
     private final TestMemoryDao<DeletionOperation> operationDao = new TestMemoryDao<>();
@@ -48,7 +50,7 @@ class SoftDeleteRestoreCoordinatorTest {
     @Test
     void shouldAuditFailedRootAndSkippedDescendants() {
         SourceTree source = completedDeleteTree();
-        RestoreAbility failingTenant = new RestoreAbility("iam.tenant", "tenant-1", true);
+        RestoreAbility failingTenant = new RestoreAbility("iam.tenant", "tenant", "tenant-1", true);
         RestoreAbility application = softDeletedAbility("iam.tenantApplication", "application-1");
 
         RestoreReport report = new SoftDeleteRestoreCoordinator(logService, resolver(failingTenant, application))
@@ -80,25 +82,30 @@ class SoftDeleteRestoreCoordinatorTest {
     }
 
     @Test
-    void shouldIgnoreUnboundSoftDeleteAbilitiesWhenIndexingStaticRecoveryResources() {
-        RestoreAbility tenant = softDeletedAbility("iam.tenant", "tenant-1");
-        SoftDeleteAbility<TestRecord> unbound = new SoftDeleteAbility<>() {
-            @Override
-            public net.ximatai.muyun.spring.ability.BaseDao<TestRecord, String> getDao() {
-                return new TestMemoryDao<>();
-            }
-
-            @Override
-            public String getModuleAlias() {
-                return null;
-            }
-        };
+    void shouldResolveStaticRecoveryResourcesByCompleteResourceKey() {
+        RestoreAbility tenant = new RestoreAbility("iam.shared", "tenant", "tenant-1", false);
+        RestoreAbility application = new RestoreAbility("iam.shared", "tenant_application", "application-1", false);
         StaticDeletionRecoveryResourceResolver resolver =
-                new StaticDeletionRecoveryResourceResolver(List.of(tenant, unbound, unbound));
+                new StaticDeletionRecoveryResourceResolver(List.of(tenant, application));
         DeletionEntry entry = new DeletionEntry();
-        entry.setResourceModuleAlias("iam.tenant");
+        entry.setResourceModuleAlias("iam.shared");
+        entry.setResourceEntityAlias("tenant_application");
 
-        assertThat(resolver.resolve(entry)).containsSame(tenant);
+        assertThat(resolver.supports(entry)).isTrue();
+        assertThat(resolver.resolve(entry)).containsSame(application);
+    }
+
+    @Test
+    void shouldRejectAmbiguousRecoveryResolverMatches() {
+        SourceTree source = completedDeleteTree();
+        RestoreAbility tenant = softDeletedAbility("iam.tenant", "tenant-1");
+        DeletionRecoveryResourceResolver first = resolver(tenant).getFirst();
+        DeletionRecoveryResourceResolver second = resolver(tenant).getFirst();
+
+        assertThatThrownBy(() -> new SoftDeleteRestoreCoordinator(logService, List.of(first, second))
+                .restore(source.operationId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Multiple deletion recovery resolvers support iam.tenant.tenant/tenant-1");
     }
 
     private SourceTree completedDeleteTree() {
@@ -108,20 +115,22 @@ class SoftDeleteRestoreCoordinatorTest {
         operation.setRootModuleAlias("iam.tenant");
         operation.setRootRecordId("tenant-1");
         String operationId = logService.startOperation(operation);
-        String rootEntryId = startEntry(operationId, null, "iam.tenant", "tenant-1");
-        String childEntryId = startEntry(operationId, rootEntryId, "iam.tenantApplication", "application-1");
+        String rootEntryId = startEntry(operationId, null, "iam.tenant", "tenant", "tenant-1");
+        String childEntryId = startEntry(operationId, rootEntryId, "iam.tenantApplication", "tenantApplication", "application-1");
         logService.completeEntry(rootEntryId, DeletionEntryStatus.SUCCEEDED, null);
         logService.completeEntry(childEntryId, DeletionEntryStatus.SUCCEEDED, null);
         logService.completeOperation(operationId, DeletionOperationStatus.SUCCEEDED, null);
         return new SourceTree(operationId, rootEntryId, childEntryId);
     }
 
-    private String startEntry(String operationId, String parentEntryId, String moduleAlias, String recordId) {
+    private String startEntry(String operationId, String parentEntryId, String moduleAlias, String entityAlias,
+                              String recordId) {
         DeletionEntry entry = new DeletionEntry();
         entry.setTenantId("tenant-1");
         entry.setOperationId(operationId);
         entry.setParentEntryId(parentEntryId);
         entry.setResourceModuleAlias(moduleAlias);
+        entry.setResourceEntityAlias(entityAlias);
         entry.setResourceRecordId(recordId);
         entry.setTriggerType(parentEntryId == null ? DeletionEntryTrigger.DIRECT : DeletionEntryTrigger.CASCADE);
         entry.setDeleteMode(DeletionEntryMode.SOFT);
@@ -129,23 +138,36 @@ class SoftDeleteRestoreCoordinatorTest {
     }
 
     private RestoreAbility softDeletedAbility(String moduleAlias, String id) {
-        return new RestoreAbility(moduleAlias, id, false);
+        return new RestoreAbility(moduleAlias, moduleAlias.substring(moduleAlias.lastIndexOf('.') + 1), id, false);
     }
 
     private List<DeletionRecoveryResourceResolver> resolver(RestoreAbility... abilities) {
-        return List.of(entry -> java.util.Arrays.stream(abilities)
-                .filter(ability -> ability.getModuleAlias().equals(entry.getResourceModuleAlias()))
-                .findFirst()
-                .map(ability -> (SoftDeleteAbility<?>) ability));
+        return List.of(new DeletionRecoveryResourceResolver() {
+            @Override
+            public boolean supports(DeletionEntry entry) {
+                return java.util.Arrays.stream(abilities)
+                        .anyMatch(ability -> ability.getModuleAlias().equals(entry.getResourceModuleAlias()));
+            }
+
+            @Override
+            public java.util.Optional<SoftDeleteAbility<?>> resolve(DeletionEntry entry) {
+                return java.util.Arrays.stream(abilities)
+                        .filter(ability -> ability.getModuleAlias().equals(entry.getResourceModuleAlias()))
+                        .findFirst()
+                        .map(ability -> (SoftDeleteAbility<?>) ability);
+            }
+        });
     }
 
     private static final class RestoreAbility extends AbstractAbilityService<TestRecord>
-            implements SoftDeleteAbility<TestRecord> {
+            implements DeletionRecoveryAbility<TestRecord> {
         private final TestRecord record;
         private final boolean fails;
+        private final String entityAlias;
 
-        private RestoreAbility(String moduleAlias, String id, boolean fails) {
+        private RestoreAbility(String moduleAlias, String entityAlias, String id, boolean fails) {
             super(moduleAlias, TestRecord.class, new TestMemoryDao<>());
+            this.entityAlias = entityAlias;
             this.fails = fails;
             this.record = new TestRecord();
             record.setId(id);
@@ -160,7 +182,12 @@ class SoftDeleteRestoreCoordinatorTest {
             if (fails) {
                 throw new IllegalStateException("restore rejected");
             }
-            return SoftDeleteAbility.super.restore(id);
+            return DeletionRecoveryAbility.super.restore(id);
+        }
+
+        @Override
+        public String getDeletionEntityAlias() {
+            return entityAlias;
         }
     }
 

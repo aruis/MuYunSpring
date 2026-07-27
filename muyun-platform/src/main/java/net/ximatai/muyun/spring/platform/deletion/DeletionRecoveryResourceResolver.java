@@ -13,5 +13,7 @@ import java.util.Optional;
  * alone does not opt a resource into an operator-facing recycle bin.</p>
  */
 public interface DeletionRecoveryResourceResolver {
+    boolean supports(DeletionEntry entry);
+
     Optional<SoftDeleteAbility<?>> resolve(DeletionEntry entry);
 }

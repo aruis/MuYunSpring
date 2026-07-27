@@ -97,13 +97,19 @@ public class SoftDeleteRestoreCoordinator {
     }
 
     private SoftDeleteAbility<?> resolveAbility(DeletionEntry entry) {
-        for (DeletionRecoveryResourceResolver resolver : resourceResolvers) {
-            SoftDeleteAbility<?> ability = resolver.resolve(entry).orElse(null);
-            if (ability != null) {
-                return ability;
-            }
+        List<DeletionRecoveryResourceResolver> matches = resourceResolvers.stream()
+                .filter(resolver -> resolver.supports(entry))
+                .toList();
+        if (matches.size() > 1) {
+            throw new IllegalStateException("Multiple deletion recovery resolvers support "
+                    + entry.getResourceModuleAlias() + "." + entry.getResourceEntityAlias() + "/"
+                    + entry.getResourceRecordId() + ": " + matches.stream()
+                    .map(resolver -> resolver.getClass().getName()).toList());
         }
-        return null;
+        return matches.isEmpty() ? null : matches.getFirst().resolve(entry).orElseThrow(() ->
+                new IllegalStateException("Deletion recovery resolver claimed but could not resolve "
+                        + entry.getResourceModuleAlias() + "." + entry.getResourceEntityAlias() + "/"
+                        + entry.getResourceRecordId()));
     }
 
     private void skipBranch(DeletionEntry entry, Map<String, List<DeletionEntry>> children,

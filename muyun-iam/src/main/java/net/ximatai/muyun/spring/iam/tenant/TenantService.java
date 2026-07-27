@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.SystemManagedAbility;
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
@@ -28,6 +29,7 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         SystemManagedAbility<Tenant>,
         GlobalScopedAbility<Tenant>,
         RecycleBinAbility<Tenant>,
+        DeletionRecoveryAbility<Tenant>,
         EnableAbility<Tenant>,
         SortAbility<Tenant>,
         ChildrenAbility<Tenant>,
@@ -126,6 +128,11 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     @Override
     public void verifyActiveTenant(String tenantId) {
         requireActiveTenant(tenantId);
+    }
+
+    @Override
+    public String getDeletionEntityAlias() {
+        return "tenant";
     }
 
     @Override

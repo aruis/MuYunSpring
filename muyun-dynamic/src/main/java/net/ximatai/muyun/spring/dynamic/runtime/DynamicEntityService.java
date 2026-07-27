@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.ability.security.FieldProtectionPlan;
 import net.ximatai.muyun.spring.ability.security.FieldSigner;
 import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -55,6 +56,7 @@ import java.util.function.Function;
 public class DynamicEntityService implements
         CrudAbility<DynamicRecord>,
         SoftDeleteAbility<DynamicRecord>,
+        DeletionRecoveryAbility<DynamicRecord>,
         ChildAbility<DynamicRecord>,
         ChildrenAbility<DynamicRecord>,
         ReferencerAbility<DynamicRecord>,
@@ -167,6 +169,11 @@ public class DynamicEntityService implements
     @Override
     public String getModuleAlias() {
         return moduleAlias;
+    }
+
+    @Override
+    public String getDeletionEntityAlias() {
+        return dao.getEntity().alias();
     }
 
     public ReferenceTarget referenceTarget() {

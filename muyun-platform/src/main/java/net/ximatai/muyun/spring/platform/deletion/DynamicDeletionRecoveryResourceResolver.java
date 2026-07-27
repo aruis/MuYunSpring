@@ -17,9 +17,25 @@ public class DynamicDeletionRecoveryResourceResolver implements DeletionRecovery
     }
 
     @Override
-    public Optional<SoftDeleteAbility<?>> resolve(DeletionEntry entry) {
+    public boolean supports(DeletionEntry entry) {
         Objects.requireNonNull(entry, "deletionEntry must not be null");
         if (entry.getResourceEntityAlias() == null || entry.getResourceEntityAlias().isBlank()) {
+            return false;
+        }
+        return dynamicRecords.map(records -> {
+            try {
+                records.entityDescriptor(entry.getResourceModuleAlias(), entry.getResourceEntityAlias());
+                return true;
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }).orElse(false);
+    }
+
+    @Override
+    public Optional<SoftDeleteAbility<?>> resolve(DeletionEntry entry) {
+        Objects.requireNonNull(entry, "deletionEntry must not be null");
+        if (!supports(entry)) {
             return Optional.empty();
         }
         return dynamicRecords.map(records -> records.entity(

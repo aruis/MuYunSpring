@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.child.CascadeDeleteChildAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionTrigger;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.common.exception.ApplicationNotOpenedException;
@@ -25,6 +26,7 @@ import java.util.Set;
 @Service
 public class TenantApplicationService extends AbstractAbilityService<TenantApplication> implements
         GlobalScopedAbility<TenantApplication>,
+        DeletionRecoveryAbility<TenantApplication>,
         CascadeDeleteChildAbility<TenantApplication> {
     public static final String MODULE_ALIAS = "iam.tenant_application";
     public static final String IAM_APPLICATION_ALIAS = "iam";
@@ -157,6 +159,11 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
                 && deletionContext.trigger() != DeletionTrigger.CASCADE) {
             throw new IllegalArgumentException("iam application must remain opened for a tenant");
         }
+    }
+
+    @Override
+    public String getDeletionEntityAlias() {
+        return "tenant_application";
     }
 
     private void requireEnabledTenantApplication(String applicationAlias) {

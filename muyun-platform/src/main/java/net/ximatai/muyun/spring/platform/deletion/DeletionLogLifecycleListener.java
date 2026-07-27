@@ -11,7 +11,7 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionTrigger;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityService;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -61,8 +61,8 @@ public class DeletionLogLifecycleListener implements DeletionLifecycleListener {
             entry.setOperationId(context.operationId());
             entry.setParentEntryId(context.parentEntryId());
             entry.setResourceModuleAlias(ability.getModuleAlias());
-            if (ability instanceof DynamicEntityService dynamicEntityService) {
-                entry.setResourceEntityAlias(dynamicEntityService.referenceTarget().entityAlias());
+            if (ability instanceof DeletionRecoveryAbility<?> recoveryAbility) {
+                entry.setResourceEntityAlias(recoveryAbility.getDeletionEntityAlias());
             }
             entry.setResourceRecordId(entity.getId());
             entry.setTriggerType(context.trigger() == DeletionTrigger.CASCADE
