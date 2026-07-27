@@ -1,6 +1,10 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
@@ -9,6 +13,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 final class PlatformAbilityDispatcher {
     private static volatile StaticOptionFieldValueValidator staticOptionFieldValueValidator =
             StaticOptionFieldValueValidator.NONE;
+    private static volatile DeletionLifecycleListener deletionLifecycleListener = DeletionLifecycleListener.NONE;
 
     private PlatformAbilityDispatcher() {
     }
@@ -19,6 +24,57 @@ final class PlatformAbilityDispatcher {
 
     static void resetStaticOptionFieldValueValidator() {
         staticOptionFieldValueValidator = StaticOptionFieldValueValidator.NONE;
+    }
+
+    static void setDeletionLifecycleListener(DeletionLifecycleListener listener) {
+        deletionLifecycleListener = listener == null ? DeletionLifecycleListener.NONE : listener;
+    }
+
+    static void resetDeletionLifecycleListener() {
+        deletionLifecycleListener = DeletionLifecycleListener.NONE;
+    }
+
+    static DeletionContext rootDeletionContext(String moduleAlias, String recordId) {
+        net.ximatai.muyun.spring.ability.deletion.DeletionResource root =
+                new net.ximatai.muyun.spring.ability.deletion.DeletionResource(moduleAlias, recordId);
+        return DeletionContext.root(moduleAlias, recordId, deletionLifecycleListener.open(root));
+    }
+
+    static DeletionContext resolveDeletionContext(String moduleAlias,
+                                                  String recordId,
+                                                  DeletionContext requestedContext) {
+        if (requestedContext == null) {
+            return rootDeletionContext(moduleAlias, recordId);
+        }
+        if (requestedContext.trigger() == net.ximatai.muyun.spring.ability.deletion.DeletionTrigger.DIRECT
+                && !requestedContext.hasLifecycleSession()) {
+            return rootDeletionContext(moduleAlias, recordId);
+        }
+        return requestedContext;
+    }
+
+    static <T extends EntityContract> DeletionNode deletionStarted(CrudAbility<T> ability,
+                                                                    T entity,
+                                                                    DeletionContext context,
+                                                                    DeletionMode mode) {
+        return context.lifecycleSession().started(ability, entity, context, mode);
+    }
+
+    static <T extends EntityContract> void deletionSucceeded(CrudAbility<T> ability,
+                                                              T entity,
+                                                              DeletionContext context,
+                                                              DeletionNode node,
+                                                              DeletionMode mode) {
+        context.lifecycleSession().succeeded(ability, entity, context, node, mode);
+    }
+
+    static <T extends EntityContract> void deletionFailed(CrudAbility<T> ability,
+                                                           T entity,
+                                                           DeletionContext context,
+                                                           DeletionNode node,
+                                                           DeletionMode mode,
+                                                           RuntimeException failure) {
+        context.lifecycleSession().failed(ability, entity, context, node, mode, failure);
     }
 
     static <T extends EntityContract> void beforeSave(CrudAbility<T> ability, T entity) {
@@ -35,8 +91,13 @@ final class PlatformAbilityDispatcher {
         ability.afterPlatformUpdate(entity, updated);
     }
 
-    static <T extends EntityContract> void afterDelete(CrudAbility<T> ability, String id, T entity, int deleted) {
-        runChildrenAfterDelete(ability, id, entity, deleted);
+    static <T extends EntityContract> void afterDelete(CrudAbility<T> ability,
+                                                        String id,
+                                                        T entity,
+                                                        int deleted,
+                                                        DeletionContext context,
+                                                        DeletionNode node) {
+        runChildrenAfterDelete(ability, id, entity, deleted, context, node);
         ability.afterPlatformDelete(id, entity, deleted);
     }
 
@@ -79,9 +140,14 @@ final class PlatformAbilityDispatcher {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static <T extends EntityContract> void runChildrenAfterDelete(CrudAbility<T> ability, String id, T entity, int deleted) {
+    private static <T extends EntityContract> void runChildrenAfterDelete(CrudAbility<T> ability,
+                                                                           String id,
+                                                                           T entity,
+                                                                           int deleted,
+                                                                           DeletionContext context,
+                                                                           DeletionNode node) {
         if (ability instanceof ChildrenAbility childrenAbility) {
-            childrenAbility.afterChildrenDelete(id, entity, deleted);
+            childrenAbility.afterChildrenDelete(id, entity, deleted, context, node);
         }
     }
 

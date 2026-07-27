@@ -66,6 +66,7 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
@@ -121,6 +122,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private TenantService tenantService;
+
+    @MockitoBean
+    private RecycleBinFacade recycleBinFacade;
 
     @MockitoBean
     private OrganizationService organizationService;

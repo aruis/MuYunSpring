@@ -22,7 +22,7 @@ class PlatformActionResolverTest {
                 FieldDefinition.sortOrder(),
                 FieldDefinition.enabled()
         ), Set.of(EntityCapability.TREE, EntityCapability.REFERENCE, EntityCapability.ENABLE,
-                EntityCapability.EXCHANGE));
+                EntityCapability.EXCHANGE, EntityCapability.RECYCLE_BIN));
 
         assertThat(EntityStandardActionCatalog.from(entity))
                 .extracting(EntityActionDefinition::actionCode)
@@ -50,6 +50,9 @@ class PlatformActionResolverTest {
         assertThat(actionCodes(entityWith(EntityCapability.EXCHANGE)))
                 .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
                         PlatformActionGroup.EXCHANGE));
+        assertThat(actionCodes(entityWith(EntityCapability.RECYCLE_BIN)))
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.RECYCLE_BIN));
     }
 
     @Test

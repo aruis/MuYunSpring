@@ -25,6 +25,7 @@ public final class DynamicRecordMapping implements RuntimeColumnMapper {
         put(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN);
         put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);
         put(StandardEntitySchema.DELETED_AT_FIELD, StandardEntitySchema.DELETED_AT_COLUMN);
+        put(StandardEntitySchema.DELETED_BY_FIELD, StandardEntitySchema.DELETED_BY_COLUMN);
         put(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN);
         put(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN);
         put(StandardEntitySchema.UPDATED_BY_FIELD, StandardEntitySchema.UPDATED_BY_COLUMN);

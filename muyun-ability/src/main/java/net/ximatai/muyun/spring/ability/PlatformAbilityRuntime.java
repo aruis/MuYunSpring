@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
 
 public final class PlatformAbilityRuntime {
     private PlatformAbilityRuntime() {
@@ -12,5 +13,13 @@ public final class PlatformAbilityRuntime {
 
     public static void resetStaticOptionFieldValueValidator() {
         PlatformAbilityDispatcher.resetStaticOptionFieldValueValidator();
+    }
+
+    public static void configureDeletionLifecycleListener(DeletionLifecycleListener listener) {
+        PlatformAbilityDispatcher.setDeletionLifecycleListener(listener);
+    }
+
+    public static void resetDeletionLifecycleListener() {
+        PlatformAbilityDispatcher.resetDeletionLifecycleListener();
     }
 }

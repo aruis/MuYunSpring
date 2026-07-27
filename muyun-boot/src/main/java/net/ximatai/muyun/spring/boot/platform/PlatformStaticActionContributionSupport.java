@@ -36,6 +36,8 @@ public final class PlatformStaticActionContributionSupport {
             case DELETE, BATCH_DELETE -> "删除" + resourceTitle;
             case ENABLE -> "启用" + resourceTitle;
             case DISABLE -> "停用" + resourceTitle;
+            case RECYCLE_BIN_QUERY -> "查询" + resourceTitle + "回收站";
+            case RECYCLE_BIN_RESTORE -> "恢复" + resourceTitle;
             case SORT -> "调整" + resourceTitle + "排序";
             case IMPORT -> "导入" + resourceTitle;
             case EXPORT -> "导出" + resourceTitle;

@@ -14,6 +14,7 @@ public final class StandardEntitySchema {
     public static final String VERSION_FIELD = "version";
     public static final String DELETED_FIELD = "deleted";
     public static final String DELETED_AT_FIELD = "deletedAt";
+    public static final String DELETED_BY_FIELD = "deletedBy";
     public static final String CREATED_BY_FIELD = "createdBy";
     public static final String CREATED_AT_FIELD = "createdAt";
     public static final String UPDATED_BY_FIELD = "updatedBy";
@@ -24,6 +25,7 @@ public final class StandardEntitySchema {
     public static final String VERSION_COLUMN = columnName(field(VERSION_FIELD));
     public static final String DELETED_COLUMN = columnName(field(DELETED_FIELD));
     public static final String DELETED_AT_COLUMN = columnName(field(DELETED_AT_FIELD));
+    public static final String DELETED_BY_COLUMN = columnName(field(DELETED_BY_FIELD));
     public static final String CREATED_BY_COLUMN = columnName(field(CREATED_BY_FIELD));
     public static final String CREATED_AT_COLUMN = columnName(field(CREATED_AT_FIELD));
     public static final String UPDATED_BY_COLUMN = columnName(field(UPDATED_BY_FIELD));

@@ -63,6 +63,9 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
+import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.AfterEach;
@@ -80,6 +83,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -101,6 +105,8 @@ class IamWebControllerTest {
     private PositionCategoryDao positionCategoryDao;
     private EmployeePositionDao employeePositionDao;
     private UserAccountDao userAccountDao;
+    private RecycleBinFacade recycleBinFacade;
+    private TenantService tenantService;
     private RoleService roleService;
     private RoleGrantableActionResolver grantableActionResolver;
     private CurrentUser currentUser;
@@ -117,6 +123,7 @@ class IamWebControllerTest {
         positionCategoryDao = mock(PositionCategoryDao.class);
         employeePositionDao = mock(EmployeePositionDao.class);
         userAccountDao = mock(UserAccountDao.class);
+        recycleBinFacade = mock(RecycleBinFacade.class);
         roleService = mock(RoleService.class);
         when(roleService.select(any())).thenAnswer(invocation -> {
             Role role = new Role();
@@ -124,7 +131,7 @@ class IamWebControllerTest {
             return role;
         });
         grantableActionResolver = mock(RoleGrantableActionResolver.class);
-        TenantService tenantService = new TenantService(tenantDao);
+        tenantService = new TenantService(tenantDao);
         OrganizationService organizationService = new OrganizationService(organizationDao, tenantService);
         PositionCategoryService positionCategoryService = new PositionCategoryService(
                 positionCategoryDao, tenantService, positionDao);
@@ -138,6 +145,7 @@ class IamWebControllerTest {
         UserAccountWebController userAccountController = new UserAccountWebController();
         RoleWebController roleController = new RoleWebController(grantableActionResolver);
         ReflectionTestUtils.setField(tenantController, "service", tenantService);
+        ReflectionTestUtils.setField(tenantController, "recycleBinFacade", recycleBinFacade);
         ReflectionTestUtils.setField(organizationController, "service", organizationService);
         ReflectionTestUtils.setField(positionController, "service", positionService);
         ReflectionTestUtils.setField(userAccountController, "service", userAccountService);
@@ -185,6 +193,36 @@ class IamWebControllerTest {
                         .content(json(tenant("tenant_b", "Tenant B"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.alias").value("tenant_b"));
+    }
+
+    @Test
+    void shouldExposeTenantRecycleBinThroughSystemScopedLifecycleFacade() throws Exception {
+        Tenant deleted = tenant("tenant_deleted", "Deleted Tenant");
+        deleted.setDeleted(true);
+        when(recycleBinFacade.list(eq(tenantService), any(PageRequest.class))).thenAnswer(invocation -> {
+            assertThat(TenantContext.isSystem()).isTrue();
+            return List.of(new RecycleBinItem<>(deleted, "delete-operation-1", deleted.getDeletedAt(), true, null));
+        });
+        RestoreReport report = new RestoreReport("delete-operation-1", "restore-operation-1", List.of());
+        when(recycleBinFacade.restore(tenantService, "delete-operation-1")).thenAnswer(invocation -> {
+            assertThat(TenantContext.isSystem()).isTrue();
+            return report;
+        });
+
+        mvc.perform(post("/iam.tenant/recycle-bin/query")
+                        .contentType("application/json")
+                        .content(json(Map.of("pageNum", 2, "pageSize", 10))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].sourceDeleteOperationId").value("delete-operation-1"))
+                .andExpect(jsonPath("$.records[0].restorable").value(true));
+
+        mvc.perform(post("/iam.tenant/recycle-bin/delete-operation-1/restore"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceOperationId").value("delete-operation-1"))
+                .andExpect(jsonPath("$.restoreOperationId").value("restore-operation-1"));
+
+        verify(recycleBinFacade).list(eq(tenantService), any(PageRequest.class));
+        verify(recycleBinFacade).restore(tenantService, "delete-operation-1");
     }
 
     @Test

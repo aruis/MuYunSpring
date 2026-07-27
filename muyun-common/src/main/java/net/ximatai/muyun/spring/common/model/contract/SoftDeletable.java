@@ -13,4 +13,8 @@ public interface SoftDeletable {
     Instant getDeletedAt();
 
     void setDeletedAt(Instant deletedAt);
+
+    String getDeletedBy();
+
+    void setDeletedBy(String deletedBy);
 }

@@ -486,6 +486,8 @@ public class PlatformModuleRuntimeContextService {
                 case SORT -> capabilities.add(EntityCapability.SORT);
                 case REFERENCE -> capabilities.add(EntityCapability.REFERENCE);
                 case ENABLE, DISABLE -> capabilities.add(EntityCapability.ENABLE);
+                case RECYCLE_BIN_QUERY, RECYCLE_BIN_RESTORE ->
+                        capabilities.add(EntityCapability.RECYCLE_BIN);
                 case IMPORT, EXPORT -> capabilities.add(EntityCapability.EXCHANGE);
                 default -> {
                 }

@@ -440,6 +440,8 @@ public final class RelationProjectionQueryPlanner {
         addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.DELETED_AT_COLUMN, StandardEntitySchema.DELETED_AT_FIELD));
         addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
+                StandardEntitySchema.DELETED_BY_COLUMN, StandardEntitySchema.DELETED_BY_FIELD));
+        addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_FIELD));
         addSelectField(selectFields, new SelectField(RelationProjectionSqlNames.MAIN_ALIAS,
                 StandardEntitySchema.CREATED_AT_COLUMN, StandardEntitySchema.CREATED_AT_FIELD));
@@ -540,6 +542,7 @@ public final class RelationProjectionQueryPlanner {
             case StandardEntitySchema.VERSION_FIELD -> StandardEntitySchema.VERSION_COLUMN;
             case StandardEntitySchema.DELETED_FIELD -> StandardEntitySchema.DELETED_COLUMN;
             case StandardEntitySchema.DELETED_AT_FIELD -> StandardEntitySchema.DELETED_AT_COLUMN;
+            case StandardEntitySchema.DELETED_BY_FIELD -> StandardEntitySchema.DELETED_BY_COLUMN;
             case StandardEntitySchema.CREATED_BY_FIELD -> StandardEntitySchema.CREATED_BY_COLUMN;
             case StandardEntitySchema.CREATED_AT_FIELD -> StandardEntitySchema.CREATED_AT_COLUMN;
             case StandardEntitySchema.UPDATED_BY_FIELD -> StandardEntitySchema.UPDATED_BY_COLUMN;

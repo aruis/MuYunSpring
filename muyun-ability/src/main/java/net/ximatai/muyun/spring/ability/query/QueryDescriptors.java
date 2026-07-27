@@ -101,6 +101,7 @@ public final class QueryDescriptors {
             Map.entry("createdAt", "创建时间"),
             Map.entry("updatedAt", "更新时间"),
             Map.entry("deletedAt", "删除时间"),
+            Map.entry("deletedBy", "删除人"),
             Map.entry("publishedAt", "发布时间"),
             Map.entry("effectiveDate", "生效日期"),
             Map.entry("effectiveFrom", "生效开始"),

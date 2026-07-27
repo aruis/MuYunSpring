@@ -165,6 +165,7 @@ public class WorkflowPublishFacade {
         copy.setVersion(source.getVersion());
         copy.setDeleted(source.getDeleted());
         copy.setDeletedAt(source.getDeletedAt());
+        copy.setDeletedBy(source.getDeletedBy());
         copy.setDefinitionId(source.getDefinitionId());
         copy.setVersionNo(source.getVersionNo());
         copy.setPublishStatus(source.getPublishStatus());

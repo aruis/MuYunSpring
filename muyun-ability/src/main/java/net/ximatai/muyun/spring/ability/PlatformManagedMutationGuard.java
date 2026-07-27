@@ -23,6 +23,7 @@ final class PlatformManagedMutationGuard {
             "version",
             "deleted",
             "deletedAt",
+            "deletedBy",
             "createdBy",
             "createdAt",
             "updatedBy",
@@ -31,7 +32,8 @@ final class PlatformManagedMutationGuard {
     private static final Set<String> PROTECTED_TECHNICAL_FIELDS = Set.of(
             "tenantId",
             "deleted",
-            "deletedAt"
+            "deletedAt",
+            "deletedBy"
     );
 
     private PlatformManagedMutationGuard() {

@@ -35,6 +35,9 @@ public abstract class StandardEntity implements EntityContract {
     @Column(name = "deleted_at", type = ColumnType.TIMESTAMP, comment = "Deleted at")
     private Instant deletedAt;
 
+    @Column(name = "deleted_by", type = ColumnType.VARCHAR, length = 64, comment = "Deleted by")
+    private String deletedBy;
+
     @Column(name = "created_by", type = ColumnType.VARCHAR, length = 64, comment = "Created by")
     private String createdBy;
 

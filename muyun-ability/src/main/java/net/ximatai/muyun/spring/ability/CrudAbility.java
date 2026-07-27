@@ -18,6 +18,9 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -119,7 +122,24 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default int delete(String id, Integer expectedVersion) {
-        beforeDelete(id);
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        return delete(id, expectedVersion, PlatformAbilityDispatcher.rootDeletionContext(getModuleAlias(), id));
+    }
+
+    /**
+     * Deletes one resource while preserving an explicit deletion-chain context.
+     * Parent services use this overload for cascades; ordinary callers keep the
+     * original API and receive a direct root context automatically.
+     */
+    default int delete(String id, Integer expectedVersion, DeletionContext deletionContext) {
+        if (id == null || id.isBlank()) {
+            return 0;
+        }
+        DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
+                getModuleAlias(), id, deletionContext);
+        beforeDelete(id, context);
         DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.DELETE, id);
         return withTenantScope(mutationScope, () -> {
             T entity = selectActiveRaw(id);
@@ -128,15 +148,22 @@ public interface CrudAbility<T extends EntityContract> {
             }
             PlatformManagedMutationGuard.beforeDelete(this, entity);
             Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
-            int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
-            if (deleted <= 0) {
-                throw new OptimisticLockException("record version conflict: " + id);
+            DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.HARD);
+            try {
+                int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
+                if (deleted <= 0) {
+                    throw new OptimisticLockException("record version conflict: " + id);
+                }
+                PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted, context, node);
+                afterDelete(id, entity, deleted);
+                afterChanged(entity);
+                CacheInvalidationSupport.clearAfterChanged(this, entity);
+                PlatformAbilityDispatcher.deletionSucceeded(this, entity, context, node, DeletionMode.HARD);
+                return deleted;
+            } catch (RuntimeException exception) {
+                PlatformAbilityDispatcher.deletionFailed(this, entity, context, node, DeletionMode.HARD, exception);
+                throw exception;
             }
-            PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
-            afterDelete(id, entity, deleted);
-            afterChanged(entity);
-            CacheInvalidationSupport.clearAfterChanged(this, entity);
-            return deleted;
         });
     }
 
@@ -152,6 +179,17 @@ public interface CrudAbility<T extends EntityContract> {
             }
             return count;
         });
+    }
+
+    default int deleteBatch(Collection<String> ids, DeletionContext deletionContext) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String id : ids) {
+            count += delete(id, null, deletionContext);
+        }
+        return count;
     }
 
     default PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -184,6 +222,11 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default void beforeDelete(String id) {
+    }
+
+    /** Receives explicit cascade metadata while retaining the legacy hook for ordinary services. */
+    default void beforeDelete(String id, DeletionContext deletionContext) {
+        beforeDelete(id);
     }
 
     default void afterPlatformInsert(String id, T entity) {

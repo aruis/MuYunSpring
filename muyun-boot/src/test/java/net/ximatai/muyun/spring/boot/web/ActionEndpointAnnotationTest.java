@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebController;
+import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -99,6 +100,14 @@ class ActionEndpointAnnotationTest {
         assertThat(revokeSessionsEndpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
         assertThat(revokeSessionsEndpoint.dataAuth()).isTrue();
         assertThat(revokeSessionsEndpoint.recordIdPathVariable()).isEqualTo("id");
+    }
+
+    @Test
+    void shouldDescribeRecycleBinLifecycleActionsAsIndependentPlatformActions() throws Exception {
+        assertThat(endpoint(RecycleBinWeb.class, "recycleBin", WebPageRequest.class).value())
+                .isEqualTo(PlatformAction.RECYCLE_BIN_QUERY);
+        assertThat(endpoint(RecycleBinWeb.class, "restoreFromRecycleBin", String.class).value())
+                .isEqualTo(PlatformAction.RECYCLE_BIN_RESTORE);
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {
