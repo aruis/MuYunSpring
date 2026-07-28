@@ -7,6 +7,7 @@ import {
   UiDropdown,
   UiEmpty,
   UiInput,
+  UiSearchInput,
   UiSelect,
   UiSpin,
 } from '@muyun/vue-ui-antdv';
@@ -82,7 +83,6 @@ const props = withDefaults(
     columns?: RecordQueryListColumn[];
     actions?: RecordActionItem[];
     standardCrudActions?: boolean;
-    createTitle?: string;
     standardCrudRowActions?: boolean;
     rowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
     extraRowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
@@ -112,7 +112,6 @@ const props = withDefaults(
     columns: () => [],
     actions: () => [],
     standardCrudActions: false,
-    createTitle: undefined,
     standardCrudRowActions: false,
     rowActionsOf: undefined,
     extraRowActionsOf: undefined,
@@ -202,7 +201,7 @@ const panelActions = computed<RecordActionItem[]>(() => {
     {
       key: 'create',
       actionCode: 'create',
-      title: props.createTitle ?? '新建',
+      title: '新建',
       primary: true,
       disabled: !queryReady.value,
     },
@@ -598,20 +597,15 @@ function handleTableRowExpand(row: QueryListRow, expanded: boolean) {
   emit('rowExpand', row.record, expanded);
 }
 
-function submitQuickSearch() {
-  appliedQuickSearch.value = quickSearchKeyword.value;
+function submitQuickSearch(value = quickSearchKeyword.value) {
+  quickSearchKeyword.value = value;
+  appliedQuickSearch.value = value;
   pageNum.value = 1;
   void loadRecords();
 }
 
 function handleQuickSearchInput(value: string) {
   quickSearchKeyword.value = value;
-  if (value || !appliedQuickSearch.value) {
-    return;
-  }
-  appliedQuickSearch.value = '';
-  pageNum.value = 1;
-  void loadRecords();
 }
 
 function toggleConditions() {
@@ -886,20 +880,23 @@ defineExpose({ refresh });
           :actions="panelActions"
           @action="handleAction"
         />
-        <UiInput
+        <UiSearchInput
           :value="quickSearchKeyword"
           class="record-query-list-search"
-          allow-clear
           :disabled="quickSearchDisabled"
           :placeholder="quickSearchPlaceholder"
           @update:value="handleQuickSearchInput"
-          @keydown.enter="submitQuickSearch"
+          @search="submitQuickSearch"
         />
-        <UiButton icon-name="search" :disabled="quickSearchDisabled" @click="submitQuickSearch">
-          查询
-        </UiButton>
-        <UiButton type="text" icon-name="settings" :disabled="conditionsDisabled" @click="toggleConditions">
-          条件<span v-if="conditionCount"> {{ conditionCount }}</span>
+        <UiButton
+          class="record-query-list-advanced"
+          :class="{ 'is-selected': conditionsExpanded }"
+          type="text"
+          icon-name="filter"
+          :disabled="conditionsDisabled"
+          @click="toggleConditions"
+        >
+          高级<span v-if="conditionCount"> {{ conditionCount }}</span>
         </UiButton>
       </div>
     </header>
@@ -996,17 +993,19 @@ defineExpose({ refresh });
         </template>
         <template #rowActions="{ record }">
           <div class="record-query-list-row-actions" @click.stop @dblclick.stop>
-            <UiButton
-              v-for="action in (record as QueryListRow).primaryActions"
-              :key="action.key"
-              class="record-query-list-primary-action"
-              type="text"
-              :disabled="action.disabled"
-              :icon-name="action.iconName"
-              @click="handlePrimaryRowAction(record as QueryListRow, action, $event)"
-            >
-              {{ action.title }}
-            </UiButton>
+            <div class="record-query-list-primary-actions">
+              <UiButton
+                v-for="action in (record as QueryListRow).primaryActions"
+                :key="action.key"
+                class="record-query-list-primary-action"
+                type="text"
+                :disabled="action.disabled"
+                :icon-name="action.iconName"
+                @click="handlePrimaryRowAction(record as QueryListRow, action, $event)"
+              >
+                {{ action.title }}
+              </UiButton>
+            </div>
             <UiDropdown
               v-if="(record as QueryListRow).secondaryActions.length > 0"
               :items="(record as QueryListRow).dropdownItems"
@@ -1140,6 +1139,18 @@ defineExpose({ refresh });
   width: clamp(150px, 20vw, 220px);
 }
 
+:deep(.record-query-list-advanced.is-selected.ant-btn) {
+  border: 1px solid #91caff;
+  background: var(--muyun-selected);
+  color: #1677ff;
+}
+
+:deep(.record-query-list-advanced.is-selected.ant-btn:hover) {
+  border-color: #69b1ff;
+  background: #d6eaff;
+  color: #1677ff;
+}
+
 .record-query-conditions {
   grid-area: conditions;
   display: grid;
@@ -1190,13 +1201,23 @@ defineExpose({ refresh });
 }
 
 .record-query-list-row-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
   width: 92px;
-  text-align: right;
   white-space: nowrap;
 }
 
+.record-query-list-primary-actions {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  min-width: 0;
+}
+
 .record-query-list-row-actions :deep(.ui-dropdown) {
-  margin-left: 2px;
+  position: absolute;
+  right: 0;
 }
 
 .record-query-list-row-actions :deep(.ant-btn) {

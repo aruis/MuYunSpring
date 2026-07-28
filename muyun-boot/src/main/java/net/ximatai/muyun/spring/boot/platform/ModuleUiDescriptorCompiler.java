@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
@@ -30,14 +31,18 @@ public final class ModuleUiDescriptorCompiler {
     }
 
     public static ModuleUiCompilationResult compileModule(StaticModuleDefinition definition) {
-        if (definition == null || definition.uiDefinition() == null) {
+        if (definition == null) {
             return null;
         }
-        validateFields(definition);
+        ModuleUiDefinition uiDefinition = definition.uiDefinition() == null
+                ? new ModuleUiDefinition(definition.moduleAlias(), List.of(), List.of())
+                : definition.uiDefinition();
+        validateFields(uiDefinition, definition.entities(), definition.moduleAlias(),
+                readProjectionOutputFields(definition));
         return new ModuleUiCompilationResult(
-                compile(definition.uiDefinition(), ModuleKind.STATIC, definition.title(),
-                        staticOptionFields(definition.modelClass())),
-                readModel(definition)
+                compile(uiDefinition, ModuleKind.STATIC, definition.title(),
+                        staticOptionFields(definition.modelClass()), staticRecordLabelField(definition)),
+                readModel(definition, uiDefinition)
         );
     }
 
@@ -45,13 +50,13 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compile(definition, null, null);
+        return compile(definition, null, null, Map.of(), null);
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
                                                      ModuleKind moduleKind,
                                                      String title) {
-        return compile(definition, moduleKind, title, Map.of());
+        return compile(definition, moduleKind, title, Map.of(), null);
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -61,13 +66,24 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields);
+        return compile(definition, moduleKind, title, optionFields, null);
+    }
+
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                     String defaultRecordLabelField) {
+        if (definition == null) return null;
+        return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields,
+                defaultRecordLabelField);
     }
 
     private static ResolvedModuleUiDescriptor compileResolved(ModuleUiDefinition definition,
                                                               ModuleKind moduleKind,
                                                               String title,
-                                                              Map<String, ResolvedOptionFieldDescriptor> optionFields) {
+                                                              Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                              String defaultRecordLabelField) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
@@ -75,7 +91,21 @@ public final class ModuleUiDescriptorCompiler {
                 title,
                 definition.views().stream()
                         .map(view -> compileView(view, optionFields))
-                        .toList()
+                        .toList(),
+                definition.actions().stream()
+                        .map(ModuleUiDescriptorCompiler::compileAction)
+                        .toList(),
+                defaultRecordLabelField
+        );
+    }
+
+    private static ResolvedUiActionDescriptor compileAction(UiActionDefinition action) {
+        UiActionConfirmationDefinition confirmation = action.confirmation();
+        return new ResolvedUiActionDescriptor(
+                action.actionCode(),
+                confirmation == null ? null : new ResolvedUiActionConfirmationDescriptor(
+                        ResolvedUiActionConfirmationDescriptor.TYPED_TEXT,
+                        confirmation.requiredField())
         );
     }
 
@@ -128,9 +158,8 @@ public final class ModuleUiDescriptorCompiler {
                 ));
     }
 
-    private static void validateFields(StaticModuleDefinition definition) {
-        validateFields(definition.uiDefinition(), definition.entities(), definition.moduleAlias(),
-                readProjectionOutputFields(definition));
+    private static String staticRecordLabelField(StaticModuleDefinition definition) {
+        return RecordLabelResolver.resolveFieldName(definition.modelClass()).orElse(null);
     }
 
     private static void validateFields(ModuleUiDefinition definition, List<EntityDefinition> entityDefinitions) {
@@ -233,7 +262,8 @@ public final class ModuleUiDescriptorCompiler {
                 .anyMatch(fieldName::equals);
     }
 
-    private static ResolvedModuleReadModel readModel(StaticModuleDefinition definition) {
+    private static ResolvedModuleReadModel readModel(StaticModuleDefinition definition,
+                                                     ModuleUiDefinition uiDefinition) {
         if (definition.entities().isEmpty()) {
             return new ResolvedModuleReadModel(definition.moduleAlias(), null, List.of());
         }
@@ -258,7 +288,7 @@ public final class ModuleUiDescriptorCompiler {
                     true
             ));
         }
-        for (ViewDefinition view : definition.uiDefinition().views()) {
+        for (ViewDefinition view : uiDefinition.views()) {
             for (ViewFieldDefinition field : view.fields()) {
                 ViewFieldRef fieldRef = field.fieldRef();
                 if (fieldRef.relationCode() != null) {

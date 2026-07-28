@@ -1,17 +1,21 @@
 package net.ximatai.muyun.spring.boot.web;
 
-import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 
 public interface RecordLabelWeb<T extends EntityContract> {
+    Object service();
+
     default String recordLabel(T record) {
-        if (record == null) {
-            return null;
+        String label = RecordLabelResolver.readAsString(record);
+        if (label == null || !(service() instanceof FieldProtectionAbility<?> protectionAbility)) {
+            return label;
         }
-        if (record instanceof TitledCapable titled && hasText(titled.getTitle())) {
-            return titled.getTitle().trim();
-        }
-        return record.getId();
+        String fieldName = RecordLabelResolver.resolveFieldName(record.getClass()).orElse(null);
+        Object protectedLabel = protectionAbility.maskProtectedValue(fieldName, label, FieldOutputContext.VIEW);
+        return protectedLabel == null ? null : String.valueOf(protectedLabel);
     }
 
     default String successMessage(T record, String actionText) {

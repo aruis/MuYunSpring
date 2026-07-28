@@ -23,6 +23,14 @@
   color: var(--muyun-success-text);
 }
 
+.ant-notification-notice.muyun-feedback-notification-warning .ant-notification-notice-icon {
+  color: var(--muyun-warning-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification-info .ant-notification-notice-icon {
+  color: var(--muyun-info-text);
+}
+
 .ant-notification-notice.muyun-feedback-notification .ant-notification-notice-message {
   margin-bottom: 0;
   margin-inline-start: 0;
@@ -73,6 +81,14 @@
 
 .ant-notification-notice.muyun-feedback-notification-success .muyun-feedback-timebar {
   background: var(--muyun-success-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification-warning .muyun-feedback-timebar {
+  background: var(--muyun-warning-text);
+}
+
+.ant-notification-notice.muyun-feedback-notification-info .muyun-feedback-timebar {
+  background: var(--muyun-info-text);
 }
 
 .ant-notification-notice.muyun-feedback-notification:hover .muyun-feedback-timebar {

@@ -67,15 +67,17 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
         v-for="action in actions"
         :key="action.key"
         class="ui-record-explorer-item-action"
-        :class="{ danger: action.danger }"
+        :class="{ danger: action.danger, 'show-label': action.showLabel }"
         :title="action.title"
         :aria-label="action.title"
         :disabled="action.disabled"
         type="button"
         @click="handleAction($event, action)"
       >
-        <UiIcon v-if="action.iconName" :name="action.iconName" />
-        <span v-else class="ui-record-explorer-item-action-label">{{ actionFallbackLabel(action) }}</span>
+        <UiIcon v-if="action.iconName && !action.showLabel" :name="action.iconName" />
+        <span v-else class="ui-record-explorer-item-action-label">
+          {{ action.showLabel ? action.title : actionFallbackLabel(action) }}
+        </span>
       </button>
     </span>
   </span>
@@ -173,6 +175,11 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
   background: transparent;
   color: var(--muyun-text-muted);
   cursor: pointer;
+}
+
+.ui-record-explorer-item-action.show-label {
+  width: auto;
+  padding: 0 6px;
 }
 
 .ui-record-explorer-item-action:hover:not(:disabled) {

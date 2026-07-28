@@ -225,7 +225,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         return MutationTenantScopeExecutor.forCreate(this, record, () -> webScope(() -> {
             String id = service().insert(record);
             T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
-            StaticStandardMutationSupport.created(this, id);
+            StandardMutationResultSupport.created(this, id, recordLabel(saved));
             return saved;
         }));
     }
@@ -241,7 +241,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             T saved = WebOutputSupport.record(service(),
                     StaticStandardMutationSupport.selectForAction(this, PlatformAction.VIEW, id),
                     FieldOutputContext.VIEW);
-            StaticStandardMutationSupport.updated(this, id);
+            StandardMutationResultSupport.updated(this, id, recordLabel(saved));
             return saved;
         }));
     }
@@ -252,7 +252,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     default int delete(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DELETE, id);
-            return StaticStandardMutationSupport.deleted(this, id, () -> service().delete(id, request.version()));
+            T existing = service().select(id);
+            return StandardMutationResultSupport.deleted(this, id, recordLabel(existing),
+                    () -> service().delete(id, request.version()));
         }));
     }
 }

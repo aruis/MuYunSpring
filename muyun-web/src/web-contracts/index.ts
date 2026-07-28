@@ -495,6 +495,16 @@ export interface ResolvedViewDescriptor {
   fields: ResolvedViewFieldDescriptor[];
 }
 
+export interface ResolvedUiActionConfirmationDescriptor {
+  mode: 'typedText';
+  requiredField: string;
+}
+
+export interface ResolvedUiActionDescriptor {
+  actionCode: string;
+  confirmation?: ResolvedUiActionConfirmationDescriptor;
+}
+
 export interface ModuleUiDefinition {
   moduleAlias: string;
   views: ViewDefinition[];
@@ -506,6 +516,8 @@ export interface ResolvedModuleUiDescriptor {
   moduleKind?: 'STATIC' | 'DYNAMIC';
   title?: string;
   views: ResolvedViewDescriptor[];
+  actions?: ResolvedUiActionDescriptor[];
+  recordLabelField?: string;
 }
 
 export interface StandardEntity {

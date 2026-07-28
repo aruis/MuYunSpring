@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinActionOutcome;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
 import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,7 +31,8 @@ import java.util.Optional;
  * facade, so every opted-in module exposes the same action and response
  * contract.</p>
  */
-public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbility<T>> extends ScopedWeb<S> {
+public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbility<T>>
+        extends ScopedWeb<S>, RecordLabelWeb<T> {
     /** Shared lifecycle facade supplied by the platform application context. */
     RecycleBinFacade recycleBinFacade();
 
@@ -109,8 +111,15 @@ public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbi
 
     @PostMapping("/recycle-bin/{sourceDeleteOperationId}/restore")
     @ActionEndpoint(PlatformAction.RECYCLE_BIN_RESTORE)
+    @BusinessMutation
     default RestoreReport restoreFromRecycleBin(@PathVariable String sourceDeleteOperationId) {
-        return webScope(() -> recycleBinFacade().restore(service(), sourceDeleteOperationId));
+        return webScope(() -> {
+            RecycleBinActionOutcome<T, RestoreReport> outcome =
+                    recycleBinFacade().restoreWithSource(service(), sourceDeleteOperationId);
+            RecycleBinMutationResultSupport.restored(webScopeName(), outcome.recordId(),
+                    recordLabel(outcome.record()), outcome.report());
+            return outcome.report();
+        });
     }
 
 }

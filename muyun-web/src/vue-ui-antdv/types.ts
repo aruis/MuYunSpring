@@ -48,6 +48,7 @@ export interface UiRecordInlineAction {
   key: string;
   title: string;
   iconName?: UiIconName;
+  showLabel?: boolean;
   disabled?: boolean;
   danger?: boolean;
 }

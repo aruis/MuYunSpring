@@ -17,7 +17,9 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     default int enable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.ENABLE, id);
-            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id, request.version()));
+            T existing = service().select(id);
+            return StandardMutationResultSupport.enabled(this, id, recordLabel(existing),
+                    () -> service().enable(id, request.version()));
         }));
     }
 
@@ -27,7 +29,9 @@ public interface EnableWeb<T extends EntityContract & EnabledCapable, S extends 
     default int disable(@PathVariable String id, @RequestBody RecordActionWebRequest request) {
         return MutationTenantScopeExecutor.forExistingRecord(this, id, () -> webScope(() -> {
             StaticStandardMutationSupport.requireDataScopeRecord(this, PlatformAction.DISABLE, id);
-            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id, request.version()));
+            T existing = service().select(id);
+            return StandardMutationResultSupport.disabled(this, id, recordLabel(existing),
+                    () -> service().disable(id, request.version()));
         }));
     }
 }

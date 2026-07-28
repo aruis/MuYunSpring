@@ -110,7 +110,7 @@ class DataScopeWebTest {
         assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE, PlatformAction.DELETE);
         assertThat(service.scopedIdCalls).containsExactly(List.of("record-1"), List.of("record-2"));
         assertThat(service.scopedDataAuth).containsExactly(true, true);
-        assertThat(service.selectedIds).isEmpty();
+        assertThat(service.selectedIds).containsExactly("record-2");
         assertThat(service.viewAction).isEqualTo(PlatformAction.VIEW);
     }
 

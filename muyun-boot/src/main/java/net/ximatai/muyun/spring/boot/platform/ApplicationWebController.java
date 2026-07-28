@@ -2,11 +2,14 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.RecycleBinWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +21,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApplicationWebController extends WebSupport<ApplicationService> implements
         CrudWeb<Application, ApplicationService>,
         EnableWeb<Application, ApplicationService>,
+        RecycleBinWeb<Application, ApplicationService>,
         SortWeb<Application, ApplicationService>,
         SystemScope<ApplicationService> {
+    private RecycleBinFacade recycleBinFacade;
+
+    @Autowired
+    void setRecycleBinFacade(RecycleBinFacade recycleBinFacade) {
+        this.recycleBinFacade = recycleBinFacade;
+    }
+
+    @Override
+    public RecycleBinFacade recycleBinFacade() {
+        if (recycleBinFacade == null) {
+            throw new IllegalStateException("RecycleBinFacade must be configured for recycle-bin endpoints");
+        }
+        return recycleBinFacade;
+    }
 }

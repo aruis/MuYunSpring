@@ -152,7 +152,7 @@ public class PlatformModuleRuntimeContextService {
         ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(snapshot,
                 resolvedConfig);
         return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title,
-                dynamicOptionFields(dynamicDescriptor));
+                dynamicOptionFields(dynamicDescriptor), dynamicRecordLabelField(dynamicDescriptor));
     }
 
     private java.util.Map<String, ResolvedOptionFieldDescriptor> dynamicOptionFields(
@@ -172,6 +172,16 @@ public class PlatformModuleRuntimeContextService {
                                         null),
                                 (left, right) -> left)))
                 .orElseGet(java.util.Map::of);
+    }
+
+    private String dynamicRecordLabelField(DynamicModuleDescriptor descriptor) {
+        if (descriptor == null) return null;
+        return descriptor.entities().stream()
+                .filter(entity -> entity.entityAlias().equals(descriptor.mainEntityAlias()))
+                .flatMap(entity -> entity.fields().stream())
+                .filter(net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor::titleField)
+                .map(net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor::fieldName)
+                .findFirst().orElse(null);
     }
 
     private DynamicModuleDescriptor dynamicDescriptor(PlatformModule module, String moduleAlias) {

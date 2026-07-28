@@ -51,33 +51,50 @@ public class RecycleBinFacade {
     }
 
     public RestoreReport restore(RecycleBinAbility<?> ability, String sourceDeleteOperationId) {
+        return restoreWithSource(ability, sourceDeleteOperationId).report();
+    }
+
+    public <T extends EntityContract> RecycleBinActionOutcome<T, RestoreReport> restoreWithSource(
+            RecycleBinAbility<T> ability,
+            String sourceDeleteOperationId) {
         Objects.requireNonNull(ability, "recycleBinAbility must not be null");
         ability.beforeRecycleBinRestore();
-        DeletionOperation source = deletionLogService.operation(sourceDeleteOperationId);
-        if (!isSuccessfulRootDelete(ability, source)) {
-            throw new PlatformException("Recycle-bin restore requires a successful root delete operation for "
-                    + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
-        }
-        if (!ability.canAccessRecycleBinSourceRecord(source.getRootRecordId())) {
-            throw new PlatformException("Recycle-bin record is unavailable: " + ability.getModuleAlias());
-        }
-        return restoreCoordinator.restore(sourceDeleteOperationId);
+        DeletionOperation source = requireAccessibleSource(ability, sourceDeleteOperationId, "restore");
+        T record = ability.selectIgnoreSoftDelete(source.getRootRecordId());
+        RestoreReport report = restoreCoordinator.restore(sourceDeleteOperationId);
+        return new RecycleBinActionOutcome<>(source.getRootRecordId(), record, report);
     }
 
     public PurgeReport purge(RecycleBinAbility<?> ability, String sourceDeleteOperationId) {
+        return purgeWithSource(ability, sourceDeleteOperationId).report();
+    }
+
+    public <T extends EntityContract> RecycleBinActionOutcome<T, PurgeReport> purgeWithSource(
+            RecycleBinAbility<T> ability,
+            String sourceDeleteOperationId) {
         Objects.requireNonNull(ability, "recycleBinAbility must not be null");
         if (!ability.isRecycleBinPurgeEnabled()) {
             throw new PlatformException("Recycle-bin purge is not enabled for " + ability.getModuleAlias());
         }
+        DeletionOperation source = requireAccessibleSource(ability, sourceDeleteOperationId, "purge");
+        T record = ability.selectIgnoreSoftDelete(source.getRootRecordId());
+        PurgeReport report = purgeCoordinator.purge(sourceDeleteOperationId);
+        return new RecycleBinActionOutcome<>(source.getRootRecordId(), record, report);
+    }
+
+    private DeletionOperation requireAccessibleSource(RecycleBinAbility<?> ability,
+                                                      String sourceDeleteOperationId,
+                                                      String action) {
         DeletionOperation source = deletionLogService.operation(sourceDeleteOperationId);
         if (!isSuccessfulRootDelete(ability, source)) {
-            throw new PlatformException("Recycle-bin purge requires a successful root delete operation for "
+            throw new PlatformException("Recycle-bin " + action
+                    + " requires a successful root delete operation for "
                     + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
         }
         if (!ability.canAccessRecycleBinSourceRecord(source.getRootRecordId())) {
             throw new PlatformException("Recycle-bin record is unavailable: " + ability.getModuleAlias());
         }
-        return purgeCoordinator.purge(sourceDeleteOperationId);
+        return source;
     }
 
     private <T extends EntityContract> RecycleBinItem<T> item(RecycleBinAbility<T> ability, T record) {

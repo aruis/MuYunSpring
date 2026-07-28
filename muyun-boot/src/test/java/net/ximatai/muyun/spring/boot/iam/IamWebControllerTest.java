@@ -65,6 +65,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinActionOutcome;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
 import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -212,9 +213,9 @@ class IamWebControllerTest {
                 any(java.util.function.Function.class), any(java.util.function.Function.class)))
                 .thenReturn((List) List.of(recycleBinItem));
         RestoreReport report = new RestoreReport("delete-operation-1", "restore-operation-1", List.of());
-        when(recycleBinFacade.restore(tenantService, "delete-operation-1")).thenAnswer(invocation -> {
+        when(recycleBinFacade.restoreWithSource(tenantService, "delete-operation-1")).thenAnswer(invocation -> {
             assertThat(TenantContext.isSystem()).isTrue();
-            return report;
+            return new RecycleBinActionOutcome<>(deleted.getId(), deleted, report);
         });
 
         mvc.perform(post("/iam.tenant/recycle-bin/query")
@@ -231,7 +232,7 @@ class IamWebControllerTest {
 
         verify(recycleBinFacade).items(eq(tenantService), eq(List.of(deleted)),
                 any(java.util.function.Function.class), any(java.util.function.Function.class));
-        verify(recycleBinFacade).restore(tenantService, "delete-operation-1");
+        verify(recycleBinFacade).restoreWithSource(tenantService, "delete-operation-1");
     }
 
     @Test

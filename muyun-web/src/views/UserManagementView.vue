@@ -927,7 +927,6 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       :columns="userListColumns"
       standard-crud-actions
       standard-crud-row-actions
-      create-title="新建用户"
       :selected-key="selectedUserKey"
       :expanded-row-keys="expandedUserKeys"
       :cell-renderers="{ onlineStatus: userOnlineStatusTitle }"

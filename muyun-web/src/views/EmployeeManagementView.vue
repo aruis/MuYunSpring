@@ -14,13 +14,14 @@ import {
   createSoftDeletedConflictErrorHandler,
   createScopedTreeModuleContext,
   type QueryListRecord,
-  type RecordQueryListMode,
+  type RecycleBinExplorerMode,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
   type RecordPickerRecord,
   type ResolvedRecordActionItem,
+  useRecycleBinExplorerMode,
   executeStaticFormSave,
   executeStaticRecordAction,
   handlePlatformActionSuccess,
@@ -40,13 +41,7 @@ import type {
   UserAccount,
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
-import {
-  actionResultData,
-  canQueryRecycleBin,
-  platformErrorCodes,
-  useModuleContext,
-  type ModuleContext,
-} from '@muyun/web-core';
+import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { usePageDataChange, usePageRecordExternalChange, useRealtimeRefreshQueue } from '../app/pageRealtime';
 import { useWorkspaceViewHost } from '../app/workspaceViewHost';
 import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
@@ -110,7 +105,6 @@ const shouldRenderEmployeeDetailDrawer = computed(
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
-const employeeListMode = ref<RecordQueryListMode>('normal');
 const selectedOrganization = ref<Organization>();
 const selectedEmployeeKey = ref<string>();
 const selectedEmployee = ref<Employee>();
@@ -131,6 +125,12 @@ const savingEmployeeAccount = ref(false);
 const employeeAccountsLoadFailed = ref(false);
 const showAccountProvisionForm = ref(false);
 const accountProvisionDraft = ref<Partial<UserAccount>>(createAccountProvisionDraft(undefined));
+const employeeRecycleBinExplorer = useRecycleBinExplorerMode({
+  context: () => employeeContext as unknown as ModuleContext<QueryListRecord>,
+  listReloadKey: employeeReloadKey,
+  canChange: canLeaveEmployeeDetailContext,
+  resetSelection: resetEmployeeListSelection,
+});
 const {
   expandedEmployeeKeys,
   employmentRowState,
@@ -141,7 +141,7 @@ const {
   context: employeeContext,
   source: 'employee-management',
   pathOf: (employeeId) =>
-    employeeListMode.value === 'recycleBin'
+    employeeRecycleBinExplorer.active.value
       ? `/iam.employee/recycle-bin/${encodeURIComponent(employeeId)}/employment-view`
       : `/iam.employee/${encodeURIComponent(employeeId)}/employment-view`,
 });
@@ -504,11 +504,13 @@ function handleEmployeeListAction(action: RecordActionItem) {
   }
 }
 
-function changeEmployeeListMode(mode: RecordQueryListMode) {
-  if (mode === 'recycleBin' && !canQueryRecycleBin(employeeListContext.value)) return;
-  if (!canLeaveEmployeeDetailContext()) return;
+function changeEmployeeListMode(mode: RecycleBinExplorerMode) {
+  if (mode === 'recycleBin') employeeRecycleBinExplorer.enter();
+  else employeeRecycleBinExplorer.leave();
+}
+
+function resetEmployeeListSelection() {
   resetEmployeeEmploymentRows();
-  employeeListMode.value = mode;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
   closeEmployeeDetail();
@@ -1256,10 +1258,9 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
     <RecordQueryListPanel
       class="employee-list-panel"
       :context="employeeListContext"
-      :title="employeeListMode === 'normal' ? '职员列表' : '职员回收站'"
-      :mode="employeeListMode"
+      :title="employeeRecycleBinExplorer.active.value ? '职员回收站' : '职员列表'"
+      :mode="employeeRecycleBinExplorer.mode.value"
       standard-crud-actions
-      create-title="新建职员"
       standard-crud-row-actions
       :extra-row-actions-of="employeeExtraRowActionsOf"
       :selected-key="selectedEmployeeKey"

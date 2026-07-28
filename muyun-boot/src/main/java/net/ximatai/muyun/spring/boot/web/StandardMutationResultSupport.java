@@ -10,20 +10,40 @@ public final class StandardMutationResultSupport {
         created(web.webScopeName(), recordId);
     }
 
+    public static void created(ScopedWeb<?> web, String recordId, String recordLabel) {
+        StaticCrudActionResultSupport.created(web.webScopeName(), recordId, recordLabel);
+    }
+
     public static void updated(ScopedWeb<?> web, String recordId) {
         updated(web.webScopeName(), recordId);
+    }
+
+    public static void updated(ScopedWeb<?> web, String recordId, String recordLabel) {
+        StaticCrudActionResultSupport.updated(web.webScopeName(), recordId, recordLabel);
     }
 
     public static int deleted(ScopedWeb<?> web, String recordId, IntSupplier action) {
         return countMutation(recordId, action, id -> deleted(web.webScopeName(), id));
     }
 
+    public static int deleted(ScopedWeb<?> web, String recordId, String recordLabel, IntSupplier action) {
+        return countMutation(recordId, action, id -> StaticCrudActionResultSupport.deleted(web.webScopeName(), id, recordLabel));
+    }
+
     public static int enabled(ScopedWeb<?> web, String recordId, IntSupplier action) {
         return countMutation(recordId, action, id -> enabled(web.webScopeName(), id));
     }
 
+    public static int enabled(ScopedWeb<?> web, String recordId, String recordLabel, IntSupplier action) {
+        return countMutation(recordId, action, id -> StaticCrudActionResultSupport.enabled(web.webScopeName(), id, recordLabel));
+    }
+
     public static int disabled(ScopedWeb<?> web, String recordId, IntSupplier action) {
         return countMutation(recordId, action, id -> disabled(web.webScopeName(), id));
+    }
+
+    public static int disabled(ScopedWeb<?> web, String recordId, String recordLabel, IntSupplier action) {
+        return countMutation(recordId, action, id -> StaticCrudActionResultSupport.disabled(web.webScopeName(), id, recordLabel));
     }
 
     public static int sorted(ScopedWeb<?> web, IntSupplier action) {

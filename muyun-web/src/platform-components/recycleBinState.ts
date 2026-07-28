@@ -3,11 +3,14 @@ import type {
   PurgeReport,
   RecycleBinItem,
   RestoreReport,
+  WebActionResultEnvelope,
   WebPageResponse,
   WebQueryRequest,
 } from '@muyun/web-contracts';
-import type { ModuleContext } from '@muyun/web-core';
-import { presentPlatformError, presentPlatformSuccess } from './platformErrorFeedback';
+import { actionResultData, type ModuleContext } from '@muyun/web-core';
+import { presentPlatformError } from './platformErrorFeedback';
+import { recordLabelOf } from './actionConfirmation';
+import { handlePlatformActionSuccess } from './platformActionResultFeedback';
 
 export interface RecycleBinStateOptions<TRecord> {
   context: MaybeRefOrGetter<ModuleContext<TRecord>>;
@@ -40,6 +43,8 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
       return options.recordTitle(item.record);
     }
     const record = item.record as Record<string, unknown>;
+    const label = recordLabelOf(toValue(options.context).runtime.snapshot()?.uiDescriptor, record);
+    if (label) return label;
     return String(record.title ?? record.alias ?? record.id ?? '未命名记录');
   }
 
@@ -96,11 +101,16 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     actingOperationId.value = item.sourceDeleteOperationId;
     const context = toValue(options.context);
     try {
-      const report = await context.http.request<RestoreReport>({
+      const result = await context.http.request<RestoreReport | WebActionResultEnvelope<RestoreReport>>({
         method: 'POST',
         path: `/${context.moduleAlias}/recycle-bin/${encodeURIComponent(item.sourceDeleteOperationId)}/restore`,
       });
-      presentRestoreResult(report, recordTitleOf(item));
+      const report = actionResultData(result);
+      await handlePlatformActionSuccess(result, {
+        fallbackMessage: restoreFallbackMessage(report, recordTitleOf(item)),
+        source: 'recycle-bin',
+        phase: 'action',
+      });
       if (reload) await load();
       return report;
     } catch (cause) {
@@ -118,11 +128,16 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     actingOperationId.value = item.sourceDeleteOperationId;
     const context = toValue(options.context);
     try {
-      const report = await context.http.request<PurgeReport>({
+      const result = await context.http.request<PurgeReport | WebActionResultEnvelope<PurgeReport>>({
         method: 'POST',
         path: `/${context.moduleAlias}/recycle-bin/${encodeURIComponent(item.sourceDeleteOperationId)}/purge`,
       });
-      presentPurgeResult(report, recordTitleOf(item));
+      const report = actionResultData(result);
+      await handlePlatformActionSuccess(result, {
+        fallbackMessage: purgeFallbackMessage(report, recordTitleOf(item)),
+        source: 'recycle-bin',
+        phase: 'action',
+      });
       if (reload) await load();
       return report;
     } catch (cause) {
@@ -160,40 +175,28 @@ function defaultQueryRequest(): WebQueryRequest {
   };
 }
 
-function presentRestoreResult(report: RestoreReport, title: string) {
+function restoreFallbackMessage(report: RestoreReport, title: string) {
   const restored = report.entries.filter((entry) => entry.status === 'RESTORED').length;
   const skipped = report.entries.filter((entry) => entry.status === 'SKIPPED').length;
   const failed = report.entries.filter((entry) => entry.status === 'FAILED').length;
   if (restored === 0) {
-    presentPlatformSuccess(`「${title}」未恢复：跳过 ${skipped}，失败 ${failed}`, {
-      source: 'recycle-bin',
-      phase: 'action',
-    });
-  } else if (failed > 0 || skipped > 0) {
-    presentPlatformSuccess(`「${title}」恢复完成：成功 ${restored}，跳过 ${skipped}，失败 ${failed}`, {
-      source: 'recycle-bin',
-      phase: 'action',
-    });
-  } else {
-    presentPlatformSuccess(`「${title}」已恢复`, { source: 'recycle-bin', phase: 'action' });
+    return `「${title}」恢复未完成：成功 0，跳过 ${skipped}，失败 ${failed}`;
   }
+  if (failed > 0 || skipped > 0) {
+    return `「${title}」恢复完成：成功 ${restored}，跳过 ${skipped}，失败 ${failed}`;
+  }
+  return `「${title}」恢复成功`;
 }
 
-function presentPurgeResult(report: PurgeReport, title: string) {
+function purgeFallbackMessage(report: PurgeReport, title: string) {
   const purged = report.entries.filter((entry) => entry.status === 'PURGED').length;
   const skipped = report.entries.filter((entry) => entry.status === 'SKIPPED').length;
   const failed = report.entries.filter((entry) => entry.status === 'FAILED').length;
   if (purged === 0) {
-    presentPlatformSuccess(`「${title}」未彻底删除：跳过 ${skipped}，失败 ${failed}`, {
-      source: 'recycle-bin',
-      phase: 'action',
-    });
-  } else if (failed > 0 || skipped > 0) {
-    presentPlatformSuccess(`「${title}」彻底删除完成：成功 ${purged}，跳过 ${skipped}，失败 ${failed}`, {
-      source: 'recycle-bin',
-      phase: 'action',
-    });
-  } else {
-    presentPlatformSuccess(`「${title}」已彻底删除`, { source: 'recycle-bin', phase: 'action' });
+    return `「${title}」彻底删除未完成：成功 0，跳过 ${skipped}，失败 ${failed}`;
   }
+  if (failed > 0 || skipped > 0) {
+    return `「${title}」彻底删除完成：成功 ${purged}，跳过 ${skipped}，失败 ${failed}`;
+  }
+  return `「${title}」彻底删除成功`;
 }

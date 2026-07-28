@@ -300,7 +300,7 @@ class IamWebControllerIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.id").value("tenant-2"))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
-                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.message.text").value("「Tenant 2」新增成功"))
                 .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.tenant' && @.recordId == 'tenant-2')]")
                         .exists());
     }
@@ -820,7 +820,7 @@ class IamWebControllerIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.id").value("position-1"))
                 .andExpect(jsonPath("$.message.code").value("platform.crud.created"))
-                .andExpect(jsonPath("$.message.text").value("新增成功"))
+                .andExpect(jsonPath("$.message.text").value("「Sales Manager」新增成功"))
                 .andExpect(jsonPath("$.changes[?(@.type == 'record-created' && @.moduleAlias == 'iam.position' && @.recordId == 'position-1')]")
                         .exists());
     }
