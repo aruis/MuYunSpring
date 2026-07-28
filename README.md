@@ -175,15 +175,16 @@ muyun.demo-bootstrap.admin-initial-password=demo123
 
 ## 运行验证
 
-后端默认验证：
+后端默认完整验证：
+
+```bash
+./gradlew verifyAll
+```
+
+该任务统一运行所有子模块的单元测试和 `*IT` 集成测试，与 CI 后端验证入口一致。开发过程中也可以按需单独运行：
 
 ```bash
 ./gradlew test
-```
-
-后端集成测试单独运行：
-
-```bash
 ./gradlew integrationTest
 ```
 
@@ -194,7 +195,7 @@ cd muyun-web
 npm run check
 ```
 
-只改文档时可以不运行测试，但提交说明应写明原因。涉及 Java 代码、构建配置或平台契约时，默认运行 `./gradlew test`。
+只改文档时可以不运行测试，但提交说明应写明原因。涉及 Java 代码、构建配置或平台契约时，默认运行 `./gradlew verifyAll`。
 
 ## 文档导航
 

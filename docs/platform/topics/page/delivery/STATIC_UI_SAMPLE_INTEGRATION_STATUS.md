@@ -64,7 +64,7 @@
 4. 后端测试覆盖 `/form/schema` 兼容出口只读取当前模块静态 UI 定义，子资源 UI 贡献不会污染当前 controller 表单 schema。
 5. 后端测试覆盖动态模块 runtime context 可从发布快照输出 `ResolvedModuleUiDescriptor`。
 6. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、动态 host、`EmployeeManagementView`、`DepartmentManagementView`、`DictionaryManagementView` 和 `PositionManagementView` 接入契约。
-7. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
+7. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew verifyAll`、`git diff --check`；后端统一入口已包含所有子模块的单元测试和 `*IT` 集成测试。
 
 ## 删除条件
 

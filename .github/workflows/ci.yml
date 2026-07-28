@@ -95,7 +95,7 @@ jobs:
 
       - name: Run tests
         if: needs.changes.outputs.backend == 'true'
-        run: ./gradlew test :muyun-boot:integrationTest --no-daemon --stacktrace
+        run: ./gradlew verifyAll --no-daemon --stacktrace
 
       - name: Skip backend tests
         if: needs.changes.outputs.backend != 'true'
