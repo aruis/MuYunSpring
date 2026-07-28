@@ -15,6 +15,8 @@
   --muyun-success-text: #0f6b57;
   --muyun-success-bg: #f1fbf7;
   --muyun-success-border: #a9d7c8;
+  --muyun-warning-text: #9a6700;
+  --muyun-info-text: #2563a8;
   color: #1f2933;
   background: var(--muyun-page-bg);
   font-family:

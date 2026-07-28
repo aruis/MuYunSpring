@@ -5,6 +5,7 @@ export { default as UiBadge } from './components/UiBadge.vue';
 export { default as UiCheckbox } from './components/UiCheckbox.vue';
 export { default as UiForm } from './components/UiForm.vue';
 export { default as UiInput } from './components/UiInput.vue';
+export { default as UiSearchInput } from './components/UiSearchInput.vue';
 export { default as UiTextArea } from './components/UiTextArea.vue';
 export { default as UiSelect } from './components/UiSelect.vue';
 export { default as UiTreeSelect } from './components/UiTreeSelect.vue';
@@ -26,7 +27,13 @@ export { default as DictionarySelect } from './components/DictionarySelect.vue';
 export { default as ReferenceSelect } from './components/ReferenceSelect.vue';
 export { default as UiTable } from './components/UiTable.vue';
 export { confirmAction } from './confirm';
-export { showErrorMessage, showFeedback, showSuccessMessage } from './feedback';
+export {
+  showErrorMessage,
+  showFeedback,
+  showInfoMessage,
+  showSuccessMessage,
+  showWarningMessage,
+} from './feedback';
 export type { UiFeedbackOptions, UiFeedbackTone } from './feedback';
 export { resolveFieldComponent } from './registry';
 export type { UiIconName } from './components/UiIcon.vue';

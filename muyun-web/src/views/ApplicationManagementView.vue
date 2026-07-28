@@ -7,7 +7,9 @@ import {
   RecordActionBar,
   RecordMetaSection,
   RecordStatusSwitch,
+  RecycleBinModeButton,
   StaticManagementLayout,
+  useRecycleBinExplorerMode,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
@@ -31,6 +33,7 @@ const {
   aliasReadonly,
   canEnable,
   handleListLoaded,
+  handleReadonlyListLoaded,
   handleSelect,
   startCreate,
   startEdit,
@@ -39,8 +42,15 @@ const {
   toggleEnabled,
   removeSelected,
 } = createApplicationManagementState(applicationContext, confirmAction);
+const recycleBinExplorer = useRecycleBinExplorerMode({
+  context: applicationContext,
+  listReloadKey: reloadKey,
+  searchKeyword: explorerSearchKeyword,
+  resetSelection,
+});
 
 const cardActions = computed<RecordActionItem[]>(() => {
+  if (recycleBinExplorer.active.value) return [];
   if (mode.value !== 'view') {
     return [
       { key: 'cancel', title: '取消', disabled: saving.value },
@@ -75,6 +85,10 @@ function applicationItemOf(record: CrudRecordListBase): RecordExplorerItemDescri
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
+  if (recycleBinExplorer.active.value) {
+    handleReadonlyListLoaded(records as Application[]);
+    return;
+  }
   handleListLoaded(records as Application[]);
 }
 
@@ -99,20 +113,28 @@ function handleCardAction(action: RecordActionItem) {
     void save();
   }
 }
+
+function resetSelection() {
+  selected.value = undefined;
+  draft.value = { alias: '', title: '', enabled: true };
+  mode.value = 'view';
+}
 </script>
 
 <template>
   <StaticManagementLayout
     v-model:explorer-search-keyword="explorerSearchKeyword"
-    explorer-title="应用列表"
-    refresh-title="刷新应用列表"
+    :explorer-title="recycleBinExplorer.active.value ? '回收站' : '应用列表'"
+    :refresh-title="recycleBinExplorer.active.value ? '刷新回收站' : '刷新应用列表'"
     explorer-search-placeholder="搜索应用名称、alias 或 ID"
+    :explorer-searchable="!recycleBinExplorer.active.value"
     :mode="mode"
     :detail-title="cardTitle"
-    @refresh="reloadKey += 1"
+    @refresh="recycleBinExplorer.refresh"
   >
     <template #explorer-actions>
       <ModuleActionButton
+        v-if="!recycleBinExplorer.active.value"
         class="record-panel-create-button"
         :context="applicationContext"
         action-code="create"
@@ -121,17 +143,28 @@ function handleCardAction(action: RecordActionItem) {
         @click="startCreate"
       />
     </template>
+    <template #explorer-footer>
+      <RecycleBinModeButton
+        v-if="recycleBinExplorer.buttonVisible.value"
+        :active="recycleBinExplorer.active.value"
+        :has-records="recycleBinExplorer.hasRecords.value"
+        :count="recycleBinExplorer.total.value"
+        @click="recycleBinExplorer.toggle"
+      />
+    </template>
 
     <template #explorer>
       <CrudRecordListExplorer
         :context="applicationContext"
         :selected-id="selected?.id"
-        :reload-key="reloadKey"
+        :reload-key="recycleBinExplorer.reloadKey.value"
+        :mode="recycleBinExplorer.mode.value"
         :keyword="explorerSearchKeyword"
-        empty-description="暂无应用"
-        loading-tip="加载应用列表"
+        :empty-description="recycleBinExplorer.active.value ? '回收站为空' : '暂无应用'"
+        :loading-tip="recycleBinExplorer.active.value ? '加载回收站' : '加载应用列表'"
         fallback-title="未命名应用"
         :item-of="applicationItemOf"
+        @recycle-bin-summary="recycleBinExplorer.updateSummary"
         @select="handleApplicationSelect"
         @loaded="handleLoaded"
       />
@@ -141,20 +174,22 @@ function handleCardAction(action: RecordActionItem) {
       <RecordActionBar :context="applicationContext" :actions="cardActions" @action="handleCardAction" />
     </template>
     <template #detail-status>
-      <RecordStatusSwitch
-        v-if="mode !== 'view'"
-        :enabled="draft.enabled"
-        :show-label="false"
-        @change="draft.enabled = $event"
-      />
-      <RecordStatusSwitch
-        v-else-if="selected"
-        :enabled="selected.enabled"
-        :disabled="saving || !canEnable"
-        :loading="saving"
-        :show-label="false"
-        @change="toggleEnabled"
-      />
+      <template v-if="!recycleBinExplorer.active.value">
+        <RecordStatusSwitch
+          v-if="mode !== 'view'"
+          :enabled="draft.enabled"
+          :show-label="false"
+          @change="draft.enabled = $event"
+        />
+        <RecordStatusSwitch
+          v-else-if="selected"
+          :enabled="selected.enabled"
+          :disabled="saving || !canEnable"
+          :loading="saving"
+          :show-label="false"
+          @change="toggleEnabled"
+        />
+      </template>
     </template>
 
     <form class="static-record-form" @submit.prevent="save">

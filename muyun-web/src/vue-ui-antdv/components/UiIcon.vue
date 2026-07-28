@@ -9,6 +9,7 @@ import {
   DownOutlined,
   EditOutlined,
   ExportOutlined,
+  FilterOutlined,
   LockOutlined,
   PlusOutlined,
   PoweroffOutlined,
@@ -28,6 +29,7 @@ export type UiIconName =
   | 'down'
   | 'edit'
   | 'export'
+  | 'filter'
   | 'lock'
   | 'notification'
   | 'plus'
@@ -49,6 +51,7 @@ const icons = {
   down: DownOutlined,
   edit: EditOutlined,
   export: ExportOutlined,
+  filter: FilterOutlined,
   lock: LockOutlined,
   notification: BellOutlined,
   plus: PlusOutlined,

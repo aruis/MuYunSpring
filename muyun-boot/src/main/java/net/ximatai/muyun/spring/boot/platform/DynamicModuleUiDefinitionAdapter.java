@@ -49,7 +49,7 @@ public final class DynamicModuleUiDefinitionAdapter {
                     }
                     views.add(view(config, uiSet, viewKind, fieldsByConfig.get(config.getId())));
                 });
-        return new ModuleUiDefinition(snapshot.moduleAlias(), views);
+        return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of());
     }
 
     private static ViewDefinition view(PlatformUiConfig config,

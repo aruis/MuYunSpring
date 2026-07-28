@@ -110,6 +110,10 @@ class ActionEndpointAnnotationTest {
                 .isEqualTo(PlatformAction.RECYCLE_BIN_RESTORE);
         assertThat(endpoint(RecycleBinPurgeWeb.class, "purgeFromRecycleBin", String.class).value())
                 .isEqualTo(PlatformAction.RECYCLE_BIN_PURGE);
+        assertThat(RecycleBinWeb.class.getMethod("restoreFromRecycleBin", String.class)
+                .getAnnotation(BusinessMutation.class)).isNotNull();
+        assertThat(RecycleBinPurgeWeb.class.getMethod("purgeFromRecycleBin", String.class)
+                .getAnnotation(BusinessMutation.class)).isNotNull();
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {

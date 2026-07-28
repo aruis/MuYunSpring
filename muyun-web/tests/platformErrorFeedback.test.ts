@@ -125,6 +125,17 @@ test('platform action result exposes message metadata and change set id', () => 
   assert.equal(actionResult.changeSetId, 'change-set-1');
 });
 
+test('platform action result preserves finite backend message types', () => {
+  assert.equal(
+    resolvePlatformActionResult({ message: { text: '部分完成', type: 'WARNING' } }).messageType,
+    'WARNING',
+  );
+  assert.equal(
+    resolvePlatformActionResult({ message: { text: '处理中', type: 'INFO' } }).messageType,
+    'INFO',
+  );
+});
+
 test('platform action result local reactions compose without duplicate local defaults', async () => {
   const result = withPlatformActionResultReactions(
     {

@@ -352,20 +352,27 @@ function createContext(
 }
 
 function fakeRuntimeState(): ModuleRuntimeContextState {
+  const context = {
+    moduleAlias: 'iam.tenant',
+    capabilities: ['CRUD', 'ENABLE', 'SORT'],
+    abilities: ['crud', 'enable', 'sort'],
+    actions: [],
+    uiDescriptor: {
+      schemaVersion: 'module-ui.v2',
+      moduleAlias: 'iam.tenant',
+      views: [],
+      actions: [
+        {
+          actionCode: 'delete',
+          confirmation: { mode: 'typedText' as const, requiredField: 'alias' },
+        },
+      ],
+    },
+  };
   return {
-    ready: Promise.resolve({
-      moduleAlias: 'iam.tenant',
-      capabilities: ['CRUD', 'ENABLE', 'SORT'],
-      abilities: ['crud', 'enable', 'sort'],
-      actions: [],
-    }),
-    load: async () => ({
-      moduleAlias: 'iam.tenant',
-      capabilities: ['CRUD', 'ENABLE', 'SORT'],
-      abilities: ['crud', 'enable', 'sort'],
-      actions: [],
-    }),
-    snapshot: () => undefined,
+    ready: Promise.resolve(context),
+    load: async () => context,
+    snapshot: () => context,
     error: () => undefined,
     hasAbility: () => undefined,
     action: () => undefined,

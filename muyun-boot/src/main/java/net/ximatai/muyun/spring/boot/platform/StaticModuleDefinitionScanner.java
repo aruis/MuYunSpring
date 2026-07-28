@@ -335,7 +335,18 @@ public class StaticModuleDefinitionScanner {
             }
             views.put(view.viewCode(), view);
         }
-        return new ModuleUiDefinition(targetModule, List.copyOf(views.values()));
+        LinkedHashMap<String, UiActionDefinition> actions = new LinkedHashMap<>();
+        if (targetUiDefinition != null) {
+            targetUiDefinition.actions().forEach(action -> actions.put(action.actionCode(), action));
+        }
+        for (UiActionDefinition action : contributionUiDefinition.actions()) {
+            if (actions.containsKey(action.actionCode())) {
+                throw new IllegalStateException("@PlatformStaticActionContribution UI action conflicts with target module: "
+                        + targetModule + "." + action.actionCode() + " <- " + contributor.getName());
+            }
+            actions.put(action.actionCode(), action);
+        }
+        return new ModuleUiDefinition(targetModule, List.copyOf(views.values()), List.copyOf(actions.values()));
     }
 
     private void mergeContributionAction(String targetModule,

@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.deletion.PurgeReport;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinActionOutcome;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
@@ -20,7 +21,14 @@ public interface RecycleBinPurgeWeb<T extends EntityContract, S extends RecycleB
 
     @PostMapping("/recycle-bin/{sourceDeleteOperationId}/purge")
     @ActionEndpoint(PlatformAction.RECYCLE_BIN_PURGE)
+    @BusinessMutation
     default PurgeReport purgeFromRecycleBin(@PathVariable String sourceDeleteOperationId) {
-        return webScope(() -> recycleBinFacade().purge(service(), sourceDeleteOperationId));
+        return webScope(() -> {
+            RecycleBinActionOutcome<T, PurgeReport> outcome =
+                    recycleBinFacade().purgeWithSource(service(), sourceDeleteOperationId);
+            RecycleBinMutationResultSupport.purged(webScopeName(), outcome.recordId(),
+                    recordLabel(outcome.record()), outcome.report());
+            return outcome.report();
+        });
     }
 }

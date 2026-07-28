@@ -169,6 +169,7 @@ function recordActions(record: CrudRecordListBase): UiRecordInlineAction[] {
             key: 'restore',
             title: '恢复',
             iconName: 'reload' as const,
+            showLabel: true,
             disabled: !item.restorable || recycleBinState.acting.value,
           },
         ]

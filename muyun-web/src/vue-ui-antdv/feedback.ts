@@ -1,7 +1,7 @@
 import { notification } from 'ant-design-vue';
 import { h } from 'vue';
 
-export type UiFeedbackTone = 'error' | 'success';
+export type UiFeedbackTone = 'error' | 'success' | 'info' | 'warning';
 
 export interface UiFeedbackOptions {
   tone: UiFeedbackTone;
@@ -14,20 +14,10 @@ export function showFeedback(options: UiFeedbackOptions) {
   if (typeof document === 'undefined') {
     return;
   }
-  if (options.tone === 'error') {
-    notification.error({
-      message: () => feedbackContent(options.content, options.tone),
-      duration: DEFAULT_DURATION_SECONDS,
-      placement: 'top',
-      class: `muyun-feedback-notification muyun-feedback-notification-${options.tone}`,
-      style: compactFeedbackStyle,
-    });
-    return;
-  }
-  notification.success({
+  notification[options.tone]({
     message: () => feedbackContent(options.content, options.tone),
     duration: DEFAULT_DURATION_SECONDS,
-    placement: 'topRight',
+    placement: options.tone === 'error' || options.tone === 'warning' ? 'top' : 'topRight',
     class: `muyun-feedback-notification muyun-feedback-notification-${options.tone}`,
     style: compactFeedbackStyle,
   });
@@ -46,6 +36,14 @@ export function showErrorMessage(content: string) {
 
 export function showSuccessMessage(content: string) {
   showFeedback({ tone: 'success', content });
+}
+
+export function showInfoMessage(content: string) {
+  showFeedback({ tone: 'info', content });
+}
+
+export function showWarningMessage(content: string) {
+  showFeedback({ tone: 'warning', content });
 }
 
 function feedbackContent(content: string, tone: UiFeedbackTone) {

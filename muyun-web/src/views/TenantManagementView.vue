@@ -11,27 +11,22 @@ import {
   RecordStatusSwitch,
   RecycleBinModeButton,
   StaticManagementLayout,
+  useRecycleBinExplorerMode,
   createSoftDeletedConflictErrorHandler,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
 import type { Application, Tenant, TenantApplication, WebPageResponse } from '@muyun/web-contracts';
-import { canQueryRecycleBin, hasRecycleBinAbility, useModuleContext } from '@muyun/web-core';
+import { useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiButton, UiDataTable, UiInput } from '@muyun/vue-ui-antdv';
 import type { UiDataTableColumn, UiDataTableRecord } from '@muyun/vue-ui-antdv';
 import { createTenantManagementState } from './tenantManagementState';
 
 defineOptions({ name: 'TenantManagementView' });
 
-type TenantViewMode = 'list' | 'recycleBin';
-
 const tenantContext = useModuleContext<Tenant>();
 const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
-const viewMode = ref<TenantViewMode>('list');
 const explorerSearchKeyword = ref('');
-const recycleBinTotal = ref<number>();
-const recycleBinEnabled = computed(() => hasRecycleBinAbility(tenantContext));
-const canQueryTenantRecycleBin = computed(() => canQueryRecycleBin(tenantContext));
 const applications = ref<Application[]>([]);
 const applicationsLoading = ref(false);
 const tenantApplications = ref<TenantApplication[]>([]);
@@ -68,6 +63,12 @@ const {
     }),
   ],
 });
+const recycleBinExplorer = useRecycleBinExplorerMode({
+  context: tenantContext,
+  listReloadKey: reloadKey,
+  searchKeyword: explorerSearchKeyword,
+  resetSelection: resetTenantSelection,
+});
 
 const enabledReadonly = computed(() => false);
 const tenantApplicationColumns: UiDataTableColumn[] = [{ key: 'applicationAlias', title: '已开通应用' }];
@@ -87,11 +88,11 @@ const applicationConfigurationColumns: UiDataTableColumn[] = [
 ];
 
 watch(
-  [() => selected.value?.id, () => viewMode.value] as const,
+  [() => selected.value?.id, () => recycleBinExplorer.mode.value] as const,
   ([tenantId, currentViewMode]) => {
     applicationConfigurationOpen.value = false;
     configuredApplicationAliases.value = new Set();
-    if (currentViewMode === 'list') {
+    if (currentViewMode === 'normal') {
       void loadTenantApplications(tenantId);
     } else {
       tenantApplications.value = [];
@@ -102,7 +103,7 @@ watch(
 onMounted(() => void loadApplications());
 
 const cardActions = computed<RecordActionItem[]>(() => {
-  if (viewMode.value === 'recycleBin') {
+  if (recycleBinExplorer.active.value) {
     return [];
   }
   if (mode.value !== 'view') {
@@ -134,14 +135,13 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   return {
     title: record.title ?? record.alias ?? record.id ?? '未命名租户',
     secondary: record.alias ?? record.id,
-    tag: viewMode.value === 'recycleBin' ? '已删除' : undefined,
-    muted: viewMode.value === 'recycleBin' || record.enabled === false,
+    muted: recycleBinExplorer.active.value || record.enabled === false,
   };
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
   const tenants = records as Tenant[];
-  if (viewMode.value === 'recycleBin') {
+  if (recycleBinExplorer.active.value) {
     handleReadonlyListLoaded(tenants);
     return;
   }
@@ -160,7 +160,7 @@ async function handleCardAction(action: RecordActionItem) {
 }
 
 async function handleFormSubmit() {
-  if (viewMode.value === 'list') {
+  if (!recycleBinExplorer.active.value) {
     await save();
   }
 }
@@ -248,15 +248,7 @@ function tenantApplicationsPath(tenantId: string) {
 }
 
 function switchToRecycleBin() {
-  if (!canQueryRecycleBin(tenantContext)) return;
-  resetTenantSelection();
-  explorerSearchKeyword.value = '';
-  viewMode.value = 'recycleBin';
-}
-
-function switchToList() {
-  resetTenantSelection();
-  viewMode.value = 'list';
+  recycleBinExplorer.enter();
 }
 
 function resetTenantSelection() {
@@ -265,32 +257,22 @@ function resetTenantSelection() {
   mode.value = 'view';
   tenantApplications.value = [];
 }
-
-function handleRefresh() {
-  if (viewMode.value === 'list') {
-    reloadKey.value += 1;
-  } else {
-    recycleBinReloadKey.value += 1;
-  }
-}
-
-const recycleBinReloadKey = ref(0);
 </script>
 
 <template>
   <StaticManagementLayout
     v-model:explorer-search-keyword="explorerSearchKeyword"
-    :explorer-title="viewMode === 'list' ? '租户列表' : '回收站'"
-    :refresh-title="viewMode === 'list' ? '刷新租户列表' : '刷新回收站'"
+    :explorer-title="recycleBinExplorer.active.value ? '回收站' : '租户列表'"
+    :refresh-title="recycleBinExplorer.active.value ? '刷新回收站' : '刷新租户列表'"
     explorer-search-placeholder="搜索租户名称、alias 或 ID"
-    :explorer-searchable="viewMode === 'list'"
+    :explorer-searchable="!recycleBinExplorer.active.value"
     :mode="mode"
     :detail-title="cardTitle"
-    @refresh="handleRefresh"
+    @refresh="recycleBinExplorer.refresh"
   >
     <template #explorer-actions>
       <ModuleActionButton
-        v-if="viewMode === 'list'"
+        v-if="!recycleBinExplorer.active.value"
         class="record-panel-create-button"
         :context="tenantContext"
         action-code="create"
@@ -301,43 +283,39 @@ const recycleBinReloadKey = ref(0);
     </template>
     <template #explorer-footer>
       <RecycleBinModeButton
-        v-if="recycleBinEnabled && viewMode === 'list' && canQueryTenantRecycleBin"
-        :has-records="recycleBinTotal === undefined ? undefined : recycleBinTotal > 0"
-        :count="recycleBinTotal"
-        @click="switchToRecycleBin"
-      />
-      <RecycleBinModeButton
-        v-else-if="recycleBinEnabled && viewMode === 'recycleBin'"
-        active
-        @click="switchToList"
+        v-if="recycleBinExplorer.buttonVisible.value"
+        :active="recycleBinExplorer.active.value"
+        :has-records="recycleBinExplorer.hasRecords.value"
+        :count="recycleBinExplorer.total.value"
+        @click="recycleBinExplorer.toggle"
       />
     </template>
     <template #explorer>
       <CrudRecordListExplorer
         :context="tenantContext"
         :selected-id="selected?.id"
-        :reload-key="viewMode === 'list' ? reloadKey : recycleBinReloadKey"
-        :mode="viewMode === 'list' ? 'normal' : 'recycleBin'"
+        :reload-key="recycleBinExplorer.reloadKey.value"
+        :mode="recycleBinExplorer.mode.value"
         :keyword="explorerSearchKeyword"
-        :empty-description="viewMode === 'list' ? '暂无租户' : '回收站为空'"
-        :loading-tip="viewMode === 'list' ? '加载租户列表' : '加载回收站'"
+        :empty-description="recycleBinExplorer.active.value ? '回收站为空' : '暂无租户'"
+        :loading-tip="recycleBinExplorer.active.value ? '加载回收站' : '加载租户列表'"
         fallback-title="未命名租户"
         :item-of="tenantItemOf"
-        @recycle-bin-summary="recycleBinTotal = $event"
+        @recycle-bin-summary="recycleBinExplorer.updateSummary"
         @select="handleTenantSelect"
         @loaded="handleLoaded"
       />
     </template>
     <template #detail-actions>
       <RecordActionBar
-        v-if="viewMode === 'list'"
+        v-if="!recycleBinExplorer.active.value"
         :context="tenantContext"
         :actions="cardActions"
         @action="handleCardAction"
       />
     </template>
     <template #detail-status>
-      <template v-if="viewMode === 'list'">
+      <template v-if="!recycleBinExplorer.active.value">
         <RecordStatusSwitch
           v-if="mode !== 'view'"
           :enabled="draft.enabled"
@@ -359,15 +337,18 @@ const recycleBinReloadKey = ref(0);
     <form class="static-record-form" @submit.prevent="handleFormSubmit">
       <label>
         <span>租户 alias</span>
-        <UiInput v-model:value="draft.alias" :disabled="viewMode === 'recycleBin' || aliasReadonly" />
+        <UiInput v-model:value="draft.alias" :disabled="recycleBinExplorer.active.value || aliasReadonly" />
       </label>
       <label>
         <span>租户名称</span>
-        <UiInput v-model:value="draft.title" :disabled="viewMode === 'recycleBin' || readonly" />
+        <UiInput v-model:value="draft.title" :disabled="recycleBinExplorer.active.value || readonly" />
       </label>
     </form>
 
-    <section v-if="viewMode === 'list' && selected && mode === 'view'" class="tenant-applications">
+    <section
+      v-if="!recycleBinExplorer.active.value && selected && mode === 'view'"
+      class="tenant-applications"
+    >
       <div class="tenant-applications-header">
         <div>
           <h3>已开通应用</h3>

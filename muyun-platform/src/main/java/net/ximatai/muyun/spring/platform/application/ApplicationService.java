@@ -6,7 +6,8 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
-import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.StandardBusinessService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
@@ -33,7 +34,8 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ApplicationService extends StandardBusinessService<Application> implements
-        SoftDeleteAbility<Application>,
+        RecycleBinAbility<Application>,
+        DeletionRecoveryAbility<Application>,
         GlobalScopedAbility<Application>,
         EnableAbility<Application>,
         SortAbility<Application>,
@@ -86,6 +88,11 @@ public class ApplicationService extends StandardBusinessService<Application> imp
     @Override
     public void normalizeBeforeMutation(Application application) {
         requireAlias(application.getAlias());
+    }
+
+    @Override
+    public String getDeletionEntityAlias() {
+        return "application";
     }
 
     @Override

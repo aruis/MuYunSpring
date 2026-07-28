@@ -291,7 +291,12 @@ test('record explorer panel focuses and closes search from keyboard', () => {
 
   assert.match(panelSource, /focusSearchInput/);
   assert.match(panelSource, /querySelector\('input'\)\?\.focus\(\)/);
-  assert.match(panelSource, /@mousedown\.prevent/);
+  assert.match(panelSource, /const searchExpanded = ref\(props\.searchKeyword\.trim\(\)\.length > 0\)/);
+  assert.match(
+    panelSource,
+    /const searchVisible = computed\(\(\) => props\.searchable && searchExpanded\.value\)/,
+  );
+  assert.match(panelSource, /if \(searchExpanded\.value\)/);
   assert.match(panelSource, /@keydown\.esc="handleSearchEscape"/);
   assert.match(panelSource, /:value="searchKeyword"\s+allow-clear/);
   assert.match(treeSource, /v-model:value="localKeyword"\s+allow-clear/);
@@ -619,6 +624,7 @@ test('department management uses organization as read-only scope and department 
 test('employee management uses organization scope and platform query list panel', () => {
   const indexSource = readSource('src/platform-components/index.ts');
   const uiIndexSource = readSource('src/vue-ui-antdv/index.ts');
+  const searchInputSource = readSource('src/vue-ui-antdv/components/UiSearchInput.vue');
   const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const sidePanelSource = readSource('src/vue-ui-antdv/components/UiSidePanel.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
@@ -638,6 +644,12 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(indexSource, /RecordQueryListPanel/);
   assert.match(indexSource, /RecordFormFields/);
   assert.match(uiIndexSource, /UiDataTable/);
+  assert.match(uiIndexSource, /UiSearchInput/);
+  assert.match(searchInputSource, /InputSearch as AInputSearch/);
+  assert.match(searchInputSource, /:enter-button="searchText \?\? false"/);
+  assert.match(searchInputSource, /allow-clear/);
+  assert.match(searchInputSource, /if \(event\.key !== 'Escape'\) return/);
+  assert.match(searchInputSource, /emit\('search', ''\)/);
   assert.match(uiIndexSource, /UiDataTableColumn/);
   assert.match(indexSource, /resolveRecordFormFieldNames/);
   assert.match(indexSource, /resolveRecordFormFieldState/);
@@ -726,7 +738,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /emit\('rowDblclick', row\.record, event\)/);
   assert.match(panelSource, /emit\('rowAction', action, row\.record/);
   assert.doesNotMatch(panelSource, /primaryRowAction\(record\)/);
-  assert.match(panelSource, /allow-clear/);
+  assert.match(panelSource, /<UiSearchInput/);
+  assert.match(panelSource, /@search="submitQuickSearch"/);
   assert.match(panelSource, /conditionsDisabled/);
   assert.doesNotMatch(panelSource, />清除</);
   assert.match(dropdownSource, /Dropdown as ADropdown/);
@@ -759,9 +772,17 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /cellRenderers\?: Record<string, \(record: QueryListRecord\) => string>/);
   assert.match(panelSource, /props\.cellRenderers\[column\.key\]/);
   assert.match(panelSource, /@dblclick\.stop/);
-  assert.match(panelSource, /class="record-query-list-row-actions" @click\.stop @dblclick\.stop/);
+  assert.match(
+    panelSource,
+    /class="record-query-list-row-actions"[\s\S]{0,180}@click\.stop[\s\S]{0,80}@dblclick\.stop/,
+  );
   assert.match(panelSource, /show-action-column="hasRowActions"/);
   assert.match(panelSource, /@row-expand="\(row, expanded\) => handleTableRowExpand/);
+  assert.match(panelSource, /record-query-list-primary-actions/);
+  assert.match(panelSource, /position: absolute/);
+  assert.match(panelSource, /right: 0/);
+  assert.match(panelSource, /width: 100%/);
+  assert.match(panelSource, /justify-content: center/);
   assert.match(panelSource, /columnsFromRuntimeListView/);
   assert.match(panelSource, /field\.fieldRef\.fieldName/);
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
@@ -807,7 +828,13 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(expandedSubtableSource, /defineOptions\(\{ name: 'RecordExpandedSubtable' \}\)/);
   assert.match(expandedSubtableSource, /record-expanded-subtable-header/);
   assert.match(employeeViewSource, /standard-crud-actions/);
-  assert.match(employeeViewSource, /create-title="新建职员"/);
+  assert.doesNotMatch(employeeViewSource, /create-title=/);
+  assert.match(panelSource, /title: '新建'/);
+  assert.match(panelSource, /icon-name="filter"/);
+  assert.match(panelSource, /:class="\{ 'is-selected': conditionsExpanded \}"/);
+  assert.match(panelSource, /background: var\(--muyun-selected\)/);
+  assert.match(panelSource, /border: 1px solid #91caff/);
+  assert.match(panelSource, /:deep\(\.record-query-list-advanced\.is-selected\.ant-btn\)/);
   assert.match(employeeViewSource, /@action="handleEmployeeListAction"/);
   assert.match(indexSource, /RecordDetailDrawer/);
   assert.match(uiIndexSource, /UiSidePanel/);
@@ -1538,15 +1565,21 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(uiFeedbackSource, /import \{ notification \} from 'ant-design-vue'/);
   assert.match(uiFeedbackSource, /export function showFeedback/);
   assert.match(uiFeedbackSource, /UiFeedbackOptions/);
-  assert.match(uiFeedbackSource, /notification\.error/);
-  assert.match(uiFeedbackSource, /notification\.success/);
-  assert.match(uiFeedbackSource, /placement: 'topRight'/);
+  assert.match(uiFeedbackSource, /notification\[options\.tone\]/);
+  assert.match(
+    uiFeedbackSource,
+    /options\.tone === 'error' \|\| options\.tone === 'warning' \? 'top' : 'topRight'/,
+  );
   assert.match(uiFeedbackSource, /muyun-feedback-notification-\$\{options\.tone\}/);
   assert.match(uiFeedbackSource, /width: 'fit-content'/);
   assert.match(uiFeedbackSource, /DEFAULT_DURATION_SECONDS/);
   assert.match(uiFeedbackSource, /muyun-feedback-timebar/);
   assert.match(uiFeedbackSource, /showFeedback\(\{ tone: 'error', content \}\)/);
   assert.match(uiFeedbackSource, /showFeedback\(\{ tone: 'success', content \}\)/);
+  assert.match(uiFeedbackSource, /showFeedback\(\{ tone: 'info', content \}\)/);
+  assert.match(uiFeedbackSource, /showFeedback\(\{ tone: 'warning', content \}\)/);
+  assert.match(actionResultFeedbackSource, /messageType === 'WARNING'/);
+  assert.match(actionResultFeedbackSource, /showWarningMessage\(message\)/);
   assert.match(uiStylesSource, /\.muyun-feedback-content/);
   assert.match(uiStylesSource, /\.ant-notification-notice\.muyun-feedback-notification/);
   assert.match(uiStylesSource, /transform-origin: right/);
@@ -1554,6 +1587,10 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(uiStylesSource, /--muyun-success-text/);
   assert.match(uiStylesSource, /muyun-feedback-notification-error \.ant-notification-notice-icon/);
   assert.match(uiStylesSource, /muyun-feedback-notification-success \.ant-notification-notice-icon/);
+  assert.match(uiStylesSource, /muyun-feedback-notification-warning \.ant-notification-notice-icon/);
+  assert.match(uiStylesSource, /muyun-feedback-notification-info \.ant-notification-notice-icon/);
+  assert.match(uiStylesSource, /muyun-feedback-notification-warning \.muyun-feedback-timebar/);
+  assert.match(uiStylesSource, /muyun-feedback-notification-info \.muyun-feedback-timebar/);
   assert.match(uiStylesSource, /inset-inline: 0/);
   assert.match(uiStylesSource, /muyun-feedback-notification \.ant-notification-notice-icon/);
   assert.match(uiStylesSource, /font-size: 16px/);
@@ -1771,11 +1808,19 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
   const explorerSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
   const recycleBinButtonSource = readSource('src/platform-components/RecycleBinModeButton.vue');
+  const explorerItemSource = readSource('src/vue-ui-antdv/components/UiRecordExplorerItem.vue');
   const explorerPanelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
   const staticLayoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
   const employeeSource = readSource('src/views/EmployeeManagementView.vue');
   const tenantSource = readSource('src/views/TenantManagementView.vue');
+  const applicationSource = readSource('src/views/ApplicationManagementView.vue');
+  const recycleBinModeSource = readSource('src/platform-components/useRecycleBinExplorerMode.ts');
   const indexSource = readSource('src/platform-components/index.ts');
+
+  assert.match(
+    applicationSource,
+    /<template #detail-status>[\s\S]*v-if="!recycleBinExplorer\.active\.value"/,
+  );
 
   assert.match(panelSource, /export type RecordQueryListMode = 'normal' \| 'recycleBin'/);
   assert.match(panelSource, /mode\?: RecordQueryListMode/);
@@ -1808,7 +1853,8 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
   assert.match(panelSource, /item\.purgeable/);
   assert.match(panelSource, /key: 'purge', actionCode: 'recycleBinPurge'/);
   assert.match(employeeSource, /<RecordQueryListPanel/);
-  assert.match(employeeSource, /:mode="employeeListMode"/);
+  assert.match(employeeSource, /useRecycleBinExplorerMode/);
+  assert.match(employeeSource, /:mode="employeeRecycleBinExplorer\.mode\.value"/);
   assert.match(employeeSource, /@mode-change="changeEmployeeListMode"/);
   assert.match(employeeSource, /createSoftDeletedConflictErrorHandler/);
   assert.doesNotMatch(employeeSource, /<RecycleBinPanel/);
@@ -1819,21 +1865,28 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
   assert.match(explorerSource, /const requestSeq = \+\+recordsRequestSeq/);
   assert.match(explorerSource, /requestSeq !== recordsRequestSeq/);
   assert.match(explorerSource, /key: 'restore'/);
+  assert.match(explorerSource, /showLabel: true/);
   assert.match(explorerSource, /recycleBinState\.restore\(item, false\)/);
   assert.match(tenantSource, /<CrudRecordListExplorer/);
-  assert.match(tenantSource, /canQueryRecycleBin\(tenantContext\)/);
-  assert.match(tenantSource, /recycleBinEnabled && viewMode === 'list' && canQueryTenantRecycleBin/);
+  assert.match(explorerItemSource, /action\.showLabel \? action\.title : actionFallbackLabel\(action\)/);
+  assert.match(recycleBinModeSource, /hasRecycleBinAbility\(toValue\(options\.context\)\)/);
+  assert.match(recycleBinModeSource, /canQueryRecycleBin\(toValue\(options\.context\)\)/);
+  assert.match(recycleBinModeSource, /options\.resetSelection\?\.\(\)/);
+  assert.match(tenantSource, /useRecycleBinExplorerMode/);
+  assert.match(applicationSource, /useRecycleBinExplorerMode/);
+  assert.match(tenantSource, /recycleBinExplorer\.buttonVisible\.value/);
   assert.match(tenantSource, /<template #explorer-footer>[\s\S]*回收站/);
   assert.match(tenantSource, /RecycleBinModeButton/);
   assert.match(tenantSource, /@recycle-bin-summary/);
-  assert.match(tenantSource, /:count="recycleBinTotal"/);
+  assert.match(tenantSource, /:count="recycleBinExplorer\.total\.value"/);
+  assert.doesNotMatch(tenantSource, /已删除/);
   assert.doesNotMatch(tenantSource, /<template #explorer-actions>[\s\S]{0,320}recycleBinQuery/);
   assert.match(explorerPanelSource, /<slot name="footer" \/>/);
   assert.match(staticLayoutSource, /<slot name="explorer-footer" \/>/);
-  assert.match(tenantSource, /:mode="viewMode === 'list' \? 'normal' : 'recycleBin'"/);
+  assert.match(tenantSource, /:mode="recycleBinExplorer\.mode\.value"/);
   assert.match(tenantSource, /handleReadonlyListLoaded\(tenants\)/);
-  assert.match(employeeSource, /mode === 'recycleBin' && !canQueryRecycleBin\(employeeListContext\.value\)/);
-  assert.match(tenantSource, /viewMode === 'recycleBin' \|\| readonly/);
+  assert.match(employeeSource, /employeeRecycleBinExplorer\.enter\(\)/);
+  assert.match(tenantSource, /recycleBinExplorer\.active\.value \|\| readonly/);
   assert.doesNotMatch(tenantSource, /<RecycleBinPanel/);
   assert.doesNotMatch(tenantSource, /recycle-bin-detail-hint/);
   assert.doesNotMatch(indexSource, /RecycleBinPanel/);

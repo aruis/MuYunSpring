@@ -49,6 +49,12 @@ class DynamicModuleUiDefinitionAdapterTest {
         ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(snapshot, resolved);
 
         assertThat(definition.moduleAlias()).isEqualTo("crm.customer");
+        assertThat(ModuleUiDescriptorCompiler.compile(
+                definition,
+                net.ximatai.muyun.spring.platform.module.ModuleKind.DYNAMIC,
+                "客户",
+                java.util.Map.of(),
+                "name").recordLabelField()).isEqualTo("name");
         assertThat(definition.views()).extracting(ViewDefinition::viewCode)
                 .containsExactly("customer_list", "customer_form");
         ViewDefinition listView = definition.views().get(0);

@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
@@ -25,7 +27,8 @@ public class TenantWebController extends WebSupport<TenantService> implements
         EnableWeb<Tenant, TenantService>,
         RecycleBinWeb<Tenant, TenantService>,
         SortWeb<Tenant, TenantService>,
-        SystemScope<TenantService> {
+        SystemScope<TenantService>,
+        StaticModuleUiContributor {
     private RecycleBinFacade recycleBinFacade;
 
     @Autowired
@@ -39,5 +42,12 @@ public class TenantWebController extends WebSupport<TenantService> implements
             throw new IllegalStateException("RecycleBinFacade must be configured for recycle-bin endpoints");
         }
         return recycleBinFacade;
+    }
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(TenantService.MODULE_ALIAS)
+                .typedTextConfirmation("delete", "alias")
+                .build();
     }
 }

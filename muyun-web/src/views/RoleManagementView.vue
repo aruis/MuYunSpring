@@ -1378,7 +1378,6 @@ function parseRoleIds(value: unknown) {
       standard-crud-row-actions
       :extra-row-actions-of="roleExtraRowActionsOf"
       :row-action-state-of="roleRowActionStateOf"
-      create-title="新建角色"
       :selected-key="selectedRoleKey"
       :reload-key="roleReloadKey"
       :ready="roleListReady"

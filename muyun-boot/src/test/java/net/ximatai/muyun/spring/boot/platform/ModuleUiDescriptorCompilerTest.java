@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.title.TitleField;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
@@ -76,6 +78,21 @@ class ModuleUiDescriptorCompilerTest {
         assertThat(descriptor.views()).singleElement()
                 .satisfies(view -> assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                         .containsExactly("employeeNo", "title", "enabled"));
+    }
+
+    @Test
+    void shouldPublishRecordLabelFactWithoutUiContributor() {
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("demo", "demo.customer", "客户管理")
+                .entities(List.of(new EntityDefinition("customer", "demo_customer", "Customer",
+                        List.of(FieldDefinition.string("displayName", "显示名称")))))
+                .modelClass(CustomerRecord.class)
+                .build();
+
+        ModuleUiCompilationResult result = ModuleUiDescriptorCompiler.compileModule(definition);
+
+        assertThat(result.uiDescriptor().recordLabelField()).isEqualTo("displayName");
+        assertThat(result.uiDescriptor().views()).isEmpty();
+        assertThat(result.uiDescriptor().actions()).isEmpty();
     }
 
     @Test
@@ -217,5 +234,10 @@ class ModuleUiDescriptorCompilerTest {
         private String gender;
 
         private String genderTitle;
+    }
+
+    private static final class CustomerRecord extends StandardEntity {
+        @TitleField
+        private String displayName;
     }
 }

@@ -1,4 +1,5 @@
 import { presentPlatformSuccess, type PlatformErrorFeedbackContext } from './platformErrorFeedback';
+import { showErrorMessage, showInfoMessage, showWarningMessage } from '@muyun/vue-ui-antdv';
 import {
   resolvePlatformActionResult,
   type PlatformActionResultReactionHandler,
@@ -37,7 +38,7 @@ export async function handlePlatformActionSuccess(
   const actionResult = resolvePlatformActionResult(result, {
     fallbackMessage: context.fallbackMessage,
   });
-  presentPlatformSuccess(actionResult.message, context);
+  presentActionMessage(actionResult.message, actionResult.messageType, context);
   for (const reaction of actionResult.reactions) {
     await context.reactionHandlers?.[reaction.type]?.(reaction, actionResult);
   }
@@ -48,5 +49,26 @@ export function presentPlatformActionSuccess(
   result: unknown,
   context: PlatformActionResultFeedbackContext = {},
 ) {
-  presentPlatformSuccess(resolvePlatformActionResult(result, context).message, context);
+  const actionResult = resolvePlatformActionResult(result, context);
+  presentActionMessage(actionResult.message, actionResult.messageType, context);
+}
+
+function presentActionMessage(
+  message: string,
+  messageType: string | undefined,
+  context: PlatformErrorFeedbackContext,
+) {
+  if (messageType === 'WARNING') {
+    showWarningMessage(message);
+    return;
+  }
+  if (messageType === 'INFO') {
+    showInfoMessage(message);
+    return;
+  }
+  if (messageType === 'ERROR') {
+    showErrorMessage(message);
+    return;
+  }
+  presentPlatformSuccess(message, context);
 }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import type { RecycleBinItem, RestoreReport, PurgeReport } from '../src/web-contracts/index.ts';
 import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
 import { useRecycleBinState } from '../src/platform-components/recycleBinState.ts';
+import { useRecycleBinExplorerMode } from '../src/platform-components/useRecycleBinExplorerMode.ts';
+import { ref } from 'vue';
 
 interface Tenant {
   id?: string;
@@ -10,6 +12,39 @@ interface Tenant {
   title?: string;
   enabled?: boolean;
 }
+
+test('recycle bin explorer mode centralizes capability, switching and reload state', () => {
+  const context = createContext({ request: async () => undefined });
+  context.abilities = { has: () => true } as never;
+  context.can = (actionCode) => actionCode === 'recycleBinQuery';
+  const listReloadKey = ref(3);
+  const searchKeyword = ref('演示租户');
+  let resetCount = 0;
+  const state = useRecycleBinExplorerMode({
+    context,
+    listReloadKey,
+    searchKeyword,
+    resetSelection: () => resetCount++,
+  });
+
+  assert.equal(state.enabled.value, true);
+  assert.equal(state.buttonVisible.value, true);
+  assert.equal(state.reloadKey.value, 3);
+
+  state.updateSummary(2);
+  state.enter();
+  assert.equal(state.active.value, true);
+  assert.equal(state.hasRecords.value, true);
+  assert.equal(searchKeyword.value, '');
+  assert.equal(resetCount, 1);
+
+  state.refresh();
+  assert.equal(state.reloadKey.value, 1);
+  state.leave();
+  state.refresh();
+  assert.equal(listReloadKey.value, 4);
+  assert.equal(resetCount, 2);
+});
 
 test('recycle bin state loads items from backend', async () => {
   const items: RecycleBinItem<Tenant>[] = [

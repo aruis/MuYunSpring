@@ -81,6 +81,7 @@ class PlatformModuleRuntimeContextServiceTest {
                         .listView(list -> list
                                 .title("组织列表")
                                 .field("title", field -> field.label("组织名称")))
+                        .typedTextConfirmation("delete", "title")
                         .build())
                                                     .build();
         PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
@@ -133,6 +134,12 @@ class PlatformModuleRuntimeContextServiceTest {
                                 assertThat(field.fieldRef().fieldName()).isEqualTo("title");
                                 assertThat(field.label()).isEqualTo("组织名称");
                             });
+                });
+        assertThat(context.uiDescriptor().actions()).singleElement()
+                .satisfies(action -> {
+                    assertThat(action.actionCode()).isEqualTo("delete");
+                    assertThat(action.confirmation().mode()).isEqualTo("typedText");
+                    assertThat(action.confirmation().requiredField()).isEqualTo("title");
                 });
     }
 

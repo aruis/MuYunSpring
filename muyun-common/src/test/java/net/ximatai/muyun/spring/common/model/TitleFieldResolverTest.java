@@ -25,6 +25,27 @@ class TitleFieldResolverTest {
     }
 
     @Test
+    void recordLabelShouldUseDeclaredTitleFieldAsSingleSource() {
+        DemoRecordLabel record = new DemoRecordLabel("customer-code", "客户甲");
+
+        assertThat(RecordLabelResolver.resolveFieldName(DemoRecordLabel.class)).contains("displayName");
+        assertThat(RecordLabelResolver.readAsString(record)).isEqualTo("客户甲");
+    }
+
+    @Test
+    void recordLabelShouldFallBackToRecordId() {
+        DemoRecordWithoutTitle record = new DemoRecordWithoutTitle();
+        record.setId("record-1");
+
+        assertThat(RecordLabelResolver.readAsString(record)).isEqualTo("record-1");
+    }
+
+    @Test
+    void recordLabelFieldShouldExposeTitledCapabilityFallback() {
+        assertThat(RecordLabelResolver.resolveFieldName(DemoTitledRecordWithoutAnnotation.class)).contains("title");
+    }
+
+    @Test
     void resolveShouldRejectMultipleTitleFieldsAcrossHierarchy() {
         DemoSpecialTitleRecord record = new DemoSpecialTitleRecord("Parent name", "Special name");
 
@@ -84,7 +105,17 @@ class TitleFieldResolverTest {
         }
     }
 
-    private static final class DemoRecordWithoutTitle {
+    private static final class DemoRecordWithoutTitle extends StandardEntity {
+    }
+
+    private static final class DemoRecordLabel extends StandardEntity {
+        @TitleField
+        private final String displayName;
+
+        private DemoRecordLabel(String id, String displayName) {
+            setId(id);
+            this.displayName = displayName;
+        }
     }
 
     private static final class DemoStandardTitleRecord extends StandardTitledEntity {

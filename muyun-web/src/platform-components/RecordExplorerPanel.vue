@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { UiButton, UiInput } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'RecordExplorerPanel' });
@@ -25,26 +25,25 @@ const emit = defineEmits<{
   refresh: [];
 }>();
 
-const searchExpanded = ref(false);
+const searchExpanded = ref(props.searchKeyword.trim().length > 0);
 const searchRoot = ref<HTMLElement>();
-const searchVisible = computed(
-  () => props.searchable && (searchExpanded.value || props.searchKeyword.trim().length > 0),
+const searchVisible = computed(() => props.searchable && searchExpanded.value);
+
+watch(
+  () => props.searchKeyword,
+  (keyword) => {
+    if (keyword.trim()) searchExpanded.value = true;
+  },
 );
 
 function toggleSearch() {
-  if (searchVisible.value) {
+  if (searchExpanded.value) {
     emit('update:searchKeyword', '');
     searchExpanded.value = false;
     return;
   }
   searchExpanded.value = true;
   focusSearchInput();
-}
-
-function handleSearchBlur() {
-  if (!props.searchKeyword.trim()) {
-    searchExpanded.value = false;
-  }
 }
 
 function handleSearchEscape() {
@@ -82,7 +81,6 @@ async function focusSearchInput() {
           icon-name="search"
           type="text"
           :title="`搜索${title}`"
-          @mousedown.prevent
           @click="toggleSearch"
         />
         <slot name="actions" />
@@ -97,7 +95,6 @@ async function focusSearchInput() {
           :placeholder="searchPlaceholder"
           autofocus
           @update:value="emit('update:searchKeyword', $event)"
-          @blur="handleSearchBlur"
           @keydown.esc="handleSearchEscape"
         />
       </div>

@@ -9,23 +9,43 @@ final class StaticCrudActionResultSupport {
     }
 
     static void created(String moduleAlias, String recordId) {
-        report("platform.crud.created", "新增成功", DataChange.recordCreated(moduleAlias, recordId));
+        created(moduleAlias, recordId, null);
+    }
+
+    static void created(String moduleAlias, String recordId, String recordLabel) {
+        report("platform.crud.created", successMessage(recordLabel, "新增"), DataChange.recordCreated(moduleAlias, recordId));
     }
 
     static void updated(String moduleAlias, String recordId) {
-        report("platform.crud.updated", "修改成功", DataChange.recordUpdated(moduleAlias, recordId));
+        updated(moduleAlias, recordId, null);
+    }
+
+    static void updated(String moduleAlias, String recordId, String recordLabel) {
+        report("platform.crud.updated", successMessage(recordLabel, "修改"), DataChange.recordUpdated(moduleAlias, recordId));
     }
 
     static void deleted(String moduleAlias, String recordId) {
-        report("platform.crud.deleted", "删除成功", DataChange.recordDeleted(moduleAlias, recordId));
+        deleted(moduleAlias, recordId, null);
+    }
+
+    static void deleted(String moduleAlias, String recordId, String recordLabel) {
+        report("platform.crud.deleted", successMessage(recordLabel, "删除"), DataChange.recordDeleted(moduleAlias, recordId));
     }
 
     static void enabled(String moduleAlias, String recordId) {
-        report("platform.crud.enabled", "启用成功", DataChange.recordUpdated(moduleAlias, recordId));
+        enabled(moduleAlias, recordId, null);
+    }
+
+    static void enabled(String moduleAlias, String recordId, String recordLabel) {
+        report("platform.crud.enabled", successMessage(recordLabel, "启用"), DataChange.recordUpdated(moduleAlias, recordId));
     }
 
     static void disabled(String moduleAlias, String recordId) {
-        report("platform.crud.disabled", "停用成功", DataChange.recordUpdated(moduleAlias, recordId));
+        disabled(moduleAlias, recordId, null);
+    }
+
+    static void disabled(String moduleAlias, String recordId, String recordLabel) {
+        report("platform.crud.disabled", successMessage(recordLabel, "停用"), DataChange.recordUpdated(moduleAlias, recordId));
     }
 
     static void sorted(String moduleAlias) {
@@ -39,5 +59,9 @@ final class StaticCrudActionResultSupport {
             context.message(ActionMessage.success(code, text));
             context.record(change);
         });
+    }
+
+    private static String successMessage(String recordLabel, String action) {
+        return recordLabel == null || recordLabel.isBlank() ? action + "成功" : "「" + recordLabel.trim() + "」" + action + "成功";
     }
 }

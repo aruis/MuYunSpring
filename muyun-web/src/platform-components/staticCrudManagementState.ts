@@ -16,6 +16,7 @@ import {
   presentPlatformMessage,
   type PlatformActionErrorHandler,
 } from './platformErrorFeedback';
+import { actionConfirmationRequiredText } from './actionConfirmation';
 
 export type StaticCrudCardMode = 'view' | 'edit' | 'create';
 export type StaticCrudActionCode = 'create' | 'update' | 'delete' | 'enable' | 'disable';
@@ -52,7 +53,6 @@ export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   isValid: (record: TRecord) => boolean;
   recordName: string;
   deleteTitle: string;
-  deleteRequiredText?: (record: TRecord) => string | undefined;
   saveDeniedMessage: string;
   createDeniedMessage: string;
   enableDeniedMessage: string;
@@ -247,12 +247,18 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       presentActionMessage(options.deleteDeniedMessage(record), 'authorization');
       return;
     }
+    const runtimeContext = options.context.runtime.snapshot() ?? (await options.context.runtime.ready);
+    const requiredText = actionConfirmationRequiredText(
+      runtimeContext.uiDescriptor,
+      'delete',
+      record as Record<string, unknown>,
+    );
     const confirmed = await options.confirmAction({
       title: options.deleteTitle,
       content: `确认删除${options.recordName}「${options.titleOf(record)}」？`,
       okText: '删除',
       danger: true,
-      requiredText: options.deleteRequiredText?.(record),
+      requiredText,
     });
     if (!confirmed) {
       return;
