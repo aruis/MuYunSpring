@@ -1,4 +1,5 @@
 export * from './abilityCodes';
+export * from './recycleBin';
 export * from './staticModuleClient';
 export type {
   ModuleActionState,

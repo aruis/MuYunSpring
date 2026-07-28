@@ -10,6 +10,8 @@ import {
   createModuleTreeContext,
   createStaticModuleCrudClient,
   createStaticModuleTreeClient,
+  canQueryRecycleBin,
+  hasRecycleBinAbility,
   normalizeError,
   platformErrorCodes,
   resolveGlobalErrorPresentation,
@@ -938,10 +940,29 @@ test('module context abilities compose tree and enable capabilities', async () =
     assert.equal(await requests[3].text(), '{"version":4}');
     assert.equal(context.abilities.hasTree(), true);
     assert.equal(context.abilities.has('tree'), true);
+    assert.equal(context.abilities.has('recycleBin'), true);
+    assert.equal(hasRecycleBinAbility(context), true);
+    assert.equal(canQueryRecycleBin(context), true);
     assert.equal(context.abilities.tryTree(), tree);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('recycle-bin access requires both module ability and query permission', () => {
+  const context = {
+    abilities: { has: () => false },
+    can: () => true,
+  } as unknown as ReturnType<typeof createModuleContext>;
+
+  assert.equal(hasRecycleBinAbility(context), false);
+  assert.equal(canQueryRecycleBin(context), false);
+
+  context.abilities.has = () => true;
+  context.can = () => false;
+
+  assert.equal(hasRecycleBinAbility(context), true);
+  assert.equal(canQueryRecycleBin(context), false);
 });
 
 test('module tree context remains compatible with explicit tree opt-in', async () => {
@@ -1110,14 +1131,15 @@ function runtimeContext() {
     entryType: 'route',
     entryRoute: '/iam/organizations',
     mainEntityAlias: 'organization',
-    capabilities: ['CRUD', 'SOFT_DELETE', 'LIFECYCLE', 'CACHE', 'TREE', 'SORT', 'ENABLE'],
-    abilities: ['crud', 'softDelete', 'lifecycle', 'cache', 'tree', 'sort', 'enable'],
+    capabilities: ['CRUD', 'SOFT_DELETE', 'LIFECYCLE', 'CACHE', 'TREE', 'SORT', 'ENABLE', 'RECYCLE_BIN'],
+    abilities: ['crud', 'softDelete', 'lifecycle', 'cache', 'tree', 'sort', 'enable', 'recycleBin'],
     actions: [
       { actionCode: 'query', permissionActionCode: 'view', title: 'Query', authorized: true },
       { actionCode: 'create', permissionActionCode: 'create', title: 'Create', authorized: true },
       { actionCode: 'update', permissionActionCode: 'update', title: 'Update', authorized: true },
       { actionCode: 'tree', permissionActionCode: 'view', title: 'Tree', authorized: true },
       { actionCode: 'disable', permissionActionCode: 'enable', title: 'Disable', authorized: true },
+      { actionCode: 'recycleBinQuery', title: 'Recycle bin', authorized: true },
     ],
   };
 }

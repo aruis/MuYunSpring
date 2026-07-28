@@ -8,6 +8,7 @@ export const moduleAbilityCodes = {
   reference: 'reference',
   enable: 'enable',
   dataScope: 'dataScope',
+  recycleBin: 'recycleBin',
   workflow: 'workflow',
   approval: 'approval',
   childRelation: 'childRelation',

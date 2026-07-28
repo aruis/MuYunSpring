@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { confirmAction, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
-import type { ModuleContext } from '@muyun/web-core';
+import { canQueryRecycleBin, hasRecycleBinAbility, type ModuleContext } from '@muyun/web-core';
 import RecordListExplorer, { type RecordListExplorerRecord } from './RecordListExplorer.vue';
 import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 import {
@@ -57,6 +57,7 @@ const emit = defineEmits<{
   action: [action: UiRecordInlineAction, record: CrudRecordListBase];
   loaded: [records: CrudRecordListBase[]];
   restored: [];
+  recycleBinSummary: [total: number | undefined];
 }>();
 
 const loading = ref(false);
@@ -74,10 +75,19 @@ const recycleBinItems = computed(
         .map((item) => [String(item.record.id), item] as const),
     ),
 );
+const recycleBinEnabled = computed(() => hasRecycleBinAbility(props.context));
 
 const listRecords = computed<RecordListExplorerRecord[]>(() => records.value);
 
 onMounted(loadRecords);
+
+watch(
+  () => recycleBinState.summaryTotal.value,
+  (total) => {
+    if (recycleBinEnabled.value) emit('recycleBinSummary', total);
+  },
+  { immediate: true },
+);
 
 watch(
   () => props.reloadKey,
@@ -110,6 +120,7 @@ async function loadRecords() {
     if (requestSeq !== recordsRequestSeq) return;
     records.value = response.records;
     emit('loaded', response.records);
+    if (canQueryRecycleBin(props.context)) void recycleBinState.refreshSummary();
   } catch (cause) {
     if (requestSeq !== recordsRequestSeq) return;
     records.value = [];

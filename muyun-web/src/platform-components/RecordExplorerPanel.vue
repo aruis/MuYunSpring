@@ -107,6 +107,10 @@ async function focusSearchInput() {
       <slot />
     </div>
 
+    <footer v-if="$slots.footer" class="record-explorer-panel-footer">
+      <slot name="footer" />
+    </footer>
+
     <slot name="editor" />
   </section>
 </template>
@@ -224,5 +228,15 @@ async function focusSearchInput() {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.record-explorer-panel-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--muyun-border-subtle);
 }
 </style>

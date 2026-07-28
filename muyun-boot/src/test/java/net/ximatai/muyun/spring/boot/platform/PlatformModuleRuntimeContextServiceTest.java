@@ -73,7 +73,8 @@ class PlatformModuleRuntimeContextServiceTest {
                         StaticModuleActionDefinition.platformAction(PlatformAction.VIEW),
                         StaticModuleActionDefinition.platformAction(PlatformAction.TREE),
                         StaticModuleActionDefinition.platformAction(PlatformAction.ENABLE),
-                        StaticModuleActionDefinition.platformAction(PlatformAction.DISABLE)
+                        StaticModuleActionDefinition.platformAction(PlatformAction.DISABLE),
+                        StaticModuleActionDefinition.platformAction(PlatformAction.RECYCLE_BIN_QUERY)
                 ))
                                                     .entities(List.of())
                                                     .uiDefinition(ModuleUiDefinition.builder("iam.organization")
@@ -104,7 +105,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 EntityCapability.CACHE,
                 EntityCapability.TREE,
                 EntityCapability.SORT,
-                EntityCapability.ENABLE
+                EntityCapability.ENABLE,
+                EntityCapability.RECYCLE_BIN
         );
         assertThat(context.abilities()).contains(
                 "crud",
@@ -113,10 +115,11 @@ class PlatformModuleRuntimeContextServiceTest {
                 "cache",
                 "tree",
                 "sort",
-                "enable"
+                "enable",
+                "recycleBin"
         );
         assertThat(context.actions()).extracting(PlatformModuleRuntimeAction::actionCode)
-                .containsExactly("menu", "view", "tree", "enable", "disable");
+                .containsExactly("menu", "view", "tree", "enable", "disable", "recycleBinQuery");
         assertThat(context.actions()).allSatisfy(action -> assertThat(action.authorized()).isTrue());
         assertThat(context.uiDescriptor()).isNotNull();
         assertThat(context.uiDescriptor().schemaVersion()).isEqualTo(ResolvedModuleUiDescriptor.SCHEMA_VERSION);

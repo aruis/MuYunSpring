@@ -40,7 +40,13 @@ import type {
   UserAccount,
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
-import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
+import {
+  actionResultData,
+  canQueryRecycleBin,
+  platformErrorCodes,
+  useModuleContext,
+  type ModuleContext,
+} from '@muyun/web-core';
 import { usePageDataChange, usePageRecordExternalChange, useRealtimeRefreshQueue } from '../app/pageRealtime';
 import { useWorkspaceViewHost } from '../app/workspaceViewHost';
 import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
@@ -499,6 +505,7 @@ function handleEmployeeListAction(action: RecordActionItem) {
 }
 
 function changeEmployeeListMode(mode: RecordQueryListMode) {
+  if (mode === 'recycleBin' && !canQueryRecycleBin(employeeListContext.value)) return;
   if (!canLeaveEmployeeDetailContext()) return;
   resetEmployeeEmploymentRows();
   employeeListMode.value = mode;
@@ -1251,8 +1258,6 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
       :context="employeeListContext"
       :title="employeeListMode === 'normal' ? '职员列表' : '职员回收站'"
       :mode="employeeListMode"
-      recycle-bin-enabled
-      recycle-bin-title="回收站"
       standard-crud-actions
       create-title="新建职员"
       standard-crud-row-actions
