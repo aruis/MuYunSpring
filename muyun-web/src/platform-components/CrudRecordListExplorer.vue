@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { confirmAction, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
-import { hasRecycleBinAbility, type ModuleContext } from '@muyun/web-core';
+import { canQueryRecycleBin, hasRecycleBinAbility, type ModuleContext } from '@muyun/web-core';
 import RecordListExplorer, { type RecordListExplorerRecord } from './RecordListExplorer.vue';
 import type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 import {
@@ -120,7 +120,7 @@ async function loadRecords() {
     if (requestSeq !== recordsRequestSeq) return;
     records.value = response.records;
     emit('loaded', response.records);
-    if (recycleBinEnabled.value) void recycleBinState.refreshSummary();
+    if (canQueryRecycleBin(props.context)) void recycleBinState.refreshSummary();
   } catch (cause) {
     if (requestSeq !== recordsRequestSeq) return;
     records.value = [];

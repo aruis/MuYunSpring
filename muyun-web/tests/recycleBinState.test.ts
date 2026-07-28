@@ -87,6 +87,30 @@ test('recycle bin state refreshes a lightweight summary without replacing loaded
   assert.equal(state.items.value[0].record.id, 'loaded_tenant');
 });
 
+test('recycle bin state preserves the current query scope when refreshing summary', async () => {
+  const context = createContext({
+    request: async (options) => {
+      assert.deepEqual(options.body, {
+        page: { pageNum: 1, pageSize: 1 },
+        conditions: [{ field: 'organizationId', operator: 'EQ', value: 'org-1' }],
+        sorts: [{ field: 'title', desc: false }],
+        externalQueryValues: { departmentScope: { organizationId: 'org-1' } },
+      });
+      return { records: [], total: 2, pageNum: 1, pageSize: 1 };
+    },
+  });
+  const state = useRecycleBinState({ context });
+
+  await state.refreshSummary({
+    page: { pageNum: 3, pageSize: 20 },
+    conditions: [{ field: 'organizationId', operator: 'EQ', value: 'org-1' }],
+    sorts: [{ field: 'title', desc: false }],
+    externalQueryValues: { departmentScope: { organizationId: 'org-1' } },
+  });
+
+  assert.equal(state.summaryTotal.value, 2);
+});
+
 test('recycle bin state restores item and reloads list', async () => {
   const calls: string[] = [];
   const restoreReport: RestoreReport = {

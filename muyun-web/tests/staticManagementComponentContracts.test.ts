@@ -1784,6 +1784,8 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
     panelSource,
     /canQueryRecycleBinAvailable = computed\(\(\) => canQueryRecycleBin\(props\.context\)\)/,
   );
+  assert.match(panelSource, /refreshRecycleBinSummary\(queryRequest\)/);
+  assert.match(panelSource, /if \(canQueryRecycleBinAvailable\.value\)/);
   assert.match(panelSource, /<footer class="record-query-list-pagination">[\s\S]*recycleBinEnabled/);
   assert.match(panelSource, /record-query-list-pagination-controls/);
   assert.match(panelSource, /RecycleBinModeButton/);
@@ -1812,6 +1814,7 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
   assert.doesNotMatch(employeeSource, /<RecycleBinPanel/);
   assert.match(explorerSource, /export type CrudRecordListMode = 'normal' \| 'recycleBin'/);
   assert.match(explorerSource, /hasRecycleBinAbility\(props\.context\)/);
+  assert.match(explorerSource, /if \(canQueryRecycleBin\(props\.context\)\)/);
   assert.match(explorerSource, /props\.mode === 'recycleBin'/);
   assert.match(explorerSource, /const requestSeq = \+\+recordsRequestSeq/);
   assert.match(explorerSource, /requestSeq !== recordsRequestSeq/);

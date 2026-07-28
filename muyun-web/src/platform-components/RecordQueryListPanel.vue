@@ -384,7 +384,8 @@ async function loadRecords(updateLoading = true) {
     loading.value = true;
   }
   try {
-    const response = await props.context.crud.query(buildQueryRequest());
+    const queryRequest = buildQueryRequest();
+    const response = await props.context.crud.query(queryRequest);
     if (requestSeq !== recordsRequestSeq) {
       return;
     }
@@ -393,7 +394,7 @@ async function loadRecords(updateLoading = true) {
     pageNum.value = response.pageNum;
     pageSize.value = response.pageSize;
     emit('loaded', response.records);
-    refreshRecycleBinSummary();
+    refreshRecycleBinSummary(queryRequest);
   } catch (cause) {
     if (requestSeq !== recordsRequestSeq) {
       return;
@@ -409,9 +410,9 @@ async function loadRecords(updateLoading = true) {
   }
 }
 
-function refreshRecycleBinSummary() {
-  if (recycleBinEnabled.value) {
-    void recycleBinState.refreshSummary();
+function refreshRecycleBinSummary(queryRequest: WebQueryRequest) {
+  if (canQueryRecycleBinAvailable.value) {
+    void recycleBinState.refreshSummary(queryRequest);
   }
 }
 
