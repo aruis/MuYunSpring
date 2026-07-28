@@ -11,8 +11,10 @@ import {
   RecordQueryListPanel,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  createSoftDeletedConflictErrorHandler,
   createScopedTreeModuleContext,
   type QueryListRecord,
+  type RecordQueryListMode,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
   type RecordFormFieldFallback,
@@ -102,6 +104,7 @@ const shouldRenderEmployeeDetailDrawer = computed(
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
+const employeeListMode = ref<RecordQueryListMode>('normal');
 const selectedOrganization = ref<Organization>();
 const selectedEmployeeKey = ref<string>();
 const selectedEmployee = ref<Employee>();
@@ -128,7 +131,14 @@ const {
   handleEmployeeRowExpand,
   loadEmployeeEmploymentRows,
   resetEmployeeEmploymentRows,
-} = useEmployeeEmploymentRows({ context: employeeContext, source: 'employee-management' });
+} = useEmployeeEmploymentRows({
+  context: employeeContext,
+  source: 'employee-management',
+  pathOf: (employeeId) =>
+    employeeListMode.value === 'recycleBin'
+      ? `/iam.employee/recycle-bin/${encodeURIComponent(employeeId)}/employment-view`
+      : `/iam.employee/${encodeURIComponent(employeeId)}/employment-view`,
+});
 const employeeExternalChange = usePageRecordExternalChange({
   moduleAlias: 'iam.employee',
   recordId: () => selectedEmployee.value?.id,
@@ -488,6 +498,19 @@ function handleEmployeeListAction(action: RecordActionItem) {
   }
 }
 
+function changeEmployeeListMode(mode: RecordQueryListMode) {
+  if (!canLeaveEmployeeDetailContext()) return;
+  resetEmployeeEmploymentRows();
+  employeeListMode.value = mode;
+  selectedEmployeeKey.value = undefined;
+  selectedEmployee.value = undefined;
+  closeEmployeeDetail();
+}
+
+function handleEmployeeRestored() {
+  employeeReloadKey.value += 1;
+}
+
 function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
   if (!canLeaveEmployeeDetailContext()) {
     return;
@@ -732,6 +755,10 @@ async function saveEmployee() {
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
         : employeeContext.crud.insert(draft),
     actionErrorHandlers: [
+      createSoftDeletedConflictErrorHandler({
+        resourceLabel: '职员',
+        onNavigateToRecycleBin: () => changeEmployeeListMode('recycleBin'),
+      }),
       {
         code: platformErrorCodes.conflictVersion,
         handle: (_error, { mode, record }) =>
@@ -1222,7 +1249,10 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
     <RecordQueryListPanel
       class="employee-list-panel"
       :context="employeeListContext"
-      title="职员列表"
+      :title="employeeListMode === 'normal' ? '职员列表' : '职员回收站'"
+      :mode="employeeListMode"
+      recycle-bin-enabled
+      recycle-bin-title="回收站"
       standard-crud-actions
       create-title="新建职员"
       standard-crud-row-actions
@@ -1240,6 +1270,8 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
       @row-dblclick="handleEmployeeRowDblclick"
       @row-expand="handleEmployeeRowExpand"
       @select="selectEmployee"
+      @mode-change="changeEmployeeListMode"
+      @restored="handleEmployeeRestored"
     >
       <template #expandedRow="{ record }">
         <RecordExpandedSubtable

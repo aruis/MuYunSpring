@@ -48,6 +48,24 @@ public class EmployeeEmploymentReadService {
     }
 
     public PageResult<EmployeeEmploymentView> page(Query query) {
+        return page(query, Map.of());
+    }
+
+    /** Reads employment rows while retaining the already-authorized employee root projection. */
+    public PageResult<EmployeeEmploymentView> pageForEmployee(Employee employee, Query query) {
+        if (employee == null || employee.getId() == null || employee.getId().isBlank()) {
+            throw new IllegalArgumentException("employee must not be null and must have an id");
+        }
+        Query normalized = query == null ? Query.defaults() : query;
+        if (normalized.employeeId() != null && !normalized.employeeId().isBlank()
+                && !employee.getId().equals(normalized.employeeId().trim())) {
+            throw new IllegalArgumentException("employee query does not match the retained root");
+        }
+        return page(new Query(employee.getId(), normalized.organizationId(), normalized.departmentId(),
+                normalized.enabledOnly(), normalized.pageRequest()), Map.of(employee.getId(), employee));
+    }
+
+    private PageResult<EmployeeEmploymentView> page(Query query, Map<String, Employee> employeeOverrides) {
         Query normalized = query == null ? Query.defaults() : query;
         Criteria criteria = Criteria.of();
         if (!Boolean.FALSE.equals(normalized.enabledOnly())) criteria.eq("enabled", Boolean.TRUE);
@@ -55,13 +73,16 @@ public class EmployeeEmploymentReadService {
         if (normalized.organizationId() != null && !normalized.organizationId().isBlank()) criteria.eq("organizationId", normalized.organizationId().trim());
         if (normalized.departmentId() != null && !normalized.departmentId().isBlank()) criteria.eq("departmentId", normalized.departmentId().trim());
         PageResult<EmployeePosition> page = employeePositionService.pageQuery(criteria, normalized.pageRequest(), Sort.asc("employeeId"));
-        return PageResult.of(views(page.getRecords()), page.getTotal(), normalized.pageRequest());
+        return PageResult.of(views(page.getRecords(), employeeOverrides), page.getTotal(), normalized.pageRequest());
     }
 
-    private List<EmployeeEmploymentView> views(List<EmployeePosition> relations) {
+    private List<EmployeeEmploymentView> views(List<EmployeePosition> relations,
+                                               Map<String, Employee> employeeOverrides) {
         if (relations.isEmpty()) return List.of();
         List<String> employeeIds = distinctIds(relations, EmployeePosition::getEmployeeId);
-        Map<String, Employee> employees = byId(employeeService.list(Criteria.of().in("id", employeeIds), pageOf(employeeIds)));
+        Map<String, Employee> employees = new java.util.LinkedHashMap<>(
+                byId(employeeService.list(Criteria.of().in("id", employeeIds), pageOf(employeeIds))));
+        employees.putAll(employeeOverrides);
         List<String> organizationIds = distinctIds(relations, EmployeePosition::getOrganizationId);
         Map<String, Organization> organizations = byId(organizationService.list(Criteria.of().in("id", organizationIds), pageOf(organizationIds)));
         List<String> departmentIds = distinctIds(relations, EmployeePosition::getDepartmentId);

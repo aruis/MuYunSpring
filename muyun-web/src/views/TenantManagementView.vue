@@ -10,6 +10,7 @@ import {
   presentPlatformError,
   RecordStatusSwitch,
   StaticManagementLayout,
+  createSoftDeletedConflictErrorHandler,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
@@ -21,8 +22,11 @@ import { createTenantManagementState } from './tenantManagementState';
 
 defineOptions({ name: 'TenantManagementView' });
 
+type TenantViewMode = 'list' | 'recycleBin';
+
 const tenantContext = useModuleContext<Tenant>();
 const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
+const viewMode = ref<TenantViewMode>('list');
 const explorerSearchKeyword = ref('');
 const applications = ref<Application[]>([]);
 const applicationsLoading = ref(false);
@@ -44,6 +48,7 @@ const {
   canDelete,
   canEnable,
   handleListLoaded,
+  handleReadonlyListLoaded,
   handleSelect,
   startCreate,
   startEdit,
@@ -51,7 +56,14 @@ const {
   save,
   toggleEnabled,
   removeSelected,
-} = createTenantManagementState(tenantContext, confirmAction);
+} = createTenantManagementState(tenantContext, confirmAction, {
+  actionErrorHandlers: [
+    createSoftDeletedConflictErrorHandler({
+      resourceLabel: '租户',
+      onNavigateToRecycleBin: () => switchToRecycleBin(),
+    }),
+  ],
+});
 
 const enabledReadonly = computed(() => false);
 const tenantApplicationColumns: UiDataTableColumn[] = [{ key: 'applicationAlias', title: '已开通应用' }];
@@ -71,17 +83,24 @@ const applicationConfigurationColumns: UiDataTableColumn[] = [
 ];
 
 watch(
-  () => selected.value?.id,
-  (tenantId) => {
+  [() => selected.value?.id, () => viewMode.value] as const,
+  ([tenantId, currentViewMode]) => {
     applicationConfigurationOpen.value = false;
     configuredApplicationAliases.value = new Set();
-    void loadTenantApplications(tenantId);
+    if (currentViewMode === 'list') {
+      void loadTenantApplications(tenantId);
+    } else {
+      tenantApplications.value = [];
+    }
   },
   { immediate: true },
 );
 onMounted(() => void loadApplications());
 
 const cardActions = computed<RecordActionItem[]>(() => {
+  if (viewMode.value === 'recycleBin') {
+    return [];
+  }
   if (mode.value !== 'view') {
     return [
       { key: 'cancel', title: '取消', disabled: saving.value },
@@ -111,12 +130,18 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   return {
     title: record.title ?? record.alias ?? record.id ?? '未命名租户',
     secondary: record.alias ?? record.id,
-    muted: record.enabled === false,
+    tag: viewMode.value === 'recycleBin' ? '已删除' : undefined,
+    muted: viewMode.value === 'recycleBin' || record.enabled === false,
   };
 }
 
 function handleLoaded(records: CrudRecordListBase[]) {
-  handleListLoaded(records as Tenant[]);
+  const tenants = records as Tenant[];
+  if (viewMode.value === 'recycleBin') {
+    handleReadonlyListLoaded(tenants);
+    return;
+  }
+  handleListLoaded(tenants);
 }
 
 function handleTenantSelect(record: CrudRecordListBase) {
@@ -128,6 +153,12 @@ async function handleCardAction(action: RecordActionItem) {
   if (action.key === 'delete') return removeSelected();
   if (action.key === 'cancel') return cancelEdit();
   if (action.key === 'save') await save();
+}
+
+async function handleFormSubmit() {
+  if (viewMode.value === 'list') {
+    await save();
+  }
 }
 
 async function loadApplications() {
@@ -211,20 +242,59 @@ function closeApplicationConfiguration() {
 function tenantApplicationsPath(tenantId: string) {
   return `/iam.tenant/${encodeURIComponent(tenantId)}/applications`;
 }
+
+function switchToRecycleBin() {
+  if (tenantContext.can('recycleBinQuery') !== true) return;
+  resetTenantSelection();
+  explorerSearchKeyword.value = '';
+  viewMode.value = 'recycleBin';
+}
+
+function switchToList() {
+  resetTenantSelection();
+  viewMode.value = 'list';
+}
+
+function resetTenantSelection() {
+  selected.value = undefined;
+  draft.value = { alias: '', title: '', enabled: true };
+  mode.value = 'view';
+  tenantApplications.value = [];
+}
+
+function handleRefresh() {
+  if (viewMode.value === 'list') {
+    reloadKey.value += 1;
+  } else {
+    recycleBinReloadKey.value += 1;
+  }
+}
+
+const recycleBinReloadKey = ref(0);
 </script>
 
 <template>
   <StaticManagementLayout
     v-model:explorer-search-keyword="explorerSearchKeyword"
-    explorer-title="租户列表"
-    refresh-title="刷新租户列表"
+    :explorer-title="viewMode === 'list' ? '租户列表' : '回收站'"
+    :refresh-title="viewMode === 'list' ? '刷新租户列表' : '刷新回收站'"
     explorer-search-placeholder="搜索租户名称、alias 或 ID"
+    :explorer-searchable="viewMode === 'list'"
     :mode="mode"
     :detail-title="cardTitle"
-    @refresh="reloadKey += 1"
+    @refresh="handleRefresh"
   >
     <template #explorer-actions>
+      <UiButton
+        v-if="viewMode === 'list' && tenantContext.can('recycleBinQuery') === true"
+        icon-name="delete"
+        type="text"
+        title="回收站"
+        @click="switchToRecycleBin"
+      />
+      <UiButton v-else type="text" title="返回租户列表" @click="switchToList"> 返回列表 </UiButton>
       <ModuleActionButton
+        v-if="viewMode === 'list'"
         class="record-panel-create-button"
         :context="tenantContext"
         action-code="create"
@@ -237,10 +307,11 @@ function tenantApplicationsPath(tenantId: string) {
       <CrudRecordListExplorer
         :context="tenantContext"
         :selected-id="selected?.id"
-        :reload-key="reloadKey"
+        :reload-key="viewMode === 'list' ? reloadKey : recycleBinReloadKey"
+        :mode="viewMode === 'list' ? 'normal' : 'recycleBin'"
         :keyword="explorerSearchKeyword"
-        empty-description="暂无租户"
-        loading-tip="加载租户列表"
+        :empty-description="viewMode === 'list' ? '暂无租户' : '回收站为空'"
+        :loading-tip="viewMode === 'list' ? '加载租户列表' : '加载回收站'"
         fallback-title="未命名租户"
         :item-of="tenantItemOf"
         @select="handleTenantSelect"
@@ -248,32 +319,45 @@ function tenantApplicationsPath(tenantId: string) {
       />
     </template>
     <template #detail-actions>
-      <RecordActionBar :context="tenantContext" :actions="cardActions" @action="handleCardAction" />
+      <RecordActionBar
+        v-if="viewMode === 'list'"
+        :context="tenantContext"
+        :actions="cardActions"
+        @action="handleCardAction"
+      />
     </template>
     <template #detail-status>
-      <RecordStatusSwitch
-        v-if="mode !== 'view'"
-        :enabled="draft.enabled"
-        :disabled="enabledReadonly"
-        :show-label="false"
-        @change="draft.enabled = $event"
-      />
-      <RecordStatusSwitch
-        v-else-if="selected"
-        :enabled="selected.enabled"
-        :disabled="saving || !canEnable"
-        :loading="saving"
-        :show-label="false"
-        @change="toggleEnabled"
-      />
+      <template v-if="viewMode === 'list'">
+        <RecordStatusSwitch
+          v-if="mode !== 'view'"
+          :enabled="draft.enabled"
+          :disabled="enabledReadonly"
+          :show-label="false"
+          @change="draft.enabled = $event"
+        />
+        <RecordStatusSwitch
+          v-else-if="selected"
+          :enabled="selected.enabled"
+          :disabled="saving || !canEnable"
+          :loading="saving"
+          :show-label="false"
+          @change="toggleEnabled"
+        />
+      </template>
     </template>
 
-    <form class="static-record-form" @submit.prevent="save">
-      <label><span>租户 alias</span><UiInput v-model:value="draft.alias" :disabled="aliasReadonly" /></label>
-      <label><span>租户名称</span><UiInput v-model:value="draft.title" :disabled="readonly" /></label>
+    <form class="static-record-form" @submit.prevent="handleFormSubmit">
+      <label>
+        <span>租户 alias</span>
+        <UiInput v-model:value="draft.alias" :disabled="viewMode === 'recycleBin' || aliasReadonly" />
+      </label>
+      <label>
+        <span>租户名称</span>
+        <UiInput v-model:value="draft.title" :disabled="viewMode === 'recycleBin' || readonly" />
+      </label>
     </form>
 
-    <section v-if="selected && mode === 'view'" class="tenant-applications">
+    <section v-if="viewMode === 'list' && selected && mode === 'view'" class="tenant-applications">
       <div class="tenant-applications-header">
         <div>
           <h3>已开通应用</h3>

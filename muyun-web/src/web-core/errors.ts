@@ -38,6 +38,7 @@ export const platformErrorCodes = {
   conflictVersion: 'CONFLICT_VERSION',
   resourceInUse: 'RESOURCE_IN_USE',
   resourceNotFound: 'RESOURCE_NOT_FOUND',
+  resourceSoftDeletedConflict: 'RESOURCE_SOFT_DELETED_CONFLICT',
   configMissing: 'CONFIG_MISSING',
   internalError: 'INTERNAL_ERROR',
 } as const;

@@ -155,7 +155,10 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable", "employeePositions", "employeeAccounts",
-                                "employeeDelegations", "employeeDelegatedToMe");
+                                "employeeDelegations", "employeeDelegatedToMe",
+                                "recycleBinQuery", "recycleBinRestore");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .doesNotContain("recycleBinPurge");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeAccounts"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeAccounts", "职员账号"));

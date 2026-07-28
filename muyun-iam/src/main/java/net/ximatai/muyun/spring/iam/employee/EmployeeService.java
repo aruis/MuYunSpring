@@ -1,10 +1,12 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.DataScopeFieldMappingAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
@@ -18,9 +20,15 @@ import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.exception.PlatformErrors;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
@@ -32,6 +40,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +49,7 @@ import java.util.function.Supplier;
 @Service
 public class EmployeeService extends TenantStandardBusinessService<Employee> implements
         SoftDeleteAbility<Employee>,
+        RecycleBinAbility<Employee>,
         EnableAbility<Employee>,
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
@@ -96,6 +106,46 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     }
 
     @Override
+    public boolean canAccessRecycleBinRecord(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        DataScopeCriteriaResult scope = recycleBinGovernanceScope(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id), true);
+        return withDataScopeTenant(scope,
+                () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
+    }
+
+    @Override
+    public boolean canAccessRecycleBinSourceRecord(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        DataScopeCriteriaResult scope = recycleBinGovernanceScope(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id), false);
+        return withDataScopeTenant(scope,
+                () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
+    }
+
+    /** Applies another employee action's data range to one retained employee root. */
+    public boolean canAccessRecycleBinRecord(ActionExecutionPolicy policy, String id) {
+        if (policy == null || id == null || id.isBlank()) {
+            return false;
+        }
+        Criteria retained = RecycleBinAbility.super.recycleBinCriteria(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id))
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
+        DataScopeCriteriaResult scope = readScopeByPolicy(policy, retained);
+        return withDataScopeTenant(scope,
+                () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
+    }
+
+    @Override
+    public String getDeletionEntityAlias() {
+        return "employee";
+    }
+
+    @Override
     public DataScopeFieldMapping dataScopeFieldMapping() {
         return DATA_SCOPE_FIELD_MAPPING;
     }
@@ -121,10 +171,45 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
             throw BusinessExceptions.warning("iam.employee.department-organization-mismatch",
                     "职员所属部门必须隶属于同一机构");
         }
+        rejectSoftDeletedEmployeeNoConflict(employee);
         rejectDuplicate(employee, Criteria.of()
                         .eq("organizationId", employee.getOrganizationId())
                         .eq("employeeNo", employee.getEmployeeNo()),
                 "employeeNo must be unique within organization: " + employee.getEmployeeNo());
+    }
+
+    private DataScopeCriteriaResult recycleBinGovernanceScope(Criteria criteria, boolean retainedOnly) {
+        Criteria governed = RecycleBinAbility.super.recycleBinCriteria(criteria);
+        if (retainedOnly) {
+            governed.eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
+        }
+        return readScope(PlatformAction.RECYCLE_BIN_QUERY, governed);
+    }
+
+    private void rejectSoftDeletedEmployeeNoConflict(Employee employee) {
+        Criteria criteria = Criteria.of()
+                .eq(StandardEntitySchema.TENANT_ID_FIELD,
+                        Preconditions.requireText(employee.getTenantId(), "employee.tenantId"))
+                .eq("organizationId", employee.getOrganizationId())
+                .eq("employeeNo", employee.getEmployeeNo())
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
+        Employee retained = getDao().query(criteria, PageRequest.of(1, 1)).stream()
+                .filter(existing -> !java.util.Objects.equals(existing.getId(), employee.getId()))
+                .findFirst()
+                .orElse(null);
+        if (retained == null) {
+            return;
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("resourceModuleAlias", MODULE_ALIAS);
+        details.put("resourceRecordId", retained.getId());
+        if (retained.getDeletedAt() != null) {
+            details.put("deletedAt", retained.getDeletedAt());
+        }
+        details.put("recoveryAvailable", Boolean.TRUE);
+        throw PlatformErrors.conflict(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT,
+                "Employee number is retained by a soft-deleted employee; restore it from the recycle bin before reusing it",
+                details);
     }
 
     @Override

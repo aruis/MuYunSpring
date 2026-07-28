@@ -37,10 +37,7 @@ test('record list explorer exposes visible secondary identity text', () => {
   assert.match(crudListSource, /action: \[action: UiRecordInlineAction, record: CrudRecordListBase\]/);
   assert.match(crudListSource, /props\.subtitleOf[\s\S]*\? props\.subtitleOf\(record\)/);
   assert.match(crudListSource, /:item-of="\(record\) => itemOf\?\.\(record as CrudRecordListBase\)"/);
-  assert.match(
-    crudListSource,
-    /:actions-of="\(record\) => actionsOf\?\.\(record as CrudRecordListBase\) \?\? \[\]"/,
-  );
+  assert.match(crudListSource, /:actions-of="\(record\) => recordActions\(record as CrudRecordListBase\)"/);
   assert.match(
     crudListSource,
     /@action="\(action, record\) => handleAction\(action, record as CrudRecordListBase\)"/,
@@ -799,6 +796,9 @@ test('employee management uses organization scope and platform query list panel'
   const employmentRowsSource = readSource('src/views/useEmployeeEmploymentRows.ts');
   assert.match(employmentRowsSource, /expandedEmployeeKeys/);
   assert.match(employmentRowsSource, /\/employment-view/);
+  assert.match(employmentRowsSource, /pathOf\?: \(employeeId: string\) => string/);
+  assert.match(employeeViewSource, /\/recycle-bin\/\$\{encodeURIComponent\(employeeId\)\}\/employment-view/);
+  assert.doesNotMatch(panelSource, /props\.mode === 'normal' && \(props\.expandedRowKeys/);
   assert.match(employmentRowsSource, /handleEmployeeRowExpand/);
   assert.match(employeeViewSource, /<RecordExpandedSubtable[\s\S]*title="任职信息"/);
   const userViewSource = readSource('src/views/UserManagementView.vue');
@@ -1765,6 +1765,39 @@ test('public management and drawer contracts use business roles instead of layou
   for (const source of standardDrawerSources) {
     assert.match(source, /<template #operation>/);
   }
+});
+
+test('record lists reuse their existing region for recycle-bin data and lifecycle actions', () => {
+  const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+  const explorerSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
+  const employeeSource = readSource('src/views/EmployeeManagementView.vue');
+  const tenantSource = readSource('src/views/TenantManagementView.vue');
+  const indexSource = readSource('src/platform-components/index.ts');
+
+  assert.match(panelSource, /export type RecordQueryListMode = 'normal' \| 'recycleBin'/);
+  assert.match(panelSource, /mode\?: RecordQueryListMode/);
+  assert.match(panelSource, /emit\('modeChange', mode === 'normal' \? 'recycleBin' : 'normal'\)/);
+  assert.match(panelSource, /key: 'restore', actionCode: 'recycleBinRestore'/);
+  assert.match(panelSource, /item\.purgeable/);
+  assert.match(panelSource, /key: 'purge', actionCode: 'recycleBinPurge'/);
+  assert.match(employeeSource, /<RecordQueryListPanel/);
+  assert.match(employeeSource, /:mode="employeeListMode"/);
+  assert.match(employeeSource, /@mode-change="changeEmployeeListMode"/);
+  assert.match(employeeSource, /createSoftDeletedConflictErrorHandler/);
+  assert.doesNotMatch(employeeSource, /<RecycleBinPanel/);
+  assert.match(explorerSource, /export type CrudRecordListMode = 'normal' \| 'recycleBin'/);
+  assert.match(explorerSource, /props\.mode === 'recycleBin'/);
+  assert.match(explorerSource, /const requestSeq = \+\+recordsRequestSeq/);
+  assert.match(explorerSource, /requestSeq !== recordsRequestSeq/);
+  assert.match(explorerSource, /key: 'restore'/);
+  assert.match(explorerSource, /recycleBinState\.restore\(item, false\)/);
+  assert.match(tenantSource, /<CrudRecordListExplorer/);
+  assert.match(tenantSource, /:mode="viewMode === 'list' \? 'normal' : 'recycleBin'"/);
+  assert.match(tenantSource, /handleReadonlyListLoaded\(tenants\)/);
+  assert.match(tenantSource, /viewMode === 'recycleBin' \|\| readonly/);
+  assert.doesNotMatch(tenantSource, /<RecycleBinPanel/);
+  assert.doesNotMatch(tenantSource, /recycle-bin-detail-hint/);
+  assert.doesNotMatch(indexSource, /RecycleBinPanel/);
 });
 
 function readSource(path: string) {

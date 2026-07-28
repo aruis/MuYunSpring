@@ -1,7 +1,13 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.boot.platform.ProjectedRecordValues;
+import net.ximatai.muyun.spring.boot.platform.RecordReadVisibility;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -11,6 +17,9 @@ import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * HTTP adapter for the optional operator-facing recycle-bin lifecycle.
@@ -27,12 +36,75 @@ public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbi
 
     @PostMapping("/recycle-bin/query")
     @ActionEndpoint(PlatformAction.RECYCLE_BIN_QUERY)
-    default WebListResponse<RecycleBinItem<T>> recycleBin(@RequestBody(required = false) WebPageRequest request) {
+    default WebPageResponse<RecycleBinItem<?>> recycleBin(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
-            WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request;
-            return new WebListResponse<>(recycleBinFacade().list(service(),
-                    PageRequest.of(page.pageNum(), page.pageSize())));
+            Optional<? extends WebPageResponse<?>> projected = recycleBinProjectedQuery(request);
+            if (projected.isPresent()) {
+                return decorateProjected(projected.get());
+            }
+            WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
+            Criteria criteria = recycleBinQueryCriteria(request);
+            Sort[] sorts = recycleBinQuerySorts(request);
+            PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
+            if (service() instanceof DataScopeAbility<?>) {
+                DataScopeAbility<T> dataScopeAbility = DataScopeAbility.cast(service());
+                DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(
+                        StaticStandardMutationSupport.actionPolicy(this, PlatformAction.RECYCLE_BIN_QUERY), criteria);
+                WebPageResponse<T> response = dataScopeAbility.withDataScopeTenant(scope,
+                        () -> WebPageResponse.from(service().pageRecycleBin(
+                                scope.criteria(), pageRequest, sorts)));
+                return decorateProjected(projectStaticFallback(response));
+            }
+            WebPageResponse<T> response = WebPageResponse.from(
+                    service().pageRecycleBin(criteria, pageRequest, sorts));
+            return decorateProjected(projectStaticFallback(response));
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<? extends WebPageResponse<?>> recycleBinProjectedQuery(WebQueryRequest request) {
+        if (!(this instanceof CrudWeb<?, ?> crudWeb)) {
+            return Optional.empty();
+        }
+        CrudWeb<T, ?> typedCrudWeb = (CrudWeb<T, ?>) crudWeb;
+        return typedCrudWeb.queryStaticProjectedList(request, RecordReadVisibility.RETAINED);
+    }
+
+    private WebPageResponse<RecycleBinItem<?>> decorateProjected(WebPageResponse<?> response) {
+        List<? extends RecycleBinItem<?>> records = decorateRecords(response.records());
+        return new WebPageResponse<>(
+                List.copyOf(records),
+                response.total(), response.pageNum(), response.pageSize(), response.pages(),
+                response.totalKnown(), response.navigation());
+    }
+
+    @SuppressWarnings("unchecked")
+    private WebPageResponse<?> projectStaticFallback(WebPageResponse<T> response) {
+        if (!(this instanceof CrudWeb<?, ?> crudWeb)) {
+            return response;
+        }
+        return ((CrudWeb<T, ?>) crudWeb).projectStaticDefaultList(response);
+    }
+
+    private <R> List<RecycleBinItem<R>> decorateRecords(List<R> records) {
+        return recycleBinFacade().items(service(), records,
+                ProjectedRecordValues::id, ProjectedRecordValues::deletedAt);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Criteria recycleBinQueryCriteria(WebQueryRequest request) {
+        if (this instanceof CrudWeb<?, ?> crudWeb) {
+            return ((CrudWeb<T, ?>) crudWeb).queryCriteria(request);
+        }
+        return Criteria.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Sort[] recycleBinQuerySorts(WebQueryRequest request) {
+        if (this instanceof CrudWeb<?, ?> crudWeb) {
+            return ((CrudWeb<T, ?>) crudWeb).querySorts(request);
+        }
+        return new Sort[0];
     }
 
     @PostMapping("/recycle-bin/{sourceDeleteOperationId}/restore")
@@ -40,4 +112,5 @@ public interface RecycleBinWeb<T extends EntityContract, S extends RecycleBinAbi
     default RestoreReport restoreFromRecycleBin(@PathVariable String sourceDeleteOperationId) {
         return webScope(() -> recycleBinFacade().restore(service(), sourceDeleteOperationId));
     }
+
 }

@@ -47,6 +47,8 @@ class RelationProjectionReadServiceTest {
         when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
                 .thenReturn(List.of(Map.of(
                         "id", "user-1",
+                        "version", 7,
+                        "deletedAt", java.time.Instant.EPOCH,
                         "username", "alice",
                         "employeeNo", "E001",
                         "employeeTitle", "Alice"
@@ -66,15 +68,17 @@ class RelationProjectionReadServiceTest {
         assertThat(page.getRecords()).singleElement()
                 .satisfies(record -> assertThat(record)
                         .containsEntry("employeeNo", "E001")
-                        .doesNotContainKeys("tenantId", "version", "deleted", "passwordStatus", "lastLoginAt"));
+                        .containsEntry("version", 7)
+                        .containsEntry("deletedAt", java.time.Instant.EPOCH)
+                        .doesNotContainKeys("tenantId", "deleted", "passwordStatus", "lastLoginAt"));
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.captor();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.captor();
         org.mockito.Mockito.verify(jdbcOperations).queryForList(sqlCaptor.capture(), paramsCaptor.capture());
         String dataSql = sqlCaptor.getValue();
         assertThat(dataSql.substring(0, dataSql.indexOf(" from (")))
-                .contains("\"id\"", "\"username\"", "\"employeeNo\"", "\"employeeTitle\"")
-                .doesNotContain("\"tenantId\"", "\"version\"", "\"deleted\"");
+                .contains("\"id\"", "\"version\"", "\"deletedAt\"", "\"username\"", "\"employeeNo\"", "\"employeeTitle\"")
+                .doesNotContain("\"tenantId\"", "\"deleted\"");
         assertThat(dataSql)
                 .contains("\"main\".\"password_status\" as \"passwordStatus\"")
                 .contains("\"main\".\"last_login_at\" as \"lastLoginAt\"")

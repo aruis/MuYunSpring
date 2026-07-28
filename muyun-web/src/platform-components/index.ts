@@ -32,6 +32,18 @@ export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
 export { default as RecordTreeSelector } from './RecordTreeSelector.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
+export { useRecycleBinState } from './recycleBinState';
+export type { RecycleBinStateOptions } from './recycleBinState';
+export {
+  createSoftDeletedConflictErrorHandler,
+  extractSoftDeletedConflict,
+  useSoftDeletedConflictHandler,
+} from './softDeletedConflictHandler';
+export type {
+  SoftDeletedConflictHandler,
+  SoftDeletedConflictHandlerOptions,
+  SoftDeletedConflictInfo,
+} from './softDeletedConflictHandler';
 export { default as StaticManagementLayout } from './StaticManagementLayout.vue';
 export { default as TreeRecordExplorer } from './TreeRecordExplorer.vue';
 export {
@@ -59,7 +71,7 @@ export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
 export type { RecordDetailDisplayResolver, RecordDetailDisplayValue } from './recordDetailFieldModel';
 export type { RecordListExplorerRecord } from './RecordListExplorer.vue';
-export type { QueryListRecord, RecordQueryListColumn } from './RecordQueryListPanel.vue';
+export type { QueryListRecord, RecordQueryListColumn, RecordQueryListMode } from './RecordQueryListPanel.vue';
 export type {
   RecordFormFieldDescriptor,
   RecordFormFieldFallback,

@@ -118,6 +118,14 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     mode.value = first || !canCreate.value ? 'view' : 'create';
   }
 
+  function handleReadonlyListLoaded(records: TRecord[]) {
+    const matched = selected.value?.id ? records.find((item) => item.id === selected.value?.id) : undefined;
+    const current = matched ?? records[0];
+    selected.value = current;
+    draft.value = current ? copyRecord(current) : options.emptyDraft();
+    mode.value = 'view';
+  }
+
   function handleSelect(record: TRecord) {
     selected.value = record;
     draft.value = copyRecord(record);
@@ -345,6 +353,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     canEnable,
     canMutate,
     handleListLoaded,
+    handleReadonlyListLoaded,
     handleSelect,
     startCreate,
     startEdit,

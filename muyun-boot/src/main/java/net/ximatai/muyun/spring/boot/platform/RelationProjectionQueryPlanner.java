@@ -107,6 +107,8 @@ public final class RelationProjectionQueryPlanner {
 
         LinkedHashSet<String> responseFields = new LinkedHashSet<>();
         responseFields.add(StandardEntitySchema.ID_FIELD);
+        responseFields.add(StandardEntitySchema.VERSION_FIELD);
+        responseFields.add(StandardEntitySchema.DELETED_AT_FIELD);
         projection.outputFields().stream()
                 .map(ViewFieldRef::fieldName)
                 .forEach(responseFields::add);
@@ -187,6 +189,8 @@ public final class RelationProjectionQueryPlanner {
 
         LinkedHashSet<String> responseFields = new LinkedHashSet<>();
         responseFields.add(StandardEntitySchema.ID_FIELD);
+        responseFields.add(StandardEntitySchema.VERSION_FIELD);
+        responseFields.add(StandardEntitySchema.DELETED_AT_FIELD);
         projection.outputFields().stream()
                 .map(ViewFieldRef::fieldName)
                 .forEach(responseFields::add);

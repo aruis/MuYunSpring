@@ -11,6 +11,13 @@ import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
+import net.ximatai.muyun.spring.platform.deletion.DeletionEntry;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
+import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
+import net.ximatai.muyun.spring.platform.deletion.RestoreEntryResult;
+import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
+import net.ximatai.muyun.spring.platform.deletion.StaticDeletionRecoveryResourceResolver;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
@@ -91,6 +98,12 @@ class MuYunSpringApplicationContextIT {
     @Autowired
     private TenantApplicationService tenantApplicationService;
 
+    @Autowired
+    private StaticDeletionRecoveryResourceResolver staticDeletionRecoveryResourceResolver;
+
+    @Autowired
+    private RecycleBinFacade recycleBinFacade;
+
     private TestRestTemplate restTemplate;
 
     @LocalServerPort
@@ -128,6 +141,50 @@ class MuYunSpringApplicationContextIT {
             assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isTrue();
             assertThat(tenantService.delete(tenantId, tenant.getVersion())).isEqualTo(1);
             assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isFalse();
+        }
+    }
+
+    @Test
+    void shouldRegisterTenantApplicationAsStaticRecoveryResource() {
+        DeletionEntry entry = new DeletionEntry();
+        entry.setResourceModuleAlias(TenantApplicationService.MODULE_ALIAS);
+        entry.setResourceEntityAlias("tenant_application");
+
+        assertThat(tenantApplicationService).isInstanceOf(DeletionRecoveryAbility.class);
+        assertThat(staticDeletionRecoveryResourceResolver.supports(entry)).isTrue();
+        assertThat(staticDeletionRecoveryResourceResolver.resolve(entry)).contains(tenantApplicationService);
+    }
+
+    @Test
+    void shouldRestoreTenantWithItsRequiredIamApplicationThroughRecycleBin() {
+        String tenantId = "tenant_restore_cascade_it";
+        try (TenantContext.Scope ignored = TenantContext.system("integration test tenant restoration")) {
+            Tenant tenant = new Tenant();
+            tenant.setAlias(tenantId);
+            tenant.setTitle("Tenant restore cascade integration test");
+            tenant.setEnabled(Boolean.TRUE);
+            tenantService.insert(tenant);
+
+            assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isTrue();
+            assertThat(tenantService.delete(tenantId, tenant.getVersion())).isEqualTo(1);
+            assertThat(tenantService.select(tenantId)).isNull();
+            assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isFalse();
+
+            RecycleBinItem<Tenant> recycleBinItem = recycleBinFacade.list(tenantService, ALL).stream()
+                    .filter(item -> tenantId.equals(item.record().getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(recycleBinItem.restorable()).isTrue();
+
+            RestoreReport report = recycleBinFacade.restore(
+                    tenantService, recycleBinItem.sourceDeleteOperationId());
+
+            assertThat(report.entries()).hasSize(2);
+            assertThat(report.entries()).allMatch(entry -> entry.status() == RestoreEntryResult.Status.RESTORED);
+            assertThat(report.entries()).extracting(RestoreEntryResult::moduleAlias)
+                    .containsExactlyInAnyOrder(TenantService.MODULE_ALIAS, TenantApplicationService.MODULE_ALIAS);
+            assertThat(tenantService.select(tenantId)).isNotNull();
+            assertThat(tenantApplicationService.isApplicationOpened(tenantId, "iam")).isTrue();
         }
     }
 
@@ -232,9 +289,11 @@ class MuYunSpringApplicationContextIT {
                 .containsEntry("id", projectionUserId(tenantId, "alice"))
                 .containsEntry("username", projectionUsername(tenantId, "alice"))
                 .containsEntry("employeeNo", "E-PROJ-001")
-                .containsEntry("employeeTitle", "Alice Employee");
+                .containsEntry("employeeTitle", "Alice Employee")
+                .containsEntry("version", 0)
+                .containsEntry("deletedAt", null);
         assertThat(alice).containsEntry("passwordStatus", "ACTIVE");
-        assertThat(alice).doesNotContainKeys("tenantId", "version", "deleted", "createdAt");
+        assertThat(alice).doesNotContainKeys("tenantId", "deleted", "createdAt");
         @SuppressWarnings("unchecked")
         Map<String, Object> bob = (Map<String, Object>) firstPage.records().get(1);
         assertThat(bob)

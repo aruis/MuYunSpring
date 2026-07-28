@@ -6,12 +6,31 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleSession;
 import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionResource;
+import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeletionLogLifecycleListenerTest {
+    @Test
+    void shouldPersistStableRootEntityAliasForRecoverableResources() {
+        TestMemoryDao<DeletionOperation> operationDao = new TestMemoryDao<>();
+        TestMemoryDao<DeletionEntry> entryDao = new TestMemoryDao<>();
+        DeletionLogLifecycleListener listener = new DeletionLogLifecycleListener(
+                new DeletionLogService(operationDao, entryDao));
+        RecoveryOperationService service = new RecoveryOperationService();
+        DeletionOperation entity = entity("employee-1");
+        DeletionLifecycleSession journal = listener.open(new DeletionResource(service.getModuleAlias(), entity.getId()));
+        DeletionContext context = DeletionContext.root(service.getModuleAlias(), entity.getId(), journal);
+
+        DeletionNode node = journal.started(service, entity, context, DeletionMode.SOFT);
+        journal.succeeded(service, entity, context, node, DeletionMode.SOFT);
+
+        assertThat(operationDao.findById(context.operationId()).getRootEntityAlias()).isEqualTo("employee");
+        assertThat(entryDao.findById(node.entryId()).getResourceEntityAlias()).isEqualTo("employee");
+    }
+
     @Test
     void shouldPersistOneOperationAndItsRecursiveEntriesWhenRootSucceeds() {
         TestMemoryDao<DeletionOperation> operationDao = new TestMemoryDao<>();
@@ -54,6 +73,18 @@ class DeletionLogLifecycleListenerTest {
     private static final class TestOperationService extends AbstractAbilityService<DeletionOperation> {
         private TestOperationService() {
             super("test.resource", DeletionOperation.class, new TestMemoryDao<>());
+        }
+    }
+
+    private static final class RecoveryOperationService extends AbstractAbilityService<DeletionOperation>
+            implements DeletionRecoveryAbility<DeletionOperation> {
+        private RecoveryOperationService() {
+            super("iam.employee", DeletionOperation.class, new TestMemoryDao<>());
+        }
+
+        @Override
+        public String getDeletionEntityAlias() {
+            return "employee";
         }
     }
 }

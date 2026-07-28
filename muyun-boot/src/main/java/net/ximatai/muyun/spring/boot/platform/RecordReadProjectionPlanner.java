@@ -167,8 +167,9 @@ public final class RecordReadProjectionPlanner {
             throw new IllegalArgumentException("record read projection action module alias mismatch: "
                     + descriptor.moduleAlias() + " != " + actionContext.moduleAlias());
         }
-        if (!PlatformAction.QUERY.matches(actionContext.actionCode())) {
-            throw new IllegalArgumentException("record read projection requires query action context: "
+        if (!PlatformAction.QUERY.matches(actionContext.actionCode())
+                && !PlatformAction.RECYCLE_BIN_QUERY.matches(actionContext.actionCode())) {
+            throw new IllegalArgumentException("record read projection requires list query action context: "
                     + descriptor.moduleAlias() + "." + actionContext.actionCode());
         }
     }

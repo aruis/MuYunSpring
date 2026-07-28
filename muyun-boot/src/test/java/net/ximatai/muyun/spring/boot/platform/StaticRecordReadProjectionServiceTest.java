@@ -4,11 +4,18 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
@@ -26,14 +33,55 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class StaticRecordReadProjectionServiceTest {
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void shouldApplyDataScopeBeforeExplicitRecordVisibilityInSharedListPipeline() {
+        StaticRecordReadProjectionService service = spy(new StaticRecordReadProjectionService(
+                new StaticModuleDefinitionCatalog(List.of())));
+        ScopedRecycleBinAbility recordService = mock(ScopedRecycleBinAbility.class);
+        PageRequest pageRequest = PageRequest.of(1, 20);
+        ActionExecutionPolicy policy = ActionExecutionPolicy.standard(PlatformAction.RECYCLE_BIN_QUERY);
+        Criteria compiled = Criteria.of().eq("requested", true);
+        Criteria scoped = Criteria.of().eq("authorized", true);
+        Criteria retained = Criteria.of().eq("authorized", true).eq("deleted", true);
+        WebPageResponse<Map<String, Object>> expected = WebPageResponse.fromList(List.of(Map.of("id", "record-1")));
+
+        doReturn(true).when(service).supportsDefaultListQuery("iam.sample", recordService);
+        doReturn(compiled).when(service).queryCriteria("iam.sample", recordService, QueryRequest.empty());
+        doReturn(new Sort[0]).when(service).querySorts("iam.sample", recordService, QueryRequest.empty());
+        when(recordService.readScopeByPolicy(policy, compiled))
+                .thenReturn(DataScopeCriteriaResult.restricted(scoped));
+        when(recordService.withDataScopeTenant(any(DataScopeCriteriaResult.class), any(Supplier.class)))
+                .thenAnswer(invocation -> invocation.<Supplier<?>>getArgument(1).get());
+        when(recordService.recycleBinReadCriteria(scoped)).thenReturn(retained);
+        doReturn(Optional.of(expected)).when(service).queryDefaultList(
+                eq("iam.sample"), eq(retained), eq(pageRequest), eq(recordService), any(Sort[].class));
+
+        Optional<WebPageResponse<Map<String, Object>>> result = service.queryDefaultList(
+                "iam.sample", QueryRequest.empty(), pageRequest, recordService, policy, RecordReadVisibility.RETAINED);
+
+        assertThat(result).contains(expected);
+        verify(recordService).readScopeByPolicy(policy, compiled);
+        verify(recordService).recycleBinReadCriteria(scoped);
+    }
+
+    private interface ScopedRecycleBinAbility
+            extends DataScopeAbility<StandardEntity>, RecycleBinAbility<StandardEntity> {
+    }
+
     @Test
     void shouldKeepResponseWhenStaticDefinitionIsMissing() {
         StaticRecordReadProjectionService service = new StaticRecordReadProjectionService(
@@ -102,6 +150,7 @@ class StaticRecordReadProjectionServiceTest {
                         "id", "user-1",
                         "tenantId", "tenant_a",
                         "version", 1,
+                        "deletedAt", java.time.Instant.EPOCH,
                         "username", "alice",
                         "employeeNo", "E001",
                         "employeeTitle", "Alice"
@@ -121,6 +170,8 @@ class StaticRecordReadProjectionServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> output = (Map<String, Object>) response.records().getFirst();
         assertThat(output).containsEntry("employeeNo", "E001");
+        assertThat(output).containsEntry("version", 1);
+        assertThat(output).containsEntry("deletedAt", java.time.Instant.EPOCH);
         assertThat(output).doesNotContainKeys("passwordStatus", "createdAt", "lastLoginAt", "deleted");
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.captor();
         @SuppressWarnings("unchecked")
@@ -131,7 +182,8 @@ class StaticRecordReadProjectionServiceTest {
         assertThat(dataSql).contains("\"id\"", "\"username\"",
                 "\"employeeNo\"", "\"employeeTitle\"", " from (");
         assertThat(dataSql.substring(0, dataSql.indexOf(" from (")))
-                .doesNotContain("\"tenantId\"", "\"version\"", "\"deleted\"");
+                .contains("\"version\"", "\"deletedAt\"")
+                .doesNotContain("\"tenantId\"", "\"deleted\"");
         assertThat(dataSql).contains("\"main\".\"password_status\" as \"passwordStatus\"");
         assertThat(dataSql).contains("\"main\".\"created_at\" as \"createdAt\"");
         assertThat(dataSql).contains("\"main\".\"last_login_at\" as \"lastLoginAt\"");

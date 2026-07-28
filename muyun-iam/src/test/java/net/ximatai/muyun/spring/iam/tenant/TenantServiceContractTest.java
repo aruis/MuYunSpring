@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.iam.tenant;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -109,7 +111,8 @@ class TenantServiceContractTest {
         TenantDao dao = mock(TenantDao.class);
         Tenant deleted = tenant("demo", "演示租户");
         deleted.setDeleted(Boolean.TRUE);
-        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(deleted));
+        when(dao.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(deleted), 1, PageRequest.of(1, 20)));
         TenantService service = new TenantService(dao);
 
         assertThat(service).isInstanceOf(RecycleBinAbility.class);
@@ -120,6 +123,16 @@ class TenantServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThat(service.listRecycleBin(PageRequest.of(1, 20))).containsExactly(deleted);
         }
+    }
+
+    @Test
+    void shouldNotAllowTenantRootPurgeBeforeTenantScopeArchivingExists() {
+        TenantService service = new TenantService(mock(TenantDao.class));
+
+        assertThat(service.isRecycleBinPurgeEnabled()).isFalse();
+        assertThatThrownBy(() -> service.purge("tenant_a"))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("not enabled");
     }
 
     @Test

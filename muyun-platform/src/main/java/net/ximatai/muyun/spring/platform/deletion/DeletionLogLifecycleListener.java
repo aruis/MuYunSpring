@@ -53,7 +53,7 @@ public class DeletionLogLifecycleListener implements DeletionLifecycleListener {
                                     EntityContract entity,
                                     DeletionContext context,
                                     DeletionMode mode) {
-            ensureOperation(context, entity);
+            ensureOperation(context, entity, ability);
             String entryId = Ids.newId();
             DeletionEntry entry = new DeletionEntry();
             entry.setId(entryId);
@@ -101,7 +101,7 @@ public class DeletionLogLifecycleListener implements DeletionLifecycleListener {
             }
         }
 
-        private void ensureOperation(DeletionContext context, EntityContract entity) {
+        private void ensureOperation(DeletionContext context, EntityContract entity, CrudAbility<?> ability) {
             if (operation != null) {
                 return;
             }
@@ -111,6 +111,9 @@ public class DeletionLogLifecycleListener implements DeletionLifecycleListener {
             operation.setOperationType(DeletionOperationType.DELETE);
             operation.setStatus(DeletionOperationStatus.IN_PROGRESS);
             operation.setRootModuleAlias(root.moduleAlias());
+            if (ability instanceof DeletionRecoveryAbility<?> recoveryAbility) {
+                operation.setRootEntityAlias(recoveryAbility.getDeletionEntityAlias());
+            }
             operation.setRootRecordId(root.recordId());
             operation.setOperatorId(CurrentUserContext.currentUser().map(user -> user.userId()).orElse(null));
             operation.setStartedAt(Instant.now());

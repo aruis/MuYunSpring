@@ -929,3 +929,48 @@ export interface DynamicPageDescriptor {
   initialRecord: RecordData;
   records: RecordData[];
 }
+
+// --- Recycle Bin ---
+
+export interface RecycleBinItem<T = Record<string, unknown>> {
+  record: T;
+  sourceDeleteOperationId: string | null;
+  deletedAt: string;
+  restorable: boolean;
+  purgeable: boolean;
+  unavailableReason?: string;
+}
+
+export type RestoreEntryStatus = 'RESTORED' | 'SKIPPED' | 'FAILED';
+
+export interface RestoreEntryResult {
+  sourceEntryId: string;
+  moduleAlias: string;
+  entityAlias: string;
+  recordId: string;
+  status: RestoreEntryStatus;
+  message?: string;
+}
+
+export interface RestoreReport {
+  sourceOperationId: string;
+  restoreOperationId: string;
+  entries: RestoreEntryResult[];
+}
+
+export type PurgeEntryStatus = 'PURGED' | 'SKIPPED' | 'FAILED';
+
+export interface PurgeEntryResult {
+  sourceEntryId: string;
+  moduleAlias: string;
+  entityAlias: string;
+  recordId: string;
+  status: PurgeEntryStatus;
+  message?: string;
+}
+
+export interface PurgeReport {
+  sourceOperationId: string;
+  purgeOperationId: string;
+  entries: PurgeEntryResult[];
+}

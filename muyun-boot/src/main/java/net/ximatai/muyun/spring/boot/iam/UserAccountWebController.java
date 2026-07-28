@@ -448,7 +448,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
             DataScopeAbility<UserAccount> dataScopeAbility = DataScopeAbility.cast(service());
             DataScopeCriteriaResult scope = dataScopeAbility.readScopeByPolicy(selectorPolicy(), criteria);
             return dataScopeAbility.withDataScopeTenant(scope, () -> staticRecordReadProjectionService
-                    .<Map<String, Object>>queryExplicitList(
+                    .queryExplicitList(
                             UserAccountService.MODULE_ALIAS,
                             "user_selector",
                             USER_SELECTOR_OUTPUT_FIELDS,
@@ -460,7 +460,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
                     .map(this::selectorItems)
                     .orElseThrow(this::unavailableUserSelectorProjection));
         }
-        return staticRecordReadProjectionService.<Map<String, Object>>queryExplicitList(
+        return staticRecordReadProjectionService.queryExplicitList(
                         UserAccountService.MODULE_ALIAS,
                         "user_selector",
                         USER_SELECTOR_OUTPUT_FIELDS,

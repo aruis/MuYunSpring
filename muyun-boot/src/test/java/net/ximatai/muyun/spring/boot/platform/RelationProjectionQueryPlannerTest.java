@@ -50,8 +50,8 @@ class RelationProjectionQueryPlannerTest {
                 "username", "passwordStatus");
         assertThat(plan.queryableFields()).doesNotContain("employeeNo", "employeeTitle");
         assertThat(plan.responseFields()).containsExactlyInAnyOrder(
-                "id", "username", "employeeNo", "employeeTitle");
-        assertThat(plan.responseFields()).doesNotContain("tenantId", "version", "deleted");
+                "id", "version", "deletedAt", "username", "employeeNo", "employeeTitle");
+        assertThat(plan.responseFields()).doesNotContain("tenantId", "deleted");
         assertThat(plan.relationOutputFields()).extracting(ViewFieldRef::fieldName)
                 .containsExactly("employeeNo", "employeeTitle");
         assertThat(plan.baseSql())
@@ -112,7 +112,8 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.queryableFields()).contains("id", "username", "employeeNo");
         assertThat(plan.queryableFields()).doesNotContain("employeeTitle");
         assertThat(plan.sortableFields()).contains("id", "username", "employeeNo", "employeeTitle");
-        assertThat(plan.responseFields()).containsExactlyInAnyOrder("id", "username", "employeeNo", "employeeTitle");
+        assertThat(plan.responseFields()).containsExactlyInAnyOrder(
+                "id", "version", "deletedAt", "username", "employeeNo", "employeeTitle");
         assertThat(plan.baseSql())
                 .contains("left join \"public\".\"iam_employee_account\" \"user_id\"")
                 .contains("\"main\".\"id\" = \"user_id\".\"user_id\"")
@@ -163,6 +164,8 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.hasRelationProjection()).isTrue();
         assertThat(plan.responseFields()).containsExactlyInAnyOrder(
                 "id",
+                "version",
+                "deletedAt",
                 "username",
                 "employeeId",
                 "employeeNo",
@@ -235,7 +238,7 @@ class RelationProjectionQueryPlannerTest {
         assertThat(plan.queryableFields()).doesNotContain("organizationTitle");
         assertThat(plan.sortableFields()).contains("organizationTitle");
         assertThat(plan.responseFields()).containsExactlyInAnyOrder(
-                "id", "employeeNo", "organizationTitle", "title");
+                "id", "version", "deletedAt", "employeeNo", "organizationTitle", "title");
         assertThat(plan.baseSql())
                 .contains("left join \"public\".\"iam_organization\" \"organization\"")
                 .contains("\"main\".\"organization_id\" = \"organization\".\"id\"")
@@ -301,7 +304,8 @@ class RelationProjectionQueryPlannerTest {
                 .filteredOn(edge -> edge.edgeKind() == ProjectionGraphEdgeKind.REFERENCE_JOIN)
                 .singleElement()
                 .satisfies(edge -> assertThat(edge.tableAlias()).isEqualTo("customer_id"));
-        assertThat(plan.responseFields()).containsExactlyInAnyOrder("id", "orderNo", "customerTitle");
+        assertThat(plan.responseFields()).containsExactlyInAnyOrder(
+                "id", "version", "deletedAt", "orderNo", "customerTitle");
         assertThat(plan.baseSql())
                 .contains("from \"public\".\"crm_order\" \"main\"")
                 .contains("left join \"public\".\"crm_customer\" \"customer_id\"")
