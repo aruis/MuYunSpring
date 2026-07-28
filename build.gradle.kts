@@ -61,3 +61,19 @@ subprojects {
         "testAnnotationProcessor"(rootProject.libs.lombok)
     }
 }
+
+val unitTestTasks = subprojects.map { it.tasks.named<Test>("test") }
+val integrationTestTasks = subprojects.map { it.tasks.named<Test>("integrationTest") }
+
+integrationTestTasks.forEach { integrationTest ->
+    integrationTest.configure {
+        mustRunAfter(unitTestTasks)
+    }
+}
+
+tasks.register("verifyAll") {
+    description = "Runs all backend unit and integration tests across subprojects."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(unitTestTasks)
+    dependsOn(integrationTestTasks)
+}

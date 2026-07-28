@@ -236,5 +236,5 @@ npm run build:business-example
 后端仍使用仓库默认验证：
 
 ```bash
-./gradlew test
+./gradlew verifyAll
 ```
