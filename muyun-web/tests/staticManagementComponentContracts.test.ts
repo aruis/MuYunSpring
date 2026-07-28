@@ -1784,7 +1784,7 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
     panelSource,
     /canQueryRecycleBinAvailable = computed\(\(\) => canQueryRecycleBin\(props\.context\)\)/,
   );
-  assert.match(panelSource, /refreshRecycleBinSummary\(queryRequest\)/);
+  assert.match(panelSource, /refreshRecycleBinSummary\(\)/);
   assert.match(panelSource, /if \(canQueryRecycleBinAvailable\.value\)/);
   assert.match(panelSource, /<footer class="record-query-list-pagination">[\s\S]*recycleBinEnabled/);
   assert.match(panelSource, /record-query-list-pagination-controls/);

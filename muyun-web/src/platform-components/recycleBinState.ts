@@ -72,14 +72,14 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     }
   }
 
-  async function refreshSummary(request: WebQueryRequest = lastRequest): Promise<number | undefined> {
+  async function refreshSummary(): Promise<number | undefined> {
     const requestSeq = ++summaryRequestSeq;
     const context = toValue(options.context);
     try {
       const response = await context.http.request<WebPageResponse<RecycleBinItem<TRecord>>>({
         method: 'POST',
         path: `/${context.moduleAlias}/recycle-bin/query`,
-        body: summaryRequest(request),
+        body: { page: { pageNum: 1, pageSize: 1 }, conditions: [], sorts: [] },
       });
       if (requestSeq !== summaryRequestSeq) return undefined;
       summaryTotal.value = response.total;
@@ -157,15 +157,6 @@ function defaultQueryRequest(): WebQueryRequest {
     page: { pageNum: 1, pageSize: 200 },
     conditions: [],
     sorts: [],
-  };
-}
-
-function summaryRequest(request: WebQueryRequest): WebQueryRequest {
-  return {
-    ...request,
-    page: { pageNum: 1, pageSize: 1 },
-    conditions: request.conditions ?? [],
-    sorts: request.sorts ?? [],
   };
 }
 
