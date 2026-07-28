@@ -1770,12 +1770,37 @@ test('public management and drawer contracts use business roles instead of layou
 test('record lists reuse their existing region for recycle-bin data and lifecycle actions', () => {
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
   const explorerSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
+  const recycleBinButtonSource = readSource('src/platform-components/RecycleBinModeButton.vue');
+  const explorerPanelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
+  const staticLayoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
   const employeeSource = readSource('src/views/EmployeeManagementView.vue');
   const tenantSource = readSource('src/views/TenantManagementView.vue');
   const indexSource = readSource('src/platform-components/index.ts');
 
   assert.match(panelSource, /export type RecordQueryListMode = 'normal' \| 'recycleBin'/);
   assert.match(panelSource, /mode\?: RecordQueryListMode/);
+  assert.match(panelSource, /hasRecycleBinAbility\(props\.context\)/);
+  assert.match(
+    panelSource,
+    /canQueryRecycleBinAvailable = computed\(\(\) => canQueryRecycleBin\(props\.context\)\)/,
+  );
+  assert.match(panelSource, /<footer class="record-query-list-pagination">[\s\S]*recycleBinEnabled/);
+  assert.match(panelSource, /record-query-list-pagination-controls/);
+  assert.match(panelSource, /RecycleBinModeButton/);
+  assert.match(recycleBinButtonSource, /props\.hasRecords === true/);
+  assert.match(recycleBinButtonSource, /count\?: number/);
+  assert.match(recycleBinButtonSource, /class="recycle-bin-mode-badge"/);
+  assert.match(recycleBinButtonSource, /visualState === 'expression' && props\.count > 0/);
+  assert.match(recycleBinButtonSource, /border-color: var\(--muyun-border-subtle\)/);
+  assert.match(recycleBinButtonSource, /'standard' \| 'expression' \| 'selected'/);
+  assert.match(recycleBinButtonSource, /is-expression/);
+  assert.match(recycleBinButtonSource, /is-selected/);
+  assert.match(recycleBinButtonSource, /border-color: var\(--muyun-danger-border\)/);
+  assert.match(recycleBinButtonSource, /min-width: 14px/);
+  assert.match(recycleBinButtonSource, /font-size: 9px/);
+  assert.match(recycleBinButtonSource, /:danger="visualState === 'selected'"/);
+  assert.match(recycleBinButtonSource, /visualState === 'selected' \? 'reload' : 'delete'/);
+  assert.doesNotMatch(panelSource, /record-query-list-actions">[\s\S]{0,320}recycleBinEnabled/);
   assert.match(panelSource, /emit\('modeChange', mode === 'normal' \? 'recycleBin' : 'normal'\)/);
   assert.match(panelSource, /key: 'restore', actionCode: 'recycleBinRestore'/);
   assert.match(panelSource, /item\.purgeable/);
@@ -1786,14 +1811,25 @@ test('record lists reuse their existing region for recycle-bin data and lifecycl
   assert.match(employeeSource, /createSoftDeletedConflictErrorHandler/);
   assert.doesNotMatch(employeeSource, /<RecycleBinPanel/);
   assert.match(explorerSource, /export type CrudRecordListMode = 'normal' \| 'recycleBin'/);
+  assert.match(explorerSource, /hasRecycleBinAbility\(props\.context\)/);
   assert.match(explorerSource, /props\.mode === 'recycleBin'/);
   assert.match(explorerSource, /const requestSeq = \+\+recordsRequestSeq/);
   assert.match(explorerSource, /requestSeq !== recordsRequestSeq/);
   assert.match(explorerSource, /key: 'restore'/);
   assert.match(explorerSource, /recycleBinState\.restore\(item, false\)/);
   assert.match(tenantSource, /<CrudRecordListExplorer/);
+  assert.match(tenantSource, /canQueryRecycleBin\(tenantContext\)/);
+  assert.match(tenantSource, /recycleBinEnabled && viewMode === 'list' && canQueryTenantRecycleBin/);
+  assert.match(tenantSource, /<template #explorer-footer>[\s\S]*回收站/);
+  assert.match(tenantSource, /RecycleBinModeButton/);
+  assert.match(tenantSource, /@recycle-bin-summary/);
+  assert.match(tenantSource, /:count="recycleBinTotal"/);
+  assert.doesNotMatch(tenantSource, /<template #explorer-actions>[\s\S]{0,320}recycleBinQuery/);
+  assert.match(explorerPanelSource, /<slot name="footer" \/>/);
+  assert.match(staticLayoutSource, /<slot name="explorer-footer" \/>/);
   assert.match(tenantSource, /:mode="viewMode === 'list' \? 'normal' : 'recycleBin'"/);
   assert.match(tenantSource, /handleReadonlyListLoaded\(tenants\)/);
+  assert.match(employeeSource, /mode === 'recycleBin' && !canQueryRecycleBin\(employeeListContext\.value\)/);
   assert.match(tenantSource, /viewMode === 'recycleBin' \|\| readonly/);
   assert.doesNotMatch(tenantSource, /<RecycleBinPanel/);
   assert.doesNotMatch(tenantSource, /recycle-bin-detail-hint/);

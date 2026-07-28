@@ -24,10 +24,16 @@ import type {
   WebSort,
   RecycleBinItem,
 } from '@muyun/web-contracts';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import {
+  canQueryRecycleBin,
+  hasRecycleBinAbility,
+  normalizeError,
+  type ModuleContext,
+} from '@muyun/web-core';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 import DateTimeText from './DateTimeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
+import RecycleBinModeButton from './RecycleBinModeButton.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 import {
   mergeRecordActions,
@@ -100,8 +106,6 @@ const props = withDefaults(
     emptyDescription?: string;
     waitingDescription?: string;
     mode?: RecordQueryListMode;
-    recycleBinEnabled?: boolean;
-    recycleBinTitle?: string;
   }>(),
   {
     rowKey: 'id',
@@ -128,8 +132,6 @@ const props = withDefaults(
     emptyDescription: '暂无记录',
     waitingDescription: '请选择查询范围',
     mode: 'normal',
-    recycleBinEnabled: false,
-    recycleBinTitle: '回收站',
   },
 );
 
@@ -176,6 +178,12 @@ const fieldOptions = computed<Option[]>(() =>
   })),
 );
 const conditionCount = computed(() => activeConditions.value.length);
+const recycleBinHasRecords = computed<boolean | undefined>(() => {
+  const total = recycleBinState.summaryTotal.value;
+  return total === undefined ? undefined : total > 0;
+});
+const recycleBinEnabled = computed(() => hasRecycleBinAbility(props.context));
+const canQueryRecycleBinAvailable = computed(() => canQueryRecycleBin(props.context));
 const quickSearchEnabled = computed(() => schema.value?.quickSearch.enabled === true);
 const quickSearchDisabled = computed(() => !queryReady.value || !quickSearchEnabled.value);
 const queryActionsDisabled = computed(() => !queryReady.value);
@@ -234,7 +242,9 @@ const booleanOptions: Option[] = [
   { label: '否', value: 'false' },
 ];
 
-onMounted(loadSchemaAndRecords);
+onMounted(() => {
+  void loadSchemaAndRecords();
+});
 
 watch(
   () => props.reloadKey,
@@ -383,6 +393,7 @@ async function loadRecords(updateLoading = true) {
     pageNum.value = response.pageNum;
     pageSize.value = response.pageSize;
     emit('loaded', response.records);
+    refreshRecycleBinSummary();
   } catch (cause) {
     if (requestSeq !== recordsRequestSeq) {
       return;
@@ -395,6 +406,12 @@ async function loadRecords(updateLoading = true) {
     if (updateLoading && requestSeq === recordsRequestSeq) {
       loading.value = false;
     }
+  }
+}
+
+function refreshRecycleBinSummary() {
+  if (recycleBinEnabled.value) {
+    void recycleBinState.refreshSummary();
   }
 }
 
@@ -863,14 +880,6 @@ defineExpose({ refresh });
         <span>{{ title }}</span>
       </UiButton>
       <div class="record-query-list-actions">
-        <UiButton
-          v-if="recycleBinEnabled && (mode === 'recycleBin' || context.can('recycleBinQuery') === true)"
-          type="text"
-          icon-name="delete"
-          @click="emit('modeChange', mode === 'normal' ? 'recycleBin' : 'normal')"
-        >
-          {{ mode === 'normal' ? recycleBinTitle : '返回列表' }}
-        </UiButton>
         <RecordActionBar
           v-if="panelActions.length > 0"
           :context="context"
@@ -1025,22 +1034,31 @@ defineExpose({ refresh });
     </section>
 
     <footer class="record-query-list-pagination">
-      <span>共 {{ total }} 条</span>
-      <UiSelect
-        class="record-query-list-page-size"
-        :value="pageSize"
-        :options="pageSizeOptions"
-        :allow-clear="false"
-        :disabled="queryActionsDisabled"
-        @update:value="handlePageSizeChange"
+      <RecycleBinModeButton
+        v-if="recycleBinEnabled && (mode === 'recycleBin' || canQueryRecycleBinAvailable)"
+        :active="mode === 'recycleBin'"
+        :has-records="recycleBinHasRecords"
+        :count="recycleBinState.summaryTotal.value"
+        @click="emit('modeChange', mode === 'normal' ? 'recycleBin' : 'normal')"
       />
-      <UiButton :disabled="queryActionsDisabled || pageNum <= 1" @click="goPage(pageNum - 1)">
-        上一页
-      </UiButton>
-      <span>第 {{ pageNum }} / {{ pages }} 页</span>
-      <UiButton :disabled="queryActionsDisabled || pageNum >= pages" @click="goPage(pageNum + 1)">
-        下一页
-      </UiButton>
+      <div class="record-query-list-pagination-controls">
+        <span>共 {{ total }} 条</span>
+        <UiSelect
+          class="record-query-list-page-size"
+          :value="pageSize"
+          :options="pageSizeOptions"
+          :allow-clear="false"
+          :disabled="queryActionsDisabled"
+          @update:value="handlePageSizeChange"
+        />
+        <UiButton :disabled="queryActionsDisabled || pageNum <= 1" @click="goPage(pageNum - 1)">
+          上一页
+        </UiButton>
+        <span>第 {{ pageNum }} / {{ pages }} 页</span>
+        <UiButton :disabled="queryActionsDisabled || pageNum >= pages" @click="goPage(pageNum + 1)">
+          下一页
+        </UiButton>
+      </div>
     </footer>
   </main>
 </template>
@@ -1104,7 +1122,8 @@ defineExpose({ refresh });
 
 .record-query-list-actions,
 .record-query-condition-actions,
-.record-query-list-pagination {
+.record-query-list-pagination,
+.record-query-list-pagination-controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1210,9 +1229,12 @@ defineExpose({ refresh });
 
 .record-query-list-pagination {
   grid-area: pagination;
-  justify-content: flex-end;
   color: var(--muyun-text-muted);
   font-size: 13px;
+}
+
+.record-query-list-pagination-controls {
+  margin-left: auto;
 }
 
 .record-query-list-page-size {
@@ -1222,7 +1244,8 @@ defineExpose({ refresh });
 @media (max-width: 900px) {
   .record-query-list-header,
   .record-query-list-actions,
-  .record-query-list-pagination {
+  .record-query-list-pagination,
+  .record-query-list-pagination-controls {
     display: grid;
     grid-template-columns: 1fr;
     justify-items: stretch;

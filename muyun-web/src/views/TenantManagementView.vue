@@ -9,13 +9,14 @@ import {
   RecordMetaSection,
   presentPlatformError,
   RecordStatusSwitch,
+  RecycleBinModeButton,
   StaticManagementLayout,
   createSoftDeletedConflictErrorHandler,
   type RecordActionItem,
   type RecordExplorerItemDescriptor,
 } from '@muyun/platform-components';
 import type { Application, Tenant, TenantApplication, WebPageResponse } from '@muyun/web-contracts';
-import { useModuleContext } from '@muyun/web-core';
+import { canQueryRecycleBin, hasRecycleBinAbility, useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiButton, UiDataTable, UiInput } from '@muyun/vue-ui-antdv';
 import type { UiDataTableColumn, UiDataTableRecord } from '@muyun/vue-ui-antdv';
 import { createTenantManagementState } from './tenantManagementState';
@@ -28,6 +29,9 @@ const tenantContext = useModuleContext<Tenant>();
 const applicationContext = useModuleContext<Application>({ moduleAlias: 'platform.application' });
 const viewMode = ref<TenantViewMode>('list');
 const explorerSearchKeyword = ref('');
+const recycleBinTotal = ref<number>();
+const recycleBinEnabled = computed(() => hasRecycleBinAbility(tenantContext));
+const canQueryTenantRecycleBin = computed(() => canQueryRecycleBin(tenantContext));
 const applications = ref<Application[]>([]);
 const applicationsLoading = ref(false);
 const tenantApplications = ref<TenantApplication[]>([]);
@@ -244,7 +248,7 @@ function tenantApplicationsPath(tenantId: string) {
 }
 
 function switchToRecycleBin() {
-  if (tenantContext.can('recycleBinQuery') !== true) return;
+  if (!canQueryRecycleBin(tenantContext)) return;
   resetTenantSelection();
   explorerSearchKeyword.value = '';
   viewMode.value = 'recycleBin';
@@ -285,14 +289,6 @@ const recycleBinReloadKey = ref(0);
     @refresh="handleRefresh"
   >
     <template #explorer-actions>
-      <UiButton
-        v-if="viewMode === 'list' && tenantContext.can('recycleBinQuery') === true"
-        icon-name="delete"
-        type="text"
-        title="回收站"
-        @click="switchToRecycleBin"
-      />
-      <UiButton v-else type="text" title="返回租户列表" @click="switchToList"> 返回列表 </UiButton>
       <ModuleActionButton
         v-if="viewMode === 'list'"
         class="record-panel-create-button"
@@ -301,6 +297,19 @@ const recycleBinReloadKey = ref(0);
         title="新建租户"
         icon-only
         @click="startCreate"
+      />
+    </template>
+    <template #explorer-footer>
+      <RecycleBinModeButton
+        v-if="recycleBinEnabled && viewMode === 'list' && canQueryTenantRecycleBin"
+        :has-records="recycleBinTotal === undefined ? undefined : recycleBinTotal > 0"
+        :count="recycleBinTotal"
+        @click="switchToRecycleBin"
+      />
+      <RecycleBinModeButton
+        v-else-if="recycleBinEnabled && viewMode === 'recycleBin'"
+        active
+        @click="switchToList"
       />
     </template>
     <template #explorer>
@@ -314,6 +323,7 @@ const recycleBinReloadKey = ref(0);
         :loading-tip="viewMode === 'list' ? '加载租户列表' : '加载回收站'"
         fallback-title="未命名租户"
         :item-of="tenantItemOf"
+        @recycle-bin-summary="recycleBinTotal = $event"
         @select="handleTenantSelect"
         @loaded="handleLoaded"
       />

@@ -22,10 +22,12 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
   const acting = ref(false);
   const actingOperationId = ref<string>();
   const total = ref(0);
+  const summaryTotal = ref<number>();
   const pageNum = ref(1);
   const pageSize = ref(20);
   let lastRequest: WebQueryRequest = defaultQueryRequest();
   let loadRequestSeq = 0;
+  let summaryRequestSeq = 0;
 
   if (options.reloadKey) {
     watch(options.reloadKey, () => void load());
@@ -55,6 +57,7 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
       if (requestSeq !== loadRequestSeq) return false;
       items.value = response.records;
       total.value = response.total;
+      summaryTotal.value = response.total;
       pageNum.value = response.pageNum;
       pageSize.value = response.pageSize;
       return true;
@@ -66,6 +69,24 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
       return false;
     } finally {
       if (requestSeq === loadRequestSeq) loading.value = false;
+    }
+  }
+
+  async function refreshSummary(): Promise<number | undefined> {
+    const requestSeq = ++summaryRequestSeq;
+    const context = toValue(options.context);
+    try {
+      const response = await context.http.request<WebPageResponse<RecycleBinItem<TRecord>>>({
+        method: 'POST',
+        path: `/${context.moduleAlias}/recycle-bin/query`,
+        body: { page: { pageNum: 1, pageSize: 1 }, conditions: [], sorts: [] },
+      });
+      if (requestSeq !== summaryRequestSeq) return undefined;
+      summaryTotal.value = response.total;
+      return response.total;
+    } catch {
+      if (requestSeq === summaryRequestSeq) summaryTotal.value = undefined;
+      return undefined;
     }
   }
 
@@ -119,11 +140,13 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     acting,
     actingOperationId,
     total,
+    summaryTotal,
     pageNum,
     pageSize,
     isEmpty,
     recordTitleOf,
     load,
+    refreshSummary,
     restore,
     purge,
   };

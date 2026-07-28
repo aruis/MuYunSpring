@@ -64,6 +64,29 @@ test('recycle bin state returns empty when no deleted items', async () => {
   assert.equal(state.isEmpty.value, true);
 });
 
+test('recycle bin state refreshes a lightweight summary without replacing loaded items', async () => {
+  const context = createContext({
+    request: async (options) => {
+      assert.deepEqual(options.body, { page: { pageNum: 1, pageSize: 1 }, conditions: [], sorts: [] });
+      return { records: [{ record: { id: 'tenant_a' } }], total: 3, pageNum: 1, pageSize: 1 };
+    },
+  });
+  const state = useRecycleBinState({ context });
+  state.items.value = [
+    {
+      record: { id: 'loaded_tenant' },
+      sourceDeleteOperationId: 'op-loaded',
+      deletedAt: '2024-01-15T10:30:00Z',
+      restorable: true,
+      purgeable: false,
+    },
+  ];
+
+  assert.equal(await state.refreshSummary(), 3);
+  assert.equal(state.summaryTotal.value, 3);
+  assert.equal(state.items.value[0].record.id, 'loaded_tenant');
+});
+
 test('recycle bin state restores item and reloads list', async () => {
   const calls: string[] = [];
   const restoreReport: RestoreReport = {

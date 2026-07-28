@@ -48,6 +48,9 @@ const emit = defineEmits<{
           <slot name="explorer-actions" />
         </template>
         <slot name="explorer" />
+        <template v-if="$slots['explorer-footer']" #footer>
+          <slot name="explorer-footer" />
+        </template>
       </RecordExplorerPanel>
     </ManagementExplorerColumn>
 
