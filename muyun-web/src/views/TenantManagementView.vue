@@ -244,7 +244,9 @@ function tenantApplicationsPath(tenantId: string) {
 }
 
 function switchToRecycleBin() {
+  if (tenantContext.can('recycleBinQuery') !== true) return;
   resetTenantSelection();
+  explorerSearchKeyword.value = '';
   viewMode.value = 'recycleBin';
 }
 
@@ -284,7 +286,7 @@ const recycleBinReloadKey = ref(0);
   >
     <template #explorer-actions>
       <UiButton
-        v-if="viewMode === 'list'"
+        v-if="viewMode === 'list' && tenantContext.can('recycleBinQuery') === true"
         icon-name="delete"
         type="text"
         title="回收站"

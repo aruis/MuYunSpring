@@ -333,6 +333,37 @@ test('recycle bin state only applies the latest load response', async () => {
   assert.equal(state.loading.value, false);
 });
 
+test('recycle bin state follows a replaced module context and ignores the old response', async () => {
+  let resolveOld: ((response: unknown) => void) | undefined;
+  const oldContext = createContext({
+    request: () => new Promise((resolve) => (resolveOld = resolve)),
+  });
+  const newContext = {
+    ...createContext({
+      request: async (options) => {
+        assert.equal(options.path, '/iam.employee/recycle-bin/query');
+        return {
+          records: [{ record: { id: 'employee-1', title: '新上下文' } }],
+          total: 1,
+          pageNum: 1,
+          pageSize: 20,
+        };
+      },
+    }),
+    moduleAlias: 'iam.employee',
+  } as ModuleContext<Tenant>;
+  let currentContext = oldContext;
+  const state = useRecycleBinState({ context: () => currentContext });
+
+  const oldLoad = state.load();
+  currentContext = newContext;
+  assert.equal(await state.load(), true);
+  resolveOld?.({ records: [{ record: { id: 'stale', title: '旧上下文' } }], total: 1 });
+
+  assert.equal(await oldLoad, false);
+  assert.equal(state.items.value[0]?.record.id, 'employee-1');
+});
+
 test('recycle bin state handles restore failure and resets acting state', async () => {
   const context = createContext({
     request: async (options) => {

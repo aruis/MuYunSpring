@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformErrors;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeFieldMapping;
@@ -109,8 +110,32 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         if (id == null || id.isBlank()) {
             return false;
         }
-        DataScopeCriteriaResult scope = recycleBinScope(Criteria.of()
-                .eq(StandardEntitySchema.ID_FIELD, id));
+        DataScopeCriteriaResult scope = recycleBinGovernanceScope(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id), true);
+        return withDataScopeTenant(scope,
+                () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
+    }
+
+    @Override
+    public boolean canAccessRecycleBinSourceRecord(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        DataScopeCriteriaResult scope = recycleBinGovernanceScope(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id), false);
+        return withDataScopeTenant(scope,
+                () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
+    }
+
+    /** Applies another employee action's data range to one retained employee root. */
+    public boolean canAccessRecycleBinRecord(ActionExecutionPolicy policy, String id) {
+        if (policy == null || id == null || id.isBlank()) {
+            return false;
+        }
+        Criteria retained = RecycleBinAbility.super.recycleBinCriteria(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id))
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
+        DataScopeCriteriaResult scope = readScopeByPolicy(policy, retained);
         return withDataScopeTenant(scope,
                 () -> !getDao().query(scope.criteria(), PageRequest.of(1, 1)).isEmpty());
     }
@@ -153,10 +178,12 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 "employeeNo must be unique within organization: " + employee.getEmployeeNo());
     }
 
-    private DataScopeCriteriaResult recycleBinScope(Criteria criteria) {
-        Criteria retained = RecycleBinAbility.super.recycleBinCriteria(criteria)
-                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
-        return readScope(PlatformAction.RECYCLE_BIN_QUERY, retained);
+    private DataScopeCriteriaResult recycleBinGovernanceScope(Criteria criteria, boolean retainedOnly) {
+        Criteria governed = RecycleBinAbility.super.recycleBinCriteria(criteria);
+        if (retainedOnly) {
+            governed.eq(StandardEntitySchema.DELETED_FIELD, Boolean.TRUE);
+        }
+        return readScope(PlatformAction.RECYCLE_BIN_QUERY, governed);
     }
 
     private void rejectSoftDeletedEmployeeNoConflict(Employee employee) {

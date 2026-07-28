@@ -75,6 +75,22 @@ public interface RecycleBinAbility<T extends EntityContract> extends SoftDeleteA
     }
 
     /**
+     * Checks the governance range of a source root even after a successful restore changed its
+     * deleted state. Purge traversal keeps the root retained until descendants are complete, so
+     * the same contract also guards retryable purge operations.
+     */
+    default boolean canAccessRecycleBinSourceRecord(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        if (canAccessRecycleBinRecord(id)) {
+            return true;
+        }
+        return !getDao().query(recycleBinCriteria(Criteria.of()
+                .eq(StandardEntitySchema.ID_FIELD, id)), PageRequest.of(1, 1)).isEmpty();
+    }
+
+    /**
      * Whether this resource has explicitly enabled irreversible cleanup.
      *
      * <p>This is deliberately separate from {@link #beforeRecycleBinPurge(String)} so delivery

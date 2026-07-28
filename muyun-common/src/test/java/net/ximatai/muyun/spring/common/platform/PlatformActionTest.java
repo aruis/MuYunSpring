@@ -49,4 +49,14 @@ class PlatformActionTest {
                         java.util.Set.of(), java.util.Optional.empty()).permissionCode())
                 .isEqualTo("sales.contract:view");
     }
+
+    @Test
+    void shouldUseRecycleBinQueryAsTheIndependentGovernanceDataRange() {
+        assertThat(PlatformAction.RECYCLE_BIN_QUERY.dataAuth()).isTrue();
+        assertThat(PlatformAction.RECYCLE_BIN_RESTORE.dataAuth()).isFalse();
+        assertThat(PlatformAction.RECYCLE_BIN_PURGE.dataAuth()).isFalse();
+        assertThat(PlatformAction.RECYCLE_BIN_QUERY.permissionActionCode()).isEqualTo("recycleBinQuery");
+        assertThat(PlatformAction.RECYCLE_BIN_RESTORE.permissionActionCode()).isEqualTo("recycleBinRestore");
+        assertThat(PlatformAction.RECYCLE_BIN_PURGE.permissionActionCode()).isEqualTo("recycleBinPurge");
+    }
 }

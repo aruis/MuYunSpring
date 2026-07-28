@@ -50,7 +50,7 @@ public enum PlatformAction {
 
     RECYCLE_BIN_QUERY(PlatformActionGroup.RECYCLE_BIN, "recycleBinQuery", "platform.action.recycle-bin-query",
             "查询回收站", "Recycle Bin Query", PlatformActionLevel.LIST, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     RECYCLE_BIN_RESTORE(PlatformActionGroup.RECYCLE_BIN, "recycleBinRestore", "platform.action.recycle-bin-restore",
             "恢复回收站数据", "Recycle Bin Restore", PlatformActionLevel.LIST, 20,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),

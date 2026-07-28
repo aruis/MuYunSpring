@@ -58,7 +58,7 @@ public class RecycleBinFacade {
             throw new PlatformException("Recycle-bin restore requires a successful root delete operation for "
                     + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
         }
-        if (!ability.canAccessRecycleBinRecord(source.getRootRecordId())) {
+        if (!ability.canAccessRecycleBinSourceRecord(source.getRootRecordId())) {
             throw new PlatformException("Recycle-bin record is unavailable: " + ability.getModuleAlias());
         }
         return restoreCoordinator.restore(sourceDeleteOperationId);
@@ -74,7 +74,7 @@ public class RecycleBinFacade {
             throw new PlatformException("Recycle-bin purge requires a successful root delete operation for "
                     + ability.getModuleAlias() + ": " + sourceDeleteOperationId);
         }
-        if (!ability.canAccessRecycleBinRecord(source.getRootRecordId())) {
+        if (!ability.canAccessRecycleBinSourceRecord(source.getRootRecordId())) {
             throw new PlatformException("Recycle-bin record is unavailable: " + ability.getModuleAlias());
         }
         return purgeCoordinator.purge(sourceDeleteOperationId);

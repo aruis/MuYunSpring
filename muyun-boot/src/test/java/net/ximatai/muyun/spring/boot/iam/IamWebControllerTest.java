@@ -1224,12 +1224,15 @@ class IamWebControllerTest {
     void shouldReadEmploymentProjectionForVisibleRecycleBinEmployee() throws Exception {
         EmployeeService employeeService = mock(EmployeeService.class);
         EmployeeEmploymentReadService employmentReadService = mock(EmployeeEmploymentReadService.class);
+        net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService actionPolicyService =
+                mock(net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService.class);
         EmployeeWebController controller = new EmployeeWebController(
                 mock(EmployeePositionService.class),
                 mock(EmployeeAccountService.class),
                 mock(EmployeeDelegationService.class));
         ReflectionTestUtils.setField(controller, "service", employeeService);
         controller.setEmployeeEmploymentReadService(employmentReadService);
+        controller.setActionExecutionPolicyService(actionPolicyService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -1246,8 +1249,10 @@ class IamWebControllerTest {
                         "position-1", "Developer", true, true, "alice");
 
         when(employeeService.canAccessRecycleBinRecord("employee-1")).thenReturn(true);
+        when(employeeService.canAccessRecycleBinRecord(any(net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy.class),
+                org.mockito.ArgumentMatchers.eq("employee-1"))).thenReturn(true);
         when(employeeService.selectIgnoreSoftDelete("employee-1")).thenReturn(retained);
-        when(employmentReadService.page(any())).thenAnswer(invocation -> {
+        when(employmentReadService.pageForEmployee(org.mockito.ArgumentMatchers.same(retained), any())).thenAnswer(invocation -> {
             assertThat(TenantContext.currentTenantId()).contains("tenant_a");
             return PageResult.of(List.of(employment), 1, PageRequest.of(1, 20));
         });
@@ -1257,6 +1262,12 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.records[0].positionTitle").value("Developer"))
                 .andExpect(jsonPath("$.records[0].organizationTitle").value("Headquarters"))
                 .andExpect(jsonPath("$.records[0].departmentTitle").value("Finance"));
+        org.mockito.ArgumentCaptor<net.ximatai.muyun.spring.common.platform.ActionExecutionContext> authorization =
+                org.mockito.ArgumentCaptor.forClass(
+                        net.ximatai.muyun.spring.common.platform.ActionExecutionContext.class);
+        verify(actionPolicyService).requireRecordAction(authorization.capture());
+        assertThat(authorization.getValue().actionCode()).isEqualTo("employeePositions");
+        assertThat(authorization.getValue().actionPolicy().requiresDataScope()).isTrue();
     }
 
     @Test

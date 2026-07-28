@@ -47,7 +47,8 @@ public class SoftDeleteRestoreCoordinator {
         String restoreOperationId = deletionLogService.startOperation(restoreOperation(sourceOperation));
         Map<String, String> restoreEntryIds = new HashMap<>();
         sourceEntries.stream().filter(entry -> entry.getParentEntryId() == null)
-                .forEach(entry -> restoreEntry(entry, children, results, restoreOperationId, restoreEntryIds));
+                .forEach(entry -> restoreEntry(entry, children, results, restoreOperationId,
+                        sourceOperationId, restoreEntryIds));
         DeletionOperationStatus status = operationStatus(results);
         deletionLogService.completeOperation(restoreOperationId, status, resultMessage(results));
         return new RestoreReport(sourceOperationId, restoreOperationId, results);
@@ -55,7 +56,7 @@ public class SoftDeleteRestoreCoordinator {
 
     private boolean restoreEntry(DeletionEntry entry, Map<String, List<DeletionEntry>> children,
                                  List<RestoreEntryResult> results, String restoreOperationId,
-                                 Map<String, String> restoreEntryIds) {
+                                 String sourceOperationId, Map<String, String> restoreEntryIds) {
         String restoreEntryId = startRestoreEntry(entry, restoreOperationId, restoreEntryIds);
         if (entry.getStatus() != DeletionEntryStatus.SUCCEEDED || entry.getDeleteMode() != DeletionEntryMode.SOFT) {
             skipBranch(entry, children, results, restoreOperationId, restoreEntryIds,
@@ -64,6 +65,17 @@ public class SoftDeleteRestoreCoordinator {
         }
         DeletionLifecycleEntry latest = deletionLogService.latestTerminalEntry(
                 entry.getResourceModuleAlias(), entry.getResourceEntityAlias(), entry.getResourceRecordId());
+        if (DeletionLifecycleRetrySupport.completedByEarlierAttempt(
+                latest, entry, DeletionOperationType.RESTORE, sourceOperationId)) {
+            completeRestoreEntry(restoreEntryId, DeletionEntryStatus.SUCCEEDED,
+                    "resource was already restored by an earlier attempt");
+            results.add(result(entry, RestoreEntryResult.Status.RESTORED,
+                    "resource was already restored by an earlier attempt"));
+            for (DeletionEntry child : children.getOrDefault(entry.getId(), List.of())) {
+                restoreEntry(child, children, results, restoreOperationId, sourceOperationId, restoreEntryIds);
+            }
+            return true;
+        }
         if (latest == null || !entry.getId().equals(latest.entry().getId())) {
             skipBranch(entry, children, results, restoreOperationId, restoreEntryIds,
                     restoreEntryId, "resource lifecycle changed after the source deletion");
@@ -98,7 +110,7 @@ public class SoftDeleteRestoreCoordinator {
         completeRestoreEntry(restoreEntryId, DeletionEntryStatus.SUCCEEDED, null);
         results.add(result(entry, RestoreEntryResult.Status.RESTORED, null));
         for (DeletionEntry child : children.getOrDefault(entry.getId(), List.of())) {
-            restoreEntry(child, children, results, restoreOperationId, restoreEntryIds);
+            restoreEntry(child, children, results, restoreOperationId, sourceOperationId, restoreEntryIds);
         }
         return true;
     }

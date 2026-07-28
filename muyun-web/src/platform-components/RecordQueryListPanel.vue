@@ -151,7 +151,7 @@ const loading = ref(false);
 const schema = ref<QuerySchema>();
 const records = ref<QueryListRecord[]>([]);
 const recycleBinItems = new Map<string, RecycleBinItem<QueryListRecord>>();
-const recycleBinState = useRecycleBinState({ context: props.context });
+const recycleBinState = useRecycleBinState({ context: () => props.context });
 const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(props.pageSize);
@@ -202,7 +202,8 @@ const panelActions = computed<RecordActionItem[]>(() => {
 });
 const hasRowActions = computed(
   () =>
-    props.mode === 'recycleBin' ||
+    (props.mode === 'recycleBin' &&
+      (props.context.can('recycleBinRestore') === true || props.context.can('recycleBinPurge') === true)) ||
     props.rowActionsOf !== undefined ||
     props.standardCrudRowActions ||
     props.extraRowActionsOf !== undefined,
@@ -469,8 +470,10 @@ function rowActions(record: QueryListRecord): RecordActionItem[] {
     const item = recycleBinItems.get(recordKey(record));
     if (!item) return [];
     return [
-      { key: 'restore', actionCode: 'recycleBinRestore', title: '恢复', disabled: !item.restorable },
-      ...(item.purgeable
+      ...(props.context.can('recycleBinRestore') === true
+        ? [{ key: 'restore', actionCode: 'recycleBinRestore', title: '恢复', disabled: !item.restorable }]
+        : []),
+      ...(item.purgeable && props.context.can('recycleBinPurge') === true
         ? [{ key: 'purge', actionCode: 'recycleBinPurge', title: '彻底删除', danger: true }]
         : []),
     ];
@@ -861,7 +864,7 @@ defineExpose({ refresh });
       </UiButton>
       <div class="record-query-list-actions">
         <UiButton
-          v-if="recycleBinEnabled"
+          v-if="recycleBinEnabled && (mode === 'recycleBin' || context.can('recycleBinQuery') === true)"
           type="text"
           icon-name="delete"
           @click="emit('modeChange', mode === 'normal' ? 'recycleBin' : 'normal')"

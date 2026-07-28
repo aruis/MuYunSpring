@@ -42,13 +42,16 @@ public class RecycleBinPurgeCoordinator {
         Map<String, String> purgeEntryIds = new HashMap<>();
         List<PurgeEntryResult> results = new ArrayList<>();
         sourceEntries.stream().filter(entry -> entry.getParentEntryId() == null)
-                .forEach(entry -> purgeEntry(entry, children, purgeOperationId, purgeEntryIds, results));
+                .forEach(entry -> purgeEntry(entry, children, purgeOperationId,
+                        sourceOperationId, purgeEntryIds, results));
+        results.sort(Comparator.comparingInt(result -> sourceEntryOrder(sourceEntries, result.sourceEntryId())));
         deletionLogService.completeOperation(purgeOperationId, status(results), message(results));
         return new PurgeReport(sourceOperationId, purgeOperationId, results);
     }
 
     private boolean purgeEntry(DeletionEntry source, Map<String, List<DeletionEntry>> children,
-                               String operationId, Map<String, String> purgeEntryIds, List<PurgeEntryResult> results) {
+                               String operationId, String sourceOperationId,
+                               Map<String, String> purgeEntryIds, List<PurgeEntryResult> results) {
         String entryId = startEntry(source, operationId, purgeEntryIds);
         if (source.getStatus() != DeletionEntryStatus.SUCCEEDED || source.getDeleteMode() != DeletionEntryMode.SOFT) {
             return skip(source, children, operationId, purgeEntryIds, results, entryId,
@@ -56,6 +59,23 @@ public class RecycleBinPurgeCoordinator {
         }
         DeletionLifecycleEntry latest = deletionLogService.latestTerminalEntry(source.getResourceModuleAlias(),
                 source.getResourceEntityAlias(), source.getResourceRecordId());
+        if (DeletionLifecycleRetrySupport.completedByEarlierAttempt(
+                latest, source, DeletionOperationType.PURGE, sourceOperationId)) {
+            boolean descendantsComplete = true;
+            for (DeletionEntry child : children.getOrDefault(source.getId(), List.of())) {
+                descendantsComplete &= purgeEntry(child, children, operationId, sourceOperationId,
+                        purgeEntryIds, results);
+            }
+            if (!descendantsComplete) {
+                return skipCurrent(source, results, entryId,
+                        "a descendant resource was not purged");
+            }
+            complete(entryId, DeletionEntryStatus.SUCCEEDED,
+                    "resource was already purged by an earlier attempt");
+            results.add(result(source, PurgeEntryResult.Status.PURGED,
+                    "resource was already purged by an earlier attempt"));
+            return true;
+        }
         if (latest == null || !source.getId().equals(latest.entry().getId())) {
             return skip(source, children, operationId, purgeEntryIds, results, entryId,
                     "resource lifecycle changed after the source deletion");
@@ -75,19 +95,47 @@ public class RecycleBinPurgeCoordinator {
                     "recycle-bin purge is unavailable for this resource");
         }
         try {
-            if (ability.purge(source.getResourceRecordId()) <= 0) {
-                return skip(source, children, operationId, purgeEntryIds, results, entryId,
-                        "resource is no longer purgeable");
+            if (!ability.isRecycleBinPurgeEnabled()) {
+                throw new UnsupportedOperationException(
+                        "Recycle-bin purge is not enabled for " + ability.getModuleAlias());
             }
+            ability.beforeRecycleBinPurge(source.getResourceRecordId());
         } catch (RuntimeException exception) {
             return failed(source, children, operationId, purgeEntryIds, results, entryId, exception.getMessage());
         }
+        boolean descendantsComplete = true;
+        for (DeletionEntry child : children.getOrDefault(source.getId(), List.of())) {
+            descendantsComplete &= purgeEntry(child, children, operationId, sourceOperationId,
+                    purgeEntryIds, results);
+        }
+        if (!descendantsComplete) {
+            return skipCurrent(source, results, entryId, "a descendant resource was not purged");
+        }
+        try {
+            if (ability.purge(source.getResourceRecordId()) <= 0) {
+                return skipCurrent(source, results, entryId, "resource is no longer purgeable");
+            }
+        } catch (RuntimeException exception) {
+            return failedCurrent(source, results, entryId, exception.getMessage());
+        }
         complete(entryId, DeletionEntryStatus.SUCCEEDED, null);
         results.add(result(source, PurgeEntryResult.Status.PURGED, null));
-        for (DeletionEntry child : children.getOrDefault(source.getId(), List.of())) {
-            purgeEntry(child, children, operationId, purgeEntryIds, results);
-        }
         return true;
+    }
+
+    private boolean skipCurrent(DeletionEntry source, List<PurgeEntryResult> results,
+                                String entryId, String message) {
+        complete(entryId, DeletionEntryStatus.SKIPPED, message);
+        results.add(result(source, PurgeEntryResult.Status.SKIPPED, message));
+        return false;
+    }
+
+    private boolean failedCurrent(DeletionEntry source, List<PurgeEntryResult> results,
+                                  String entryId, String message) {
+        String failure = message == null || message.isBlank() ? "resource purge failed" : message;
+        complete(entryId, DeletionEntryStatus.FAILED, failure);
+        results.add(result(source, PurgeEntryResult.Status.FAILED, failure));
+        return false;
     }
 
     private boolean skip(DeletionEntry source, Map<String, List<DeletionEntry>> children, String operationId,
@@ -193,5 +241,14 @@ public class RecycleBinPurgeCoordinator {
 
     private String resource(DeletionEntry entry) {
         return entry.getResourceModuleAlias() + "." + entry.getResourceEntityAlias() + "/" + entry.getResourceRecordId();
+    }
+
+    private int sourceEntryOrder(List<DeletionEntry> sourceEntries, String sourceEntryId) {
+        for (int index = 0; index < sourceEntries.size(); index++) {
+            if (sourceEntries.get(index).getId().equals(sourceEntryId)) {
+                return index;
+            }
+        }
+        return Integer.MAX_VALUE;
     }
 }

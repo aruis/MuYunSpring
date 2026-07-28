@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue';
+import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue';
 import type {
   PurgeReport,
   RecycleBinItem,
@@ -10,14 +10,13 @@ import type { ModuleContext } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformSuccess } from './platformErrorFeedback';
 
 export interface RecycleBinStateOptions<TRecord> {
-  context: ModuleContext<TRecord>;
+  context: MaybeRefOrGetter<ModuleContext<TRecord>>;
   recordTitle?: (record: TRecord) => string;
   /** 外部刷新信号，变化时重新加载列表 */
   reloadKey?: Ref<number>;
 }
 
 export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRecord>) {
-  const { context } = options;
   const items = ref<RecycleBinItem<TRecord>[]>([]);
   const loading = ref(false);
   const acting = ref(false);
@@ -44,6 +43,7 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
 
   async function load(request: WebQueryRequest = lastRequest): Promise<boolean> {
     const requestSeq = ++loadRequestSeq;
+    const context = toValue(options.context);
     loading.value = true;
     lastRequest = request;
     try {
@@ -73,6 +73,7 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     if (acting.value || !item.restorable || !item.sourceDeleteOperationId) return undefined;
     acting.value = true;
     actingOperationId.value = item.sourceDeleteOperationId;
+    const context = toValue(options.context);
     try {
       const report = await context.http.request<RestoreReport>({
         method: 'POST',
@@ -94,6 +95,7 @@ export function useRecycleBinState<TRecord>(options: RecycleBinStateOptions<TRec
     if (acting.value || !item.purgeable || !item.sourceDeleteOperationId) return undefined;
     acting.value = true;
     actingOperationId.value = item.sourceDeleteOperationId;
+    const context = toValue(options.context);
     try {
       const report = await context.http.request<PurgeReport>({
         method: 'POST',

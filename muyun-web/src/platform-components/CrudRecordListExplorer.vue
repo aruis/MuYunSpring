@@ -63,7 +63,7 @@ const loading = ref(false);
 const records = ref<CrudRecordListBase[]>([]);
 let recordsRequestSeq = 0;
 const recycleBinState = useRecycleBinState({
-  context: props.context,
+  context: () => props.context,
   recordTitle: (record) => recordTitle(record),
 });
 const recycleBinItems = computed(
@@ -152,13 +152,17 @@ function recordActions(record: CrudRecordListBase): UiRecordInlineAction[] {
   const item = recycleBinItems.value.get(String(record.id ?? ''));
   if (!item) return [];
   return [
-    {
-      key: 'restore',
-      title: '恢复',
-      iconName: 'reload',
-      disabled: !item.restorable || recycleBinState.acting.value,
-    },
-    ...(item.purgeable
+    ...(props.context.can('recycleBinRestore') === true
+      ? [
+          {
+            key: 'restore',
+            title: '恢复',
+            iconName: 'reload' as const,
+            disabled: !item.restorable || recycleBinState.acting.value,
+          },
+        ]
+      : []),
+    ...(item.purgeable && props.context.can('recycleBinPurge') === true
       ? [
           {
             key: 'purge',

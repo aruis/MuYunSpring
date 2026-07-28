@@ -17,10 +17,16 @@ import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
@@ -44,6 +50,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 @RestController
@@ -57,6 +65,9 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         RecycleBinWeb<Employee, EmployeeService>,
         MutationTenantScopeResolver<Employee>,
         StaticModuleUiContributor {
+    private static final ActionExecutionPolicy EMPLOYEE_POSITIONS_POLICY = new ActionExecutionPolicy(
+            "employeePositions", PlatformActionLevel.RECORD, ActionAccessMode.AUTH_REQUIRED,
+            true, true, ActionDefaultGrantPolicy.NONE, null);
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeDelegationService employeeDelegationService;
@@ -64,6 +75,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
     private RecycleBinFacade recycleBinFacade;
+    private ActionExecutionPolicyService actionExecutionPolicyService;
 
     @Autowired
     void setRecycleBinFacade(RecycleBinFacade recycleBinFacade) {
@@ -100,6 +112,11 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @Autowired(required = false)
     void setEmployeeEmploymentReadService(EmployeeEmploymentReadService employeeEmploymentReadService) {
         this.employeeEmploymentReadService = employeeEmploymentReadService;
+    }
+
+    @Autowired
+    void setActionExecutionPolicyService(ActionExecutionPolicyService actionExecutionPolicyService) {
+        this.actionExecutionPolicyService = actionExecutionPolicyService;
     }
 
     @Override
@@ -210,7 +227,9 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     @ActionEndpoint(PlatformAction.RECYCLE_BIN_QUERY)
     public WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> recycleBinEmploymentView(
             @PathVariable String employeeId) {
-        return employeeRecycleBinScope(employeeId, () -> employmentViewRecords(employeeId));
+        requireEmployeePositionsAccess(employeeId);
+        return employeeRecycleBinScope(employeeId,
+                retained -> employmentViewRecords(employeeId, retained));
     }
 
     @PostMapping("/{employeeId}/positions")
@@ -362,17 +381,43 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                         new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
     }
 
-    private <R> R employeeRecycleBinScope(String employeeId, Supplier<R> action) {
+    private WebListResponse<EmployeeEmploymentReadService.EmployeeEmploymentView> employmentViewRecords(
+            String employeeId, Employee retainedEmployee) {
+        if (employeeEmploymentReadService == null) {
+            throw new IllegalStateException("employment view is not available");
+        }
+        return new WebListResponse<>(employeeEmploymentReadService.pageForEmployee(
+                retainedEmployee,
+                new EmployeeEmploymentReadService.Query(employeeId, null, null, Boolean.FALSE,
+                        new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))).getRecords());
+    }
+
+    private <R> R employeeRecycleBinScope(String employeeId, Function<Employee, R> action) {
         if (!service().canAccessRecycleBinRecord(employeeId)) {
             throw new PlatformException("Recycle-bin record is unavailable: " + EmployeeService.MODULE_ALIAS);
         }
         Employee retained = service().selectIgnoreSoftDelete(employeeId);
         Optional<String> tenantId = tenantIdForEmployee(retained);
         if (!TenantContext.isSystem() || tenantId.isEmpty()) {
-            return webScope(action);
+            return webScope(() -> action.apply(retained));
         }
         try (TenantContext.Scope ignored = TenantContext.use(tenantId.get())) {
-            return webScope(action);
+            return webScope(() -> action.apply(retained));
+        }
+    }
+
+    private void requireEmployeePositionsAccess(String employeeId) {
+        if (actionExecutionPolicyService == null) {
+            throw new IllegalStateException("ActionExecutionPolicyService must be configured");
+        }
+        actionExecutionPolicyService.requireRecordAction(ActionExecutionContext.ofPolicy(
+                EmployeeService.MODULE_ALIAS,
+                EMPLOYEE_POSITIONS_POLICY,
+                Set.of(employeeId),
+                CurrentUserContext.currentUser()));
+        if (!service().canAccessRecycleBinRecord(EMPLOYEE_POSITIONS_POLICY, employeeId)) {
+            throw new PlatformException("record data permission denied: "
+                    + EmployeeService.MODULE_ALIAS + ".employeePositions");
         }
     }
 

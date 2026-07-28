@@ -102,7 +102,7 @@ class RecycleBinPurgeCoordinatorTest {
                 .purge(source.operationId());
 
         assertThat(report.entries()).extracting(PurgeEntryResult::status)
-                .containsExactly(PurgeEntryResult.Status.PURGED, PurgeEntryResult.Status.SKIPPED);
+                .containsExactly(PurgeEntryResult.Status.SKIPPED, PurgeEntryResult.Status.SKIPPED);
         assertThat(report.entries().get(1).message()).contains("lifecycle changed");
         assertThat(logService.operation(report.purgeOperationId()).getStatus())
                 .isEqualTo(DeletionOperationStatus.PARTIALLY_SUCCEEDED);
@@ -134,8 +134,29 @@ class RecycleBinPurgeCoordinatorTest {
                 .purge(source.operationId());
 
         assertThat(report.entries()).extracting(PurgeEntryResult::status)
-                .containsExactly(PurgeEntryResult.Status.PURGED, PurgeEntryResult.Status.SKIPPED);
+                .containsExactly(PurgeEntryResult.Status.SKIPPED, PurgeEntryResult.Status.SKIPPED);
         assertThat(report.entries().get(1).message()).contains("purge is unavailable");
+    }
+
+    @Test
+    void shouldResumeDescendantsWhenRootWasPurgedByAnEarlierAttempt() {
+        SourceTree source = completedDeleteTree();
+        simulatePurge(source.operationId(), source.rootEntryId(),
+                "iam.tenant", "tenant", "tenant-1");
+        PurgeAbility tenant = purgeableAbility("iam.tenant", "tenant", "tenant-1");
+        tenant.dao().deleteById("tenant-1");
+        PurgeAbility application = purgeableAbility(
+                "iam.tenantApplication", "tenantApplication", "application-1");
+
+        PurgeReport retry = new RecycleBinPurgeCoordinator(logService, resolver(tenant, application))
+                .purge(source.operationId());
+
+        assertThat(retry.entries()).extracting(PurgeEntryResult::status)
+                .containsExactly(PurgeEntryResult.Status.PURGED, PurgeEntryResult.Status.PURGED);
+        assertThat(retry.entries().getFirst().message()).contains("already purged");
+        assertThat(application.dao().findById("application-1")).isNull();
+        assertThat(logService.operation(retry.purgeOperationId()).getStatus())
+                .isEqualTo(DeletionOperationStatus.SUCCEEDED);
     }
 
     // --- helpers ---
@@ -177,6 +198,30 @@ class RecycleBinPurgeCoordinatorTest {
         String entryId = logService.startEntry(restoreEntry);
         logService.completeEntry(entryId, DeletionEntryStatus.SUCCEEDED, null);
         logService.completeOperation(restoreOpId, DeletionOperationStatus.SUCCEEDED, null);
+    }
+
+    private void simulatePurge(String sourceOperationId, String sourceEntryId,
+                               String moduleAlias, String entityAlias, String recordId) {
+        DeletionOperation purgeOperation = new DeletionOperation();
+        purgeOperation.setTenantId("tenant-1");
+        purgeOperation.setOperationType(DeletionOperationType.PURGE);
+        purgeOperation.setRootModuleAlias(moduleAlias);
+        purgeOperation.setRootEntityAlias(entityAlias);
+        purgeOperation.setRootRecordId(recordId);
+        purgeOperation.setSourceOperationId(sourceOperationId);
+        String operationId = logService.startOperation(purgeOperation);
+        DeletionEntry purgeEntry = new DeletionEntry();
+        purgeEntry.setTenantId("tenant-1");
+        purgeEntry.setOperationId(operationId);
+        purgeEntry.setSourceEntryId(sourceEntryId);
+        purgeEntry.setResourceModuleAlias(moduleAlias);
+        purgeEntry.setResourceEntityAlias(entityAlias);
+        purgeEntry.setResourceRecordId(recordId);
+        purgeEntry.setTriggerType(DeletionEntryTrigger.DIRECT);
+        purgeEntry.setDeleteMode(DeletionEntryMode.SOFT);
+        String entryId = logService.startEntry(purgeEntry);
+        logService.completeEntry(entryId, DeletionEntryStatus.SUCCEEDED, null);
+        logService.completeOperation(operationId, DeletionOperationStatus.PARTIALLY_SUCCEEDED, null);
     }
 
     private String startEntry(String operationId, String parentEntryId, String moduleAlias, String entityAlias,

@@ -154,7 +154,7 @@ class RecycleBinFacadeTest {
         RestoreReport expected = new RestoreReport("delete-1", "restore-1", List.of());
         when(ability.getModuleAlias()).thenReturn("iam.tenant");
         when(ability.getDeletionEntityAlias()).thenReturn("tenant");
-        when(ability.canAccessRecycleBinRecord("tenant-1")).thenReturn(true);
+        when(ability.canAccessRecycleBinSourceRecord("tenant-1")).thenReturn(true);
         when(logService.operation("delete-1")).thenReturn(successfulDelete("delete-1", "iam.tenant", "tenant", "tenant-1"));
         when(coordinator.restore("delete-1")).thenReturn(expected);
 
@@ -200,7 +200,7 @@ class RecycleBinFacadeTest {
         rootEntry.setResourceRecordId("employee-1");
         when(ability.getModuleAlias()).thenReturn("iam.employee");
         when(ability.getDeletionEntityAlias()).thenReturn("employee");
-        when(ability.canAccessRecycleBinRecord("employee-1")).thenReturn(true);
+        when(ability.canAccessRecycleBinSourceRecord("employee-1")).thenReturn(true);
         when(logService.operation("delete-1")).thenReturn(operation);
         when(logService.operationEntries("delete-1")).thenReturn(List.of(rootEntry));
         when(coordinator.restore("delete-1")).thenReturn(expected);

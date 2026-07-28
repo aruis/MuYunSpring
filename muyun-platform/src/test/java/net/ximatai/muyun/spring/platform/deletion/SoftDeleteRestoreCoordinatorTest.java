@@ -68,6 +68,29 @@ class SoftDeleteRestoreCoordinatorTest {
     }
 
     @Test
+    void shouldResumeDescendantsAfterRootWasRestoredByEarlierAttempt() {
+        SourceTree source = completedDeleteTree();
+        RestoreAbility tenant = softDeletedAbility("iam.tenant", "tenant-1");
+        RestoreAbility failingApplication = new RestoreAbility(
+                "iam.tenantApplication", "tenantApplication", "application-1", true);
+
+        RestoreReport first = new SoftDeleteRestoreCoordinator(logService, resolver(tenant, failingApplication))
+                .restore(source.operationId());
+        RestoreAbility retryableApplication = softDeletedAbility("iam.tenantApplication", "application-1");
+        RestoreReport retry = new SoftDeleteRestoreCoordinator(logService, resolver(tenant, retryableApplication))
+                .restore(source.operationId());
+
+        assertThat(first.entries()).extracting(RestoreEntryResult::status)
+                .containsExactly(RestoreEntryResult.Status.RESTORED, RestoreEntryResult.Status.FAILED);
+        assertThat(retry.entries()).extracting(RestoreEntryResult::status)
+                .containsExactly(RestoreEntryResult.Status.RESTORED, RestoreEntryResult.Status.RESTORED);
+        assertThat(retry.entries().getFirst().message()).contains("already restored");
+        assertThat(logService.operation(retry.restoreOperationId()).getStatus())
+                .isEqualTo(DeletionOperationStatus.SUCCEEDED);
+        assertThat(retryableApplication.record.getDeleted()).isFalse();
+    }
+
+    @Test
     void shouldNotMarkAnAllSkippedRestoreAsSucceeded() {
         SourceTree source = completedDeleteTree();
 
