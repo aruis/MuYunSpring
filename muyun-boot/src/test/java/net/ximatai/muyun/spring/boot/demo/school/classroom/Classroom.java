@@ -38,13 +38,4 @@ public class Classroom extends StandardSortableEntity {
     )
     private List<ClassMember> members;
 
-    public Classroom() {
-    }
-
-    public Classroom(String classCode, String title, String academicYear, String homeroomTeacherId) {
-        this.classCode = classCode;
-        setTitle(title);
-        this.academicYear = academicYear;
-        this.homeroomTeacherId = homeroomTeacherId;
-    }
 }

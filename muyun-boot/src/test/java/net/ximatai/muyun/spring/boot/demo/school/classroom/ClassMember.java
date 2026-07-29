@@ -22,10 +22,4 @@ public class ClassMember extends StandardSortableEntity {
 
     private transient String studentIdTitle;
 
-    public ClassMember() {
-    }
-
-    public ClassMember(String studentId) {
-        this.studentId = studentId;
-    }
 }

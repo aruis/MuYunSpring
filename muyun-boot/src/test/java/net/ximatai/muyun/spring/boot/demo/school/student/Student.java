@@ -38,12 +38,4 @@ public class Student extends StandardTitledEntity implements EnabledCapable {
             defaultVal = @net.ximatai.muyun.database.core.annotation.Default(bool = TrueOrFalse.TRUE))
     private Boolean enabled = Boolean.TRUE;
 
-    public Student() {
-    }
-
-    public Student(String studentNo, String title, String grade) {
-        this.studentNo = studentNo;
-        setTitle(title);
-        this.grade = grade;
-    }
 }

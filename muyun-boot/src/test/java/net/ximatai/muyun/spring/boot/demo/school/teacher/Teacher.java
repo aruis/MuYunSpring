@@ -31,12 +31,4 @@ public class Teacher extends StandardTitledEntity implements EnabledCapable {
             defaultVal = @net.ximatai.muyun.database.core.annotation.Default(bool = TrueOrFalse.TRUE))
     private Boolean enabled = Boolean.TRUE;
 
-    public Teacher() {
-    }
-
-    public Teacher(String teacherNo, String title, String subjectCode) {
-        this.teacherNo = teacherNo;
-        setTitle(title);
-        this.subjectCode = subjectCode;
-    }
 }

@@ -114,10 +114,10 @@ class TeachingDemoIT {
     void shouldSupportTreeHobbiesAndResolveStudentMultiSelectTitles() {
         String serial = serial();
         try (TenantContext.Scope ignored = TenantContext.use("campus-hobby")) {
-            String sportId = hobbies.insert(new Hobby("sport-" + serial, "运动", TreeAbility.ROOT_ID));
-            String basketballId = hobbies.insert(new Hobby("basketball-" + serial, "篮球", sportId));
-            String readingId = hobbies.insert(new Hobby("reading-" + serial, "阅读", TreeAbility.ROOT_ID));
-            Student student = new Student("S-" + serial, "爱好学生", "五年级");
+            String sportId = hobbies.insert(hobby("sport-" + serial, "运动", TreeAbility.ROOT_ID));
+            String basketballId = hobbies.insert(hobby("basketball-" + serial, "篮球", sportId));
+            String readingId = hobbies.insert(hobby("reading-" + serial, "阅读", TreeAbility.ROOT_ID));
+            Student student = student("S-" + serial, "爱好学生", "五年级");
             student.setHobbyIds(new LinkedHashSet<>(List.of(basketballId, readingId)));
             String studentId = students.insert(student);
 
@@ -139,21 +139,21 @@ class TeachingDemoIT {
         String serial = serial();
         String code = "unique-" + serial;
         try (TenantContext.Scope ignored = TenantContext.use("campus-unique-a")) {
-            String firstId = hobbies.insert(new Hobby(code, "唯一爱好", TreeAbility.ROOT_ID));
+            String firstId = hobbies.insert(hobby(code, "唯一爱好", TreeAbility.ROOT_ID));
 
-            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "重复爱好", TreeAbility.ROOT_ID)))
+            assertThatThrownBy(() -> hobbies.insert(hobby(code, "重复爱好", TreeAbility.ROOT_ID)))
                     .isInstanceOf(PlatformException.class)
                     .extracting(error -> ((PlatformException) error).code())
                     .isEqualTo(PlatformErrorCodes.CONFLICT_UNIQUE);
 
             assertThat(hobbies.delete(firstId)).isEqualTo(1);
-            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "软删后重复", TreeAbility.ROOT_ID)))
+            assertThatThrownBy(() -> hobbies.insert(hobby(code, "软删后重复", TreeAbility.ROOT_ID)))
                     .isInstanceOf(PlatformException.class)
                     .extracting(error -> ((PlatformException) error).code())
                     .isEqualTo(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT);
         }
         try (TenantContext.Scope ignored = TenantContext.use("campus-unique-b")) {
-            assertThat(hobbies.insert(new Hobby(code, "另一租户爱好", TreeAbility.ROOT_ID))).isNotBlank();
+            assertThat(hobbies.insert(hobby(code, "另一租户爱好", TreeAbility.ROOT_ID))).isNotBlank();
         }
     }
 
@@ -168,16 +168,16 @@ class TeachingDemoIT {
                             org.assertj.core.groups.Tuple.tuple("chinese", "语文"),
                             org.assertj.core.groups.Tuple.tuple("english", "英语"));
 
-            String teacherId = teachers.insert(new Teacher("T-" + serial(), "数学老师", "mathematics"));
+            String teacherId = teachers.insert(teacher("T-" + serial(), "数学老师", "mathematics"));
             Teacher output = recordOutput.record(teachers, teachers.select(teacherId), FieldOutputContext.VIEW);
             assertThat(output.getSubjectCode()).isEqualTo("mathematics");
             assertThat(output.getSubjectCodeTitle()).isEqualTo("数学");
 
-            assertThatThrownBy(() -> teachers.insert(new Teacher("T-" + serial(), "无效学科", "physics")))
+            assertThatThrownBy(() -> teachers.insert(teacher("T-" + serial(), "无效学科", "physics")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("invalid option code for field subjectCode");
 
-            String anotherTeacherId = teachers.insert(new Teacher("T-" + serial(), "英语老师", "english"));
+            String anotherTeacherId = teachers.insert(teacher("T-" + serial(), "英语老师", "english"));
             Teacher anotherTeacher = teachers.select(anotherTeacherId);
             String duplicateTeacherNo = teachers.select(teacherId).getTeacherNo();
             anotherTeacher.setTeacherNo(duplicateTeacherNo);
@@ -192,13 +192,13 @@ class TeachingDemoIT {
         String serial = serial();
         String campusAStudentId;
         try (TenantContext.Scope ignored = TenantContext.use("campus-a")) {
-            campusAStudentId = students.insert(new Student("S-" + serial, "林晓", "一年级"));
+            campusAStudentId = students.insert(student("S-" + serial, "林晓", "一年级"));
 
             Student firstRead = students.select(campusAStudentId);
             firstRead.setTitle("mutated client copy");
             assertThat(students.select(campusAStudentId).getTitle()).isEqualTo("林晓");
 
-            assertThatThrownBy(() -> students.insert(new Student("S-" + serial, "重复学号", "一年级")))
+            assertThatThrownBy(() -> students.insert(student("S-" + serial, "重复学号", "一年级")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("studentNo already exists");
             assertThat(students.disable(campusAStudentId)).isEqualTo(1);
@@ -206,7 +206,7 @@ class TeachingDemoIT {
         }
 
         try (TenantContext.Scope ignored = TenantContext.use("campus-b")) {
-            students.insert(new Student("S-" + serial, "周然", "一年级"));
+            students.insert(student("S-" + serial, "周然", "一年级"));
             assertThat(students.list(Criteria.of())).extracting(Student::getTitle).contains("周然");
         }
 
@@ -223,10 +223,10 @@ class TeachingDemoIT {
     @Test
     void shouldResolveHomeroomTeacherAndPopulateClassMembers() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo aggregate")) {
-            String teacherId = teachers.insert(new Teacher("T-" + serial(), "王老师", "mathematics"));
-            String studentId = students.insert(new Student("S-" + serial(), "陈同学", "二年级"));
-            ClassMember member = new ClassMember(studentId);
-            Classroom classroom = new Classroom("G2-" + serial(), "二年级一班", "2026", teacherId);
+            String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));
+            String studentId = students.insert(student("S-" + serial(), "陈同学", "二年级"));
+            ClassMember member = classMember(studentId);
+            Classroom classroom = classroom("G2-" + serial(), "二年级一班", "2026", teacherId);
             classroom.setMembers(List.of(member));
 
             String classroomId = classrooms.insert(classroom);
@@ -245,17 +245,17 @@ class TeachingDemoIT {
     @Test
     void shouldReplaceMemberRowsAndCascadeSoftDeleteWhenClassroomIsDeleted() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo aggregate")) {
-            String teacherId = teachers.insert(new Teacher("T-" + serial(), "王老师", "mathematics"));
-            String firstStudentId = students.insert(new Student("S-" + serial(), "林晓", "三年级"));
-            String removedStudentId = students.insert(new Student("S-" + serial(), "周然", "三年级"));
-            String replacementStudentId = students.insert(new Student("S-" + serial(), "陈同学", "三年级"));
-            ClassMember first = new ClassMember(firstStudentId);
-            ClassMember removed = new ClassMember(removedStudentId);
-            Classroom classroom = new Classroom("G3-" + serial(), "三年级一班", "2026", teacherId);
+            String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));
+            String firstStudentId = students.insert(student("S-" + serial(), "林晓", "三年级"));
+            String removedStudentId = students.insert(student("S-" + serial(), "周然", "三年级"));
+            String replacementStudentId = students.insert(student("S-" + serial(), "陈同学", "三年级"));
+            ClassMember first = classMember(firstStudentId);
+            ClassMember removed = classMember(removedStudentId);
+            Classroom classroom = classroom("G3-" + serial(), "三年级一班", "2026", teacherId);
             classroom.setMembers(List.of(first, removed));
             String classroomId = classrooms.insert(classroom);
 
-            ClassMember replacement = new ClassMember(replacementStudentId);
+            ClassMember replacement = classMember(replacementStudentId);
             classroom.setMembers(List.of(first, replacement));
             assertThat(classrooms.update(classroom)).isEqualTo(1);
             assertThat(members.select(removed.getId())).isNull();
@@ -275,13 +275,13 @@ class TeachingDemoIT {
     @Test
     void shouldOrderClassroomsByAcademicYearAndMembersByClassroom() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo sort")) {
-            String teacherId = teachers.insert(new Teacher("T-" + serial(), "王老师", "mathematics"));
-            String firstStudentId = students.insert(new Student("S-" + serial(), "林晓", "四年级"));
-            String secondStudentId = students.insert(new Student("S-" + serial(), "周然", "四年级"));
-            Classroom first = new Classroom("G4-" + serial(), "四年级一班", "2026", teacherId);
-            first.setMembers(List.of(new ClassMember(firstStudentId), new ClassMember(secondStudentId)));
+            String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));
+            String firstStudentId = students.insert(student("S-" + serial(), "林晓", "四年级"));
+            String secondStudentId = students.insert(student("S-" + serial(), "周然", "四年级"));
+            Classroom first = classroom("G4-" + serial(), "四年级一班", "2026", teacherId);
+            first.setMembers(List.of(classMember(firstStudentId), classMember(secondStudentId)));
             String firstId = classrooms.insert(first);
-            Classroom second = new Classroom("G4-" + serial(), "四年级二班", "2026", teacherId);
+            Classroom second = classroom("G4-" + serial(), "四年级二班", "2026", teacherId);
             String secondId = classrooms.insert(second);
 
             assertThat(first.getSortOrder()).isPositive();
@@ -292,6 +292,45 @@ class TeachingDemoIT {
             assertThat(classrooms.sortedList(Criteria.of())).extracting(Classroom::getTitle)
                     .containsSubsequence("四年级二班", "四年级一班");
         }
+    }
+
+    private Hobby hobby(String code, String title, String parentId) {
+        Hobby hobby = new Hobby();
+        hobby.setCode(code);
+        hobby.setTitle(title);
+        hobby.setParentId(parentId);
+        return hobby;
+    }
+
+    private Student student(String studentNo, String title, String grade) {
+        Student student = new Student();
+        student.setStudentNo(studentNo);
+        student.setTitle(title);
+        student.setGrade(grade);
+        return student;
+    }
+
+    private Teacher teacher(String teacherNo, String title, String subjectCode) {
+        Teacher teacher = new Teacher();
+        teacher.setTeacherNo(teacherNo);
+        teacher.setTitle(title);
+        teacher.setSubjectCode(subjectCode);
+        return teacher;
+    }
+
+    private Classroom classroom(String classCode, String title, String academicYear, String homeroomTeacherId) {
+        Classroom classroom = new Classroom();
+        classroom.setClassCode(classCode);
+        classroom.setTitle(title);
+        classroom.setAcademicYear(academicYear);
+        classroom.setHomeroomTeacherId(homeroomTeacherId);
+        return classroom;
+    }
+
+    private ClassMember classMember(String studentId) {
+        ClassMember member = new ClassMember();
+        member.setStudentId(studentId);
+        return member;
     }
 
     private String serial() {
