@@ -19,6 +19,10 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
+import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionCatalog;
+import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionRegistrar;
+import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
@@ -40,6 +44,7 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
@@ -117,6 +122,39 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(StaticApplicationDefinitionScanner.class)
+    public StaticApplicationDefinitionScanner staticApplicationDefinitionScanner(ApplicationContext applicationContext) {
+        return new StaticApplicationDefinitionScanner(applicationContext);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(StaticApplicationDefinitionCatalog.class)
+    public StaticApplicationDefinitionCatalog staticApplicationDefinitionCatalog(
+            List<StaticApplicationDefinition> definitions,
+            StaticApplicationDefinitionScanner scanner) {
+        return new StaticApplicationDefinitionCatalog(definitions, List.of(scanner));
+    }
+
+    @Bean
+    public StaticApplicationDefinition platformStaticApplicationDefinition() {
+        return StaticApplicationDefinition.of("platform", "平台能力", 10);
+    }
+
+    @Bean
+    public StaticApplicationDefinition iamStaticApplicationDefinition() {
+        return StaticApplicationDefinition.of("iam", "身份权限", 20);
+    }
+
+    @Bean
+    @ConditionalOnBean(ApplicationService.class)
+    @ConditionalOnMissingBean(StaticApplicationDefinitionRegistrar.class)
+    public StaticApplicationDefinitionRegistrar staticApplicationDefinitionRegistrar(
+            ApplicationService applicationService,
+            StaticApplicationDefinitionCatalog catalog) {
+        return new StaticApplicationDefinitionRegistrar(applicationService, catalog);
+    }
+
+    @Bean
     public StaticModuleDefinition employeeAccountStaticModuleDefinition() {
         return StaticModuleDefinition.builder("iam", EmployeeAccountService.MODULE_ALIAS, "职员账号绑定")
                 .entry(ModuleEntryType.MODULE, null, null)
@@ -135,8 +173,9 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(StaticModuleDefinitionRegistrar.class)
     public StaticModuleDefinitionRegistrar staticModuleDefinitionRegistrar(PlatformModuleService moduleService,
                                                                           PlatformModuleActionService actionService,
-                                                                          StaticModuleDefinitionCatalog catalog) {
-        return new StaticModuleDefinitionRegistrar(moduleService, actionService, catalog, true);
+                                                                          StaticModuleDefinitionCatalog catalog,
+                                                                          StaticApplicationDefinitionCatalog applicationCatalog) {
+        return new StaticModuleDefinitionRegistrar(moduleService, actionService, catalog, true, applicationCatalog);
     }
 
     @Bean

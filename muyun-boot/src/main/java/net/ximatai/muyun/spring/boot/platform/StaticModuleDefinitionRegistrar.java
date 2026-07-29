@@ -18,6 +18,7 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     private final PlatformModuleActionService actionService;
     private final StaticModuleDefinitionCatalog definitionCatalog;
     private final boolean disablesStaleSystemManagedModules;
+    private final StaticApplicationDefinitionCatalog applicationCatalog;
 
     public StaticModuleDefinitionRegistrar(PlatformModuleService moduleService,
                                            PlatformModuleActionService actionService,
@@ -38,12 +39,21 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
                                            PlatformModuleActionService actionService,
                                            StaticModuleDefinitionCatalog definitionCatalog,
                                            boolean disablesStaleSystemManagedModules) {
+        this(moduleService, actionService, definitionCatalog, disablesStaleSystemManagedModules, null);
+    }
+
+    public StaticModuleDefinitionRegistrar(PlatformModuleService moduleService,
+                                           PlatformModuleActionService actionService,
+                                           StaticModuleDefinitionCatalog definitionCatalog,
+                                           boolean disablesStaleSystemManagedModules,
+                                           StaticApplicationDefinitionCatalog applicationCatalog) {
         this.moduleService = moduleService;
         this.actionService = actionService;
         this.definitionCatalog = definitionCatalog == null
                 ? new StaticModuleDefinitionCatalog(List.of())
                 : definitionCatalog;
         this.disablesStaleSystemManagedModules = disablesStaleSystemManagedModules;
+        this.applicationCatalog = applicationCatalog;
     }
 
     @Override
@@ -59,6 +69,7 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     public void registerAll() {
         try (TenantContext.Scope ignored = TenantContext.system("register static modules")) {
             List<StaticModuleDefinition> allDefinitions = definitionCatalog.definitions();
+            validateApplications(allDefinitions);
             PlatformManagedMutationContext.runAsPlatformManaged(() -> {
                 for (StaticModuleDefinition definition : allDefinitions) {
                     registerModule(definition);
@@ -66,6 +77,18 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
                 }
                 disableStaleSystemManagedModules(allDefinitions);
             });
+        }
+    }
+
+    private void validateApplications(List<StaticModuleDefinition> definitions) {
+        if (applicationCatalog == null) {
+            return;
+        }
+        for (StaticModuleDefinition definition : definitions) {
+            if (applicationCatalog.find(definition.applicationAlias()).isEmpty()) {
+                throw new IllegalStateException("static module references undeclared static application: "
+                        + definition.moduleAlias() + " -> " + definition.applicationAlias());
+            }
         }
     }
 

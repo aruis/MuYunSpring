@@ -76,8 +76,9 @@ class PlatformModelSchemaTest {
 
         assertThat(table.getName()).isEqualTo("platform_application");
         assertThat(columnNames(table))
-                .contains("id", "title", "sort_order", "enabled")
+                .contains("id", "title", "sort_order", "enabled", "system_managed")
                 .doesNotContain("parent_id");
+        assertThat(columnDefault(table, "system_managed")).isEqualTo("FALSE");
     }
 
     @Test
