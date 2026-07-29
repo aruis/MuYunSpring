@@ -1,6 +1,7 @@
-package net.ximatai.muyun.spring.boot.demo.school.classroom;
+package net.ximatai.muyun.spring.boot.demo.school.test;
 
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.boot.demo.school.classroom.ClassMember;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import org.junit.jupiter.api.Test;
 

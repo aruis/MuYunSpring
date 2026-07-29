@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot.demo.school;
+package net.ximatai.muyun.spring.boot.demo.school.test;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = MuYunSpringApplication.class)
 @ContextConfiguration(classes = TeachingDemoConfiguration.class)
 @ActiveProfiles("school-demo")
-class TeachingDemoIT {
+public class TeachingDemoIT {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 

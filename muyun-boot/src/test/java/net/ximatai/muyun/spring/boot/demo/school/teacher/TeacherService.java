@@ -5,7 +5,9 @@ import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import org.springframework.stereotype.Service;
 
+@Service
 public class TeacherService extends AbstractAbilityService<Teacher> implements
         SoftDeleteAbility<Teacher>,
         EnableAbility<Teacher>,
