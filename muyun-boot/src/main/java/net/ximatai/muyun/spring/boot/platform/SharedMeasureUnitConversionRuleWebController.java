@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @RestController
+@PlatformStaticWebProjection(module = MeasureUnitConversionRuleService.MODULE_ALIAS)
 @RequestMapping("/platform.measure_unit/conversion-rules")
 public class SharedMeasureUnitConversionRuleWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitConversionRule, MeasureUnitConversionRuleService> {

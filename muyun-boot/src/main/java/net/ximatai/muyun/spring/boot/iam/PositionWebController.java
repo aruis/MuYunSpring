@@ -5,9 +5,7 @@ import net.ximatai.muyun.spring.boot.platform.ModuleUiViewCodes;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.position.Position;
 import net.ximatai.muyun.spring.iam.position.PositionCategory;
@@ -29,8 +27,6 @@ import java.util.Optional;
 @RequestMapping("/iam.position")
 public class PositionWebController extends WebSupport<PositionService> implements
         CrudWeb<Position, PositionService>,
-        EnableWeb<Position, PositionService>,
-        SortWeb<Position, PositionService>,
         MutationTenantScopeResolver<Position>,
         StaticModuleUiContributor {
 

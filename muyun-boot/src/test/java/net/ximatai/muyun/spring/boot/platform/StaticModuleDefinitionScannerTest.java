@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowDefinitionWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowVersionWebController;
+import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -33,6 +34,13 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.user.PasswordPolicyRuleService;
+import net.ximatai.muyun.spring.platform.code.CodeRuleService;
+import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
@@ -57,8 +65,14 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DisablePlatformOperations;
+import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.measure.MeasureUnitField;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import org.junit.jupiter.api.Test;
@@ -75,15 +89,24 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
 
 class StaticModuleDefinitionScannerTest {
+
+    private static <T> T withService(T controller, Object service) {
+        ReflectionTestUtils.setField(controller, "service", service);
+        return controller;
+    }
+
     @Test
     void shouldScanIamStaticModulesAndActionsFromControllerAnnotations() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(TenantWebController.class,
-                    TenantWebController::new);
-            context.registerBean(OrganizationWebController.class);
-            context.registerBean(DepartmentWebController.class);
+                    () -> withService(new TenantWebController(), mock(TenantService.class)));
+            context.registerBean(OrganizationWebController.class,
+                    () -> withService(new OrganizationWebController(), mock(OrganizationService.class)));
+            context.registerBean(DepartmentWebController.class,
+                    () -> withService(new DepartmentWebController(), mock(DepartmentService.class)));
             EmployeeService employeeService = new EmployeeService(mock(EmployeeDao.class),
                     mock(net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier.class),
                     mock(OrganizationService.class),
@@ -95,9 +118,13 @@ class StaticModuleDefinitionScannerTest {
                 ReflectionTestUtils.setField(controller, "service", employeeService);
                 return controller;
             });
-            context.registerBean(PositionWebController.class);
-            context.registerBean(PositionCategoryWebController.class);
-            context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
+            context.registerBean(PositionWebController.class,
+                    () -> withService(new PositionWebController(),
+                            mock(net.ximatai.muyun.spring.iam.position.PositionService.class)));
+            context.registerBean(PositionCategoryWebController.class,
+                    () -> withService(new PositionCategoryWebController(), mock(PositionCategoryService.class)));
+            context.registerBean(RoleWebController.class,
+                    () -> withService(new RoleWebController(null), mock(RoleService.class)));
             UserAccountService userAccountService = net.ximatai.muyun.spring.boot.iam.UserAccountServiceTestFactory.create(mock(UserAccountDao.class),
                     mock(net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier.class),
                     new PasswordHashingService());
@@ -108,7 +135,8 @@ class StaticModuleDefinitionScannerTest {
                 return controller;
             });
             context.registerBean(SystemUserAccountWebController.class);
-            context.registerBean(PasswordPolicyRuleWebController.class);
+            context.registerBean(PasswordPolicyRuleWebController.class,
+                    () -> withService(new PasswordPolicyRuleWebController(), mock(PasswordPolicyRuleService.class)));
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -421,7 +449,9 @@ class StaticModuleDefinitionScannerTest {
     void shouldScanCodeRuleAndReadOnlyLifecycleModules() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(CodeRuleWebController.class,
-                    () -> new CodeRuleWebController(org.mockito.Mockito.mock(CodePreviewService.class)));
+                    () -> withService(
+                            new CodeRuleWebController(org.mockito.Mockito.mock(CodePreviewService.class)),
+                            mock(CodeRuleService.class)));
             context.registerBean(CodeSequenceStateWebController.class,
                     () -> new CodeSequenceStateWebController(org.mockito.Mockito.mock(CodeOpsActionService.class)));
             context.registerBean(CodeLedgerEntryWebController.class);
@@ -469,8 +499,11 @@ class StaticModuleDefinitionScannerTest {
                     () -> new DictionaryCategoryService(mock(BaseDao.class)));
             context.registerBean(DictionaryItemService.class,
                     () -> new DictionaryItemService(mock(BaseDao.class), context.getBean(DictionaryCategoryService.class)));
-            context.registerBean(MenuSchemeWebController.class);
-            context.registerBean(MenuManagementWebController.class);
+            context.registerBean(MenuSchemeWebController.class,
+                    () -> withService(new MenuSchemeWebController(), mock(MenuSchemeService.class)));
+            context.registerBean(MenuManagementWebController.class,
+                    () -> withService(new MenuManagementWebController(),
+                            mock(net.ximatai.muyun.spring.platform.menu.MenuService.class)));
             context.registerBean(DictionaryCategoryWebController.class, () -> {
                 DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
                 ReflectionTestUtils.setField(controller, "service", context.getBean(DictionaryCategoryService.class));
@@ -566,8 +599,12 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanRecordLinkageRuleConfigurationModules() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(RecordGenerationRuleWebController.class);
-            context.registerBean(RecordWriteBackRuleWebController.class);
+            context.registerBean(RecordGenerationRuleWebController.class,
+                    () -> withService(new RecordGenerationRuleWebController(),
+                            mock(net.ximatai.muyun.spring.platform.generation.RecordGenerationRuleService.class)));
+            context.registerBean(RecordWriteBackRuleWebController.class,
+                    () -> withService(new RecordWriteBackRuleWebController(),
+                            mock(net.ximatai.muyun.spring.platform.writeback.RecordWriteBackRuleService.class)));
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -642,8 +679,11 @@ class StaticModuleDefinitionScannerTest {
     void shouldScanWorkflowConfigurationModules() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(WorkflowDefinitionWebController.class,
-                    () -> new WorkflowDefinitionWebController(mock(net.ximatai.muyun.spring.platform.module.PlatformModuleService.class),
-                            mock(WorkflowPublishFacade.class)));
+                    () -> withService(
+                            new WorkflowDefinitionWebController(
+                                    mock(net.ximatai.muyun.spring.platform.module.PlatformModuleService.class),
+                                    mock(WorkflowPublishFacade.class)),
+                            mock(WorkflowDefinitionService.class)));
             context.registerBean(WorkflowVersionWebController.class,
                     () -> new WorkflowVersionWebController(mock(WorkflowDefinitionService.class)));
             context.refresh();
@@ -681,7 +721,8 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanSnakeCaseWebScopeForCamelCaseStaticAlias() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldTypeWebController.class);
+            context.registerBean(PlatformFieldTypeWebController.class,
+                    () -> withService(new PlatformFieldTypeWebController(), mock(PlatformFieldTypeService.class)));
             context.refresh();
 
             StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
@@ -696,7 +737,9 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanNestedResourceControllerActionsFromInheritedEndpoints() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformUiSetWebController.class);
+            context.registerBean(PlatformUiSetWebController.class,
+                    () -> withService(new PlatformUiSetWebController(),
+                            mock(net.ximatai.muyun.spring.platform.ui.PlatformUiSetService.class)));
             context.refresh();
 
             StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
@@ -711,8 +754,12 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanFieldUiTypeNestedConfigurationActions() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldUiTypeAttributeWebController.class);
-            context.registerBean(PlatformFieldUiTypeFieldMappingWebController.class);
+            context.registerBean(PlatformFieldUiTypeAttributeWebController.class,
+                    () -> withService(new PlatformFieldUiTypeAttributeWebController(),
+                            mock(net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService.class)));
+            context.registerBean(PlatformFieldUiTypeFieldMappingWebController.class,
+                    () -> withService(new PlatformFieldUiTypeFieldMappingWebController(),
+                            mock(net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService.class)));
             context.refresh();
 
             Map<String, StaticModuleDefinition> byAlias = new StaticModuleDefinitionScanner(context).scan().stream()
@@ -829,6 +876,62 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
+    @Test
+    void shouldCompileCapabilitiesAndStandardActionsFromServiceWithoutWebAbilityInterfaces() {
+        Object service = mock(CrudAbility.class, withSettings().extraInterfaces(
+                EnableAbility.class, SortAbility.class, RecycleBinAbility.class));
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(ServiceDeclaredAbilityWeb.class, () -> new ServiceDeclaredAbilityWeb(service));
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.capabilities()).contains(
+                    EntityCapability.CRUD,
+                    EntityCapability.ENABLE,
+                    EntityCapability.SORT,
+                    EntityCapability.SOFT_DELETE,
+                    EntityCapability.RECYCLE_BIN
+            );
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("enable", "disable", "sort",
+                            "recycleBinQuery", "recycleBinRestore");
+        }
+    }
+
+    @Test
+    void shouldRejectServiceAbilityRedeclaredByStaticModuleAnnotation() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(RedeclaredServiceAbilityWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("must not redeclare service ability")
+                    .hasMessageContaining("demo.redeclared.ENABLE");
+        }
+    }
+
+    @Test
+    void shouldSubtractConcreteServiceDisabledOperationsFromCanonicalAbilityMethods() {
+        assertThat(StaticServiceAbilityCompiler.operationMethods(new ReadOnlyOperationService()).keySet())
+                .containsExactlyInAnyOrder(PlatformAction.VIEW, PlatformAction.QUERY);
+    }
+
+    @Test
+    void shouldNotRepublishDisabledCrudActionsFromDefaultWebMethods() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(DisabledCrudWeb.class,
+                    () -> new DisabledCrudWeb(new ReadOnlyOperationService()));
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("menu", "query", "view");
+        }
+    }
+
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
         assertThat(action.actionCode()).isEqualTo(actionCode);
         assertThat(action.permissionActionCode()).isEqualTo(actionCode);
@@ -884,6 +987,56 @@ class StaticModuleDefinitionScannerTest {
     static class StaticMeasureOrderWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<StaticMeasureOrderService> {
         StaticMeasureOrderWeb(StaticMeasureOrderService service) {
             this.service = service;
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "demo", alias = "demo.service_ability", title = "Service Ability")
+    @RequestMapping("/demo.service_ability")
+    static class ServiceDeclaredAbilityWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+        ServiceDeclaredAbilityWeb(Object service) {
+            this.service = service;
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "demo", alias = "demo.redeclared", title = "Redeclared",
+            capabilities = EntityCapability.ENABLE)
+    @RequestMapping("/demo.redeclared")
+    static class RedeclaredServiceAbilityWeb {
+    }
+
+    @DisablePlatformOperations({PlatformAction.CREATE, PlatformAction.UPDATE, PlatformAction.DELETE})
+    static final class ReadOnlyOperationService implements CrudAbility<StandardEntity> {
+        @Override
+        public BaseDao<StandardEntity, String> getDao() {
+            return null;
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return "demo.read_only";
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "demo", alias = "demo.read_only", title = "Read only")
+    @RequestMapping("/demo.read_only")
+    static final class DisabledCrudWeb implements CrudWeb<StandardEntity, ReadOnlyOperationService> {
+        private final ReadOnlyOperationService service;
+
+        DisabledCrudWeb(ReadOnlyOperationService service) {
+            this.service = service;
+        }
+
+        @Override
+        public ReadOnlyOperationService service() {
+            return service;
+        }
+
+        @Override
+        public <T> T webScope(java.util.function.Supplier<T> action) {
+            return action.get();
         }
     }
 

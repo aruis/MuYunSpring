@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -14,6 +15,8 @@ import net.ximatai.muyun.spring.boot.web.ActionEndpointInterceptor;
 import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationInterceptor;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.StaticAbilityWebEndpointRegistrar;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -54,6 +57,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigPublishService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
@@ -63,12 +67,15 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.HandlerMapping;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -95,6 +102,38 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class PlatformConfigurationWebControllerTest {
+
+    private static MockMvc abilityAwareMvc(Object... controllers) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        return MockMvcBuilders.standaloneSetup(controllers)
+                .setCustomHandlerMapping(() -> new AbilityAwareHandlerMapping(objectMapper))
+                .build();
+    }
+
+    private static final class AbilityAwareHandlerMapping extends RequestMappingHandlerMapping {
+        private final ObjectMapper objectMapper;
+
+        private AbilityAwareHandlerMapping(ObjectMapper objectMapper) {
+            this.objectMapper = objectMapper;
+        }
+
+        @Override
+        public void afterPropertiesSet() {
+            super.afterPropertiesSet();
+            DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+            ObjectProvider<net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade> provider =
+                    beanFactory.getBeanProvider(net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade.class);
+            new StaticAbilityWebEndpointRegistrar(
+                    obtainApplicationContext(),
+                    this,
+                    new RegisteredWebEndpointCatalog(),
+                    provider,
+                    objectMapper
+            ).afterSingletonsInstantiated();
+        }
+    }
+
     @Test
     void shouldExposeApplicationScopedModuleTree() throws Exception {
         PlatformModuleService service = mock(PlatformModuleService.class);
@@ -442,7 +481,7 @@ class PlatformConfigurationWebControllerTest {
                 "moduleAlias", "platform.sales.order",
                 "relationId", "rel-1"));
 
-        assertThatThrownBy(() -> controller.sort(request, "rule-1", null))
+        assertThatThrownBy(() -> controller.requireRecord(request, PlatformAction.SORT, "rule-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong to relation");
     }
@@ -510,7 +549,7 @@ class PlatformConfigurationWebControllerTest {
                 "moduleAlias", "platform.sales.order",
                 "relationId", "rel-1"));
 
-        assertThatThrownBy(() -> controller.sort(request, "view-1", null))
+        assertThatThrownBy(() -> controller.requireRecord(request, PlatformAction.SORT, "view-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong to relation");
     }
@@ -617,13 +656,13 @@ class PlatformConfigurationWebControllerTest {
         DictionaryCategory child = dictionaryCategory("category-2", "platform", "status", "category-1");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(root), 1, PageRequest.of(1, 20)));
-        when(service.rootCategories("platform")).thenReturn(List.of(root));
-        when(service.children("platform", "category-1")).thenReturn(List.of(child));
-        when(service.children("platform", "category-2")).thenReturn(List.of());
+        when(service.children(any(Criteria.class), eq("root"))).thenReturn(List.of(root));
+        when(service.children(any(Criteria.class), eq("category-1"))).thenReturn(List.of(child));
+        when(service.children(any(Criteria.class), eq("category-2"))).thenReturn(List.of());
         when(service.insert(any(DictionaryCategory.class))).thenReturn("category-1");
         when(service.select("category-1")).thenReturn(root);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = abilityAwareMvc(controller);
         mvc.perform(post("/platform.application/platform/dictionary-categories/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -674,7 +713,7 @@ class PlatformConfigurationWebControllerTest {
         ReflectionTestUtils.setField(controller, "service", service);
         when(service.select("category-1")).thenReturn(dictionaryCategory("category-1", "platform", "common", null));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = abilityAwareMvc(controller);
         mvc.perform(post("/platform.application/platform/dictionary-categories/sort/category-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -701,13 +740,13 @@ class PlatformConfigurationWebControllerTest {
         when(service.category("category-1")).thenReturn(category);
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(root), 1, PageRequest.of(1, 20)));
-        when(service.rootItems("category-1")).thenReturn(List.of(root));
-        when(service.children("category-1", "item-1")).thenReturn(List.of(child));
-        when(service.children("category-1", "item-2")).thenReturn(List.of());
+        when(service.children(any(Criteria.class), eq("root"))).thenReturn(List.of(root));
+        when(service.children(any(Criteria.class), eq("item-1"))).thenReturn(List.of(child));
+        when(service.children(any(Criteria.class), eq("item-2"))).thenReturn(List.of());
         when(service.insert(any(DictionaryItem.class))).thenReturn("item-1");
         when(service.select("item-1")).thenReturn(root);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = abilityAwareMvc(controller);
         mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -772,7 +811,7 @@ class PlatformConfigurationWebControllerTest {
         when(service.select("item-0")).thenReturn(dictionaryItem("item-0", "category-1", "status", "disabled", "parent-1"));
         when(service.select("parent-1")).thenReturn(dictionaryItem("parent-1", "category-1", "status", "group", null));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = abilityAwareMvc(controller);
         mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/sort/item-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

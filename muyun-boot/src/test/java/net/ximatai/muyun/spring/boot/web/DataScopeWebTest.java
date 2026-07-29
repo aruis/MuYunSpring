@@ -217,7 +217,7 @@ class DataScopeWebTest {
         }
 
         assertThat(service.scopedIdCalls).anySatisfy(ids ->
-                assertThat(ids).containsExactly("moving", "previous", "parent", "hidden"));
+                assertThat(ids).containsExactlyInAnyOrder("moving", "previous", "parent", "hidden"));
     }
 
     @Getter

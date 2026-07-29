@@ -1,8 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,7 +13,5 @@ import org.springframework.web.bind.annotation.RestController;
 @PlatformMenu(parent = PlatformMenuGroups.SETTINGS, title = "菜单方案", order = 10)
 @RequestMapping("/platform.menu_scheme")
 public class MenuSchemeWebController extends net.ximatai.muyun.spring.boot.web.WebSupport<MenuSchemeService>
-        implements CrudWeb<MenuScheme, MenuSchemeService>,
-        EnableWeb<MenuScheme, MenuSchemeService>,
-        SortWeb<MenuScheme, MenuSchemeService> {
+        implements CrudWeb<MenuScheme, MenuSchemeService> {
 }

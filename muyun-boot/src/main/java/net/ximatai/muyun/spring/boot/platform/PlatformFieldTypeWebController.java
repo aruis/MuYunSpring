@@ -1,8 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
@@ -16,7 +14,5 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/platform.field_type")
 public class PlatformFieldTypeWebController extends WebSupport<PlatformFieldTypeService> implements
         CrudWeb<PlatformFieldType, PlatformFieldTypeService>,
-        EnableWeb<PlatformFieldType, PlatformFieldTypeService>,
-        SortWeb<PlatformFieldType, PlatformFieldTypeService>,
         SystemScope<PlatformFieldTypeService> {
 }

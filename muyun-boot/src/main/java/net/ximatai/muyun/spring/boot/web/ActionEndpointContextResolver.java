@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContributionSupport;
+import net.ximatai.muyun.spring.boot.web.endpoint.ResolvedWebEndpoint;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -94,6 +95,18 @@ public class ActionEndpointContextResolver {
                 customRecordIds(request, endpoint),
                 CurrentUserContext.currentUser()
         ));
+    }
+
+    public ActionExecutionContext resolve(HttpServletRequest request, ResolvedWebEndpoint endpoint) {
+        ActionExecutionPolicy policy = registeredPolicy(
+                endpoint.moduleAlias(), endpoint.executionPolicy().actionCode())
+                .orElse(endpoint.executionPolicy());
+        return ActionExecutionContext.ofPolicy(
+                endpoint.moduleAlias(),
+                policy,
+                recordIds(request),
+                CurrentUserContext.currentUser()
+        );
     }
 
     private PlatformStaticActionContribution contribution(HandlerMethod handlerMethod) {

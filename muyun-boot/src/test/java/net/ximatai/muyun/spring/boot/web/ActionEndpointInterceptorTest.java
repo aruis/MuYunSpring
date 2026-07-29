@@ -19,6 +19,9 @@ import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpoint;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.ResolvedWebEndpoint;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -28,10 +31,13 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -55,6 +61,7 @@ class ActionEndpointInterceptorTest {
         CurrentUserContext.clear();
         ActingContextHolder.clear();
         ActionExecutionContextHolder.clear();
+        MDC.clear();
     }
 
     @Test
@@ -80,6 +87,66 @@ class ActionEndpointInterceptorTest {
                     handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class)), null);
             assertThat(ActionExecutionContextHolder.current()).isEmpty();
         }
+    }
+
+    @Test
+    void shouldAuthorizeCompiledEndpointFromRegisteredCatalogWithoutControllerDeclaration() throws Exception {
+        StaticScopedWeb endpointHandler = new StaticScopedWeb();
+        Method method = CrudWeb.class.getMethod("query", WebQueryRequest.class);
+        RegisteredWebEndpointCatalog catalog = new RegisteredWebEndpointCatalog();
+        ResolvedWebEndpoint definition = new ResolvedWebEndpoint(
+                "platform.application.enable.enable",
+                "platform.application",
+                "enable",
+                "enable",
+                PlatformAction.ENABLE,
+                RequestMethod.POST,
+                "/platform.application/enable/{id}",
+                ResolvedWebEndpoint.Source.STATIC_ABILITY
+        );
+        RequestMappingInfo mapping = RequestMappingInfo.paths(definition.path())
+                .methods(definition.method())
+                .build();
+        catalog.register(new RegisteredWebEndpoint(definition, mapping, endpointHandler, method));
+        ActionEndpointInterceptor compiledInterceptor = new ActionEndpointInterceptor(
+                policyService,
+                new ActionEndpointContextResolver(),
+                null,
+                catalog
+        );
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/platform.application/enable/app-1");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "app-1"));
+
+        compiledInterceptor.preHandle(request, new MockHttpServletResponse(), handler(endpointHandler, method));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("platform.application");
+            assertThat(context.platformAction()).isEqualTo(PlatformAction.ENABLE);
+            assertThat(context.recordIds()).containsExactly("app-1");
+        });
+    }
+
+    @Test
+    void shouldExposeAndClearCompiledEndpointIdInLogContext() throws Exception {
+        StaticScopedWeb endpointHandler = new StaticScopedWeb();
+        Method method = CrudWeb.class.getMethod("query", WebQueryRequest.class);
+        RegisteredWebEndpointCatalog catalog = new RegisteredWebEndpointCatalog();
+        ResolvedWebEndpoint definition = new ResolvedWebEndpoint(
+                "platform.application.enable.enable", "platform.application", "enable", "enable",
+                PlatformAction.ENABLE, RequestMethod.POST, "/platform.application/enable/{id}",
+                ResolvedWebEndpoint.Source.STATIC_ABILITY);
+        RequestMappingInfo mapping = RequestMappingInfo.paths(definition.path()).methods(definition.method()).build();
+        catalog.register(new RegisteredWebEndpoint(definition, mapping, endpointHandler, method));
+        ActionEndpointInterceptor compiledInterceptor = new ActionEndpointInterceptor(
+                policyService, new ActionEndpointContextResolver(), null, catalog);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/platform.application/enable/app-1");
+
+        compiledInterceptor.preHandle(request, new MockHttpServletResponse(), handler(endpointHandler, method));
+        assertThat(MDC.get("endpointId")).isEqualTo(definition.endpointId());
+
+        compiledInterceptor.afterCompletion(request, new MockHttpServletResponse(), handler(endpointHandler, method), null);
+        assertThat(MDC.get("endpointId")).isNull();
     }
 
     @Test

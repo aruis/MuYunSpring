@@ -9,10 +9,9 @@ import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.ScopedTreeWeb;
 import net.ximatai.muyun.spring.boot.web.TreeScope;
+import net.ximatai.muyun.spring.boot.web.ScopedTreeWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
@@ -31,8 +30,7 @@ import java.util.Optional;
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,
-        EnableWeb<Department, DepartmentService>,
-        ScopedTreeWeb<Department, DepartmentService>,
+        ScopedTreeWebProjectionPolicy<Department, DepartmentService>,
         MutationTenantScopeResolver<Department>,
         StaticModuleUiContributor {
     private OrganizationService organizationService;

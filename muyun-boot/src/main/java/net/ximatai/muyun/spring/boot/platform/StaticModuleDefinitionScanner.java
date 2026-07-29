@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.web.RecycleBinPurgeWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
+import net.ximatai.muyun.spring.boot.web.StandardWebEndpoint;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
@@ -55,11 +56,12 @@ public class StaticModuleDefinitionScanner {
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
         validateScopeAlias(beanClass, module);
         List<RelationProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
+        java.util.Set<EntityCapability> capabilities = capabilities(bean, module);
         return StaticModuleDefinition.builder(module.application(), module.alias(), module.title())
                 .parentModuleAlias(module.parent().isBlank() ? null : module.parent())
                 .entry(entryType(module), module.route(), module.externalUrl())
-                .capabilities(java.util.Set.of(module.capabilities()))
-                .actions(actions(beanClass, java.util.Set.of(module.capabilities())))
+                .capabilities(capabilities)
+                .actions(actions(bean, beanClass, capabilities))
                 .entities(entities(bean, module, projectionJoins))
                 .uiDefinition(uiDefinition(bean, module))
                 .references(references(bean))
@@ -67,6 +69,19 @@ public class StaticModuleDefinitionScanner {
                 .modelClass(modelClass(bean))
                 .projectionJoins(projectionJoins)
                 .build();
+    }
+
+    private java.util.Set<EntityCapability> capabilities(Object bean, PlatformStaticModule module) {
+        java.util.EnumSet<EntityCapability> capabilities = java.util.EnumSet.noneOf(EntityCapability.class);
+        for (EntityCapability declared : module.capabilities()) {
+            if (StaticServiceAbilityCompiler.isServiceDeclared(declared)) {
+                throw new IllegalStateException("@PlatformStaticModule must not redeclare service ability: "
+                        + module.alias() + "." + declared.name());
+            }
+            capabilities.add(declared);
+        }
+        capabilities.addAll(StaticServiceAbilityCompiler.compile(service(bean)));
+        return java.util.Set.copyOf(capabilities);
     }
 
     private Class<?> modelClass(Object bean) {
@@ -222,13 +237,16 @@ public class StaticModuleDefinitionScanner {
         return value == null ? "" : value.replace("-", "_").toLowerCase(java.util.Locale.ROOT);
     }
 
-    private List<StaticModuleActionDefinition> actions(Class<?> beanClass,
+    private List<StaticModuleActionDefinition> actions(Object bean,
+                                                       Class<?> beanClass,
                                                        java.util.Set<EntityCapability> capabilities) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
         addMenuAction(actions, beanClass);
-        addStandardActions(actions, beanClass);
+        addStandardActions(actions, bean, beanClass);
         addWorkflowActions(actions, capabilities);
-        ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service(bean));
+        ReflectionUtils.doWithMethods(beanClass,
+                method -> addAnnotatedAction(actions, method, disabledActions));
         return List.copyOf(actions.values());
     }
 
@@ -249,7 +267,7 @@ public class StaticModuleDefinitionScanner {
             }
             LinkedHashMap<String, StaticModuleActionDefinition> merged = new LinkedHashMap<>();
             target.actions().forEach(action -> merged.put(action.actionCode(), action));
-            contributionActions(beanClass, contribution)
+            contributionActions(bean, beanClass, contribution)
                     .forEach(action -> mergeContributionAction(target.moduleAlias(), beanClass, merged, action));
             List<EntityDefinition> entities = mergeContributionEntities(
                     target.moduleAlias(), beanClass, target.entities(), contributionEntities(bean, contribution));
@@ -360,12 +378,14 @@ public class StaticModuleDefinitionScanner {
         actions.put(action.actionCode(), action);
     }
 
-    private List<StaticModuleActionDefinition> contributionActions(Class<?> beanClass,
+    private List<StaticModuleActionDefinition> contributionActions(Object bean,
+                                                                   Class<?> beanClass,
                                                                    PlatformStaticActionContribution contribution) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
-        addContributionStandardActions(actions, beanClass, contribution);
+        addContributionStandardActions(actions, bean, beanClass, contribution);
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service(bean));
         ReflectionUtils.doWithMethods(beanClass, method -> addContributionAnnotatedAction(actions, method,
-                contribution));
+                contribution, disabledActions));
         return List.copyOf(actions.values());
     }
 
@@ -375,19 +395,42 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
-    private void addStandardActions(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
+    private void addStandardActions(Map<String, StaticModuleActionDefinition> actions,
+                                    Object bean,
+                                    Class<?> beanClass) {
+        Object service = service(bean);
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service);
         if (CrudWeb.class.isAssignableFrom(beanClass)) {
-            addPlatform(actions, PlatformAction.MENU);
-            addPlatform(actions, PlatformAction.CREATE);
-            addPlatform(actions, PlatformAction.VIEW);
-            addPlatform(actions, PlatformAction.UPDATE);
-            addPlatform(actions, PlatformAction.DELETE);
-            addPlatform(actions, PlatformAction.QUERY);
+            addPlatformUnlessDisabled(actions, PlatformAction.MENU, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.CREATE, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.VIEW, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.UPDATE, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.DELETE, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.QUERY, disabledActions);
         } else if (ReadOnlyWeb.class.isAssignableFrom(beanClass)) {
-            addPlatform(actions, PlatformAction.MENU);
-            addPlatform(actions, PlatformAction.VIEW);
-            addPlatform(actions, PlatformAction.QUERY);
+            addPlatformUnlessDisabled(actions, PlatformAction.MENU, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.VIEW, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.QUERY, disabledActions);
         }
+        StaticServiceAbilityCompiler.standardActions(service).forEach(action -> addPlatform(actions, action));
+        if (service == null) {
+            addUnwiredLegacyAbilityActions(actions, beanClass);
+        }
+        if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
+            addPlatformUnlessDisabled(actions, PlatformAction.REFERENCE, disabledActions);
+        }
+    }
+
+    private void addPlatformUnlessDisabled(Map<String, StaticModuleActionDefinition> actions,
+                                           PlatformAction action,
+                                           java.util.Set<PlatformAction> disabledActions) {
+        if (!disabledActions.contains(action)) {
+            addPlatform(actions, action);
+        }
+    }
+
+    private void addUnwiredLegacyAbilityActions(Map<String, StaticModuleActionDefinition> actions,
+                                                Class<?> beanClass) {
         if (TreeWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.TREE);
             addPlatform(actions, PlatformAction.SORT);
@@ -405,43 +448,56 @@ public class StaticModuleDefinitionScanner {
         if (RecycleBinPurgeWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.RECYCLE_BIN_PURGE);
         }
-        if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
-            addPlatform(actions, PlatformAction.REFERENCE);
-        }
     }
 
     private void addContributionStandardActions(Map<String, StaticModuleActionDefinition> actions,
+                                                Object bean,
                                                 Class<?> beanClass,
                                                 PlatformStaticActionContribution contribution) {
+        Object service = service(bean);
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service);
         if (CrudWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.CREATE);
-            addContributionPlatform(actions, contribution, PlatformAction.VIEW);
-            addContributionPlatform(actions, contribution, PlatformAction.UPDATE);
-            addContributionPlatform(actions, contribution, PlatformAction.DELETE);
-            addContributionPlatform(actions, contribution, PlatformAction.QUERY);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.CREATE, disabledActions);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.VIEW, disabledActions);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.UPDATE, disabledActions);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.DELETE, disabledActions);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.QUERY, disabledActions);
         } else if (ReadOnlyWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.VIEW);
-            addContributionPlatform(actions, contribution, PlatformAction.QUERY);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.VIEW, disabledActions);
+            addContributionUnlessDisabled(actions, contribution, PlatformAction.QUERY, disabledActions);
         }
-        if (TreeWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.TREE);
-            addContributionPlatform(actions, contribution, PlatformAction.SORT);
-        } else if (SortWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.SORT);
-        }
-        if (EnableWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.ENABLE);
-            addContributionPlatform(actions, contribution, PlatformAction.DISABLE);
-        }
-        if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_QUERY);
-            addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_RESTORE);
-        }
-        if (RecycleBinPurgeWeb.class.isAssignableFrom(beanClass)) {
-            addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_PURGE);
+        StaticServiceAbilityCompiler.standardActions(service)
+                .forEach(action -> addContributionPlatform(actions, contribution, action));
+        if (service == null) {
+            if (TreeWeb.class.isAssignableFrom(beanClass)) {
+                addContributionPlatform(actions, contribution, PlatformAction.TREE);
+                addContributionPlatform(actions, contribution, PlatformAction.SORT);
+            } else if (SortWeb.class.isAssignableFrom(beanClass)) {
+                addContributionPlatform(actions, contribution, PlatformAction.SORT);
+            }
+            if (EnableWeb.class.isAssignableFrom(beanClass)) {
+                addContributionPlatform(actions, contribution, PlatformAction.ENABLE);
+                addContributionPlatform(actions, contribution, PlatformAction.DISABLE);
+            }
+            if (RecycleBinWeb.class.isAssignableFrom(beanClass)) {
+                addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_QUERY);
+                addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_RESTORE);
+            }
+            if (RecycleBinPurgeWeb.class.isAssignableFrom(beanClass)) {
+                addContributionPlatform(actions, contribution, PlatformAction.RECYCLE_BIN_PURGE);
+            }
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
             addContributionPlatform(actions, contribution, PlatformAction.REFERENCE);
+        }
+    }
+
+    private void addContributionUnlessDisabled(Map<String, StaticModuleActionDefinition> actions,
+                                               PlatformStaticActionContribution contribution,
+                                               PlatformAction action,
+                                               java.util.Set<PlatformAction> disabledActions) {
+        if (!disabledActions.contains(action)) {
+            addContributionPlatform(actions, contribution, action);
         }
     }
 
@@ -456,9 +512,12 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
-    private void addAnnotatedAction(Map<String, StaticModuleActionDefinition> actions, Method method) {
+    private void addAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
+                                    Method method,
+                                    java.util.Set<PlatformAction> disabledActions) {
         ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
-        if (standard != null) {
+        if (standard != null && (!disabledActions.contains(standard.value())
+                || !StandardWebEndpoint.isDefault(method))) {
             addPlatform(actions, standard.value());
         }
         CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);
@@ -478,9 +537,11 @@ public class StaticModuleDefinitionScanner {
 
     private void addContributionAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
                                                 Method method,
-                                                PlatformStaticActionContribution contribution) {
+                                                PlatformStaticActionContribution contribution,
+                                                java.util.Set<PlatformAction> disabledActions) {
         ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
-        if (standard != null) {
+        if (standard != null && (!disabledActions.contains(standard.value())
+                || !StandardWebEndpoint.isDefault(method))) {
             addContributionPlatform(actions, contribution, standard.value());
         }
         CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);

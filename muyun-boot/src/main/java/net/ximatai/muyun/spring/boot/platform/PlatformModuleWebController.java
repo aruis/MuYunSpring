@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.StandardMutation;
 import net.ximatai.muyun.spring.boot.web.StandardMutationKind;
 import net.ximatai.muyun.spring.boot.web.StandardMutationResultSupport;
@@ -40,7 +39,6 @@ import java.util.List;
 @RequestMapping("/platform.module")
 public class PlatformModuleWebController extends WebSupport<PlatformModuleService> implements
         CrudWeb<PlatformModule, PlatformModuleService>,
-        EnableWeb<PlatformModule, PlatformModuleService>,
         SystemScope<PlatformModuleService> {
 
     private PlatformDynamicRuntimeRefreshService runtimeRefreshService;

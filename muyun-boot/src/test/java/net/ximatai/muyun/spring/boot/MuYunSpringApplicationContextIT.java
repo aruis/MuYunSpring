@@ -4,14 +4,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.RecycleBinAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticWebProjection;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.platform.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.ResolvedWebEndpoint;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.deletion.DeletionEntry;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
@@ -30,11 +42,14 @@ import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -43,6 +58,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -54,8 +71,12 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -104,6 +125,12 @@ class MuYunSpringApplicationContextIT {
     @Autowired
     private RecycleBinFacade recycleBinFacade;
 
+    @Autowired
+    private RegisteredWebEndpointCatalog registeredWebEndpointCatalog;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
     private TestRestTemplate restTemplate;
 
     @LocalServerPort
@@ -126,6 +153,208 @@ class MuYunSpringApplicationContextIT {
 
     @Test
     void shouldLoadApplicationContextWithRealDatabase() {
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .extracting(endpoint -> endpoint.definition().endpointId())
+                .contains("platform.application.enable.enable", "platform.application.enable.disable",
+                        "platform.application.sort.sort", "platform.application.recycleBin.query",
+                        "platform.application.recycleBin.restore");
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .filteredOn(endpoint -> !endpoint.definition().abilityCode().equals("controller"))
+                .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
+                        .isEqualTo(ResolvedWebEndpoint.Source.STATIC_ABILITY));
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .filteredOn(endpoint -> endpoint.definition().abilityCode().equals("controller"))
+                .isNotEmpty()
+                .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
+                        .isEqualTo(ResolvedWebEndpoint.Source.STATIC_EXPLICIT));
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("iam.organization"))
+                .filter(endpoint -> endpoint.definition().source() == ResolvedWebEndpoint.Source.STATIC_ABILITY))
+                .extracting(endpoint -> endpoint.definition().endpointId())
+                .contains("iam.organization.enable.enable", "iam.organization.enable.disable",
+                        "iam.organization.tree.tree", "iam.organization.tree.subtree",
+                        "iam.organization.tree.sort");
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.module"))
+                .filter(endpoint -> endpoint.definition().source() == ResolvedWebEndpoint.Source.STATIC_ABILITY))
+                .extracting(endpoint -> endpoint.definition().action())
+                .doesNotContain(net.ximatai.muyun.spring.common.platform.PlatformAction.TREE,
+                        net.ximatai.muyun.spring.common.platform.PlatformAction.SORT);
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().abilityCode().startsWith("item.")))
+                .extracting(endpoint -> endpoint.definition().executionPolicy().actionCode())
+                .contains("item_enable", "item_disable", "item_tree", "item_sort");
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .map(endpoint -> endpoint.definition().path()))
+                .contains("/platform.measure_unit/categories/enable/{id}",
+                        "/platform.measure_unit/categories/{categoryAlias}/units/enable/{id}",
+                        "/platform.measure_unit/conversion-rules/enable/{id}");
+    }
+
+    @Test
+    void shouldKeepAllStaticAbilityEndpointMappingsComplete() {
+        Set<ExpectedEndpoint> expected = expectedStaticAbilityEndpoints();
+        Set<ExpectedEndpoint> actual = registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().source() == ResolvedWebEndpoint.Source.STATIC_ABILITY)
+                .map(endpoint -> new ExpectedEndpoint(
+                        endpoint.definition().moduleAlias(),
+                        endpoint.definition().action(),
+                        endpoint.definition().method(),
+                        endpoint.definition().path()
+                ))
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    private Set<ExpectedEndpoint> expectedStaticAbilityEndpoints() {
+        Set<ExpectedEndpoint> expected = new LinkedHashSet<>();
+        addModuleEndpoints(expected);
+        addContributionEndpoints(expected);
+        addAdditionalProjectionEndpoints(expected);
+        return Set.copyOf(expected);
+    }
+
+    private void addModuleEndpoints(Set<ExpectedEndpoint> expected) {
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticModule.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            if (!(bean instanceof ScopedWeb<?> anchor)) {
+                continue;
+            }
+            Class<?> type = AopUtils.getTargetClass(bean);
+            PlatformStaticModule module = AnnotationUtils.findAnnotation(type, PlatformStaticModule.class);
+            if (module != null) {
+                addExpectedEndpoints(expected, module.alias(), basePaths(type, module.alias()), anchor.service(), Set.of());
+            }
+        }
+    }
+
+    private void addContributionEndpoints(Set<ExpectedEndpoint> expected) {
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticActionContribution.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            if (!(bean instanceof ScopedWeb<?> anchor)) {
+                continue;
+            }
+            Class<?> type = AopUtils.getTargetClass(bean);
+            PlatformStaticActionContribution contribution =
+                    AnnotationUtils.findAnnotation(type, PlatformStaticActionContribution.class);
+            if (contribution != null) {
+                addExpectedEndpoints(expected, contribution.targetModule(),
+                        basePaths(type, contribution.targetModule()), anchor.service(), Set.of());
+            }
+        }
+    }
+
+    private void addAdditionalProjectionEndpoints(Set<ExpectedEndpoint> expected) {
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticWebProjection.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            if (!(bean instanceof ScopedWeb<?> anchor)) {
+                continue;
+            }
+            Class<?> type = AopUtils.getTargetClass(bean);
+            PlatformStaticWebProjection projection =
+                    AnnotationUtils.findAnnotation(type, PlatformStaticWebProjection.class);
+            if (projection != null) {
+                addExpectedEndpoints(expected, projection.module(), basePaths(type, projection.module()),
+                        anchor.service(), disabledOperations(projection));
+            }
+        }
+    }
+
+    private void addExpectedEndpoints(Set<ExpectedEndpoint> expected,
+                                      String moduleAlias,
+                                      List<String> basePaths,
+                                      Object service,
+                                      Set<PlatformAction> locallyDisabled) {
+        if (service instanceof EnableAbility<?> && !locallyDisabled.contains(PlatformAction.ENABLE)
+                && StaticServiceAbilityCompiler.operationMethods(service).containsKey(PlatformAction.ENABLE)) {
+            add(expected, moduleAlias, PlatformAction.ENABLE, RequestMethod.POST, basePaths, "/enable/{id}");
+        }
+        if (service instanceof EnableAbility<?> && !locallyDisabled.contains(PlatformAction.DISABLE)
+                && StaticServiceAbilityCompiler.operationMethods(service).containsKey(PlatformAction.DISABLE)) {
+            add(expected, moduleAlias, PlatformAction.DISABLE, RequestMethod.POST, basePaths, "/disable/{id}");
+        }
+        if (service instanceof TreeAbility<?>) {
+            if (enabled(service, PlatformAction.TREE, locallyDisabled)) {
+                add(expected, moduleAlias, PlatformAction.TREE, RequestMethod.GET, basePaths, "/tree");
+                add(expected, moduleAlias, PlatformAction.TREE, RequestMethod.GET, basePaths, "/tree/{id}");
+            }
+            if (enabled(service, PlatformAction.SORT, locallyDisabled)) {
+                add(expected, moduleAlias, PlatformAction.SORT, RequestMethod.POST, basePaths, "/sort/{id}");
+            }
+        } else if (service instanceof SortAbility<?> && enabled(service, PlatformAction.SORT, locallyDisabled)) {
+            add(expected, moduleAlias, PlatformAction.SORT, RequestMethod.POST, basePaths, "/sort/{id}");
+        }
+        if (service instanceof RecycleBinAbility<?> recycleBinAbility) {
+            if (enabled(service, PlatformAction.RECYCLE_BIN_QUERY, locallyDisabled)) {
+                add(expected, moduleAlias, PlatformAction.RECYCLE_BIN_QUERY, RequestMethod.POST,
+                        basePaths, "/recycle-bin/query");
+            }
+            if (enabled(service, PlatformAction.RECYCLE_BIN_RESTORE, locallyDisabled)) {
+                add(expected, moduleAlias, PlatformAction.RECYCLE_BIN_RESTORE, RequestMethod.POST,
+                        basePaths, "/recycle-bin/{sourceDeleteOperationId}/restore");
+            }
+            if (recycleBinAbility.isRecycleBinPurgeEnabled()
+                    && enabled(service, PlatformAction.RECYCLE_BIN_PURGE, locallyDisabled)) {
+                add(expected, moduleAlias, PlatformAction.RECYCLE_BIN_PURGE, RequestMethod.POST,
+                        basePaths, "/recycle-bin/{sourceDeleteOperationId}/purge");
+            }
+        }
+    }
+
+    private boolean enabled(Object service, PlatformAction action, Set<PlatformAction> locallyDisabled) {
+        return !locallyDisabled.contains(action) && !StaticServiceAbilityCompiler.disabledActions(service).contains(action);
+    }
+
+    private Set<PlatformAction> disabledOperations(PlatformStaticWebProjection projection) {
+        if (projection.disabledOperations().length == 0) {
+            return Set.of();
+        }
+        EnumSet<PlatformAction> disabled = EnumSet.noneOf(PlatformAction.class);
+        java.util.Collections.addAll(disabled, projection.disabledOperations());
+        return Set.copyOf(disabled);
+    }
+
+    private List<String> basePaths(Class<?> type, String moduleAlias) {
+        RequestMapping mapping = AnnotationUtils.findAnnotation(type, RequestMapping.class);
+        if (mapping == null) {
+            return List.of("/" + moduleAlias);
+        }
+        String[] values = mapping.path().length == 0 ? mapping.value() : mapping.path();
+        return values.length == 0 ? List.of("/" + moduleAlias)
+                : Arrays.stream(values).map(this::normalizePath).toList();
+    }
+
+    private void add(Set<ExpectedEndpoint> expected,
+                     String moduleAlias,
+                     PlatformAction action,
+                     RequestMethod method,
+                     List<String> basePaths,
+                     String operationPath) {
+        for (String basePath : basePaths) {
+            expected.add(new ExpectedEndpoint(moduleAlias, action, method,
+                    normalizePath(basePath) + normalizePath(operationPath)));
+        }
+    }
+
+    private String normalizePath(String path) {
+        if (path == null || path.isBlank() || "/".equals(path.trim())) {
+            return "";
+        }
+        String normalized = path.trim();
+        if (!normalized.startsWith("/")) {
+            normalized = "/" + normalized;
+        }
+        return normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
+    }
+
+    private record ExpectedEndpoint(String moduleAlias,
+                                    PlatformAction action,
+                                    RequestMethod method,
+                                    String path) {
     }
 
     @Test

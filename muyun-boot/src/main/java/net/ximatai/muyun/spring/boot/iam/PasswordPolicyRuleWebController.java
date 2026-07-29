@@ -4,8 +4,6 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.user.PasswordPolicyRule;
@@ -20,7 +18,5 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/iam.password_policy_rule")
 public class PasswordPolicyRuleWebController extends WebSupport<PasswordPolicyRuleService> implements
         CrudWeb<PasswordPolicyRule, PasswordPolicyRuleService>,
-        EnableWeb<PasswordPolicyRule, PasswordPolicyRuleService>,
-        SortWeb<PasswordPolicyRule, PasswordPolicyRuleService>,
         SystemScope<PasswordPolicyRuleService> {
 }

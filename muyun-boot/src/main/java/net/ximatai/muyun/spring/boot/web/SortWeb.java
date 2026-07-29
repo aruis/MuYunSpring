@@ -14,7 +14,8 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public interface SortWeb<T extends SortCapable, S extends SortAbility<T>> extends ScopedWeb<S> {
+public interface SortWeb<T extends SortCapable, S extends SortAbility<T>>
+        extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
     @ActionEndpoint(PlatformAction.SORT)
     @StandardMutation(StandardMutationKind.SORT)
