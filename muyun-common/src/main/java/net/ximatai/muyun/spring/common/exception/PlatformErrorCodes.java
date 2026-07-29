@@ -9,6 +9,7 @@ public final class PlatformErrorCodes {
     public static final String APPLICATION_NOT_OPENED = "APPLICATION_NOT_OPENED";
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String CONFLICT_VERSION = "CONFLICT_VERSION";
+    public static final String CONFLICT_UNIQUE = "CONFLICT_UNIQUE";
     public static final String RESOURCE_IN_USE = "RESOURCE_IN_USE";
     /**
      * A create command reused the identifier of a record retained by soft deletion.

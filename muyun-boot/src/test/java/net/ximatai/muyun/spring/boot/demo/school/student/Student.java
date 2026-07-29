@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardTitledEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
 import java.util.List;
 import java.util.Set;
@@ -18,6 +19,7 @@ import java.util.Set;
 @Getter
 @Setter
 @Table(name = "education_student", comment = "学生")
+@TenantUniqueConstraint(fields = "studentNo", message = "studentNo already exists in the current tenant")
 public class Student extends StandardTitledEntity implements EnabledCapable {
     @Column(name = "student_no", type = ColumnType.VARCHAR, length = 32, nullable = false)
     private String studentNo;

@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.common.schema;
 import net.ximatai.muyun.database.core.annotation.AnnotationProcessor;
 import net.ximatai.muyun.database.core.annotation.Indexed;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.common.model.constraint.StaticTenantUniqueConstraints;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
 import java.lang.reflect.Field;
@@ -24,6 +25,7 @@ public class StaticEntityTableMapper {
         TableWrapper table = AnnotationProcessor.fromEntityClass(modelClass);
         PlatformUniqueIndexes.normalizeTenantUniqueIndexes(table);
         addTenantUniqueIndexesFromFields(table, modelClass);
+        addDeclaredTenantUniqueConstraints(table, modelClass);
         tableValidator.requireStandardEntityTable(table, modelClass.getName());
         return table;
     }
@@ -48,6 +50,35 @@ public class StaticEntityTableMapper {
             }
             current = current.getSuperclass();
         }
+    }
+
+    private void addDeclaredTenantUniqueConstraints(TableWrapper table, Class<?> modelClass) {
+        StaticTenantUniqueConstraints.resolve(modelClass).forEach(constraint -> PlatformUniqueIndexes.addTenantUniqueIndex(
+                table,
+                constraint.fieldNames().stream()
+                        .map(field -> columnName(modelClass, field))
+                        .toList()
+        ));
+    }
+
+    private String columnName(Class<?> modelClass, String fieldName) {
+        Class<?> current = modelClass;
+        while (current != null && current != Object.class) {
+            try {
+                Field field = current.getDeclaredField(fieldName);
+                net.ximatai.muyun.database.core.annotation.Column column =
+                        field.getAnnotation(net.ximatai.muyun.database.core.annotation.Column.class);
+                if (column == null) {
+                    throw new IllegalArgumentException("tenant unique constraint field must declare @Column: "
+                            + modelClass.getName() + "." + fieldName);
+                }
+                return columnName(field, column);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new IllegalArgumentException("unknown tenant unique constraint field: "
+                + modelClass.getName() + "." + fieldName);
     }
 
     private String columnName(Field field, net.ximatai.muyun.database.core.annotation.Column column) {

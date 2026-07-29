@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.model.constraint.StaticTenantUniqueConstraints;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 import java.lang.reflect.Field;
@@ -29,9 +30,13 @@ public class StaticEntityDefinitionCompiler {
         }
         return new EntityDefinition(
                 PlatformNameRules.requireIdentifier(entityAlias, "static entity alias"),
+                EntityDefinition.DEFAULT_SCHEMA_NAME,
                 table.name(),
                 entityName == null || entityName.isBlank() ? tableName(table, modelClass) : entityName.trim(),
-                fields(modelClass)
+                fields(modelClass),
+                Set.of(net.ximatai.muyun.spring.common.platform.EntityCapability.CRUD),
+                List.of(),
+                StaticTenantUniqueConstraints.resolve(modelClass)
         );
     }
 

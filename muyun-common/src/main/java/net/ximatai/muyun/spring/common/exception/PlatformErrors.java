@@ -16,7 +16,22 @@ public final class PlatformErrors {
     }
 
     public static PlatformException conflict(String code, String message, Map<String, Object> details) {
-        return new PlatformException(code, 409, message, ErrorScope.empty(), List.of(), details);
+        return conflict(code, message, ErrorScope.empty(), details);
+    }
+
+    public static PlatformException conflict(String code,
+                                             String message,
+                                             ErrorScope scope,
+                                             Map<String, Object> details) {
+        return new PlatformException(code, 409, message, scope, List.of(), details);
+    }
+
+    public static PlatformException conflict(String code,
+                                             String message,
+                                             Throwable cause,
+                                             ErrorScope scope,
+                                             Map<String, Object> details) {
+        return new PlatformException(code, 409, message, cause, scope, List.of(), details);
     }
 
     /**

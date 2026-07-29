@@ -5,7 +5,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.ErrorScope;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
@@ -98,7 +99,9 @@ public interface DataScopeAbility<T extends EntityContract> extends CrudAbility<
         DataScopeCriteriaResult scope = readScopeByPolicy(policy, criteria);
         long visible = withDataScopeTenant(scope, () -> count(scope.criteria()));
         if (visible != normalized.size()) {
-            throw new PlatformException("record data permission denied: " + getModuleAlias() + "." + policy.actionCode());
+            throw new PlatformAccessDeniedException(
+                    "record data permission denied: " + getModuleAlias() + "." + policy.actionCode(),
+                    ErrorScope.module(getModuleAlias()).action(policy.actionCode()));
         }
         return scope;
     }

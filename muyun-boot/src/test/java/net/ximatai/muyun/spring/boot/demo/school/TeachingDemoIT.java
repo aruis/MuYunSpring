@@ -134,6 +134,27 @@ class TeachingDemoIT {
     }
 
     @Test
+    void shouldEnforceDeclaredTenantUniqueConstraintsIncludingSoftDeletedRecords() {
+        String serial = serial();
+        String code = "unique-" + serial;
+        try (TenantContext.Scope ignored = TenantContext.use("campus-unique-a")) {
+            String firstId = hobbies.insert(new Hobby(code, "唯一爱好", TreeAbility.ROOT_ID));
+
+            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "重复爱好", TreeAbility.ROOT_ID)))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessage("hobby code already exists in the current tenant");
+
+            assertThat(hobbies.delete(firstId)).isEqualTo(1);
+            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "软删后重复", TreeAbility.ROOT_ID)))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessage("hobby code already exists in the current tenant");
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("campus-unique-b")) {
+            assertThat(hobbies.insert(new Hobby(code, "另一租户爱好", TreeAbility.ROOT_ID))).isNotBlank();
+        }
+    }
+
+    @Test
     void shouldUsePlatformDictionaryForTeacherTeachingSubject() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo dictionary")) {
             assertThat(optionSources.source(OptionBinding.dictionary("education", "teaching_subject"))

@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformErrors;
 import net.ximatai.muyun.spring.common.web.RequestTraceContext;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -83,6 +85,20 @@ class PlatformWebExceptionHandlerTest {
     }
 
     @Test
+    void shouldReturnAccessDeniedContractWithScope() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/access-denied"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.ACCESS_DENIED))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.scope.moduleAlias").value("iam.user"))
+                .andExpect(jsonPath("$.scope.actionCode").value("update"))
+                .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.ACCESS_DENIED))
+                .andExpect(jsonPath("$.actionMessage.type").value("ERROR"));
+    }
+
+    @Test
     void shouldReturnUnifiedEnvelopeForConfigurationErrorWithScope() throws Exception {
         MockMvc mvc = mvc(new DemoController());
 
@@ -105,6 +121,19 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.CONFLICT_VERSION))
                 .andExpect(jsonPath("$.actionMessage.text").value("record version conflict"))
                 .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
+    }
+
+    @Test
+    void shouldReturnUniqueConflictContractWithScopeAndDetails() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/unique-conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_UNIQUE))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.scope.moduleAlias").value("school.hobby"))
+                .andExpect(jsonPath("$.details.fields[0]").value("code"))
+                .andExpect(jsonPath("$.actionMessage").doesNotExist());
     }
 
     @Test
@@ -157,6 +186,12 @@ class PlatformWebExceptionHandlerTest {
             throw new AuthenticationRequiredException("current user context is not available");
         }
 
+        @GetMapping("/demo/access-denied")
+        String accessDenied() {
+            throw new PlatformAccessDeniedException("record data permission denied",
+                    ErrorScope.module("iam.user").action("update"));
+        }
+
         @GetMapping("/demo/config")
         String config() {
             throw PlatformErrors.config("DYNAMIC_DESCRIPTOR_MISSING", "模块页面配置不存在",
@@ -166,6 +201,12 @@ class PlatformWebExceptionHandlerTest {
         @GetMapping("/demo/optimistic-lock")
         String optimisticLock() {
             throw new OptimisticLockException("record version conflict");
+        }
+
+        @GetMapping("/demo/unique-conflict")
+        String uniqueConflict() {
+            throw PlatformErrors.conflict(PlatformErrorCodes.CONFLICT_UNIQUE,
+                    "hobby code already exists", ErrorScope.module("school.hobby"), Map.of("fields", List.of("code")));
         }
 
         @GetMapping("/demo/bad-request")

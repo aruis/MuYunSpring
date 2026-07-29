@@ -122,6 +122,7 @@ public class ModuleDefinitionValidator {
             validateMeasureUnit(entity, field, fields);
             validateMoney(entity, field, fields);
         }
+        validateTenantUniqueConstraints(entity, fields);
         if (!entity.supports(EntityCapability.CRUD)) {
             throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.alias());
         }
@@ -154,6 +155,25 @@ public class ModuleDefinitionValidator {
         }
         FieldCompanionRules.validateEntity(entity);
         validateFormulaRules(entity);
+    }
+
+    private void validateTenantUniqueConstraints(EntityDefinition entity, List<FieldDefinition> fields) {
+        Set<List<String>> declared = new HashSet<>();
+        for (net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition constraint
+                : entity.tenantUniqueConstraints()) {
+            if (!declared.add(constraint.fieldNames())) {
+                throw new ModuleDefinitionException("duplicate tenant unique constraint: "
+                        + entity.alias() + "." + String.join(",", constraint.fieldNames()));
+            }
+            for (String fieldName : constraint.fieldNames()) {
+                boolean physical = fields.stream().anyMatch(field -> field.fieldName().equals(fieldName)
+                        && field.isPhysical());
+                if (!physical) {
+                    throw new ModuleDefinitionException("tenant unique constraint requires physical field: "
+                            + entity.alias() + "." + fieldName);
+                }
+            }
+        }
     }
 
     public void validateFormulaRules(EntityDefinition entity) {

@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.demo.school.student;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
@@ -28,18 +27,6 @@ public class StudentService extends AbstractAbilityService<Student> implements
     @Override
     public String getDeletionEntityAlias() {
         return "student";
-    }
-
-    @Override
-    public void beforeInsert(Student entity) {
-        rejectDuplicate(entity, Criteria.of().eq("studentNo", entity.getStudentNo()),
-                "studentNo already exists in the current tenant");
-    }
-
-    @Override
-    public void beforeUpdate(Student entity) {
-        rejectDuplicate(entity, Criteria.of().eq("studentNo", entity.getStudentNo()),
-                "studentNo already exists in the current tenant");
     }
 
     @Override
