@@ -9,9 +9,11 @@ import net.ximatai.muyun.spring.ability.action.DataChangeModuleAliasResolver;
 import net.ximatai.muyun.spring.ability.action.DataChangeRecorder;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.DevelopmentEndpointCatalogReporter;
 import net.ximatai.muyun.spring.boot.web.endpoint.StaticAbilityWebEndpointRegistrar;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
+import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -41,6 +43,14 @@ public class ActionEndpointWebConfiguration {
             ObjectProvider<ObjectMapper> objectMapper) {
         return new StaticAbilityWebEndpointRegistrar(applicationContext, handlerMapping, endpointCatalog,
                 recycleBinFacade, objectMapper.getIfAvailable(ObjectMapper::new));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DevelopmentEndpointCatalogReporter developmentEndpointCatalogReporter(
+            RegisteredWebEndpointCatalog endpointCatalog,
+            ObjectProvider<PlatformRuntimeModeProvider> runtimeModeProvider) {
+        return new DevelopmentEndpointCatalogReporter(endpointCatalog, runtimeModeProvider.getIfAvailable());
     }
 
     @Bean

@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpoint;
 import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
 import org.springframework.lang.NonNull;
+import org.slf4j.MDC;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
 
@@ -24,6 +25,8 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
             ActionEndpointInterceptor.class.getName() + ".ACTION_CONTEXT_SCOPE";
     private static final String ACTING_CONTEXT_SCOPE_ATTRIBUTE =
             ActionEndpointInterceptor.class.getName() + ".ACTING_CONTEXT_SCOPE";
+    private static final String ENDPOINT_ID_ATTRIBUTE =
+            ActionEndpointInterceptor.class.getName() + ".ENDPOINT_ID";
 
     private final ActionExecutionPolicyService policyService;
     private final ActionEndpointContextResolver contextResolver;
@@ -77,6 +80,10 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
         if (registered.isEmpty() && endpoint == null && customEndpoint == null) {
             return true;
         }
+        registered.ifPresent(value -> {
+            request.setAttribute(ENDPOINT_ID_ATTRIBUTE, value.definition().endpointId());
+            MDC.put("endpointId", value.definition().endpointId());
+        });
         Optional<ActionExecutionContext> context;
         if (registered.isPresent()) {
             context = Optional.of(contextResolver.resolve(request, registered.get().definition()));
@@ -106,6 +113,7 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                     ActionExecutionContextHolder.use(resolved.withAuthorizationResult(authorization)));
             return true;
         } catch (RuntimeException ex) {
+            clearEndpointId(request);
             if (actingScope != null) {
                 request.removeAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
                 actingScope.close();
@@ -121,6 +129,7 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                                 Exception ex) {
         closeActionContext(request);
         closeActingContext(request);
+        clearEndpointId(request);
     }
 
     @Override
@@ -129,6 +138,7 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                                                @NonNull Object handler) {
         closeActionContext(request);
         closeActingContext(request);
+        clearEndpointId(request);
     }
 
     private void closeActionContext(HttpServletRequest request) {
@@ -145,5 +155,10 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
         if (scope instanceof ActingContextHolder.Scope actingScope) {
             actingScope.close();
         }
+    }
+
+    private void clearEndpointId(HttpServletRequest request) {
+        request.removeAttribute(ENDPOINT_ID_ATTRIBUTE);
+        MDC.remove("endpointId");
     }
 }

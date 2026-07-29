@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticWebProjection;
+import net.ximatai.muyun.spring.boot.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
@@ -172,6 +174,56 @@ class StaticAbilityWebEndpointRegistrarTest {
     }
 
     @Test
+    void shouldCompileAdditionalWebProjectionAndApplyProjectionLocalDisable() throws Exception {
+        EnableAbility<DemoRecord> service = mock(EnableAbility.class);
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(AdditionalProjectionController.class,
+                    () -> new AdditionalProjectionController(service));
+            context.refresh();
+            RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();
+            mapping.setApplicationContext(context);
+            mapping.afterPropertiesSet();
+            RegisteredWebEndpointCatalog catalog = new RegisteredWebEndpointCatalog();
+
+            new StaticAbilityWebEndpointRegistrar(
+                    context, mapping, catalog,
+                    context.getBeanProvider(net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade.class)
+            ).afterSingletonsInstantiated();
+
+            assertThat(catalog.endpoints())
+                    .extracting(endpoint -> endpoint.definition().path())
+                    .containsExactly("/demo/shared/enable/{id}");
+            assertThat(catalog.endpoints())
+                    .extracting(endpoint -> endpoint.definition().endpointId())
+                    .allSatisfy(endpointId -> assertThat(endpointId)
+                            .startsWith("demo.resource.enable.enable.projection."));
+        }
+    }
+
+    @Test
+    void shouldRejectUnanchoredStandardWebProjection() {
+        EnableAbility<DemoRecord> service = mock(EnableAbility.class);
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(UnanchoredProjectionController.class,
+                    () -> new UnanchoredProjectionController(service));
+            context.refresh();
+            RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();
+            mapping.setApplicationContext(context);
+            mapping.afterPropertiesSet();
+
+            StaticAbilityWebEndpointRegistrar registrar = new StaticAbilityWebEndpointRegistrar(
+                    context, mapping, new RegisteredWebEndpointCatalog(),
+                    context.getBeanProvider(net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade.class)
+            );
+
+            assertThatThrownBy(registrar::afterSingletonsInstantiated)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("standard Web projection requires")
+                    .hasMessageContaining(UnanchoredProjectionController.class.getName());
+        }
+    }
+
+    @Test
     void shouldExposeIrreversiblePurgeOnlyWhenServicePolicyEnablesIt() throws Exception {
         RecycleBinAbility<?> retainedOnly = mock(RecycleBinAbility.class);
         RecycleBinAbility<?> purgeEnabled = mock(RecycleBinAbility.class);
@@ -284,6 +336,43 @@ class StaticAbilityWebEndpointRegistrarTest {
         @Override
         public EnableAbility<DemoRecord> service() {
             return service;
+        }
+
+        @Override
+        public <T> T webScope(java.util.function.Supplier<T> action) {
+            return action.get();
+        }
+    }
+
+    @PlatformStaticWebProjection(
+            module = "demo.resource",
+            disabledOperations = PlatformAction.DISABLE
+    )
+    @RequestMapping("/demo/shared")
+    static final class AdditionalProjectionController extends UnanchoredProjectionController {
+        AdditionalProjectionController(EnableAbility<DemoRecord> service) {
+            super(service);
+        }
+    }
+
+    @RequestMapping("/demo/unanchored")
+    static class UnanchoredProjectionController
+            implements ScopedWeb<EnableAbility<DemoRecord>>, RecordWebProjectionPolicy {
+        private final EnableAbility<DemoRecord> service;
+
+        UnanchoredProjectionController(EnableAbility<DemoRecord> service) {
+            this.service = service;
+        }
+
+        @Override
+        public EnableAbility<DemoRecord> service() {
+            return service;
+        }
+
+        @Override
+        public void requireRecord(jakarta.servlet.http.HttpServletRequest request,
+                                  PlatformAction action,
+                                  String id) {
         }
 
         @Override

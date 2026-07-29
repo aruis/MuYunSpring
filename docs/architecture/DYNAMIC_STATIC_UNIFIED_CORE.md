@@ -83,6 +83,9 @@ Web 层通过标准投射描述组合模块基础路径、动作相对路径、H
 
 - 标准启停、排序、树和回收站端点由 Ability 自动装配；`@PlatformStaticActionContribution` 子资源也进入同一编译链，其资源前缀动作和权限继承关系写入 resolved endpoint。
 - 路径变量派生的机构、父资源或模块范围属于 Web 投影，使用类型化 `RecordWebProjectionPolicy`、`TreeWebProjectionPolicy` 等策略接入统一 Dispatcher，不在 Controller 里重写一套标准端点。
+- 同一模块确需在另一条基础路径投射标准动作时，Controller 使用 `@PlatformStaticWebProjection(module = "...")` 锚定该投影；它可仅收窄这一条路径的暴露动作，不能替代模块声明，也不改变 Service 的能力组合。所有实现 `RecordWebProjectionPolicy` 的静态 Controller 都必须具有模块、子资源贡献或此投影锚点，启动期会校验，避免标准端点静默遗漏。
+- 静态模块、子资源贡献和额外投影的标准端点映射由应用上下文契约测试统一核验：按 Service 能力与局部收窄规则计算期望映射，并与 Spring 已接受的端点目录逐项一致，避免共享路径或后续接入出现静默缺口。
+- 开发态会输出已注册端点目录（`endpointId`、模块、动作、方法、路径和来源）；编译端点执行期间将 `endpointId` 与既有 `traceId` 一同进入日志上下文，用于从异常、权限和运行日志回溯实际端点。
 - 真正独立的业务 HTTP 契约继续使用原生 Spring Controller。确需完全替换某个标准端点时，先在具体 Service 用 `@DisablePlatformOperations` 停用对应动作，再声明显式 `@ActionEndpoint`；标准动作仍启用时发生同路径覆写会在启动期失败。
 
 旧 `EnableWeb`、`SortWeb`、`TreeWeb`、`RecycleBinWeb` 只作为动态链路和存量兼容入口，不是新的静态模块接入方式。静态业务行为扩展优先留在 Service/Ability hook；仅 HTTP 语境差异进入类型化 Web 投影策略，避免把 URL、请求 DTO 或路径变量污染到 Service。

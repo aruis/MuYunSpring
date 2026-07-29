@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
@@ -135,7 +136,8 @@ public class PlatformWebExceptionHandler {
     public ResponseEntity<PlatformWebError> handleUnexpected(Exception exception) {
         PlatformWebError error = PlatformWebError.of(PlatformErrorCodes.INTERNAL_ERROR, 500,
                 "Internal server error");
-        log.error("Unhandled platform web exception, traceId={}", error.traceId(), exception);
+        log.error("Unhandled platform web exception, traceId={}, endpointId={}",
+                error.traceId(), MDC.get("endpointId"), exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 

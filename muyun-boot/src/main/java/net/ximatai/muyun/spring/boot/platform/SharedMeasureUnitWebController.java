@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 @RestController
+@PlatformStaticWebProjection(module = MeasureUnitService.MODULE_ALIAS)
 @RequestMapping("/platform.measure_unit/categories/{categoryAlias}/units")
 public class SharedMeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
 

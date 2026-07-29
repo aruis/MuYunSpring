@@ -1,19 +1,18 @@
 package net.ximatai.muyun.spring.boot.web.endpoint;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.ximatai.muyun.spring.ability.EnableAbility;
-import net.ximatai.muyun.spring.ability.RecycleBinAbility;
-import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.PlatformOperationDefinition;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContributionSupport;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticWebProjection;
 import net.ximatai.muyun.spring.boot.platform.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.boot.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.StaticAbilityOperationRuntime;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,8 +25,11 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** Compiles service abilities into real Spring MVC mappings at application startup. */
 public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingleton {
@@ -36,6 +38,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
     private final RegisteredWebEndpointCatalog endpointCatalog;
     private final ObjectProvider<RecycleBinFacade> recycleBinFacade;
     private final PlatformWebOperationDispatcher dispatcher;
+    private final StaticWebEndpointProjectionCompiler projectionCompiler = new StaticWebEndpointProjectionCompiler();
 
     public StaticAbilityWebEndpointRegistrar(ApplicationContext applicationContext,
                                              RequestMappingHandlerMapping handlerMapping,
@@ -59,6 +62,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
 
     @Override
     public void afterSingletonsInstantiated() {
+        Set<String> compiledProjectionBeans = new LinkedHashSet<>();
         for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticModule.class)) {
             Object bean = applicationContext.getBean(beanName);
             if (!(bean instanceof ScopedWeb<?> anchor)) {
@@ -71,7 +75,8 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
             }
             List<String> basePaths = basePaths(beanClass, module.alias());
             Object service = anchor.service();
-            contribute(module.alias(), basePaths, anchor, service, null);
+            contribute(module.alias(), basePaths, anchor, service, null, Set.of(), "");
+            compiledProjectionBeans.add(beanName);
         }
         for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticActionContribution.class)) {
             Object bean = applicationContext.getBean(beanName);
@@ -85,8 +90,28 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
                 continue;
             }
             String moduleAlias = PlatformStaticActionContributionSupport.targetModule(contribution);
-            contribute(moduleAlias, basePaths(beanClass, moduleAlias), anchor, anchor.service(), contribution);
+            contribute(moduleAlias, basePaths(beanClass, moduleAlias), anchor, anchor.service(), contribution,
+                    Set.of(), "");
+            compiledProjectionBeans.add(beanName);
         }
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticWebProjection.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            if (!(bean instanceof ScopedWeb<?> anchor)) {
+                throw new IllegalStateException("@PlatformStaticWebProjection requires ScopedWeb: "
+                        + AopUtils.getTargetClass(bean).getName());
+            }
+            Class<?> beanClass = AopUtils.getTargetClass(bean);
+            PlatformStaticWebProjection projection =
+                    AnnotationUtils.findAnnotation(beanClass, PlatformStaticWebProjection.class);
+            if (projection == null) {
+                continue;
+            }
+            String moduleAlias = PlatformNameRules.requireModuleAlias(projection.module());
+            contribute(moduleAlias, basePaths(beanClass, moduleAlias), anchor, anchor.service(), null,
+                    disabledOperations(projection), ".projection");
+            compiledProjectionBeans.add(beanName);
+        }
+        requireAnchoredStandardProjections(compiledProjectionBeans);
         registerExplicitControllerEndpoints();
     }
 
@@ -94,135 +119,64 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
                             List<String> basePaths,
                             ScopedWeb<?> anchor,
                             Object service,
-                            PlatformStaticActionContribution contribution) {
-        contributeEnable(moduleAlias, basePaths, anchor, service, contribution);
-        contributeTree(moduleAlias, basePaths, anchor, service, contribution);
-        contributeSort(moduleAlias, basePaths, anchor, service, contribution);
-        contributeRecycleBin(moduleAlias, basePaths, anchor, service, contribution);
-    }
-
-    private void contributeTree(String moduleAlias,
-                                List<String> basePaths,
-                                ScopedWeb<?> anchor,
-                                Object service,
-                                PlatformStaticActionContribution contribution) {
-        if (!(service instanceof TreeAbility<?> ability)) {
-            return;
-        }
-        StaticWebOperationTarget target = new StaticWebOperationTarget(moduleAlias, anchor, ability);
-        if (enabled(service, PlatformAction.TREE)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "tree"), "tree",
-                    PlatformAction.TREE, RequestMethod.GET, "/tree", contribution));
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "tree"), "subtree",
-                    PlatformAction.TREE, RequestMethod.GET, "/tree/{id}", contribution));
-        }
-        if (enabled(service, PlatformAction.SORT)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "tree"), "sort",
-                    PlatformAction.SORT, RequestMethod.POST, "/sort/{id}", contribution));
-        }
-    }
-
-    private void contributeEnable(String moduleAlias,
-                                  List<String> basePaths,
-                                  ScopedWeb<?> anchor,
-                                  Object service,
-                                  PlatformStaticActionContribution contribution) {
-        if (!(service instanceof EnableAbility<?> ability)) {
-            return;
-        }
-        StaticWebOperationTarget target = new StaticWebOperationTarget(moduleAlias, anchor, ability);
-        if (directOperation(service, PlatformAction.ENABLE)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "enable"), "enable",
-                    PlatformAction.ENABLE, RequestMethod.POST, "/enable/{id}", contribution));
-        }
-        if (directOperation(service, PlatformAction.DISABLE)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "enable"), "disable",
-                    PlatformAction.DISABLE, RequestMethod.POST, "/disable/{id}", contribution));
-        }
-    }
-
-    private void contributeSort(String moduleAlias,
-                                List<String> basePaths,
-                                ScopedWeb<?> anchor,
-                                Object service,
-                                PlatformStaticActionContribution contribution) {
-        if (!(service instanceof SortAbility<?> ability)
-                || service instanceof TreeAbility<?>
-                || !enabled(service, PlatformAction.SORT)) {
-            return;
-        }
-        StaticWebOperationTarget target = new StaticWebOperationTarget(moduleAlias, anchor, ability);
-        register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "sort"), "sort",
-                PlatformAction.SORT, RequestMethod.POST, "/sort/{id}", contribution));
-    }
-
-    private void contributeRecycleBin(String moduleAlias,
-                                      List<String> basePaths,
-                                      ScopedWeb<?> anchor,
-                                      Object service,
-                                      PlatformStaticActionContribution contribution) {
-        if (!(service instanceof RecycleBinAbility<?> ability)) {
-            return;
-        }
-        RecycleBinFacade facade = recycleBinFacade.getIfAvailable();
-        if (facade == null) {
+                            PlatformStaticActionContribution contribution,
+                            Set<PlatformAction> disabledOperations,
+                            String endpointIdNamespace) {
+        List<PlatformOperationDefinition> operations =
+                StaticServiceAbilityCompiler.standardOperations(service);
+        if (operations.stream()
+                .anyMatch(operation -> operation.action().name().startsWith("RECYCLE_BIN"))
+                && recycleBinFacade.getIfAvailable() == null) {
             throw new IllegalStateException("RecycleBinFacade is required by " + moduleAlias + ".recycleBin");
         }
-        StaticWebOperationTarget target = new StaticWebOperationTarget(moduleAlias, anchor, ability);
-        if (enabled(service, PlatformAction.RECYCLE_BIN_QUERY)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "recycleBin"), "query",
-                    PlatformAction.RECYCLE_BIN_QUERY, RequestMethod.POST, "/recycle-bin/query", contribution));
+        StaticWebOperationTarget target = new StaticWebOperationTarget(moduleAlias, anchor, service);
+        projectionCompiler.compile(moduleAlias, basePaths, operations.stream()
+                        .filter(operation -> !disabledOperations.contains(operation.action()))
+                        .toList(), contribution, endpointIdNamespace)
+                .forEach(projection -> register(target, projection));
+    }
+
+    private Set<PlatformAction> disabledOperations(PlatformStaticWebProjection projection) {
+        if (projection.disabledOperations().length == 0) {
+            return Set.of();
         }
-        if (enabled(service, PlatformAction.RECYCLE_BIN_RESTORE)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "recycleBin"), "restore",
-                    PlatformAction.RECYCLE_BIN_RESTORE, RequestMethod.POST,
-                    "/recycle-bin/{sourceDeleteOperationId}/restore", contribution));
-        }
-        if (ability.isRecycleBinPurgeEnabled() && enabled(service, PlatformAction.RECYCLE_BIN_PURGE)) {
-            register(basePaths, target, operation(moduleAlias, abilityCode(contribution, "recycleBin"), "purge",
-                    PlatformAction.RECYCLE_BIN_PURGE, RequestMethod.POST,
-                    "/recycle-bin/{sourceDeleteOperationId}/purge", contribution));
+        EnumSet<PlatformAction> disabled = EnumSet.noneOf(PlatformAction.class);
+        java.util.Collections.addAll(disabled, projection.disabledOperations());
+        return Set.copyOf(disabled);
+    }
+
+    private void requireAnchoredStandardProjections(Set<String> compiledProjectionBeans) {
+        for (String beanName : applicationContext.getBeanNamesForType(RecordWebProjectionPolicy.class)) {
+            if (compiledProjectionBeans.contains(beanName)) {
+                continue;
+            }
+            Object bean = applicationContext.getBean(beanName);
+            throw new IllegalStateException("standard Web projection requires @PlatformStaticModule, "
+                    + "@PlatformStaticActionContribution, or @PlatformStaticWebProjection: "
+                    + AopUtils.getTargetClass(bean).getName());
         }
     }
 
-    private boolean directOperation(Object service, PlatformAction action) {
-        return StaticServiceAbilityCompiler.operationMethods(service).containsKey(action);
-    }
-
-    private boolean enabled(Object service, PlatformAction action) {
-        return !StaticServiceAbilityCompiler.disabledActions(service).contains(action);
-    }
-
-    private void register(List<String> basePaths,
-                          StaticWebOperationTarget target,
-                          EndpointOperation operation) {
-        for (int index = 0; index < basePaths.size(); index++) {
-            ResolvedWebEndpoint template = operation.definition();
-            String fullPath = join(basePaths.get(index), template.path());
-            String endpointId = index == 0 ? template.endpointId() : template.endpointId() + "@" + index;
-            ResolvedWebEndpoint definition = new ResolvedWebEndpoint(
-                    endpointId, template.moduleAlias(), template.abilityCode(), template.operationCode(),
-                    template.action(), template.method(), fullPath, template.source(), template.executionPolicy());
-            RequestMappingInfo mapping = RequestMappingInfo.paths(fullPath)
-                    .methods(template.method())
+    private void register(StaticWebOperationTarget target, WebEndpointProjection projection) {
+        ResolvedWebEndpoint definition = projection.resolve();
+        RequestMappingInfo mapping = RequestMappingInfo.paths(definition.path())
+                    .methods(definition.method())
                     .options(handlerMapping.getBuilderConfiguration())
                     .build();
-            ExistingMapping existing = findExistingMapping(fullPath, template.method());
-            if (existing != null) {
-                throw new IllegalStateException("explicit controller cannot replace enabled standard ability endpoint "
-                        + definition.method() + " " + definition.path()
-                        + "; disable " + definition.action().code() + " on the concrete service first: "
-                        + existing.handler());
-            }
-            try {
-                handlerMapping.registerMapping(mapping, dispatcher, dispatcher.handlerMethod());
-            } catch (RuntimeException failure) {
-                throw new IllegalStateException("failed to register ability endpoint " + endpointId
-                        + " at " + template.method() + " " + fullPath, failure);
-            }
-            endpointCatalog.register(new RegisteredWebEndpoint(
-                    definition, mapping, dispatcher, dispatcher.handlerMethod(), target));
+        ExistingMapping existing = findExistingMapping(definition.path(), definition.method());
+        if (existing != null) {
+            throw new IllegalStateException("explicit controller cannot replace enabled standard ability endpoint "
+                    + definition.method() + " " + definition.path()
+                    + "; disable " + definition.action().code() + " on the concrete service first: "
+                    + existing.handler());
         }
+        try {
+            handlerMapping.registerMapping(mapping, dispatcher, dispatcher.handlerMethod());
+        } catch (RuntimeException failure) {
+            throw new IllegalStateException("failed to register ability endpoint " + definition.endpointId()
+                    + " at " + definition.method() + " " + definition.path(), failure);
+        }
+        endpointCatalog.register(new RegisteredWebEndpoint(definition, mapping, dispatcher, dispatcher.handlerMethod(), target));
     }
 
     private ExistingMapping findExistingMapping(String path, RequestMethod method) {
@@ -280,41 +234,6 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
         return module == null ? null : module.alias();
     }
 
-    private EndpointOperation operation(String moduleAlias,
-                                        String abilityCode,
-                                        String operationCode,
-                                        PlatformAction action,
-                                        RequestMethod method,
-                                        String path,
-                                        PlatformStaticActionContribution contribution) {
-        ResolvedWebEndpoint definition = new ResolvedWebEndpoint(
-                moduleAlias + "." + abilityCode + "." + operationCode,
-                moduleAlias, abilityCode, operationCode, action, method, path,
-                ResolvedWebEndpoint.Source.STATIC_ABILITY,
-                contribution == null ? action.executionPolicy() : contributionPolicy(contribution, action));
-        return new EndpointOperation(definition);
-    }
-
-    private String abilityCode(PlatformStaticActionContribution contribution, String abilityCode) {
-        return contribution == null ? abilityCode : contribution.resource() + "." + abilityCode;
-    }
-
-    private ActionExecutionPolicy contributionPolicy(PlatformStaticActionContribution contribution,
-                                                       PlatformAction action) {
-        String actionCode = PlatformStaticActionContributionSupport.actionCode(contribution, action);
-        String permissionActionCode = PlatformStaticActionContributionSupport.permissionActionCode(
-                contribution, action);
-        return new ActionExecutionPolicy(
-                actionCode,
-                action.level(),
-                action.accessMode(),
-                action.actionAuth(),
-                action.dataAuth(),
-                action.defaultGrantPolicy(),
-                actionCode.equals(permissionActionCode) ? null : permissionActionCode
-        );
-    }
-
     private List<String> basePaths(Class<?> beanClass, String moduleAlias) {
         RequestMapping mapping = AnnotationUtils.findAnnotation(beanClass, RequestMapping.class);
         if (mapping == null) {
@@ -327,10 +246,6 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
         return Arrays.stream(values).map(this::normalizePath).toList();
     }
 
-    private String join(String basePath, String endpointPath) {
-        return normalizePath(basePath) + normalizePath(endpointPath);
-    }
-
     private String normalizePath(String path) {
         if (path == null || path.isBlank() || "/".equals(path.trim())) {
             return "";
@@ -340,9 +255,6 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
             normalized = "/" + normalized;
         }
         return normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
-    }
-
-    private record EndpointOperation(ResolvedWebEndpoint definition) {
     }
 
     private record ExistingMapping(RequestMappingInfo mapping,

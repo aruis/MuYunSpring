@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.DisablePlatformOperations;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.PlatformOperation;
+import net.ximatai.muyun.spring.ability.PlatformOperationDefinition;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
@@ -69,32 +70,46 @@ public final class StaticServiceAbilityCompiler {
         return SERVICE_DECLARED_CAPABILITIES.contains(capability);
     }
 
-    static List<PlatformAction> standardActions(Object service) {
-        List<PlatformAction> actions = new ArrayList<>();
+    public static List<PlatformOperationDefinition> standardOperations(Object service) {
+        List<PlatformOperationDefinition> operations = new ArrayList<>();
         if (service instanceof TreeAbility<?>) {
-            actions.add(PlatformAction.TREE);
-            actions.add(PlatformAction.SORT);
+            operations.add(operation("tree", "tree", PlatformAction.TREE));
+            operations.add(operation("tree", "subtree", PlatformAction.TREE));
+            operations.add(operation("tree", "sort", PlatformAction.SORT));
         } else if (service instanceof SortAbility<?>) {
-            actions.add(PlatformAction.SORT);
+            operations.add(operation("sort", "sort", PlatformAction.SORT));
         }
         if (service instanceof EnableAbility<?>) {
             Set<PlatformAction> directOperations = operationMethods(service).keySet();
             if (directOperations.contains(PlatformAction.ENABLE)) {
-                actions.add(PlatformAction.ENABLE);
+                operations.add(operation("enable", "enable", PlatformAction.ENABLE));
             }
             if (directOperations.contains(PlatformAction.DISABLE)) {
-                actions.add(PlatformAction.DISABLE);
+                operations.add(operation("enable", "disable", PlatformAction.DISABLE));
             }
         }
         if (service instanceof RecycleBinAbility<?> recycleBinAbility) {
-            actions.add(PlatformAction.RECYCLE_BIN_QUERY);
-            actions.add(PlatformAction.RECYCLE_BIN_RESTORE);
+            operations.add(operation("recycleBin", "query", PlatformAction.RECYCLE_BIN_QUERY));
+            operations.add(operation("recycleBin", "restore", PlatformAction.RECYCLE_BIN_RESTORE));
             if (recycleBinAbility.isRecycleBinPurgeEnabled()) {
-                actions.add(PlatformAction.RECYCLE_BIN_PURGE);
+                operations.add(operation("recycleBin", "purge", PlatformAction.RECYCLE_BIN_PURGE));
             }
         }
         Set<PlatformAction> disabled = disabledActions(service);
-        return actions.stream().filter(action -> !disabled.contains(action)).toList();
+        return operations.stream().filter(operation -> !disabled.contains(operation.action())).toList();
+    }
+
+    static List<PlatformAction> standardActions(Object service) {
+        return standardOperations(service).stream()
+                .map(PlatformOperationDefinition::action)
+                .distinct()
+                .toList();
+    }
+
+    private static PlatformOperationDefinition operation(String abilityCode,
+                                                         String operationCode,
+                                                         PlatformAction action) {
+        return new PlatformOperationDefinition(abilityCode, operationCode, action);
     }
 
     public static Map<PlatformAction, Method> operationMethods(Object service) {

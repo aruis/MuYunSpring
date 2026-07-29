@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
+@PlatformStaticWebProjection(module = MeasureUnitCategoryService.MODULE_ALIAS)
 @RequestMapping("/platform.measure_unit/categories")
 public class SharedMeasureUnitCategoryWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitCategory, MeasureUnitCategoryService> {

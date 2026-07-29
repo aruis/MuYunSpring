@@ -31,6 +31,7 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
@@ -60,6 +61,7 @@ class ActionEndpointInterceptorTest {
         CurrentUserContext.clear();
         ActingContextHolder.clear();
         ActionExecutionContextHolder.clear();
+        MDC.clear();
     }
 
     @Test
@@ -123,6 +125,28 @@ class ActionEndpointInterceptorTest {
             assertThat(context.platformAction()).isEqualTo(PlatformAction.ENABLE);
             assertThat(context.recordIds()).containsExactly("app-1");
         });
+    }
+
+    @Test
+    void shouldExposeAndClearCompiledEndpointIdInLogContext() throws Exception {
+        StaticScopedWeb endpointHandler = new StaticScopedWeb();
+        Method method = CrudWeb.class.getMethod("query", WebQueryRequest.class);
+        RegisteredWebEndpointCatalog catalog = new RegisteredWebEndpointCatalog();
+        ResolvedWebEndpoint definition = new ResolvedWebEndpoint(
+                "platform.application.enable.enable", "platform.application", "enable", "enable",
+                PlatformAction.ENABLE, RequestMethod.POST, "/platform.application/enable/{id}",
+                ResolvedWebEndpoint.Source.STATIC_ABILITY);
+        RequestMappingInfo mapping = RequestMappingInfo.paths(definition.path()).methods(definition.method()).build();
+        catalog.register(new RegisteredWebEndpoint(definition, mapping, endpointHandler, method));
+        ActionEndpointInterceptor compiledInterceptor = new ActionEndpointInterceptor(
+                policyService, new ActionEndpointContextResolver(), null, catalog);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/platform.application/enable/app-1");
+
+        compiledInterceptor.preHandle(request, new MockHttpServletResponse(), handler(endpointHandler, method));
+        assertThat(MDC.get("endpointId")).isEqualTo(definition.endpointId());
+
+        compiledInterceptor.afterCompletion(request, new MockHttpServletResponse(), handler(endpointHandler, method), null);
+        assertThat(MDC.get("endpointId")).isNull();
     }
 
     @Test
