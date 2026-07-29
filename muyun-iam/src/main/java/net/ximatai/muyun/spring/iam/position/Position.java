@@ -3,15 +3,15 @@ package net.ximatai.muyun.spring.iam.position;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
 @Getter
 @Setter
 @Table(name = "iam_position", comment = "Position")
-@CompositeIndex(columns = {"tenant_id", "code"}, unique = true)
+@TenantUniqueConstraint(fields = "code")
 public class Position extends StandardEnabledSortableEntity {
     @Column(name = "category_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Position category id")

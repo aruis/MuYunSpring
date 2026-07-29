@@ -3,16 +3,16 @@ package net.ximatai.muyun.spring.platform.measure;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
 @Getter
 @Setter
 @Table(name = "platform_measure_unit_category", comment = "Platform measure unit category")
-@CompositeIndex(columns = {"tenant_id", "application_alias", "alias"}, unique = true)
+@TenantUniqueConstraint(fields = {"applicationAlias", "alias"})
 public class MeasureUnitCategory extends StandardEnabledSortableEntity {
     @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false,
             comment = "Application alias")

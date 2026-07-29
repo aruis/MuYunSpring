@@ -3,21 +3,20 @@ package net.ximatai.muyun.spring.iam.role;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
 @Getter
 @Setter
 @Table(name = "iam_role", comment = "Role")
-@CompositeIndex(columns = {"tenant_id", "owner_scope_type", "owner_scope_key", "assignment_type", "role_kind", "title"},
-        unique = true)
+@TenantUniqueConstraint(fields = {"ownerScopeType", "ownerScopeKey", "assignmentType", "roleKind", "title"})
 @InitialDataFields(
         managed = {"assignmentType", "roleKind", "memberRoleIds", "ownerScopeType", "ownerScopeId",
                 "sharePolicy", "builtIn", "systemManaged", "description"},

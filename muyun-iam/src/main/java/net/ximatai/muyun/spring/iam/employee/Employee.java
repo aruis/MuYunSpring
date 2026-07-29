@@ -3,11 +3,11 @@ package net.ximatai.muyun.spring.iam.employee;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ModuleReference;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
@@ -17,7 +17,7 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 @Getter
 @Setter
 @Table(name = "iam_employee", comment = "Employee")
-@CompositeIndex(columns = {"tenant_id", "organization_id", "employee_no"}, unique = true)
+@TenantUniqueConstraint(fields = {"organizationId", "employeeNo"})
 @InitialDataFields(
         managed = {"organizationId", "departmentId", "employeeNo"},
         operator = {"title", "gender", "mobile", "email", "enabled", "sortOrder"}

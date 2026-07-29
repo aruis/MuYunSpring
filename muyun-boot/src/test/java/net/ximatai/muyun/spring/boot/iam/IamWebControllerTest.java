@@ -488,7 +488,7 @@ class IamWebControllerTest {
             return "org-1";
         });
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(organization("org-1", "HQ", "Headquarters")));
+                .thenReturn(List.of(), List.of(organization("org-1", "HQ", "Headquarters")));
 
         mvc.perform(post("/iam.organization/insert")
                         .contentType("application/json")
@@ -510,7 +510,7 @@ class IamWebControllerTest {
             return "user-1";
         });
         when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(), List.of(user("user-1", "alice", "Alice")));
+                .thenReturn(List.of(), List.of(), List.of(user("user-1", "alice", "Alice")));
 
         mvc.perform(post("/iam.user/insert")
                         .contentType("application/json")
@@ -541,7 +541,7 @@ class IamWebControllerTest {
             return "user-1";
         });
         when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(), List.of(user("user-1", "alice", "Alice")));
+                .thenReturn(List.of(), List.of(), List.of(user("user-1", "alice", "Alice")));
 
         mvc.perform(post("/iam.user/insert")
                         .contentType("application/json")

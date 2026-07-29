@@ -111,7 +111,7 @@ class OrganizationServiceContractTest {
         Organization saved = organization("HQ", "Headquarters");
         saved.setId("org-1");
         saved.setTenantId("tenant_a");
-        when(dao.query(any(), any())).thenReturn(List.of(saved));
+        when(dao.query(any(), any())).thenReturn(List.of(), List.of(saved));
         OrganizationCreationProvisioner provisioner = mock(OrganizationCreationProvisioner.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<OrganizationCreationProvisioner> provisioners = mock(ObjectProvider.class);

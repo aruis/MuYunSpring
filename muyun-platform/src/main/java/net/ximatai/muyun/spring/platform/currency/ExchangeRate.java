@@ -3,10 +3,10 @@ package net.ximatai.muyun.spring.platform.currency;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Table(name = "platform_exchange_rate", comment = "Platform exchange rate")
-@CompositeIndex(columns = {"tenant_id", "from_currency_code", "to_currency_code", "rate_type_code", "effective_date"}, unique = true)
+@TenantUniqueConstraint(fields = {"fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate"})
 public class ExchangeRate extends StandardEnabledSortableEntity {
     @Column(name = "from_currency_code", type = ColumnType.VARCHAR, length = 3, nullable = false,
             comment = "Source currency code")
