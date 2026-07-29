@@ -12,6 +12,10 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetDeletionPolicy;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.database.core.orm.Criteria;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
@@ -174,6 +178,18 @@ public class DynamicRecordRuntime implements AutoCloseable {
         return entityService(moduleAlias, entityAlias, DynamicRecordLifecycle.NONE);
     }
 
+    public java.util.Optional<net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?>> referenceAbility(
+            ReferenceTarget target) {
+        if (target == null) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(entityService(target.moduleAlias(), target.entityAlias()).referenceAbility());
+        } catch (ModuleDefinitionException ignored) {
+            return java.util.Optional.empty();
+        }
+    }
+
     public DynamicEntityService entityService(String moduleAlias, String entityAlias, DynamicRecordLifecycle lifecycle) {
         ModuleDefinition module = registry.requireModule(moduleAlias);
         EntityDefinition entity = registry.requireEntity(moduleAlias, entityAlias);
@@ -190,6 +206,28 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 fieldSigner,
                 timeService
         );
+    }
+
+    /** Checks dynamic referrers for an arbitrary platform reference target. */
+    public void validateReferenceTargetDeletion(ReferenceTarget target, String targetId) {
+        if (target == null || targetId == null || targetId.isBlank()) {
+            return;
+        }
+        for (ModuleDefinition sourceModule : registry.modules()) {
+            for (var reference : sourceModule.references()) {
+                if (!target.equals(reference.target())
+                        || reference.integrity().onTargetSoftDelete() != ReferenceTargetDeletionPolicy.RESTRICT) {
+                    continue;
+                }
+                DynamicEntityService source = entityService(sourceModule.moduleAlias(), reference.sourceEntityAlias());
+                long count = source.count(Criteria.of().eq(reference.sourceField(), targetId));
+                if (count > 0) {
+                    throw new PlatformException("cannot soft-delete reference target " + target.qualifiedName()
+                            + ": " + count + " active records in " + sourceModule.moduleAlias()
+                            + "." + reference.sourceField() + " still reference it");
+                }
+            }
+        }
     }
 
     public void clearCache() {

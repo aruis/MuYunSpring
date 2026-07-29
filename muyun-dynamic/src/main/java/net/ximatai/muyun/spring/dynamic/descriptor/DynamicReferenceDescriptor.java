@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 
@@ -22,7 +23,8 @@ public record DynamicReferenceDescriptor(
         String queryTemplateId,
         Set<String> plusFields,
         List<DynamicReferenceFilterDescriptor> filters,
-        List<DynamicReferenceAffectDescriptor> affects
+        List<DynamicReferenceAffectDescriptor> affects,
+        ReferenceIntegrityPolicy integrity
 ) {
     public DynamicReferenceDescriptor(String sourceEntityAlias,
                                       String sourceField,
@@ -33,7 +35,28 @@ public record DynamicReferenceDescriptor(
                                       String titleOutputField,
                                       List<DynamicReferenceProjectionDescriptor> projections) {
         this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality, autoTitle,
-                titleOutputField, projections, null, null, null, null, Set.of(), List.of(), List.of());
+                titleOutputField, projections, null, null, null, null, Set.of(), List.of(), List.of(),
+                ReferenceIntegrityPolicy.DEFAULT);
+    }
+
+    public DynamicReferenceDescriptor(String sourceEntityAlias,
+                                      String sourceField,
+                                      String targetModuleAlias,
+                                      String targetEntityAlias,
+                                      ReferenceCardinality cardinality,
+                                      boolean autoTitle,
+                                      String titleOutputField,
+                                      List<DynamicReferenceProjectionDescriptor> projections,
+                                      String keyField,
+                                      String labelField,
+                                      String generateRuleId,
+                                      String queryTemplateId,
+                                      Set<String> plusFields,
+                                      List<DynamicReferenceFilterDescriptor> filters,
+                                      List<DynamicReferenceAffectDescriptor> affects) {
+        this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality, autoTitle,
+                titleOutputField, projections, keyField, labelField, generateRuleId, queryTemplateId,
+                plusFields, filters, affects, ReferenceIntegrityPolicy.DEFAULT);
     }
 
     public DynamicReferenceDescriptor {
@@ -41,6 +64,7 @@ public record DynamicReferenceDescriptor(
         plusFields = plusFields == null ? Set.of() : Set.copyOf(plusFields);
         filters = filters == null ? List.of() : List.copyOf(filters);
         affects = affects == null ? List.of() : List.copyOf(affects);
+        integrity = integrity == null ? ReferenceIntegrityPolicy.DEFAULT : integrity;
     }
 
     public static DynamicReferenceDescriptor from(EntityReferenceDefinition reference) {
@@ -60,7 +84,8 @@ public record DynamicReferenceDescriptor(
                 reference.queryTemplateId(),
                 reference.plusFields(),
                 reference.filters().stream().map(DynamicReferenceFilterDescriptor::from).toList(),
-                reference.affects().stream().map(DynamicReferenceAffectDescriptor::from).toList()
+                reference.affects().stream().map(DynamicReferenceAffectDescriptor::from).toList(),
+                reference.integrity()
         );
     }
 }

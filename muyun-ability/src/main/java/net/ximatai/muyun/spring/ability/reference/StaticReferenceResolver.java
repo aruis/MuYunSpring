@@ -99,7 +99,8 @@ public final class StaticReferenceResolver {
                                 referenceTo.cardinality(),
                                 referenceTo.autoTitle(),
                                 referenceTo.titleOutputField(),
-                                projections(referenceTo)
+                                projections(referenceTo),
+                                ReferenceIntegrityPolicy.from(referenceTo.integrity())
                         )
                 ));
             }
@@ -121,6 +122,10 @@ public final class StaticReferenceResolver {
 
         public ReferenceCardinality cardinality() {
             return plan.cardinality();
+        }
+
+        public ReferenceIntegrityPolicy integrity() {
+            return plan.integrity();
         }
 
         private List<String> values(Object record) {

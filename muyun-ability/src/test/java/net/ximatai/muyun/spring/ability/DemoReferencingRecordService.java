@@ -20,6 +20,12 @@ final class DemoReferencingRecordService implements
         DemoUser owner = new DemoUser("Owner One");
         owner.setId("user-owner");
         userService.insert(owner);
+        DemoUser firstWatcher = new DemoUser("Watcher One");
+        firstWatcher.setId("user-watcher-1");
+        userService.insert(firstWatcher);
+        DemoUser secondWatcher = new DemoUser("Watcher Two");
+        secondWatcher.setId("user-watcher-2");
+        userService.insert(secondWatcher);
     }
 
     @Override

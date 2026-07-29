@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -14,6 +16,8 @@ final class PlatformAbilityDispatcher {
     private static volatile StaticOptionFieldValueValidator staticOptionFieldValueValidator =
             StaticOptionFieldValueValidator.NONE;
     private static volatile DeletionLifecycleListener deletionLifecycleListener = DeletionLifecycleListener.NONE;
+    private static volatile ReferenceDeletionGuard referenceDeletionGuard = ReferenceDeletionGuard.NONE;
+    private static volatile ReferenceTargetResolver referenceTargetResolver = ReferenceTargetResolver.NONE;
 
     private PlatformAbilityDispatcher() {
     }
@@ -32,6 +36,37 @@ final class PlatformAbilityDispatcher {
 
     static void resetDeletionLifecycleListener() {
         deletionLifecycleListener = DeletionLifecycleListener.NONE;
+    }
+
+    static void setReferenceDeletionGuard(ReferenceDeletionGuard guard) {
+        referenceDeletionGuard = guard == null ? ReferenceDeletionGuard.NONE : guard;
+    }
+
+    static void resetReferenceDeletionGuard() {
+        referenceDeletionGuard = ReferenceDeletionGuard.NONE;
+    }
+
+    static void setReferenceTargetResolver(ReferenceTargetResolver resolver) {
+        referenceTargetResolver = resolver == null ? ReferenceTargetResolver.NONE : resolver;
+    }
+
+    static void resetReferenceTargetResolver() {
+        referenceTargetResolver = ReferenceTargetResolver.NONE;
+    }
+
+    static ReferenceTargetResolver referenceTargetResolver() {
+        return referenceTargetResolver;
+    }
+
+    static <T extends EntityContract> void beforeSoftDelete(CrudAbility<T> ability, T entity) {
+        referenceDeletionGuard.beforeSoftDelete(ability, entity);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    static <T extends EntityContract> void beforeRestore(CrudAbility<T> ability, T entity) {
+        if (ability instanceof ReferencerAbility referencerAbility) {
+            referencerAbility.validateReferenceIntegrity(entity);
+        }
     }
 
     static DeletionContext rootDeletionContext(String moduleAlias, String recordId) {
@@ -79,6 +114,7 @@ final class PlatformAbilityDispatcher {
 
     static <T extends EntityContract> void beforeSave(CrudAbility<T> ability, T entity) {
         runStaticOptionFieldValidation(ability, entity);
+        runReferenceIntegrityValidation(ability, entity);
         TenantUniqueConstraintSupport.validate(ability, entity);
     }
 
@@ -164,6 +200,13 @@ final class PlatformAbilityDispatcher {
         if (ability instanceof ReferencerAbility referencerAbility) {
             referencerAbility.afterReferenceSelect(entity);
             referencerAbility.refreshReferenceDependencies(entity);
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static <T extends EntityContract> void runReferenceIntegrityValidation(CrudAbility<T> ability, T entity) {
+        if (ability instanceof ReferencerAbility referencerAbility) {
+            referencerAbility.validateReferenceIntegrity(entity);
         }
     }
 
