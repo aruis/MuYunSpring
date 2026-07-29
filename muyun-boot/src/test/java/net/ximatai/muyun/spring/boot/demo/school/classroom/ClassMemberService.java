@@ -8,9 +8,11 @@ import net.ximatai.muyun.spring.ability.child.CascadeDeleteChildAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.boot.demo.school.student.StudentService;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 public class ClassMemberService extends AbstractAbilityService<ClassMember> implements
         SoftDeleteAbility<ClassMember>,
         SortAbility<ClassMember>,
