@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.web.RecycleBinPurgeWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
+import net.ximatai.muyun.spring.boot.web.StandardWebEndpoint;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
@@ -243,7 +244,9 @@ public class StaticModuleDefinitionScanner {
         addMenuAction(actions, beanClass);
         addStandardActions(actions, bean, beanClass);
         addWorkflowActions(actions, capabilities);
-        ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service(bean));
+        ReflectionUtils.doWithMethods(beanClass,
+                method -> addAnnotatedAction(actions, method, disabledActions));
         return List.copyOf(actions.values());
     }
 
@@ -380,8 +383,9 @@ public class StaticModuleDefinitionScanner {
                                                                    PlatformStaticActionContribution contribution) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
         addContributionStandardActions(actions, bean, beanClass, contribution);
+        java.util.Set<PlatformAction> disabledActions = StaticServiceAbilityCompiler.disabledActions(service(bean));
         ReflectionUtils.doWithMethods(beanClass, method -> addContributionAnnotatedAction(actions, method,
-                contribution));
+                contribution, disabledActions));
         return List.copyOf(actions.values());
     }
 
@@ -508,9 +512,12 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
-    private void addAnnotatedAction(Map<String, StaticModuleActionDefinition> actions, Method method) {
+    private void addAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
+                                    Method method,
+                                    java.util.Set<PlatformAction> disabledActions) {
         ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
-        if (standard != null) {
+        if (standard != null && (!disabledActions.contains(standard.value())
+                || !StandardWebEndpoint.isDefault(method))) {
             addPlatform(actions, standard.value());
         }
         CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);
@@ -530,9 +537,11 @@ public class StaticModuleDefinitionScanner {
 
     private void addContributionAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
                                                 Method method,
-                                                PlatformStaticActionContribution contribution) {
+                                                PlatformStaticActionContribution contribution,
+                                                java.util.Set<PlatformAction> disabledActions) {
         ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
-        if (standard != null) {
+        if (standard != null && (!disabledActions.contains(standard.value())
+                || !StandardWebEndpoint.isDefault(method))) {
             addContributionPlatform(actions, contribution, standard.value());
         }
         CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);

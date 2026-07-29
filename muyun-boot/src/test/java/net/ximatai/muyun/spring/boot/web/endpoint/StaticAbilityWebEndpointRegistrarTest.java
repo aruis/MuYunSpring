@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticWebProjection;
 import net.ximatai.muyun.spring.boot.web.RecordWebProjectionPolicy;
+import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
@@ -83,6 +84,32 @@ class StaticAbilityWebEndpointRegistrarTest {
         assertThat(mappings(new EnableOnlyDisabledService())).containsExactly(
                 "/demo.resource/disable/{id}"
         );
+    }
+
+    @Test
+    void shouldRemoveDisabledDefaultCrudMappingsFromSpringMvc() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(DisabledCrudController.class,
+                    () -> new DisabledCrudController(new ReadOnlyOperationService()));
+            context.refresh();
+            RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();
+            mapping.setApplicationContext(context);
+            mapping.afterPropertiesSet();
+
+            new StaticAbilityWebEndpointRegistrar(
+                    context, mapping, new RegisteredWebEndpointCatalog(),
+                    context.getBeanProvider(net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade.class)
+            ).afterSingletonsInstantiated();
+
+            Set<String> paths = mapping.getHandlerMethods().keySet().stream()
+                    .flatMap(info -> info.getPatternValues().stream())
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            assertThat(paths).doesNotContain(
+                    "/demo.read_only/insert",
+                    "/demo.read_only/update/{id}",
+                    "/demo.read_only/delete/{id}");
+            assertThat(paths).contains("/demo.read_only/query", "/demo.read_only/view/{id}");
+        }
     }
 
     @Test
@@ -440,6 +467,40 @@ class StaticAbilityWebEndpointRegistrarTest {
         @Override
         public String getModuleAlias() {
             return "demo.resource";
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "demo", alias = "demo.read_only", title = "Read only")
+    @RequestMapping("/demo.read_only")
+    static final class DisabledCrudController implements CrudWeb<DemoRecord, CrudAbility<DemoRecord>> {
+        private final CrudAbility<DemoRecord> service;
+
+        DisabledCrudController(CrudAbility<DemoRecord> service) {
+            this.service = service;
+        }
+
+        @Override
+        public CrudAbility<DemoRecord> service() {
+            return service;
+        }
+
+        @Override
+        public <T> T webScope(java.util.function.Supplier<T> action) {
+            return action.get();
+        }
+    }
+
+    @DisablePlatformOperations({PlatformAction.CREATE, PlatformAction.UPDATE, PlatformAction.DELETE})
+    static final class ReadOnlyOperationService implements CrudAbility<DemoRecord> {
+        @Override
+        public BaseDao<DemoRecord, String> getDao() {
+            return null;
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return "demo.read_only";
         }
     }
 }

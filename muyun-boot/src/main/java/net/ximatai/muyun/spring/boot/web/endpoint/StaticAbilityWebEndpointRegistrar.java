@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticServiceAbilityCompiler;
 import net.ximatai.muyun.spring.boot.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.StaticAbilityOperationRuntime;
+import net.ximatai.muyun.spring.boot.web.StandardWebEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -22,6 +23,7 @@ import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.Arrays;
@@ -62,6 +64,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
 
     @Override
     public void afterSingletonsInstantiated() {
+        suppressDisabledDefaultControllerMappings();
         Set<String> compiledProjectionBeans = new LinkedHashSet<>();
         for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticModule.class)) {
             Object bean = applicationContext.getBean(beanName);
@@ -113,6 +116,37 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
         }
         requireAnchoredStandardProjections(compiledProjectionBeans);
         registerExplicitControllerEndpoints();
+    }
+
+    private void suppressDisabledDefaultControllerMappings() {
+        List<RequestMappingInfo> suppressed = handlerMapping.getHandlerMethods().entrySet().stream()
+                .filter(entry -> isDisabledDefaultControllerMapping(entry.getValue()))
+                .map(java.util.Map.Entry::getKey)
+                .toList();
+        suppressed.forEach(handlerMapping::unregisterMapping);
+    }
+
+    private boolean isDisabledDefaultControllerMapping(HandlerMethod handler) {
+        ActionEndpoint endpoint = AnnotationUtils.findAnnotation(handler.getMethod(), ActionEndpoint.class);
+        if (endpoint == null || !StandardWebEndpoint.isDefault(handler.getMethod())) {
+            return false;
+        }
+        Object controller = handler.getBean();
+        if (controller instanceof String beanName) {
+            controller = applicationContext.getBean(beanName);
+        }
+        Class<?> controllerClass = AopUtils.getTargetClass(controller);
+        if (!isStaticWebAnchor(controllerClass)) {
+            return false;
+        }
+        return controller instanceof ScopedWeb<?> scopedWeb
+                && StaticServiceAbilityCompiler.disabledActions(scopedWeb.service()).contains(endpoint.value());
+    }
+
+    private boolean isStaticWebAnchor(Class<?> controllerClass) {
+        return AnnotationUtils.findAnnotation(controllerClass, PlatformStaticModule.class) != null
+                || AnnotationUtils.findAnnotation(controllerClass, PlatformStaticActionContribution.class) != null
+                || AnnotationUtils.findAnnotation(controllerClass, PlatformStaticWebProjection.class) != null;
     }
 
     private void contribute(String moduleAlias,

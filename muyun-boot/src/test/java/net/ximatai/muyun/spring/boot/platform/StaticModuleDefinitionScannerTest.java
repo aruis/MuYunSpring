@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowDefinitionWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowVersionWebController;
+import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -917,6 +918,20 @@ class StaticModuleDefinitionScannerTest {
                 .containsExactlyInAnyOrder(PlatformAction.VIEW, PlatformAction.QUERY);
     }
 
+    @Test
+    void shouldNotRepublishDisabledCrudActionsFromDefaultWebMethods() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(DisabledCrudWeb.class,
+                    () -> new DisabledCrudWeb(new ReadOnlyOperationService()));
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("menu", "query", "view");
+        }
+    }
+
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
         assertThat(action.actionCode()).isEqualTo(actionCode);
         assertThat(action.permissionActionCode()).isEqualTo(actionCode);
@@ -1001,6 +1016,27 @@ class StaticModuleDefinitionScannerTest {
         @Override
         public String getModuleAlias() {
             return "demo.read_only";
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "demo", alias = "demo.read_only", title = "Read only")
+    @RequestMapping("/demo.read_only")
+    static final class DisabledCrudWeb implements CrudWeb<StandardEntity, ReadOnlyOperationService> {
+        private final ReadOnlyOperationService service;
+
+        DisabledCrudWeb(ReadOnlyOperationService service) {
+            this.service = service;
+        }
+
+        @Override
+        public ReadOnlyOperationService service() {
+            return service;
+        }
+
+        @Override
+        public <T> T webScope(java.util.function.Supplier<T> action) {
+            return action.get();
         }
     }
 
