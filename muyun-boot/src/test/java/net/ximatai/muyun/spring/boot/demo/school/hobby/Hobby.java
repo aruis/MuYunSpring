@@ -17,12 +17,4 @@ public class Hobby extends StandardEnabledTreeEntity {
     @Column(name = "code", type = ColumnType.VARCHAR, length = 32, nullable = false)
     private String code;
 
-    public Hobby() {
-    }
-
-    public Hobby(String code, String title, String parentId) {
-        this.code = code;
-        setTitle(title);
-        setParentId(parentId);
-    }
 }
