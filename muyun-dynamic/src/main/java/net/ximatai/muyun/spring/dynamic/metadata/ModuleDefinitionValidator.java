@@ -160,7 +160,7 @@ public class ModuleDefinitionValidator {
     private void validateTenantUniqueConstraints(EntityDefinition entity, List<FieldDefinition> fields) {
         Set<List<String>> declared = new HashSet<>();
         for (net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition constraint
-                : entity.tenantUniqueConstraints()) {
+                : entity.resolvedTenantUniqueConstraints()) {
             if (!declared.add(constraint.fieldNames())) {
                 throw new ModuleDefinitionException("duplicate tenant unique constraint: "
                         + entity.alias() + "." + String.join(",", constraint.fieldNames()));

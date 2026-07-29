@@ -574,6 +574,11 @@ class DynamicRecordWebControllerTest {
                                     "children": {
                                       "lines": [
                                         {
+                                          "values": {
+                                            "lineNo": "L-001"
+                                          }
+                                        },
+                                        {
                                           "values": {}
                                         }
                                       ]
@@ -586,7 +591,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.message").value("UI required field is missing: lines.lineNo"))
                 .andExpect(jsonPath("$.targets[0].moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.targets[0].relationAlias").value("lines"))
-                .andExpect(jsonPath("$.targets[0].fieldName").value("lineNo"));
+                .andExpect(jsonPath("$.targets[0].fieldName").value("lineNo"))
+                .andExpect(jsonPath("$.targets[0].rowIndex").value(1));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")

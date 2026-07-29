@@ -52,7 +52,7 @@ public interface CrudAbility<T extends EntityContract> {
             try {
                 id = getDao().insert(entity);
             } catch (RuntimeException failure) {
-                throw TenantUniqueConstraintSupport.translatePersistFailure(this, failure);
+                throw TenantUniqueConstraintSupport.translatePersistFailure(this, entity, failure);
             }
         }
         PlatformAbilityDispatcher.afterInsert(this, id, entity);
@@ -363,7 +363,7 @@ public interface CrudAbility<T extends EntityContract> {
             try {
                 updated = getDao().updateByIdAndVersion(entity, expectedVersion);
             } catch (RuntimeException failure) {
-                throw TenantUniqueConstraintSupport.translatePersistFailure(this, failure);
+                throw TenantUniqueConstraintSupport.translatePersistFailure(this, entity, failure);
             }
         }
         if (updated <= 0) {

@@ -81,6 +81,9 @@ class DynamicTableMapperTest {
                 )
         ).withTenantUniqueConstraints(new TenantUniqueConstraintDefinition(List.of("category", "code"), ""));
 
+        assertThat(entity.resolvedTenantUniqueConstraints())
+                .extracting(TenantUniqueConstraintDefinition::fieldNames)
+                .containsExactly(List.of("category", "code"));
         assertThat(mapper.toTable(entity).getIndexes()).anySatisfy(index -> {
             assertThat(index.isUnique()).isTrue();
             assertThat(index.getColumns()).containsExactly("tenant_id", "category", "code");

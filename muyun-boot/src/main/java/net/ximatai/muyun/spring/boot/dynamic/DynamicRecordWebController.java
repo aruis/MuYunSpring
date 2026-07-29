@@ -920,11 +920,12 @@ public class DynamicRecordWebController implements
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        for (DynamicRecord row : rows) {
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            DynamicRecord row = rows.get(rowIndex);
             Map<String, FieldDefinition> fields = row.getEntity().fields().stream()
                     .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
             validateUiRecordField(moduleAlias, row, uiField, fields.get(resolved.fieldName()),
-                    resolved.relationAlias() + "." + resolved.fieldName());
+                    resolved.relationAlias() + "." + resolved.fieldName(), rowIndex);
         }
     }
 
@@ -933,21 +934,31 @@ public class DynamicRecordWebController implements
                                        PlatformUiConfigField uiField,
                                        FieldDefinition field,
                                        String fieldPath) {
+        validateUiRecordField(moduleAlias, record, uiField, field, fieldPath, null);
+    }
+
+    private void validateUiRecordField(String moduleAlias,
+                                       DynamicRecord record,
+                                       PlatformUiConfigField uiField,
+                                       FieldDefinition field,
+                                       String fieldPath,
+                                       Integer rowIndex) {
         if (field == null) {
             return;
         }
-        validateUiReadOnly(moduleAlias, record, uiField, field, fieldPath);
-        validateUiRequired(moduleAlias, record, uiField, field, fieldPath);
+        validateUiReadOnly(moduleAlias, record, uiField, field, fieldPath, rowIndex);
+        validateUiRequired(moduleAlias, record, uiField, field, fieldPath, rowIndex);
     }
 
     private void validateUiReadOnly(String moduleAlias,
                                     DynamicRecord record,
                                     PlatformUiConfigField uiField,
                                     FieldDefinition field,
-                                    String fieldPath) {
+                                    String fieldPath,
+                                    Integer rowIndex) {
         if (Boolean.TRUE.equals(uiField.getReadOnly()) && record.isExplicitlySet(field.fieldName())) {
             throw PlatformErrors.validation(PlatformErrorCodes.VALIDATION_FAILED,
-                    "UI read-only field cannot be saved: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath));
+                    "UI read-only field cannot be saved: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath, rowIndex));
         }
     }
 
@@ -955,7 +966,8 @@ public class DynamicRecordWebController implements
                                     DynamicRecord record,
                                     PlatformUiConfigField uiField,
                                     FieldDefinition field,
-                                    String fieldPath) {
+                                    String fieldPath,
+                                    Integer rowIndex) {
         boolean required = Boolean.TRUE.equals(uiField.getRequiredOverride()) || field.isRequired();
         if (!required) {
             return;
@@ -963,18 +975,19 @@ public class DynamicRecordWebController implements
         Object value = record.getValues().get(field.fieldName());
         if (value == null || value instanceof String text && text.isBlank()) {
             throw PlatformErrors.validation(PlatformErrorCodes.VALIDATION_FAILED,
-                    "UI required field is missing: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath));
+                    "UI required field is missing: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath, rowIndex));
         }
     }
 
-    private ErrorTarget uiFieldTarget(String moduleAlias, String fieldPath) {
+    private ErrorTarget uiFieldTarget(String moduleAlias, String fieldPath, Integer rowIndex) {
         int separator = fieldPath.indexOf('.');
         if (separator < 0) {
             return ErrorTarget.field(fieldPath).module(moduleAlias);
         }
-        return ErrorTarget.field(fieldPath.substring(separator + 1))
+        ErrorTarget target = ErrorTarget.field(fieldPath.substring(separator + 1))
                 .module(moduleAlias)
                 .relation(fieldPath.substring(0, separator));
+        return rowIndex == null ? target : target.row(rowIndex);
     }
 
     private void validateQueryTemplateBelongsToModule(String moduleAlias, String queryTemplateId) {

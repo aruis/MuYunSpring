@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.common.schema;
 
 import net.ximatai.muyun.database.core.annotation.AnnotationProcessor;
-import net.ximatai.muyun.database.core.annotation.Indexed;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.model.constraint.StaticTenantUniqueConstraints;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
@@ -24,7 +23,6 @@ public class StaticEntityTableMapper {
         requirePlatformEntity(modelClass);
         TableWrapper table = AnnotationProcessor.fromEntityClass(modelClass);
         PlatformUniqueIndexes.normalizeTenantUniqueIndexes(table);
-        addTenantUniqueIndexesFromFields(table, modelClass);
         addDeclaredTenantUniqueConstraints(table, modelClass);
         tableValidator.requireStandardEntityTable(table, modelClass.getName());
         return table;
@@ -34,21 +32,6 @@ public class StaticEntityTableMapper {
         Objects.requireNonNull(modelClass, "modelClass must not be null");
         if (!StandardEntity.class.isAssignableFrom(modelClass)) {
             throw new IllegalArgumentException("static entity must extend StandardEntity: " + modelClass.getName());
-        }
-    }
-
-    private void addTenantUniqueIndexesFromFields(TableWrapper table, Class<?> modelClass) {
-        Class<?> current = modelClass;
-        while (current != null && current != Object.class) {
-            for (Field field : current.getDeclaredFields()) {
-                net.ximatai.muyun.database.core.annotation.Column column =
-                        field.getAnnotation(net.ximatai.muyun.database.core.annotation.Column.class);
-                Indexed indexed = field.getAnnotation(Indexed.class);
-                if ((column != null && column.unique()) || (indexed != null && indexed.unique())) {
-                    PlatformUniqueIndexes.addTenantUniqueIndex(table, columnName(field, column));
-                }
-            }
-            current = current.getSuperclass();
         }
     }
 

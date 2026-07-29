@@ -226,7 +226,7 @@ public class DynamicEntityService implements
 
     @Override
     public List<net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition> tenantUniqueConstraints() {
-        return dao.getEntity().tenantUniqueConstraints();
+        return dao.getEntity().resolvedTenantUniqueConstraints();
     }
 
     @Override

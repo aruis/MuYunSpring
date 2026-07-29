@@ -30,11 +30,8 @@ public class DynamicTableMapper {
         StandardEntitySchema.auditColumns().forEach(table::addColumn);
         for (FieldDefinition field : tableFields(entity)) {
             table.addColumn(toColumn(field));
-            if (field.isUnique()) {
-                PlatformUniqueIndexes.addTenantUniqueIndex(table, field.columnName());
-            }
         }
-        entity.tenantUniqueConstraints().forEach(constraint -> PlatformUniqueIndexes.addTenantUniqueIndex(table,
+        entity.resolvedTenantUniqueConstraints().forEach(constraint -> PlatformUniqueIndexes.addTenantUniqueIndex(table,
                 constraint.fieldNames().stream()
                         .map(fieldName -> field(entity, fieldName).columnName())
                         .toList()));

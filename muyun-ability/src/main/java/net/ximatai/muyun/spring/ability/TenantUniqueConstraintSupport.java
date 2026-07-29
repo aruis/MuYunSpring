@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.lang.reflect.Field;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,7 @@ final class TenantUniqueConstraintSupport {
     }
 
     static <T extends EntityContract> RuntimeException translatePersistFailure(CrudAbility<T> ability,
+                                                                                T entity,
                                                                                 RuntimeException failure) {
         if (!isDatabaseUniqueViolation(failure)) {
             return failure;
@@ -37,13 +39,28 @@ final class TenantUniqueConstraintSupport {
         if (constraints.isEmpty()) {
             return failure;
         }
-        TenantUniqueConstraintDefinition constraint = constraints.size() == 1 ? constraints.getFirst() : null;
-        return tenantUniqueConflict(ability, constraint, failure);
+        List<TenantUniqueConstraintDefinition> matching = constraints.stream()
+                .filter(constraint -> !conflictingRecords(ability, entity, constraint).isEmpty())
+                .toList();
+        if (matching.size() != 1) {
+            return failure;
+        }
+        TenantUniqueConstraintDefinition constraint = matching.getFirst();
+        return tenantUniqueConflict(ability, constraint, conflictingRecords(ability, entity, constraint), failure);
     }
 
     private static <T extends EntityContract> void validate(CrudAbility<T> ability,
                                                              T entity,
                                                              TenantUniqueConstraintDefinition constraint) {
+        List<T> conflicts = conflictingRecords(ability, entity, constraint);
+        if (!conflicts.isEmpty()) {
+            throw tenantUniqueConflict(ability, constraint, conflicts, null);
+        }
+    }
+
+    private static <T extends EntityContract> List<T> conflictingRecords(CrudAbility<T> ability,
+                                                                           T entity,
+                                                                           TenantUniqueConstraintDefinition constraint) {
         Criteria criteria = Criteria.of();
         if (entity.getTenantId() != null && !entity.getTenantId().isBlank()) {
             criteria.eq(StandardEntitySchema.TENANT_ID_FIELD, entity.getTenantId());
@@ -51,20 +68,26 @@ final class TenantUniqueConstraintSupport {
         for (String field : constraint.fieldNames()) {
             Object value = value(ability, entity, field);
             if (value == null) {
-                return;
+                return List.of();
             }
             criteria.eq(field, value);
         }
-        boolean duplicated = ability.getDao().query(criteria, PageRequest.of(1, 2)).stream()
-                .anyMatch(existing -> !Objects.equals(existing.getId(), entity.getId()));
-        if (duplicated) {
-            throw tenantUniqueConflict(ability, constraint, null);
-        }
+        return ability.getDao().query(criteria, PageRequest.of(1, 2)).stream()
+                .filter(existing -> !Objects.equals(existing.getId(), entity.getId()))
+                .toList();
     }
 
     private static <T extends EntityContract> PlatformException tenantUniqueConflict(CrudAbility<T> ability,
                                                                                         TenantUniqueConstraintDefinition constraint,
+                                                                                        List<T> conflicts,
                                                                                         Throwable cause) {
+        T active = conflicts.stream()
+                .filter(existing -> !Boolean.TRUE.equals(existing.getDeleted()))
+                .findFirst()
+                .orElse(null);
+        if (active == null && !conflicts.isEmpty()) {
+            return softDeletedConflict(ability, conflicts.getFirst(), cause);
+        }
         String message = constraint == null ? "tenant unique constraint violated" : constraint.violationMessage();
         Map<String, Object> details = constraint == null
                 ? Map.of("moduleAlias", ability.getModuleAlias())
@@ -73,6 +96,23 @@ final class TenantUniqueConstraintSupport {
         return cause == null
                 ? PlatformErrors.conflict(PlatformErrorCodes.CONFLICT_UNIQUE, message, scope, details)
                 : PlatformErrors.conflict(PlatformErrorCodes.CONFLICT_UNIQUE, message, cause, scope, details);
+    }
+
+    private static PlatformException softDeletedConflict(CrudAbility<?> ability,
+                                                          EntityContract retained,
+                                                          Throwable cause) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("resourceModuleAlias", ability.getModuleAlias());
+        details.put("resourceRecordId", retained.getId());
+        if (retained.getDeletedAt() != null) {
+            details.put("deletedAt", retained.getDeletedAt());
+        }
+        details.put("recoveryAvailable", Boolean.TRUE);
+        String message = "tenant unique identity is retained by a soft-deleted record; restore it from the recycle bin before reusing it";
+        ErrorScope scope = ErrorScope.module(ability.getModuleAlias());
+        return cause == null
+                ? PlatformErrors.conflict(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT, message, scope, details)
+                : PlatformErrors.conflict(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT, message, cause, scope, details);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
