@@ -3,11 +3,11 @@ package net.ximatai.muyun.spring.platform.measure;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,7 +15,7 @@ import java.math.RoundingMode;
 @Getter
 @Setter
 @Table(name = "platform_measure_unit", comment = "Platform measure unit")
-@CompositeIndex(columns = {"tenant_id", "application_alias", "category_alias", "code"}, unique = true)
+@TenantUniqueConstraint(fields = {"applicationAlias", "categoryAlias", "code"})
 public class MeasureUnit extends StandardEnabledSortableEntity {
     @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false,
             comment = "Application alias")

@@ -133,6 +133,7 @@ class UserAccountServiceContractTest {
         when(dao.count(any(Criteria.class))).thenReturn(1L);
         when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(
                 List.of(),
+                List.of(),
                 List.of(user),
                 List.of(user)
         );

@@ -5,11 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
-import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
@@ -18,7 +18,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Table(name = "iam_user", comment = "User account")
-@CompositeIndex(columns = {"tenant_id", "username"}, unique = true)
+@TenantUniqueConstraint(fields = "username")
 @InitialDataFields(
         identity = {"tenantId", "username"},
         managed = {"authUserId", "authModuleAlias"},

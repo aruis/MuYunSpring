@@ -87,7 +87,8 @@ class RoleServiceContractTest {
         when(roleDao.insert(any())).thenReturn("group-1");
         when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(employmentRole("r1", RoleKind.STANDARD)))
-                .thenReturn(List.of(employmentRole("r2", RoleKind.DATA_GRANT)));
+                .thenReturn(List.of(employmentRole("r2", RoleKind.DATA_GRANT)))
+                .thenReturn(List.of());
         RoleService service = service(roleDao, mock(AccountRoleGrantDao.class),
                 mock(EmploymentRoleGrantDao.class), mock(RoleActionDao.class));
 
