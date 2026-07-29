@@ -37,6 +37,7 @@ public interface CrudAbility<T extends EntityContract> {
         return null;
     }
 
+    @PlatformOperation(PlatformAction.CREATE)
     default String insert(T entity) {
         beforePrepareInsert(entity);
         EntityLifecycle.prepareInsert(entity, Instant.now());
@@ -68,6 +69,7 @@ public interface CrudAbility<T extends EntityContract> {
         return ids;
     }
 
+    @PlatformOperation(PlatformAction.VIEW)
     default T select(String id) {
         if (this instanceof CacheAbility<?> cacheAbility) {
             @SuppressWarnings("unchecked")
@@ -83,6 +85,7 @@ public interface CrudAbility<T extends EntityContract> {
         return entity;
     }
 
+    @PlatformOperation(PlatformAction.UPDATE)
     default int update(T entity) {
         DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.UPDATE, entity == null ? null : entity.getId());
         return withTenantScope(mutationScope, () -> {
@@ -121,6 +124,7 @@ public interface CrudAbility<T extends EntityContract> {
         return delete(entity.getId(), entity.getVersion());
     }
 
+    @PlatformOperation(PlatformAction.DELETE)
     default int delete(String id, Integer expectedVersion) {
         if (id == null || id.isBlank()) {
             return 0;
@@ -192,6 +196,7 @@ public interface CrudAbility<T extends EntityContract> {
         return count;
     }
 
+    @PlatformOperation(PlatformAction.QUERY)
     default PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         return getDao().pageQuery(activeCriteria(criteria), pageRequest, sorts);
     }

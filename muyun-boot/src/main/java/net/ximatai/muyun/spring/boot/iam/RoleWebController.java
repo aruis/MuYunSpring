@@ -6,10 +6,8 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.boot.web.BusinessMutation;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationResultSupport;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
@@ -64,8 +62,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements
         CrudWeb<Role, RoleService>,
-        EnableWeb<Role, RoleService>,
-        SortWeb<Role, RoleService>,
         MutationTenantScopeResolver<Role>,
         StaticModuleUiContributor {
     private final RoleGrantableActionResolver grantableActionResolver;

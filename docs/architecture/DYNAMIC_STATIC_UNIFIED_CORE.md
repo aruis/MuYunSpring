@@ -74,6 +74,18 @@ DynamicRecordService
 静态模型和动态模型可以有不同声明入口，但进入平台底座前应编译成统一定义。
 
 1. 静态模型由 Java 类、注解、DAO 和 Ability 组合声明；业务开发者不应为了接入平台再手写 `ModuleDefinition`。
+
+静态 Service 的 Ability 组合也是标准交互能力的事实源。Ability 只在规范方法上用 `@PlatformOperation(PlatformAction.X)` 声明动作，不声明 URL、HTTP method 或请求 DTO，也不额外重复声明类型级 ability code。标准动作默认参与平台投射；具体 Service 确需收窄时，使用 `@DisablePlatformOperations` 直接停用少量动作。停用发生在 Operation 编译阶段，不影响 Service 内部调用，并使 Web、UI、权限声明和后续 OpenAPI 同时看不到该动作。
+
+Web 层通过标准投射描述组合模块基础路径、动作相对路径、HTTP method 和输入绑定，并把启用的 Operation 注册为真实 Spring MVC mapping。所有编译端点进入同一个平台 Dispatcher，不为每种 Ability 生成 Handler 类。端点在 Spring MVC 接受后写入真实端点目录，目录保留实际 `RequestMappingInfo`、Operation 语义和执行目标；模块运行态、Action 权限和后续 OpenAPI 应消费这条统一链路。动态元数据后续也应编译到相同 Operation 和端点目录，不能再维护一套独立硬编码路径。
+
+标准 Ability 端点、Web 投影差异和独立业务 HTTP 接口遵守三条边界：
+
+- 标准启停、排序、树和回收站端点由 Ability 自动装配；`@PlatformStaticActionContribution` 子资源也进入同一编译链，其资源前缀动作和权限继承关系写入 resolved endpoint。
+- 路径变量派生的机构、父资源或模块范围属于 Web 投影，使用类型化 `RecordWebProjectionPolicy`、`TreeWebProjectionPolicy` 等策略接入统一 Dispatcher，不在 Controller 里重写一套标准端点。
+- 真正独立的业务 HTTP 契约继续使用原生 Spring Controller。确需完全替换某个标准端点时，先在具体 Service 用 `@DisablePlatformOperations` 停用对应动作，再声明显式 `@ActionEndpoint`；标准动作仍启用时发生同路径覆写会在启动期失败。
+
+旧 `EnableWeb`、`SortWeb`、`TreeWeb`、`RecycleBinWeb` 只作为动态链路和存量兼容入口，不是新的静态模块接入方式。静态业务行为扩展优先留在 Service/Ability hook；仅 HTTP 语境差异进入类型化 Web 投影策略，避免把 URL、请求 DTO 或路径变量污染到 Service。
 2. 动态模型没有 Java 类，才直接使用 `ModuleDefinition`、`EntityDefinition`、`FieldDefinition` 表达配置态。
 3. `Definition` 是动态配置和平台内部编译结果，不是静态业务接入的额外负担。
 4. 字段定义只表达字段事实、物理列、类型、约束和运行态必须知道的轻量字段行为。字典绑定可以作为编译后的运行态事实进入 `FieldDefinition`，但字典类目、项目维护和启用校验仍属于平台字典能力；默认值、过滤、影响等复杂字段行为应进入后续独立配置。

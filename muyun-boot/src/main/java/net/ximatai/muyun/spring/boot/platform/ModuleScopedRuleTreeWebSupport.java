@@ -9,8 +9,8 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
-import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.RecordActionWebRequest;
+import net.ximatai.muyun.spring.boot.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.StandardMutation;
 import net.ximatai.muyun.spring.boot.web.StandardMutationKind;
 import net.ximatai.muyun.spring.boot.web.StandardMutationResultSupport;
@@ -39,7 +39,7 @@ import java.util.Objects;
 abstract class ModuleScopedRuleTreeWebSupport<
         T extends EntityContract & EnabledCapable & SortCapable,
         S extends CrudAbility<T> & EnableAbility<T> & SortAbility<T>>
-        extends WebSupport<S> implements SystemScope<S> {
+        extends WebSupport<S> implements SystemScope<S>, RecordWebProjectionPolicy {
     private final String scopeField;
 
     protected ModuleScopedRuleTreeWebSupport(String scopeField) {
@@ -98,53 +98,9 @@ abstract class ModuleScopedRuleTreeWebSupport<
         });
     }
 
-    @PostMapping("/enable/{id}")
-    @ActionEndpoint(PlatformAction.ENABLE)
-    @StandardMutation(StandardMutationKind.ENABLE)
-    public int enable(HttpServletRequest servletRequest, @PathVariable String id,
-                      @RequestBody RecordActionWebRequest request) {
-        return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
-            return StandardMutationResultSupport.enabled(this, id, () -> service().enable(id, request.version()));
-        });
-    }
-
-    @PostMapping("/disable/{id}")
-    @ActionEndpoint(PlatformAction.DISABLE)
-    @StandardMutation(StandardMutationKind.DISABLE)
-    public int disable(HttpServletRequest servletRequest, @PathVariable String id,
-                       @RequestBody RecordActionWebRequest request) {
-        return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
-            return StandardMutationResultSupport.disabled(this, id, () -> service().disable(id, request.version()));
-        });
-    }
-
-    @PostMapping("/sort/{id}")
-    @ActionEndpoint(PlatformAction.SORT)
-    @StandardMutation(StandardMutationKind.SORT)
-    public int sort(HttpServletRequest servletRequest,
-                    @PathVariable String id,
-                    @RequestBody(required = false) SortWebRequest request) {
-        return webScope(() -> {
-            SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
-            requireScopedRecord(servletRequest, id);
-            if (hasText(normalized.previousId())) {
-                requireScopedRecord(servletRequest, normalized.previousId());
-                return StandardMutationResultSupport.sorted(this, () -> {
-                    service().moveAfter(id, normalized.previousId());
-                    return 1;
-                });
-            }
-            if (hasText(normalized.nextId())) {
-                requireScopedRecord(servletRequest, normalized.nextId());
-                return StandardMutationResultSupport.sorted(this, () -> {
-                    service().moveBefore(id, normalized.nextId());
-                    return 1;
-                });
-            }
-            throw new IllegalArgumentException("rule sort requires previousId or nextId");
-        });
+    @Override
+    public void requireRecord(HttpServletRequest request, PlatformAction action, String id) {
+        requireScopedRecord(request, id);
     }
 
     protected void requireExistingRuleInScope(HttpServletRequest request, T rule) {

@@ -8,62 +8,51 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
 
 public abstract class NestedEnabledTreeCrudWebSupport<
         T extends EntityContract & EnabledCapable & TreeCapable,
         S extends CrudAbility<T> & EnableAbility<T> & TreeAbility<T>>
-        extends NestedCrudWebSupport<T, S> {
-    @PostMapping("/enable/{id}")
-    @ActionEndpoint(PlatformAction.ENABLE)
-    @StandardMutation(StandardMutationKind.ENABLE)
-    public int enable(HttpServletRequest servletRequest, @PathVariable String id,
-                      @RequestBody RecordActionWebRequest request) {
-        return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
-            return StaticStandardMutationSupport.enabled(this, id, () -> service().enable(id, request.version()));
-        });
+        extends NestedCrudWebSupport<T, S>
+        implements RecordWebProjectionPolicy, TreeWebProjectionPolicy<T, S> {
+
+    @Override
+    public void requireRecord(HttpServletRequest request, PlatformAction action, String id) {
+        requireScopedRecord(request, id);
     }
 
-    @PostMapping("/disable/{id}")
-    @ActionEndpoint(PlatformAction.DISABLE)
-    @StandardMutation(StandardMutationKind.DISABLE)
-    public int disable(HttpServletRequest servletRequest, @PathVariable String id,
-                       @RequestBody RecordActionWebRequest request) {
-        return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
-            return StaticStandardMutationSupport.disabled(this, id, () -> service().disable(id, request.version()));
-        });
+    @Override
+    public T treeSelect(HttpServletRequest request, String id) {
+        return requireScopedRecord(request, id);
     }
 
-    @PostMapping("/sort/{id}")
-    @ActionEndpoint(PlatformAction.SORT)
-    @StandardMutation(StandardMutationKind.SORT)
-    public int sort(HttpServletRequest servletRequest,
-                    @PathVariable String id,
-                    @RequestBody(required = false) TreeSortWebRequest request) {
-        return webScope(() -> {
-            TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
-            requireSortInput(normalized);
-            requireScopedRecord(servletRequest, id);
-            requireScopedNeighbor(servletRequest, normalized.previousId());
-            requireScopedNeighbor(servletRequest, normalized.nextId());
-            requireScopedParent(servletRequest, normalized.parentId());
-            Criteria scopeCriteria = treeScopeCriteria(servletRequest);
-            return StaticStandardMutationSupport.sorted(this, () -> {
-                if (scopeCriteria == null || scopeCriteria.isEmpty()) {
-                    service().moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
-                } else {
-                    service().moveInTree(scopeCriteria, id, normalized.previousId(), normalized.nextId(),
-                            normalized.parentId());
-                }
-                return 1;
-            });
-        });
+    @Override
+    public List<T> treeChildren(HttpServletRequest request, String parentId) {
+        Criteria criteria = treeScopeCriteria(request);
+        return criteria == null || criteria.isEmpty()
+                ? service().children(parentId)
+                : service().children(criteria, parentId);
+    }
+
+    @Override
+    public void requireTreeSortScope(HttpServletRequest request, String id, TreeSortWebRequest sortRequest) {
+        requireScopedRecord(request, id);
+        requireScopedNeighbor(request, sortRequest.previousId());
+        requireScopedNeighbor(request, sortRequest.nextId());
+        requireScopedParent(request, sortRequest.parentId());
+    }
+
+    @Override
+    public void moveTree(HttpServletRequest request, String id, TreeSortWebRequest sortRequest) {
+        Criteria criteria = treeScopeCriteria(request);
+        if (criteria == null || criteria.isEmpty()) {
+            service().moveInTree(id, sortRequest.previousId(), sortRequest.nextId(), sortRequest.parentId());
+        } else {
+            service().moveInTree(criteria, id,
+                    sortRequest.previousId(), sortRequest.nextId(), sortRequest.parentId());
+        }
     }
 
     protected Criteria treeScopeCriteria(HttpServletRequest request) {
@@ -79,14 +68,6 @@ public abstract class NestedEnabledTreeCrudWebSupport<
     private void requireScopedParent(HttpServletRequest request, String parentId) {
         if (parentId != null && !parentId.isBlank() && !TreeAbility.ROOT_ID.equals(parentId)) {
             requireScopedRecord(request, parentId);
-        }
-    }
-
-    private void requireSortInput(TreeSortWebRequest request) {
-        if ((request.previousId() == null || request.previousId().isBlank())
-                && (request.nextId() == null || request.nextId().isBlank())
-                && (request.parentId() == null || request.parentId().isBlank())) {
-            throw new IllegalArgumentException("tree sort requires previousId, nextId, or parentId");
         }
     }
 }

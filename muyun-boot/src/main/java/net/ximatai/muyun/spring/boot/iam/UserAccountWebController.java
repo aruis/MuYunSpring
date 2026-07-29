@@ -10,7 +10,6 @@ import net.ximatai.muyun.spring.boot.web.BusinessMutationChange;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationRecordIdSource;
 import net.ximatai.muyun.spring.boot.web.BusinessMutationResult;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
@@ -65,7 +64,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
-        EnableWeb<UserAccount, UserAccountService>,
         MutationTenantScopeResolver<UserAccount>,
         StaticModuleUiContributor {
     private static final ActionExecutionPolicy USER_SELECTOR_POLICY = new ActionExecutionPolicy(

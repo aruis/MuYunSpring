@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.boot.web;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -37,4 +37,5 @@ public class MuYunSpringWebConfiguration {
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }
+
 }

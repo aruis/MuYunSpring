@@ -3,9 +3,8 @@ package net.ximatai.muyun.spring.boot.iam;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.ScopedTreeWeb;
 import net.ximatai.muyun.spring.boot.web.TreeScope;
+import net.ximatai.muyun.spring.boot.web.ScopedTreeWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
@@ -24,8 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements
         CrudWeb<Organization, OrganizationService>,
-        EnableWeb<Organization, OrganizationService>,
-        ScopedTreeWeb<Organization, OrganizationService> {
+        ScopedTreeWebProjectionPolicy<Organization, OrganizationService> {
     @Override
     public TreeScope treeScope(HttpServletRequest request) {
         String tenantId = resolveTreeTenantId(request.getParameter("tenantId"));

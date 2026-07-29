@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 import java.util.Objects;
@@ -13,6 +14,7 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
         return updateEnabled(id, Boolean.TRUE);
     }
 
+    @PlatformOperation(PlatformAction.ENABLE)
     default int enable(String id, Integer expectedVersion) {
         return updateEnabled(id, Boolean.TRUE, expectedVersion);
     }
@@ -21,6 +23,7 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
         return updateEnabled(id, Boolean.FALSE);
     }
 
+    @PlatformOperation(PlatformAction.DISABLE)
     default int disable(String id, Integer expectedVersion) {
         return updateEnabled(id, Boolean.FALSE, expectedVersion);
     }

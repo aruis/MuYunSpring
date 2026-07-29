@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.ResolvedWebEndpoint;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.platform.deletion.DeletionEntry;
 import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
@@ -104,6 +106,9 @@ class MuYunSpringApplicationContextIT {
     @Autowired
     private RecycleBinFacade recycleBinFacade;
 
+    @Autowired
+    private RegisteredWebEndpointCatalog registeredWebEndpointCatalog;
+
     private TestRestTemplate restTemplate;
 
     @LocalServerPort
@@ -126,6 +131,40 @@ class MuYunSpringApplicationContextIT {
 
     @Test
     void shouldLoadApplicationContextWithRealDatabase() {
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .extracting(endpoint -> endpoint.definition().endpointId())
+                .contains("platform.application.enable.enable", "platform.application.enable.disable",
+                        "platform.application.sort.sort", "platform.application.recycleBin.query",
+                        "platform.application.recycleBin.restore");
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .filteredOn(endpoint -> !endpoint.definition().abilityCode().equals("controller"))
+                .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
+                        .isEqualTo(ResolvedWebEndpoint.Source.STATIC_ABILITY));
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .filteredOn(endpoint -> endpoint.definition().abilityCode().equals("controller"))
+                .isNotEmpty()
+                .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
+                        .isEqualTo(ResolvedWebEndpoint.Source.STATIC_EXPLICIT));
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("iam.organization"))
+                .filter(endpoint -> endpoint.definition().source() == ResolvedWebEndpoint.Source.STATIC_ABILITY))
+                .extracting(endpoint -> endpoint.definition().endpointId())
+                .contains("iam.organization.enable.enable", "iam.organization.enable.disable",
+                        "iam.organization.tree.tree", "iam.organization.tree.subtree",
+                        "iam.organization.tree.sort");
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.module"))
+                .filter(endpoint -> endpoint.definition().source() == ResolvedWebEndpoint.Source.STATIC_ABILITY))
+                .extracting(endpoint -> endpoint.definition().action())
+                .doesNotContain(net.ximatai.muyun.spring.common.platform.PlatformAction.TREE,
+                        net.ximatai.muyun.spring.common.platform.PlatformAction.SORT);
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().abilityCode().startsWith("item.")))
+                .extracting(endpoint -> endpoint.definition().executionPolicy().actionCode())
+                .contains("item_enable", "item_disable", "item_tree", "item_sort");
     }
 
     @Test

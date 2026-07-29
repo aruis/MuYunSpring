@@ -7,12 +7,9 @@ import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.BusinessMutation;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
-import net.ximatai.muyun.spring.boot.web.RecycleBinWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
@@ -39,7 +36,6 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
-import net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -60,9 +56,6 @@ import java.util.function.Supplier;
 @RequestMapping("/iam.employee")
 public class EmployeeWebController extends WebSupport<EmployeeService> implements
         CrudWeb<Employee, EmployeeService>,
-        EnableWeb<Employee, EmployeeService>,
-        SortWeb<Employee, EmployeeService>,
-        RecycleBinWeb<Employee, EmployeeService>,
         MutationTenantScopeResolver<Employee>,
         StaticModuleUiContributor {
     private static final ActionExecutionPolicy EMPLOYEE_POSITIONS_POLICY = new ActionExecutionPolicy(
@@ -74,21 +67,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     private OrganizationService organizationService;
     private StaticRecordReadProjectionService staticRecordReadProjectionService;
     private EmployeeEmploymentReadService employeeEmploymentReadService;
-    private RecycleBinFacade recycleBinFacade;
     private ActionExecutionPolicyService actionExecutionPolicyService;
-
-    @Autowired
-    void setRecycleBinFacade(RecycleBinFacade recycleBinFacade) {
-        this.recycleBinFacade = recycleBinFacade;
-    }
-
-    @Override
-    public RecycleBinFacade recycleBinFacade() {
-        if (recycleBinFacade == null) {
-            throw new IllegalStateException("RecycleBinFacade must be configured for recycle-bin endpoints");
-        }
-        return recycleBinFacade;
-    }
 
     @Autowired
     public EmployeeWebController(EmployeePositionService employeePositionService,

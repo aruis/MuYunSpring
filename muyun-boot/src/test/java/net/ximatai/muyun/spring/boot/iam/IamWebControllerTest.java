@@ -15,6 +15,8 @@ import net.ximatai.muyun.spring.boot.platform.RecordReadVisibility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.StaticAbilityWebEndpointRegistrar;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -74,11 +76,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.List;
 import java.util.Map;
@@ -147,7 +151,6 @@ class IamWebControllerTest {
         UserAccountWebController userAccountController = new UserAccountWebController();
         RoleWebController roleController = new RoleWebController(grantableActionResolver);
         ReflectionTestUtils.setField(tenantController, "service", tenantService);
-        ReflectionTestUtils.setField(tenantController, "recycleBinFacade", recycleBinFacade);
         ReflectionTestUtils.setField(organizationController, "service", organizationService);
         ReflectionTestUtils.setField(positionController, "service", positionService);
         ReflectionTestUtils.setField(userAccountController, "service", userAccountService);
@@ -160,6 +163,7 @@ class IamWebControllerTest {
                         userAccountController,
                         roleController
                 )
+                .setCustomHandlerMapping(() -> new AbilityAwareHandlerMapping(objectMapper, recycleBinFacade))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.ofNullable(currentUser)))
@@ -170,6 +174,31 @@ class IamWebControllerTest {
     void tearDown() {
         TenantContext.clear();
         CurrentUserContext.clear();
+    }
+
+    private static final class AbilityAwareHandlerMapping extends RequestMappingHandlerMapping {
+        private final ObjectMapper objectMapper;
+        private final RecycleBinFacade recycleBinFacade;
+
+        private AbilityAwareHandlerMapping(ObjectMapper objectMapper, RecycleBinFacade recycleBinFacade) {
+            this.objectMapper = objectMapper;
+            this.recycleBinFacade = recycleBinFacade;
+        }
+
+        @Override
+        public void afterPropertiesSet() {
+            super.afterPropertiesSet();
+            DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+            beanFactory.registerSingleton("recycleBinFacade", recycleBinFacade);
+            ObjectProvider<RecycleBinFacade> provider = beanFactory.getBeanProvider(RecycleBinFacade.class);
+            new StaticAbilityWebEndpointRegistrar(
+                    obtainApplicationContext(),
+                    this,
+                    new RegisteredWebEndpointCatalog(),
+                    provider,
+                    objectMapper
+            ).afterSingletonsInstantiated();
+        }
     }
 
     @Test

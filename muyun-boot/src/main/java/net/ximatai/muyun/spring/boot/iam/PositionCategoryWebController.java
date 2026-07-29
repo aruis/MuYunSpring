@@ -6,10 +6,9 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.MutationTenantScopeResolver;
-import net.ximatai.muyun.spring.boot.web.ScopedTreeWeb;
 import net.ximatai.muyun.spring.boot.web.TreeScope;
+import net.ximatai.muyun.spring.boot.web.ScopedTreeWebProjectionPolicy;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.position.PositionCategory;
 import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
@@ -25,8 +24,7 @@ import java.util.Optional;
 @RequestMapping("/iam.position_category")
 public class PositionCategoryWebController extends WebSupport<PositionCategoryService> implements
         CrudWeb<PositionCategory, PositionCategoryService>,
-        EnableWeb<PositionCategory, PositionCategoryService>,
-        ScopedTreeWeb<PositionCategory, PositionCategoryService>,
+        ScopedTreeWebProjectionPolicy<PositionCategory, PositionCategoryService>,
         MutationTenantScopeResolver<PositionCategory> {
     @Override
     public TreeScope treeScope(HttpServletRequest request) {

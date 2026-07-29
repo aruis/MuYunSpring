@@ -1,8 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.EnableWeb;
-import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -17,7 +15,5 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/platform.metadata")
 public class MetadataWebController extends WebSupport<MetadataService> implements
         CrudWeb<Metadata, MetadataService>,
-        EnableWeb<Metadata, MetadataService>,
-        SortWeb<Metadata, MetadataService>,
         SystemScope<MetadataService> {
 }

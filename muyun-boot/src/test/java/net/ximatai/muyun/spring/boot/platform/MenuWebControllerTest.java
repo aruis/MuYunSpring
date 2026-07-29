@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.boot.web.endpoint.StaticAbilityWebEndpointRegistrar;
 import net.ximatai.muyun.spring.ability.action.BusinessException;
 import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -25,11 +27,14 @@ import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.List;
 import java.util.Optional;
@@ -170,15 +175,16 @@ class MenuWebControllerTest {
         Menu root = menu("root-1", "scheme-1", "业务中心", null);
         Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer");
         Menu inserted = menu("menu-2", "scheme-1", "订单", "crm.order");
-        when(menuService.rootMenus("scheme-1")).thenReturn(List.of(root));
-        when(menuService.children("scheme-1", "root-1")).thenReturn(List.of(child));
-        when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
+        when(menuService.children(any(Criteria.class), org.mockito.ArgumentMatchers.eq("root")))
+                .thenReturn(List.of(root));
+        when(menuService.children(any(Criteria.class), org.mockito.ArgumentMatchers.eq("root-1")))
+                .thenReturn(List.of(child));
+        when(menuService.children(any(Criteria.class), org.mockito.ArgumentMatchers.eq("menu-1")))
+                .thenReturn(List.of());
         when(menuService.insert(any(Menu.class))).thenReturn("menu-2");
         when(menuService.select("menu-2")).thenReturn(inserted);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-                .setMessageConverters(codeTitleEnumConverter())
-                .build();
+        MockMvc mvc = abilityAwareMvc(controller);
         mvc.perform(get("/platform.menu-scheme/scheme-1/menus/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
@@ -266,8 +272,42 @@ class MenuWebControllerTest {
     }
 
     private MappingJackson2HttpMessageConverter codeTitleEnumConverter() {
-        ObjectMapper objectMapper = new ObjectMapper()
+        return new MappingJackson2HttpMessageConverter(codeTitleObjectMapper());
+    }
+
+    private MockMvc abilityAwareMvc(Object controller) {
+        ObjectMapper objectMapper = codeTitleObjectMapper();
+        return MockMvcBuilders.standaloneSetup(controller)
+                .setCustomHandlerMapping(() -> new AbilityAwareHandlerMapping(objectMapper))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .build();
+    }
+
+    private ObjectMapper codeTitleObjectMapper() {
+        return new ObjectMapper()
                 .registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
-        return new MappingJackson2HttpMessageConverter(objectMapper);
+    }
+
+    private static final class AbilityAwareHandlerMapping extends RequestMappingHandlerMapping {
+        private final ObjectMapper objectMapper;
+
+        private AbilityAwareHandlerMapping(ObjectMapper objectMapper) {
+            this.objectMapper = objectMapper;
+        }
+
+        @Override
+        public void afterPropertiesSet() {
+            super.afterPropertiesSet();
+            DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+            ObjectProvider<net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade> provider =
+                    beanFactory.getBeanProvider(net.ximatai.muyun.spring.platform.deletion.RecycleBinFacade.class);
+            new StaticAbilityWebEndpointRegistrar(
+                    obtainApplicationContext(),
+                    this,
+                    new RegisteredWebEndpointCatalog(),
+                    provider,
+                    objectMapper
+            ).afterSingletonsInstantiated();
+        }
     }
 }

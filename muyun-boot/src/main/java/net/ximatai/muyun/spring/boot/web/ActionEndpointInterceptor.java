@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpoint;
+import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
 import org.springframework.lang.NonNull;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
@@ -26,18 +28,27 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
     private final ActionExecutionPolicyService policyService;
     private final ActionEndpointContextResolver contextResolver;
     private final ActingRequestResolver actingRequestResolver;
+    private final RegisteredWebEndpointCatalog endpointCatalog;
 
     public ActionEndpointInterceptor(ActionExecutionPolicyService policyService,
                                      ActionEndpointContextResolver contextResolver) {
-        this(policyService, contextResolver, null);
+        this(policyService, contextResolver, null, null);
     }
 
     public ActionEndpointInterceptor(ActionExecutionPolicyService policyService,
                                      ActionEndpointContextResolver contextResolver,
                                      ActingRequestResolver actingRequestResolver) {
+        this(policyService, contextResolver, actingRequestResolver, null);
+    }
+
+    public ActionEndpointInterceptor(ActionExecutionPolicyService policyService,
+                                     ActionEndpointContextResolver contextResolver,
+                                     ActingRequestResolver actingRequestResolver,
+                                     RegisteredWebEndpointCatalog endpointCatalog) {
         this.policyService = policyService;
         this.contextResolver = contextResolver;
         this.actingRequestResolver = actingRequestResolver;
+        this.endpointCatalog = endpointCatalog;
     }
 
     @Override
@@ -47,6 +58,9 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
+        Optional<RegisteredWebEndpoint> registered = endpointCatalog == null
+                ? Optional.empty()
+                : endpointCatalog.find(request, handlerMethod);
         ActionEndpoint endpoint = WebAnnotationSupport.findMergedMethodAnnotation(handlerMethod.getMethod(),
                 handlerMethod.getBeanType(), ActionEndpoint.class);
         CustomActionEndpoint customEndpoint = WebAnnotationSupport.findMergedMethodAnnotation(
@@ -55,12 +69,22 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
             throw new IllegalStateException("method cannot declare both standard and custom action endpoint: "
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
         }
-        if (endpoint == null && customEndpoint == null) {
+        if (registered.isPresent() && (endpoint != null || customEndpoint != null)) {
+            // The compiled catalog is authoritative for generated and compatibility mappings alike.
+            endpoint = null;
+            customEndpoint = null;
+        }
+        if (registered.isEmpty() && endpoint == null && customEndpoint == null) {
             return true;
         }
-        Optional<ActionExecutionContext> context = endpoint == null
-                ? contextResolver.resolve(request, handlerMethod, customEndpoint)
-                : contextResolver.resolve(request, handlerMethod, endpoint);
+        Optional<ActionExecutionContext> context;
+        if (registered.isPresent()) {
+            context = Optional.of(contextResolver.resolve(request, registered.get().definition()));
+        } else if (endpoint != null) {
+            context = contextResolver.resolve(request, handlerMethod, endpoint);
+        } else {
+            context = contextResolver.resolve(request, handlerMethod, customEndpoint);
+        }
         if (context.isEmpty()) {
             throw new IllegalStateException("action endpoint requires module alias: "
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());

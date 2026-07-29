@@ -5,45 +5,15 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 public abstract class NestedSortableCrudWebSupport<
         T extends EntityContract & SortCapable,
         S extends CrudAbility<T> & SortAbility<T>>
-        extends NestedCrudWebSupport<T, S> {
-    @PostMapping("/sort/{id}")
-    @ActionEndpoint(PlatformAction.SORT)
-    @StandardMutation(StandardMutationKind.SORT)
-    public int sort(HttpServletRequest servletRequest,
-                    @PathVariable String id,
-                    @RequestBody(required = false) SortWebRequest request) {
-        return webScope(() -> moveWithinScope(servletRequest, id, request, "sort requires previousId or nextId"));
-    }
+        extends NestedCrudWebSupport<T, S> implements RecordWebProjectionPolicy {
 
-    protected int moveWithinScope(HttpServletRequest servletRequest,
-                                               String id,
-                                               SortWebRequest request,
-                                               String errorMessage) {
-        SortWebRequest normalized = request == null ? new SortWebRequest(null, null) : request;
-        requireScopedRecord(servletRequest, id);
-        if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
-            requireScopedRecord(servletRequest, normalized.previousId());
-            return StaticStandardMutationSupport.sorted(this, () -> {
-                service().moveAfter(id, normalized.previousId());
-                return 1;
-            });
-        }
-        if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
-            requireScopedRecord(servletRequest, normalized.nextId());
-            return StaticStandardMutationSupport.sorted(this, () -> {
-                service().moveBefore(id, normalized.nextId());
-                return 1;
-            });
-        }
-        throw new IllegalArgumentException(errorMessage);
+    @Override
+    public void requireRecord(HttpServletRequest request, PlatformAction action, String id) {
+        requireScopedRecord(request, id);
     }
 }
