@@ -99,6 +99,8 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             throw new OptimisticLockException("record version conflict: " + id);
         }
         Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+        beforeSoftDelete(entity);
+        PlatformAbilityDispatcher.beforeSoftDelete(this, entity);
         DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.SOFT);
         try {
             EntityLifecycle.prepareDelete(entity, Instant.now());
@@ -143,6 +145,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             throw new OptimisticLockException("record version conflict: " + id);
         }
         Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+        PlatformAbilityDispatcher.beforeRestore(this, entity);
         EntityLifecycle.prepareRestore(entity, Instant.now());
         int restored;
         try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
@@ -158,6 +161,9 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
     }
 
     default void beforeRestore(String id) {
+    }
+
+    default void beforeSoftDelete(T entity) {
     }
 
     default void afterRestore(String id, T entity, int restored) {

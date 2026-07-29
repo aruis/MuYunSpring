@@ -32,6 +32,31 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
         populateStaticReferenceTitles(entity);
     }
 
+    /**
+     * Validates non-empty static references against the target service's active
+     * scope. This is a write-side integrity check; title projection remains a
+     * read-side concern.
+     */
+    default void validateReferenceIntegrity(T entity) {
+        Class<?> modelClass = referenceModelClass(entity);
+        if (entity == null || modelClass == null) {
+            return;
+        }
+        for (StaticReferenceResolver.ReferenceRule rule : StaticReferenceResolver.rules(modelClass)) {
+            List<String> ids = StaticReferenceResolver.values(entity, rule.plan());
+            if (ids.isEmpty()) {
+                continue;
+            }
+            Map<String, String> resolved = referenceTitles(rule.target(), ids);
+            List<String> unavailable = ids.stream().filter(id -> !resolved.containsKey(id)).toList();
+            if (!unavailable.isEmpty()) {
+                throw new PlatformException("reference target is unavailable: "
+                        + rule.target().qualifiedName() + "." + rule.plan().sourceField()
+                        + " -> " + unavailable);
+            }
+        }
+    }
+
     default void refreshReferenceDependencies(T entity) {
         ReferenceDependencyRegistry.refresh(this, entity);
     }
@@ -87,6 +112,13 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
         ReferenceLookup lookup = lookups.get(target);
         if (lookup != null) {
             return lookup;
+        }
+        ReferenceAbility<?> resolved = net.ximatai.muyun.spring.ability.PlatformAbilityRuntime
+                .referenceTargetResolver()
+                .resolve(target)
+                .orElse(null);
+        if (resolved != null) {
+            return new ReferenceLookup(target, resolved);
         }
         throw new PlatformException("reference " + purpose + " resolver is not configured: "
                 + target.qualifiedName()

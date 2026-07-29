@@ -243,6 +243,30 @@ class TeachingDemoIT {
     }
 
     @Test
+    void shouldValidateMemberReferenceAndRestrictDeletingReferencedStudent() {
+        try (TenantContext.Scope ignored = TenantContext.system("school demo reference integrity")) {
+            String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));
+            Classroom invalid = classroom("G-" + serial(), "引用校验班", "2026", teacherId);
+            invalid.setMembers(List.of(classMember("missing-student")));
+            assertThatThrownBy(() -> classrooms.insert(invalid))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("reference target is unavailable: education.student.studentId");
+
+            String studentId = students.insert(student("S-" + serial(), "陈同学", "二年级"));
+            Classroom classroom = classroom("G-" + serial(), "成员约束班", "2026", teacherId);
+            classroom.setMembers(List.of(classMember(studentId)));
+            String classroomId = classrooms.insert(classroom);
+
+            assertThatThrownBy(() -> students.delete(studentId))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("active records in education.class_member.studentId");
+
+            assertThat(classrooms.delete(classroomId)).isEqualTo(1);
+            assertThat(students.delete(studentId)).isEqualTo(1);
+        }
+    }
+
+    @Test
     void shouldReplaceMemberRowsAndCascadeSoftDeleteWhenClassroomIsDeleted() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo aggregate")) {
             String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));

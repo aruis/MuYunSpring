@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetProvider;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
@@ -63,7 +64,8 @@ public class DynamicEntityService implements
         ReferencerAbility<DynamicRecord>,
         CacheAbility<DynamicRecord>,
         FieldProtectionAbility<DynamicRecord>,
-        TenantUniqueConstraintProvider<DynamicRecord> {
+        TenantUniqueConstraintProvider<DynamicRecord>,
+        ReferenceTargetProvider {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;
@@ -178,8 +180,15 @@ public class DynamicEntityService implements
         return dao.getEntity().alias();
     }
 
+    @Override
     public ReferenceTarget referenceTarget() {
         return ReferenceTarget.of(moduleAlias, dao.getEntity().alias());
+    }
+
+    /** Exposes the dynamic entity through the shared reference-read contract. */
+    public net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?> referenceAbility() {
+        requireCapability(EntityCapability.REFERENCE);
+        return referenceRuntime();
     }
 
     public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
@@ -273,6 +282,14 @@ public class DynamicEntityService implements
     @Override
     public void beforeDelete(String id) {
         lifecycle.beforeDelete(id);
+    }
+
+    @Override
+    public void beforeRestore(String id) {
+        DynamicRecord record = selectIgnoreSoftDelete(id);
+        if (record != null) {
+            validateReferenceValues(record, false);
+        }
     }
 
     public DynamicFormulaPreviewResult previewFormula(DynamicRecord record) {
@@ -625,12 +642,20 @@ public class DynamicEntityService implements
                 clearReferenceProjectionValues(record, plan);
                 continue;
             }
-            DynamicEntityService targetService = referenceService(plan.target());
-            if (plan.autoTitle()) {
-                Map<String, String> titles = targetService.titles(ids);
-                record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, titles, plan));
+            try {
+                DynamicEntityService targetService = referenceService(plan.target());
+                if (plan.autoTitle()) {
+                    Map<String, String> titles = targetService.titles(ids);
+                    record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, titles, plan));
+                }
+                populateReferenceProjectionValues(record, targetService, ids, plan);
+            } catch (RuntimeException dynamicResolutionFailure) {
+                net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?> targetService = referenceAbility(plan.target());
+                if (plan.autoTitle()) {
+                    record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, targetService.titles(ids), plan));
+                }
+                populateReferenceProjectionValues(record, targetService, ids, plan);
             }
-            populateReferenceProjectionValues(record, targetService, ids, plan);
         }
     }
 
@@ -681,6 +706,16 @@ public class DynamicEntityService implements
         return referenceServiceResolver.apply(target);
     }
 
+    private net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?> referenceAbility(ReferenceTarget target) {
+        try {
+            return referenceService(target).referenceAbility();
+        } catch (RuntimeException dynamicResolutionFailure) {
+            return net.ximatai.muyun.spring.ability.PlatformAbilityRuntime.referenceTargetResolver()
+                    .resolve(target)
+                    .orElseThrow(() -> dynamicResolutionFailure);
+        }
+    }
+
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
         if (plan.cardinality() == ReferenceCardinality.MANY) {
             return ids.stream()
@@ -689,6 +724,19 @@ public class DynamicEntityService implements
                     .toList();
         }
         return titles.get(ids.getFirst());
+    }
+
+    private void populateReferenceProjectionValues(DynamicRecord record,
+                                                   net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?> targetService,
+                                                   List<String> ids,
+                                                   ReferencePlan plan) {
+        if (plan.projections().isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, Object>> loaded = targetService.projections(ids, projectionSourceFields(plan));
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceProjection projection : plan.projections()) {
+            record.putVirtualValue(projection.outputField(), referenceProjectionValue(ids, loaded, plan, projection.targetField()));
+        }
     }
 
     private void populateReferenceProjectionValues(DynamicRecord record,
@@ -883,6 +931,10 @@ public class DynamicEntityService implements
     }
 
     private void validateReferenceValues(DynamicRecord record) {
+        validateReferenceValues(record, true);
+    }
+
+    private void validateReferenceValues(DynamicRecord record, boolean explicitFieldsOnly) {
         requireSameEntity(record);
         if (module == null) {
             return;
@@ -890,7 +942,7 @@ public class DynamicEntityService implements
         Map<String, FieldDefinition> fields = dao.getEntity().fields().stream()
                 .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, Function.identity()));
         for (ReferencePlan plan : referencePlans()) {
-            if (!record.isExplicitlySet(plan.sourceField())) {
+            if (explicitFieldsOnly && !record.isExplicitlySet(plan.sourceField())) {
                 continue;
             }
             FieldDefinition field = fields.get(plan.sourceField());
@@ -906,12 +958,23 @@ public class DynamicEntityService implements
         if (ids.isEmpty()) {
             return;
         }
-        DynamicEntityService targetService = referenceService(plan.target());
-        for (String id : ids) {
-            if (targetService.activeRaw(id) == null) {
-                throw new IllegalArgumentException("dynamic reference target not found: "
-                        + plan.target().qualifiedName() + "." + id);
-            }
+        Set<String> resolved;
+        try {
+            resolved = referenceService(plan.target()).list(
+                            Criteria.of().in(StandardEntitySchema.ID_FIELD, ids),
+                            new PageRequest(0, ids.size()))
+                    .stream()
+                    .map(DynamicRecord::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+        } catch (RuntimeException dynamicResolutionFailure) {
+            resolved = referenceAbility(plan.target()).titles(ids).keySet();
+        }
+        Set<String> resolvedIds = resolved;
+        List<String> unavailable = ids.stream().filter(id -> !resolvedIds.contains(id)).toList();
+        if (!unavailable.isEmpty()) {
+            throw new IllegalArgumentException("dynamic reference target not found: "
+                    + plan.target().qualifiedName() + "."
+                    + (unavailable.size() == 1 ? unavailable.getFirst() : unavailable));
         }
     }
 

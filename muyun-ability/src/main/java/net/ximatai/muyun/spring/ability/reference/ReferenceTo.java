@@ -19,4 +19,6 @@ public @interface ReferenceTo {
     String titleOutputField() default "";
 
     ReferenceProject[] projections() default {};
+
+    ReferenceIntegrity integrity() default @ReferenceIntegrity;
 }

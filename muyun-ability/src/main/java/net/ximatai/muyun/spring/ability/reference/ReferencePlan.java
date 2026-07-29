@@ -12,7 +12,8 @@ public record ReferencePlan(
         ReferenceCardinality cardinality,
         boolean autoTitle,
         String titleOutputField,
-        List<ReferenceProjection> projections
+        List<ReferenceProjection> projections,
+        ReferenceIntegrityPolicy integrity
 ) {
     public ReferencePlan {
         if (sourceField == null || sourceField.isBlank()) {
@@ -34,6 +35,11 @@ public record ReferencePlan(
             throw new PlatformException("reference titleOutputField requires autoTitle: " + sourceField);
         }
         projections = projections == null ? List.of() : List.copyOf(projections);
+        integrity = integrity == null ? ReferenceIntegrityPolicy.DEFAULT : integrity;
+        if (integrity.onTargetSoftDelete() == ReferenceTargetDeletionPolicy.RESTRICT
+                && cardinality == ReferenceCardinality.MANY) {
+            throw new PlatformException("RESTRICT reference deletion requires cardinality ONE: " + sourceField);
+        }
         validateOutputFields(sourceField, titleOutputField, projections);
     }
 
@@ -42,7 +48,17 @@ public record ReferencePlan(
                          ReferenceCardinality cardinality,
                          boolean autoTitle,
                          String titleOutputField) {
-        this(sourceField, target, cardinality, autoTitle, titleOutputField, List.of());
+        this(sourceField, target, cardinality, autoTitle, titleOutputField, List.of(), ReferenceIntegrityPolicy.DEFAULT);
+    }
+
+    public ReferencePlan(String sourceField,
+                         ReferenceTarget target,
+                         ReferenceCardinality cardinality,
+                         boolean autoTitle,
+                         String titleOutputField,
+                         List<ReferenceProjection> projections) {
+        this(sourceField, target, cardinality, autoTitle, titleOutputField, projections,
+                ReferenceIntegrityPolicy.DEFAULT);
     }
 
     public static ReferencePlan of(String sourceField, ReferenceTarget target, ReferenceCardinality cardinality) {
@@ -50,12 +66,12 @@ public record ReferencePlan(
     }
 
     public ReferencePlan withAutoTitle(String titleOutputField) {
-        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField, projections);
+        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField, projections, integrity);
     }
 
     public ReferencePlan withProjection(String targetField, String outputField) {
         return new ReferencePlan(sourceField(), target, cardinality, autoTitle, titleOutputField,
-                appendProjection(new ReferenceProjection(targetField, outputField)));
+                appendProjection(new ReferenceProjection(targetField, outputField)), integrity);
     }
 
     public List<String> normalizeValues(Object value) {

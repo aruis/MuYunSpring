@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetDeletionPolicy;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
@@ -103,7 +105,9 @@ class DynamicModuleDescriptorTest {
                         .withAutoPopulate()))
                 .references(List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
                         .withAutoTitle("customerTitle")
-                        .withProjection("title", "customerTitle")))
+                        .withProjection("title", "customerTitle")
+                        .withIntegrity(new ReferenceIntegrityPolicy(
+                                ReferenceTargetDeletionPolicy.RESTRICT))))
                 .views(List.of())
                 .associationViews(List.of(
                         EntityAssociationViewDefinition.childRelation("contacts", "customer", "crm.customer",
@@ -188,6 +192,7 @@ class DynamicModuleDescriptorTest {
         assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
         assertThat(reference.targetEntityAlias()).isEqualTo("customer");
         assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
+        assertThat(reference.integrity().onTargetSoftDelete()).isEqualTo(ReferenceTargetDeletionPolicy.RESTRICT);
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
         assertThat(descriptor.entities().get(1).fields().get(1).reference())
