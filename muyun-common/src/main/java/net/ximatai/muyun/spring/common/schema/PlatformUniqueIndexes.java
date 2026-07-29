@@ -37,11 +37,17 @@ public final class PlatformUniqueIndexes {
     }
 
     public static void addTenantUniqueIndex(TableWrapper table, String columnName) {
-        if (table == null || columnName == null || columnName.isBlank() || shouldKeepGlobal(List.of(columnName))) {
+        addTenantUniqueIndex(table, List.of(columnName));
+    }
+
+    public static void addTenantUniqueIndex(TableWrapper table, List<String> columnNames) {
+        if (table == null || columnNames == null || columnNames.isEmpty()
+                || columnNames.stream().anyMatch(column -> column == null || column.isBlank())
+                || shouldKeepGlobal(columnNames)) {
             return;
         }
-        List<String> columns = List.of(StandardEntitySchema.TENANT_ID_COLUMN, columnName);
-        table.getIndexes().removeIf(index -> index.isUnique() && index.getColumns().equals(List.of(columnName)));
+        List<String> columns = withTenant(columnNames);
+        table.getIndexes().removeIf(index -> index.isUnique() && index.getColumns().equals(columnNames));
         if (!containsIndex(table.getIndexes(), columns, true)) {
             table.addIndex(columns, true);
         }

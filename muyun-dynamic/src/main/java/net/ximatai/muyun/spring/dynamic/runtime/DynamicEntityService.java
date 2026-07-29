@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.ability.security.FieldProtectionPlan;
 import net.ximatai.muyun.spring.ability.security.FieldSigner;
 import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.TenantUniqueConstraintProvider;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -61,7 +62,8 @@ public class DynamicEntityService implements
         ChildrenAbility<DynamicRecord>,
         ReferencerAbility<DynamicRecord>,
         CacheAbility<DynamicRecord>,
-        FieldProtectionAbility<DynamicRecord> {
+        FieldProtectionAbility<DynamicRecord>,
+        TenantUniqueConstraintProvider<DynamicRecord> {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;
@@ -220,6 +222,16 @@ public class DynamicEntityService implements
     @Override
     public DynamicRecord copyForCache(DynamicRecord entity) {
         return entity == null ? null : entity.copy();
+    }
+
+    @Override
+    public List<net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition> tenantUniqueConstraints() {
+        return dao.getEntity().resolvedTenantUniqueConstraints();
+    }
+
+    @Override
+    public Object tenantUniqueConstraintValue(DynamicRecord entity, String fieldName) {
+        return entity == null ? null : entity.getValue(fieldName);
     }
 
     @Override

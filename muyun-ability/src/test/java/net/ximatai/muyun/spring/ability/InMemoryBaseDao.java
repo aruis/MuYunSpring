@@ -17,7 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, String> {
+class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, String> {
     private final Map<String, T> rows = new LinkedHashMap<>();
     private final Map<String, Integer> versions = new LinkedHashMap<>();
     private Map<String, Object> lastDeleteConditions = Map.of();

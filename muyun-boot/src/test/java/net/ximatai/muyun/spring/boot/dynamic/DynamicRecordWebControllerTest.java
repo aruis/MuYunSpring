@@ -574,6 +574,11 @@ class DynamicRecordWebControllerTest {
                                     "children": {
                                       "lines": [
                                         {
+                                          "values": {
+                                            "lineNo": "L-001"
+                                          }
+                                        },
+                                        {
                                           "values": {}
                                         }
                                       ]
@@ -581,9 +586,13 @@ class DynamicRecordWebControllerTest {
                                   }
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("UI required field is missing: lines.lineNo"));
+                .andExpect(jsonPath("$.message").value("UI required field is missing: lines.lineNo"))
+                .andExpect(jsonPath("$.targets[0].moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.targets[0].relationAlias").value("lines"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("lineNo"))
+                .andExpect(jsonPath("$.targets[0].rowIndex").value(1));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")
@@ -607,9 +616,11 @@ class DynamicRecordWebControllerTest {
                                   }
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: lines.lineAmount"));
+                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: lines.lineAmount"))
+                .andExpect(jsonPath("$.targets[0].relationAlias").value("lines"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("lineAmount"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")
@@ -621,9 +632,11 @@ class DynamicRecordWebControllerTest {
                                   }
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("UI required field is missing: code"));
+                .andExpect(jsonPath("$.message").value("UI required field is missing: code"))
+                .andExpect(jsonPath("$.targets[0].moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("code"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
                         .contentType("application/json")
@@ -639,9 +652,10 @@ class DynamicRecordWebControllerTest {
                                   }
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: amount"));
+                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: amount"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("amount"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")
@@ -655,8 +669,9 @@ class DynamicRecordWebControllerTest {
                                   }
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFIG_MISSING))
+                .andExpect(jsonPath("$.scope.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.message").value("UI config is not published in module snapshot: missing-ui"));
     }
 

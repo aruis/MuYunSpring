@@ -79,6 +79,7 @@ final class PlatformAbilityDispatcher {
 
     static <T extends EntityContract> void beforeSave(CrudAbility<T> ability, T entity) {
         runStaticOptionFieldValidation(ability, entity);
+        TenantUniqueConstraintSupport.validate(ability, entity);
     }
 
     static <T extends EntityContract> void afterInsert(CrudAbility<T> ability, String id, T entity) {

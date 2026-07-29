@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -66,6 +67,27 @@ class DynamicTableMapperTest {
 
         assertThat(entity.schemaName()).isEqualTo(EntityDefinition.DEFAULT_SCHEMA_NAME);
         assertThat(mapper.toTable(entity).getSchema()).isEqualTo(EntityDefinition.DEFAULT_SCHEMA_NAME);
+    }
+
+    @Test
+    void shouldMapDeclaredCompositeTenantUniqueConstraint() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("category", "Category"),
+                        FieldDefinition.string("code", "Code")
+                )
+        ).withTenantUniqueConstraints(new TenantUniqueConstraintDefinition(List.of("category", "code"), ""));
+
+        assertThat(entity.resolvedTenantUniqueConstraints())
+                .extracting(TenantUniqueConstraintDefinition::fieldNames)
+                .containsExactly(List.of("category", "code"));
+        assertThat(mapper.toTable(entity).getIndexes()).anySatisfy(index -> {
+            assertThat(index.isUnique()).isTrue();
+            assertThat(index.getColumns()).containsExactly("tenant_id", "category", "code");
+        });
     }
 
     @Test

@@ -27,6 +27,10 @@ import net.ximatai.muyun.spring.boot.platform.DynamicRelationProjectionReadServi
 import net.ximatai.muyun.spring.boot.platform.PlatformDynamicModuleScopeService;
 import net.ximatai.muyun.spring.boot.platform.ProjectionQueryDescriptor;
 import net.ximatai.muyun.spring.boot.platform.ProjectionQueryFallbackReason;
+import net.ximatai.muyun.spring.common.exception.ErrorScope;
+import net.ximatai.muyun.spring.common.exception.ErrorTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.exception.PlatformErrors;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -888,8 +892,9 @@ public class DynamicRecordWebController implements
         PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
                 .filter(config -> Objects.equals(config.getId(), uiConfigId))
                 .findFirst()
-                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
-                        + uiConfigId));
+                .orElseThrow(() -> PlatformErrors.config(PlatformErrorCodes.CONFIG_MISSING,
+                        "UI config is not published in module snapshot: " + uiConfigId,
+                        ErrorScope.module(moduleAlias)));
         Map<String, FieldDefinition> mainFields = record.getEntity().fields().stream()
                 .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
         for (PlatformUiConfigField uiField : snapshot.uiFields()) {
@@ -899,60 +904,90 @@ public class DynamicRecordWebController implements
             }
             ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(uiField.getModuleMetadataFieldId());
             if (resolved.relationRole() == RelationRole.MAIN) {
-                validateUiRecordField(record, uiField, mainFields.get(resolved.fieldName()), resolved.fieldName());
+                validateUiRecordField(moduleAlias, record, uiField, mainFields.get(resolved.fieldName()),
+                        resolved.fieldName());
             } else if (resolved.relationRole() == RelationRole.CHILD) {
-                validateUiChildField(record, uiField, resolved);
+                validateUiChildField(moduleAlias, record, uiField, resolved);
             }
         }
     }
 
-    private void validateUiChildField(DynamicRecord record,
+    private void validateUiChildField(String moduleAlias,
+                                      DynamicRecord record,
                                       PlatformUiConfigField uiField,
                                       ResolvedModuleMetadataField resolved) {
         List<DynamicRecord> rows = record.getChildren(resolved.relationAlias());
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        for (DynamicRecord row : rows) {
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            DynamicRecord row = rows.get(rowIndex);
             Map<String, FieldDefinition> fields = row.getEntity().fields().stream()
                     .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
-            validateUiRecordField(row, uiField, fields.get(resolved.fieldName()),
-                    resolved.relationAlias() + "." + resolved.fieldName());
+            validateUiRecordField(moduleAlias, row, uiField, fields.get(resolved.fieldName()),
+                    resolved.relationAlias() + "." + resolved.fieldName(), rowIndex);
         }
     }
 
-    private void validateUiRecordField(DynamicRecord record,
+    private void validateUiRecordField(String moduleAlias,
+                                       DynamicRecord record,
                                        PlatformUiConfigField uiField,
                                        FieldDefinition field,
                                        String fieldPath) {
+        validateUiRecordField(moduleAlias, record, uiField, field, fieldPath, null);
+    }
+
+    private void validateUiRecordField(String moduleAlias,
+                                       DynamicRecord record,
+                                       PlatformUiConfigField uiField,
+                                       FieldDefinition field,
+                                       String fieldPath,
+                                       Integer rowIndex) {
         if (field == null) {
             return;
         }
-        validateUiReadOnly(record, uiField, field, fieldPath);
-        validateUiRequired(record, uiField, field, fieldPath);
+        validateUiReadOnly(moduleAlias, record, uiField, field, fieldPath, rowIndex);
+        validateUiRequired(moduleAlias, record, uiField, field, fieldPath, rowIndex);
     }
 
-    private void validateUiReadOnly(DynamicRecord record,
+    private void validateUiReadOnly(String moduleAlias,
+                                    DynamicRecord record,
                                     PlatformUiConfigField uiField,
                                     FieldDefinition field,
-                                    String fieldPath) {
+                                    String fieldPath,
+                                    Integer rowIndex) {
         if (Boolean.TRUE.equals(uiField.getReadOnly()) && record.isExplicitlySet(field.fieldName())) {
-            throw new PlatformException("UI read-only field cannot be saved: " + fieldPath);
+            throw PlatformErrors.validation(PlatformErrorCodes.VALIDATION_FAILED,
+                    "UI read-only field cannot be saved: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath, rowIndex));
         }
     }
 
-    private void validateUiRequired(DynamicRecord record,
+    private void validateUiRequired(String moduleAlias,
+                                    DynamicRecord record,
                                     PlatformUiConfigField uiField,
                                     FieldDefinition field,
-                                    String fieldPath) {
+                                    String fieldPath,
+                                    Integer rowIndex) {
         boolean required = Boolean.TRUE.equals(uiField.getRequiredOverride()) || field.isRequired();
         if (!required) {
             return;
         }
         Object value = record.getValues().get(field.fieldName());
         if (value == null || value instanceof String text && text.isBlank()) {
-            throw new PlatformException("UI required field is missing: " + fieldPath);
+            throw PlatformErrors.validation(PlatformErrorCodes.VALIDATION_FAILED,
+                    "UI required field is missing: " + fieldPath, uiFieldTarget(moduleAlias, fieldPath, rowIndex));
         }
+    }
+
+    private ErrorTarget uiFieldTarget(String moduleAlias, String fieldPath, Integer rowIndex) {
+        int separator = fieldPath.indexOf('.');
+        if (separator < 0) {
+            return ErrorTarget.field(fieldPath).module(moduleAlias);
+        }
+        ErrorTarget target = ErrorTarget.field(fieldPath.substring(separator + 1))
+                .module(moduleAlias)
+                .relation(fieldPath.substring(0, separator));
+        return rowIndex == null ? target : target.row(rowIndex);
     }
 
     private void validateQueryTemplateBelongsToModule(String moduleAlias, String queryTemplateId) {

@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -232,8 +233,9 @@ class DynamicSchemaServiceIT {
             assertThatThrownBy(() -> invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-ROOT")
                     .setValue("title", "Duplicate in tenant A")))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("duplicate key");
+                    .isInstanceOf(PlatformException.class)
+                    .extracting(error -> ((PlatformException) error).code())
+                    .isEqualTo(PlatformErrorCodes.CONFLICT_UNIQUE);
 
             assertThat(invoiceService.delete(invoiceWithLineId)).isEqualTo(1);
             assertThat(lineService.select(lineId)).isNull();

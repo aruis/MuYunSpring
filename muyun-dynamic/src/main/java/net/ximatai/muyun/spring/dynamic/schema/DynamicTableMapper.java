@@ -30,12 +30,21 @@ public class DynamicTableMapper {
         StandardEntitySchema.auditColumns().forEach(table::addColumn);
         for (FieldDefinition field : tableFields(entity)) {
             table.addColumn(toColumn(field));
-            if (field.isUnique()) {
-                PlatformUniqueIndexes.addTenantUniqueIndex(table, field.columnName());
-            }
         }
+        entity.resolvedTenantUniqueConstraints().forEach(constraint -> PlatformUniqueIndexes.addTenantUniqueIndex(table,
+                constraint.fieldNames().stream()
+                        .map(fieldName -> field(entity, fieldName).columnName())
+                        .toList()));
         tableValidator.requireStandardEntityTable(table, entity.alias());
         return table;
+    }
+
+    private FieldDefinition field(EntityDefinition entity, String fieldName) {
+        return entity.fields().stream()
+                .filter(field -> field.fieldName().equals(fieldName) && field.isPhysical())
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("unknown physical tenant unique constraint field: "
+                        + entity.alias() + "." + fieldName));
     }
 
     public TableWrapper toTable(EntityDefinition entity, EntityDefinition previousEntity) {

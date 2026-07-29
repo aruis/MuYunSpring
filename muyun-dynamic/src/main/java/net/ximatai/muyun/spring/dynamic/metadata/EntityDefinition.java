@@ -1,10 +1,13 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition;
 
 import java.util.EnumSet;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public record EntityDefinition(
@@ -14,12 +17,13 @@ public record EntityDefinition(
         String name,
         List<FieldDefinition> fields,
         Set<EntityCapability> capabilities,
-        List<EntityFormulaRuleDefinition> formulaRules
+        List<EntityFormulaRuleDefinition> formulaRules,
+        List<TenantUniqueConstraintDefinition> tenantUniqueConstraints
 ) {
     public static final String DEFAULT_SCHEMA_NAME = "public";
 
     public EntityDefinition(String alias, String tableName, String name, List<FieldDefinition> fields) {
-        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of());
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of(), List.of());
     }
 
     public EntityDefinition(String alias,
@@ -27,7 +31,7 @@ public record EntityDefinition(
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of());
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of(), List.of());
     }
 
     public EntityDefinition(String alias,
@@ -36,7 +40,17 @@ public record EntityDefinition(
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(alias, schemaName, tableName, name, fields, capabilities, List.of());
+        this(alias, schemaName, tableName, name, fields, capabilities, List.of(), List.of());
+    }
+
+    public EntityDefinition(String alias,
+                            String schemaName,
+                            String tableName,
+                            String name,
+                            List<FieldDefinition> fields,
+                            Set<EntityCapability> capabilities,
+                            List<EntityFormulaRuleDefinition> formulaRules) {
+        this(alias, schemaName, tableName, name, fields, capabilities, formulaRules, List.of());
     }
 
     public EntityDefinition {
@@ -44,15 +58,37 @@ public record EntityDefinition(
         fields = fields == null ? List.of() : List.copyOf(fields);
         capabilities = normalizeCapabilities(capabilities);
         formulaRules = formulaRules == null ? List.of() : List.copyOf(formulaRules);
+        tenantUniqueConstraints = tenantUniqueConstraints == null ? List.of() : List.copyOf(tenantUniqueConstraints);
     }
 
     public EntityDefinition withCapabilities(EntityCapability... values) {
-        return new EntityDefinition(alias, schemaName, tableName, name, fields, Set.of(values), formulaRules);
+        return new EntityDefinition(alias, schemaName, tableName, name, fields, Set.of(values), formulaRules,
+                tenantUniqueConstraints);
     }
 
     public EntityDefinition withFormulaRules(EntityFormulaRuleDefinition... values) {
         return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities,
+                values == null ? List.of() : List.of(values), tenantUniqueConstraints);
+    }
+
+    public EntityDefinition withTenantUniqueConstraints(TenantUniqueConstraintDefinition... values) {
+        return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities, formulaRules,
                 values == null ? List.of() : List.of(values));
+    }
+
+    /**
+     * Normalizes explicit composite declarations and existing single-field metadata unique flags
+     * into the tenant-scoped unique facts consumed by schema and runtime validation.
+     */
+    public List<TenantUniqueConstraintDefinition> resolvedTenantUniqueConstraints() {
+        Map<List<String>, TenantUniqueConstraintDefinition> constraints = new LinkedHashMap<>();
+        tenantUniqueConstraints.forEach(constraint -> constraints.put(constraint.fieldNames(), constraint));
+        fields.stream()
+                .filter(FieldDefinition::isPhysical)
+                .filter(FieldDefinition::isUnique)
+                .map(field -> new TenantUniqueConstraintDefinition(List.of(field.fieldName()), ""))
+                .forEach(constraint -> constraints.putIfAbsent(constraint.fieldNames(), constraint));
+        return List.copyOf(constraints.values());
     }
 
     public List<EntityFormulaRuleDefinition> orderedFormulaRules() {

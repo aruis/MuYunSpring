@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,10 @@ class ScopedMutationAbilityTest {
 
         assertThatThrownBy(() -> service.insert(new DemoEnabledRecord("Tenant")))
                 .isInstanceOf(PlatformException.class)
+                .satisfies(exception -> {
+                    assertThat(((PlatformException) exception).code()).isEqualTo(PlatformErrorCodes.ACCESS_DENIED);
+                    assertThat(((PlatformException) exception).httpStatus()).isEqualTo(403);
+                })
                 .hasMessageContaining("system context");
 
         try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
@@ -85,6 +90,10 @@ class ScopedMutationAbilityTest {
 
         assertThatThrownBy(() -> service.insert(new DemoPlainRecord("No tenant")))
                 .isInstanceOf(PlatformException.class)
+                .satisfies(exception -> {
+                    assertThat(((PlatformException) exception).code()).isEqualTo(PlatformErrorCodes.ACCESS_DENIED);
+                    assertThat(((PlatformException) exception).httpStatus()).isEqualTo(403);
+                })
                 .hasMessageContaining("tenant context");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {

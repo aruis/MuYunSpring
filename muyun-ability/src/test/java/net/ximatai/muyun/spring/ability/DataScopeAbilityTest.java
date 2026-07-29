@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -61,6 +63,11 @@ class DataScopeAbilityTest {
             DemoDataScopedRecord update = record("Others updated", "user-2");
             update.setId(othersId);
             assertThatThrownBy(() -> service.update(update))
+                    .isInstanceOfSatisfying(PlatformException.class, exception -> {
+                        assertThat(exception.code()).isEqualTo(PlatformErrorCodes.ACCESS_DENIED);
+                        assertThat(exception.httpStatus()).isEqualTo(403);
+                        assertThat(exception.scope().moduleAlias()).isEqualTo("demo.dataScoped");
+                    })
                     .hasMessageContaining("record data permission denied");
         }
     }

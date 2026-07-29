@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
@@ -130,6 +131,29 @@ class TeachingDemoIT {
             assertThat(hobbies.update(basketball)).isEqualTo(1);
             assertThat(students.select(studentId).getHobbyTitles())
                     .containsExactlyInAnyOrder("篮球校队", "阅读");
+        }
+    }
+
+    @Test
+    void shouldEnforceDeclaredTenantUniqueConstraintsIncludingSoftDeletedRecords() {
+        String serial = serial();
+        String code = "unique-" + serial;
+        try (TenantContext.Scope ignored = TenantContext.use("campus-unique-a")) {
+            String firstId = hobbies.insert(new Hobby(code, "唯一爱好", TreeAbility.ROOT_ID));
+
+            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "重复爱好", TreeAbility.ROOT_ID)))
+                    .isInstanceOf(PlatformException.class)
+                    .extracting(error -> ((PlatformException) error).code())
+                    .isEqualTo(PlatformErrorCodes.CONFLICT_UNIQUE);
+
+            assertThat(hobbies.delete(firstId)).isEqualTo(1);
+            assertThatThrownBy(() -> hobbies.insert(new Hobby(code, "软删后重复", TreeAbility.ROOT_ID)))
+                    .isInstanceOf(PlatformException.class)
+                    .extracting(error -> ((PlatformException) error).code())
+                    .isEqualTo(PlatformErrorCodes.RESOURCE_SOFT_DELETED_CONFLICT);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("campus-unique-b")) {
+            assertThat(hobbies.insert(new Hobby(code, "另一租户爱好", TreeAbility.ROOT_ID))).isNotBlank();
         }
     }
 

@@ -5,6 +5,8 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
+import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraintDefinition;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -56,16 +58,18 @@ class DynamicStaticTableDefinitionConsistencyTest {
                 "demo_contract_dynamic",
                 "Contract",
                 List.of(
-                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                         FieldDefinition.enabled()
                 )
-        ).withCapabilities(EntityCapability.ENABLE);
+        ).withCapabilities(EntityCapability.ENABLE)
+                .withTenantUniqueConstraints(new TenantUniqueConstraintDefinition(List.of("code"), ""));
     }
 
     @Table(name = "demo_contract_static", comment = "Contract")
+    @TenantUniqueConstraint(fields = "code")
     private static class StaticContract extends StandardEntity {
-        @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, unique = true)
+        @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false)
         private String code;
 
         @Column(name = "amount", type = ColumnType.NUMERIC, precision = 18, scale = 2)
