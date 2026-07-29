@@ -77,6 +77,8 @@ DynamicRecordService
 
 静态 Service 的 Ability 组合也是标准交互能力的事实源。Ability 只在规范方法上用 `@PlatformOperation(PlatformAction.X)` 声明动作，不声明 URL、HTTP method 或请求 DTO，也不额外重复声明类型级 ability code。具体 Service 确需收窄时，使用 `@DisablePlatformOperations` 直接停用少量动作；停用不影响 Service 内部调用，并使默认 Web、UI、权限声明和后续 OpenAPI 同时看不到该动作。
 
+静态业务应用通过一个 Spring 配置类上的 `@PlatformStaticApplication` 声明一次应用别名、标题和排序；同一应用下的 Controller 仍以 `@PlatformStaticModule(application = "...")` 仅声明所属应用。启动期先协调平台托管 Application，再注册模块和动作；模块引用未声明应用会直接失败。人工在管理台创建的 Application 不属于静态声明协调范围，静态应用被移除时按平台托管规则停用而不物理删除。
+
 当前自动 Web 投射范围收敛在启停、排序、树和回收站。CRUD、查询 schema 等仍由稳定的 `CrudWeb` / `ReadOnlyWeb` 基类交付，暂不塞入现有投射编译器；它们仍服从同一份动作声明与停用规则。后续扩展必须先形成唯一的 `PlatformOperationDefinition → WebEndpointProjection → RegisteredWebEndpoint` 编译链，再扩大自动投射范围。
 
 Web 层通过标准投射描述组合模块基础路径、动作相对路径、HTTP method 和输入绑定，并把启用的 Operation 注册为真实 Spring MVC mapping。所有编译端点进入同一个平台 Dispatcher，不为每种 Ability 生成 Handler 类。端点在 Spring MVC 接受后写入真实端点目录，目录保留实际 `RequestMappingInfo`、Operation 语义和执行目标；模块运行态、Action 权限和后续 OpenAPI 应消费这条统一链路。动态元数据后续也应编译到相同 Operation 和端点目录，不能再维护一套独立硬编码路径。

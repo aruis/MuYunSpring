@@ -1,0 +1,18 @@
+package net.ximatai.muyun.spring.boot.platform;
+
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+
+/** Source-independent application declaration compiled from static application configuration. */
+public record StaticApplicationDefinition(String alias, String title, int sortOrder) {
+    public StaticApplicationDefinition {
+        alias = PlatformNameRules.requireApplicationAlias(alias);
+        title = title == null || title.isBlank() ? alias : title.trim();
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("static application sortOrder must not be negative: " + alias);
+        }
+    }
+
+    public static StaticApplicationDefinition of(String alias, String title, int sortOrder) {
+        return new StaticApplicationDefinition(alias, title, sortOrder);
+    }
+}

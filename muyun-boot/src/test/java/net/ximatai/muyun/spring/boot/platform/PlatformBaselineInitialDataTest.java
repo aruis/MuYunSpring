@@ -56,9 +56,12 @@ class PlatformBaselineInitialDataTest {
     }
 
     private void initializeBaseline() {
+        new StaticApplicationDefinitionRegistrar(applicationService, List.of(
+                StaticApplicationDefinition.of("platform", "平台能力", 10),
+                StaticApplicationDefinition.of("iam", "身份权限", 20)
+        )).registerAll();
         new InitialDataExecutor(
                 List.<InitialDataAbility<?>>of(
-                        applicationService,
                         userAccountService
                 ),
                 List.of()

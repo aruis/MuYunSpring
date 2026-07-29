@@ -217,6 +217,21 @@ class StaticModuleDefinitionRegistrarTest {
                 .hasMessageContaining("duplicate static module action definition: iam.user.changePassword");
     }
 
+    @Test
+    void shouldRejectStaticModuleReferencingUndeclaredApplication() {
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                mock(PlatformModuleService.class),
+                mock(PlatformModuleActionService.class),
+                new StaticModuleDefinitionCatalog(List.of(definition("iam.user", List.of()))),
+                false,
+                new StaticApplicationDefinitionCatalog(List.of(
+                        StaticApplicationDefinition.of("platform", "平台能力", 10))));
+
+        assertThatThrownBy(registrar::registerAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("iam.user -> iam");
+    }
+
     private StaticModuleDefinition definition(String moduleAlias, List<StaticModuleActionDefinition> actions) {
         return StaticModuleDefinition.builder("iam", moduleAlias, "用户管理")
                        .parentModuleAlias(null)

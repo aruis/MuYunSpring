@@ -10,8 +10,6 @@ import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.StandardBusinessService;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -39,7 +37,6 @@ public class ApplicationService extends StandardBusinessService<Application> imp
         GlobalScopedAbility<Application>,
         EnableAbility<Application>,
         SortAbility<Application>,
-        InitialDataAbility<Application>,
         QueryAbility<Application>,
         TenantApplicationCatalog {
 
@@ -70,19 +67,6 @@ public class ApplicationService extends StandardBusinessService<Application> imp
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, Application.class, java.util.List.of("id", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
-    }
-
-    @Override
-    public InitialDataOptions initialDataOptions() {
-        return InitialDataOptions.system("platform.applications", 10);
-    }
-
-    @Override
-    public List<Application> initialData() {
-        return List.of(
-                application(PLATFORM_APPLICATION_ALIAS, "平台能力", 10),
-                application(IAM_APPLICATION_ALIAS, "身份权限", 20)
-        );
     }
 
     @Override
@@ -126,15 +110,6 @@ public class ApplicationService extends StandardBusinessService<Application> imp
 
     private void requireAlias(String alias) {
         PlatformNameRules.requireApplicationAlias(alias);
-    }
-
-    private Application application(String alias, String title, int sortOrder) {
-        Application application = new Application();
-        application.setAlias(alias);
-        application.setTitle(title);
-        application.setEnabled(Boolean.TRUE);
-        application.setSortOrder(sortOrder);
-        return application;
     }
 
     private <T extends EntityContract> void rejectReferenced(Optional<? extends CrudAbility<T>> service,
