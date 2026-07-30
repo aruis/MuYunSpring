@@ -5,6 +5,9 @@ import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 
@@ -15,6 +18,8 @@ import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 public class Position extends StandardEnabledSortableEntity {
     @Column(name = "category_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Position category id")
+    @ReferenceTo(target = PositionCategoryService.class,
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT))
     private String categoryId;
 
     @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Position code")

@@ -1,0 +1,180 @@
+package net.ximatai.muyun.spring.boot.platform;
+
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+
+import java.util.Collections;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Enriches static list output through the source-independent reference contract.
+ *
+ * <p>SQL joins remain an optimization for static-to-static projections. This
+ * post-processor is the semantic fallback for every target that can be resolved
+ * through {@link net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver},
+ * including dynamic entities.</p>
+ */
+final class ReferenceReadProjectionPostProcessor {
+    private ReferenceReadProjectionPostProcessor() {
+    }
+
+    static List<Map<String, Object>> apply(Class<?> modelClass, List<Map<String, Object>> records) {
+        return apply(modelClass, records, null);
+    }
+
+    static List<Map<String, Object>> apply(Class<?> modelClass,
+                                            List<Map<String, Object>> records,
+                                            Collection<String> outputFields) {
+        if (modelClass == null || records == null || records.isEmpty()) {
+            return records == null ? List.of() : records;
+        }
+        List<ReferencePlan> plans = StaticReferenceResolver.plans(modelClass).stream()
+                .map(plan -> forOutputFields(plan, outputFields))
+                .filter(plan -> plan != null)
+                .toList();
+        if (plans.isEmpty()) {
+            return records;
+        }
+        List<Map<String, Object>> output = records.stream()
+                .<Map<String, Object>>map(record -> new LinkedHashMap<>(record))
+                .toList();
+        Map<ReferenceTarget, TargetRequest> requests = collectRequests(output, plans);
+        Map<ReferenceTarget, TargetValues> resolved = resolve(requests);
+        for (Map<String, Object> record : output) {
+            for (ReferencePlan plan : plans) {
+                applyPlan(record, plan, resolved.get(plan.target()));
+            }
+        }
+        return output.stream()
+                .map(record -> restrictOutput(record, outputFields))
+                .map(Collections::unmodifiableMap)
+                .toList();
+    }
+
+    private static ReferencePlan forOutputFields(ReferencePlan plan, Collection<String> outputFields) {
+        if (outputFields == null) {
+            return plan.autoTitle() || !plan.projections().isEmpty() ? plan : null;
+        }
+        Set<String> fields = new LinkedHashSet<>(outputFields);
+        boolean autoTitle = plan.autoTitle() && fields.contains(plan.titleOutputField());
+        List<ReferenceProjection> projections = plan.projections().stream()
+                .filter(projection -> fields.contains(projection.outputField()))
+                .toList();
+        if (!autoTitle && projections.isEmpty()) {
+            return null;
+        }
+        return new ReferencePlan(plan.sourceField(), plan.target(), plan.cardinality(), autoTitle,
+                autoTitle ? plan.titleOutputField() : "", projections, plan.integrity());
+    }
+
+    private static Map<String, Object> restrictOutput(Map<String, Object> record, Collection<String> outputFields) {
+        if (outputFields == null) {
+            return record;
+        }
+        Set<String> fields = new LinkedHashSet<>();
+        fields.add(StandardEntitySchema.ID_FIELD);
+        fields.add(StandardEntitySchema.VERSION_FIELD);
+        fields.add(StandardEntitySchema.DELETED_AT_FIELD);
+        fields.addAll(outputFields);
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+        fields.forEach(field -> {
+            if (record.containsKey(field)) {
+                result.put(field, record.get(field));
+            }
+        });
+        return result;
+    }
+
+    private static Map<ReferenceTarget, TargetRequest> collectRequests(List<Map<String, Object>> records,
+                                                                         List<ReferencePlan> plans) {
+        Map<ReferenceTarget, TargetRequest> requests = new LinkedHashMap<>();
+        for (ReferencePlan plan : plans) {
+            TargetRequest request = requests.computeIfAbsent(plan.target(), ignored -> new TargetRequest());
+            if (plan.autoTitle()) {
+                request.titles = true;
+            }
+            plan.projections().stream().map(ReferenceProjection::targetField).forEach(request.fields::add);
+            for (Map<String, Object> record : records) {
+                request.ids.addAll(plan.normalizeValues(record.get(plan.sourceField())));
+            }
+        }
+        return requests;
+    }
+
+    private static Map<ReferenceTarget, TargetValues> resolve(Map<ReferenceTarget, TargetRequest> requests) {
+        Map<ReferenceTarget, TargetValues> resolved = new LinkedHashMap<>();
+        for (Map.Entry<ReferenceTarget, TargetRequest> entry : requests.entrySet()) {
+            TargetRequest request = entry.getValue();
+            if (request.ids.isEmpty()) {
+                resolved.put(entry.getKey(), TargetValues.EMPTY);
+                continue;
+            }
+            ReferenceAbility<?> target = PlatformAbilityRuntime.referenceTargetResolver().resolve(entry.getKey())
+                    .orElseThrow(() -> new PlatformException("reference target is not registered: "
+                            + entry.getKey().qualifiedName()));
+            List<String> ids = List.copyOf(request.ids);
+            List<String> fields = List.copyOf(request.fields);
+            Map<String, String> titles = request.titles ? target.titles(ids) : Map.of();
+            Map<String, Map<String, Object>> projections = request.fields.isEmpty()
+                    ? Map.of()
+                    : target.projections(ids, fields);
+            resolved.put(entry.getKey(), new TargetValues(titles, projections));
+        }
+        return resolved;
+    }
+
+    private static void applyPlan(Map<String, Object> record, ReferencePlan plan, TargetValues target) {
+        List<String> ids = plan.normalizeValues(record.get(plan.sourceField()));
+        if (plan.autoTitle()) {
+            record.put(plan.titleOutputField(), titleValue(ids, target.titles, plan.cardinality()));
+        }
+        for (ReferenceProjection projection : plan.projections()) {
+            record.put(projection.outputField(), projectionValue(ids, target.projections,
+                    projection.targetField(), plan.cardinality()));
+        }
+    }
+
+    private static Object titleValue(List<String> ids, Map<String, String> titles, ReferenceCardinality cardinality) {
+        if (cardinality == ReferenceCardinality.MANY) {
+            return ids.stream().map(titles::get).filter(java.util.Objects::nonNull).toList();
+        }
+        return ids.isEmpty() ? null : titles.get(ids.getFirst());
+    }
+
+    private static Object projectionValue(List<String> ids,
+                                          Map<String, Map<String, Object>> values,
+                                          String field,
+                                          ReferenceCardinality cardinality) {
+        if (cardinality == ReferenceCardinality.MANY) {
+            return ids.stream().map(id -> value(values, id, field)).filter(java.util.Objects::nonNull).toList();
+        }
+        return ids.isEmpty() ? null : value(values, ids.getFirst(), field);
+    }
+
+    private static Object value(Map<String, Map<String, Object>> values, String id, String field) {
+        Map<String, Object> fields = values.get(id);
+        return fields == null ? null : fields.get(field);
+    }
+
+    private static final class TargetRequest {
+        private final Set<String> ids = new LinkedHashSet<>();
+        private final Set<String> fields = new LinkedHashSet<>();
+        private boolean titles;
+    }
+
+    private record TargetValues(Map<String, String> titles, Map<String, Map<String, Object>> projections) {
+        private static final TargetValues EMPTY = new TargetValues(Map.of(), Map.of());
+    }
+}

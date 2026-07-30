@@ -11,6 +11,9 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
@@ -193,6 +196,19 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
     }
 
     @Test
+    void shouldExposeDynamicReferenceTargetsThroughThePlatformResolver() {
+        contextRunner.withUserConfiguration(MuYunSpringReferenceConfiguration.class)
+                .run(context -> {
+                    DynamicRecordRuntime runtime = context.getBean(DynamicRecordRuntime.class);
+                    runtime.register(new ModuleDefinition("sales.contract", "Contract", List.of(referenceContractEntity())));
+
+                    assertThat(PlatformAbilityRuntime.referenceTargetResolver()
+                            .resolve(ReferenceTarget.of("sales.contract", "contract")))
+                            .isPresent();
+                });
+    }
+
+    @Test
     void shouldConfigureActionTransactionOperatorFromTransactionManager() {
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -364,6 +380,12 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
     private EntityDefinition contractEntity() {
         return new EntityDefinition("contract", "app_contract", "Contract",
                 List.of(FieldDefinition.string("code", "Code").length(64)));
+    }
+
+    private EntityDefinition referenceContractEntity() {
+        return new EntityDefinition("contract", "app_contract", "Contract",
+                List.of(FieldDefinition.string("title", "Title").title(), FieldDefinition.string("code", "Code").length(64)),
+                java.util.Set.of(EntityCapability.REFERENCE));
     }
 
     private EntityDefinition timeContractEntity() {

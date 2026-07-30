@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
@@ -151,6 +153,28 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldPublishReferenceOutputsAsStaticReadModelFields() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("orderNo").field("customerTitle").field("customerLevel"))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("orderNo", "订单号"),
+                                FieldDefinition.string("customerId", "客户")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        ModuleUiCompilationResult result = ModuleUiDescriptorCompiler.compileModule(definition);
+
+        assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
+                .containsExactly("orderNo", "customerId", "customerTitle", "customerLevel");
+        assertThat(result.readModel().fields()).filteredOn(ResolvedModuleReadField::platformManaged)
+                .extracting(ResolvedModuleReadField::fieldName)
+                .containsExactly("customerTitle", "customerLevel");
+    }
+
+    @Test
     void shouldRejectChildResourceFormWhenRelationIsOutsideModelFacts() {
         ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.position_category")
                 .formView(ModuleUiViewCodes.childResourceDefaultForm("position"), form -> form
@@ -239,5 +263,12 @@ class ModuleUiDescriptorCompilerTest {
     private static final class CustomerRecord extends StandardEntity {
         @TitleField
         private String displayName;
+    }
+
+    private static final class ReferenceOrder {
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "customer", autoTitle = true,
+                titleOutputField = "customerTitle",
+                projections = @ReferenceProject(targetField = "level", outputField = "customerLevel"))
+        private String customerId;
     }
 }

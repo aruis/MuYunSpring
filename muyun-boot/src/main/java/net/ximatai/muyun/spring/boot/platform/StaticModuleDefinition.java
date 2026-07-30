@@ -24,7 +24,7 @@ public final class StaticModuleDefinition {
     private final List<StaticModuleActionDefinition> actions;
     private final List<EntityDefinition> entities;
     private final ModuleUiDefinition uiDefinition;
-    private final List<StaticModuleReferenceDefinition> references;
+    private final List<StaticReferenceDefinition> references;
     private final List<StaticModuleReadProjectionDefinition> readProjections;
     private final Class<?> modelClass;
     private final List<RelationProjectionJoinDefinition> projectionJoins;
@@ -40,7 +40,7 @@ public final class StaticModuleDefinition {
                                    List<StaticModuleActionDefinition> actions,
                                    List<EntityDefinition> entities,
                                    ModuleUiDefinition uiDefinition,
-                                   List<StaticModuleReferenceDefinition> references,
+                                   List<StaticReferenceDefinition> references,
                                    List<StaticModuleReadProjectionDefinition> readProjections,
                                    Class<?> modelClass,
                                    List<RelationProjectionJoinDefinition> projectionJoins) {
@@ -102,7 +102,7 @@ public final class StaticModuleDefinition {
     public List<StaticModuleActionDefinition> actions() { return actions; }
     public List<EntityDefinition> entities() { return entities; }
     public ModuleUiDefinition uiDefinition() { return uiDefinition; }
-    public List<StaticModuleReferenceDefinition> references() { return references; }
+    public List<StaticReferenceDefinition> references() { return references; }
     public List<StaticModuleReadProjectionDefinition> readProjections() { return readProjections; }
     public Class<?> modelClass() { return modelClass; }
     public List<RelationProjectionJoinDefinition> projectionJoins() { return projectionJoins; }
@@ -118,7 +118,7 @@ public final class StaticModuleDefinition {
     public List<StaticModuleActionDefinition> getActions() { return actions; }
     public List<EntityDefinition> getEntities() { return entities; }
     public ModuleUiDefinition getUiDefinition() { return uiDefinition; }
-    public List<StaticModuleReferenceDefinition> getReferences() { return references; }
+    public List<StaticReferenceDefinition> getReferences() { return references; }
     public List<StaticModuleReadProjectionDefinition> getReadProjections() { return readProjections; }
     public Class<?> getModelClass() { return modelClass; }
     public List<RelationProjectionJoinDefinition> getProjectionJoins() { return projectionJoins; }
@@ -204,7 +204,7 @@ public final class StaticModuleDefinition {
         private List<StaticModuleActionDefinition> actions = List.of();
         private List<EntityDefinition> entities = List.of();
         private ModuleUiDefinition uiDefinition;
-        private List<StaticModuleReferenceDefinition> references = List.of();
+        private List<StaticReferenceDefinition> references = List.of();
         private List<StaticModuleReadProjectionDefinition> readProjections = List.of();
         private Class<?> modelClass;
         private List<RelationProjectionJoinDefinition> projectionJoins = List.of();
@@ -247,7 +247,7 @@ public final class StaticModuleDefinition {
             return this;
         }
 
-        public Builder references(List<StaticModuleReferenceDefinition> references) {
+        public Builder references(List<StaticReferenceDefinition> references) {
             this.references = references;
             return this;
         }
@@ -327,14 +327,14 @@ public final class StaticModuleDefinition {
         }
     }
 
-    private static void validateReferences(String moduleAlias, List<StaticModuleReferenceDefinition> references) {
+    private static void validateReferences(String moduleAlias, List<StaticReferenceDefinition> references) {
         if (references.isEmpty()) {
             return;
         }
         Set<String> codes = new java.util.LinkedHashSet<>();
-        for (StaticModuleReferenceDefinition reference : references) {
+        for (StaticReferenceDefinition reference : references) {
             if (!codes.add(reference.code())) {
-                throw new IllegalArgumentException("duplicate static module reference code: "
+                throw new IllegalArgumentException("duplicate static reference code: "
                         + moduleAlias + "." + reference.code());
             }
         }

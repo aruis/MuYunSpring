@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
@@ -444,7 +444,7 @@ class StaticRecordReadProjectionServiceTest {
                         .build())
                        .references(List.of())
                        .readProjections(List.of(new StaticModuleReadProjectionDefinition(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle"
@@ -471,8 +471,8 @@ class StaticRecordReadProjectionServiceTest {
                 )))
                        .uiDefinition(null)
                        .references(List.of(
-                        new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
-                        new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
+                        new StaticReferenceDefinition("employee", "employeeId", "iam.employee"),
+                        new StaticReferenceDefinition("user", "userId", "iam.user")
                 ))
                        .readProjections(List.of())
                        .modelClass(EmployeeAccount.class)

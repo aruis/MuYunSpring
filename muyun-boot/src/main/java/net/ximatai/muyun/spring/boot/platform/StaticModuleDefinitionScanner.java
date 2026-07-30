@@ -92,12 +92,12 @@ public class StaticModuleDefinitionScanner {
         return null;
     }
 
-    private List<StaticModuleReferenceDefinition> references(Object bean) {
+    private List<StaticReferenceDefinition> references(Object bean) {
         Object service = service(bean);
         if (!(service instanceof CrudAbility<?> ability)) {
             return List.of();
         }
-        return StaticModuleReferenceCompiler.compile(ability.modelClass());
+        return StaticReferenceCompiler.compile(ability.modelClass());
     }
 
     private List<StaticModuleReadProjectionDefinition> readProjections(Object bean) {

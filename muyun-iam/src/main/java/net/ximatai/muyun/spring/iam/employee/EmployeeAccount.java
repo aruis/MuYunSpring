@@ -6,7 +6,9 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
-import net.ximatai.muyun.spring.ability.reference.ModuleReference;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
@@ -21,10 +23,12 @@ import net.ximatai.muyun.spring.iam.user.UserAccountService;
 )
 public class EmployeeAccount extends StandardEntity {
     @Column(name = "employee_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Employee id")
-    @ModuleReference(target = EmployeeService.class)
+    @ReferenceTo(target = EmployeeService.class,
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.CASCADE_DELETE))
     private String employeeId;
 
     @Column(name = "user_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "User account id")
-    @ModuleReference(target = UserAccountService.class)
+    @ReferenceTo(target = UserAccountService.class,
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.CASCADE_DELETE))
     private String userId;
 }

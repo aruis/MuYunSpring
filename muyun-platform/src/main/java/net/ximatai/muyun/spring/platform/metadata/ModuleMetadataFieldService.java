@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -90,7 +91,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataField.class, java.util.List.of("id", "relationId", "metadataFieldId", "cloneable", "dictionaryApplicationAlias", "dictionaryCategoryAlias", "referenceModuleAlias", "referenceModuleKeyField", "referenceModuleLabelField", "referenceGenerateRuleId", "referenceQueryTemplateId", "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode", "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode", "unitConversionMode", "conversionScopeFieldId", "unitRequired", "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode", "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode", "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId", "moneyCurrencyRequired", "title", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataField.class, java.util.List.of("id", "relationId", "metadataFieldId", "cloneable", "dictionaryApplicationAlias", "dictionaryCategoryAlias", "referenceModuleAlias", "referenceTargetUnavailablePolicy", "referenceModuleKeyField", "referenceModuleLabelField", "referenceGenerateRuleId", "referenceQueryTemplateId", "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode", "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode", "unitConversionMode", "conversionScopeFieldId", "unitRequired", "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode", "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode", "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId", "moneyCurrencyRequired", "title", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -284,6 +285,9 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                           ModuleMetadataRelation relation) {
         if (moduleField.getCloneable() == null) {
             moduleField.setCloneable(Boolean.FALSE);
+        }
+        if (moduleField.getReferenceTargetUnavailablePolicy() == null) {
+            moduleField.setReferenceTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
         }
         boolean hasDictionaryApplication = hasText(moduleField.getDictionaryApplicationAlias());
         boolean hasDictionaryCategory = hasText(moduleField.getDictionaryCategoryAlias());

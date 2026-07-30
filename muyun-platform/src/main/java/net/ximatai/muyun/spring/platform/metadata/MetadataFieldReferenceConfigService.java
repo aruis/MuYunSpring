@@ -5,7 +5,11 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -16,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -67,7 +72,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldReferenceConfig.class, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldReferenceConfig.class, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "targetUnavailablePolicy", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
     }
 
     @Override
@@ -132,6 +137,12 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         if (config.getCardinality() == null) {
             config.setCardinality(ReferenceCardinality.ONE);
         }
+        if (config.getTargetUnavailablePolicy() == null) {
+            config.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
+        }
+        new ReferencePlan(sourceField.getFieldName(), ReferenceTarget.of("platform", "reference_target"),
+                config.getCardinality(), false, "", List.of(),
+                new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy()));
         normalizeAutoTitle(config);
         validateOutputFields(config, sourceField.getMetadataId());
         if (config.getTargetModuleAlias() != null

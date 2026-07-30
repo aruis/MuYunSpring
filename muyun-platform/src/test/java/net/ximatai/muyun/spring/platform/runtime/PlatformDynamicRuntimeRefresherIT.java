@@ -15,6 +15,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
@@ -127,6 +129,7 @@ class PlatformDynamicRuntimeRefresherIT {
         MetadataField customerIdField = field(contactMetadataId, "customerId", "customer_id", FieldType.STRING);
         services.fieldService.insert(customerIdField);
         MetadataFieldReferenceConfig customerReference = referenceConfig(customerIdField.getId(), customerMetadataId);
+        customerReference.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
         customerReference.setAutoTitle(true);
         customerReference.setTitleOutputField("customerTitle");
         customerReference.setProjectionMappings("code:customerCode");
@@ -194,6 +197,11 @@ class PlatformDynamicRuntimeRefresherIT {
         String defaultedId = customer.create(defaulted);
 
         DynamicRecord selected = customer.select(id);
+
+        assertThatThrownBy(() -> runtime.validateReferenceTargetDeletion(
+                ReferenceTarget.of("crm.customer", "customer"), id))
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("cannot make reference target unavailable");
 
         assertThat(categoryId).isNotBlank();
         assertThat(runtime.registry().requireModule("crm.customer").mainEntityAlias()).isEqualTo("customer");

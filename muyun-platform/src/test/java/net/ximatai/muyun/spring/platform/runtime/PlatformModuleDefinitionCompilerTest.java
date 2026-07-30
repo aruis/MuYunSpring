@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
@@ -306,6 +307,7 @@ class PlatformModuleDefinitionCompilerTest {
         ModuleMetadataField customerField = moduleField(orderFields, customerId.getId());
         ModuleMetadataField formRegion = moduleField(orderFields, customerRegion.getId());
         customerField.setReferenceModuleAlias("crm.customer");
+        customerField.setReferenceTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
         customerField.setReferenceModuleKeyField("id");
         customerField.setReferenceModuleLabelField("title");
         customerField.setReferenceGenerateRuleId("generate-order");
@@ -332,6 +334,7 @@ class PlatformModuleDefinitionCompilerTest {
         EntityReferenceDefinition reference = definition.references().getFirst();
         assertThat(reference.sourceField()).isEqualTo("customerId");
         assertThat(reference.targetQualifiedName()).isEqualTo("crm.customer.customer");
+        assertThat(reference.integrity().onTargetUnavailable()).isEqualTo(ReferenceTargetUnavailablePolicy.RESTRICT);
         assertThat(reference.keyField()).isEqualTo("id");
         assertThat(reference.labelField()).isEqualTo("title");
         assertThat(reference.generateRuleId()).isEqualTo("generate-order");
@@ -409,6 +412,7 @@ class PlatformModuleDefinitionCompilerTest {
         relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
         MetadataFieldReferenceConfig referenceConfig = referenceConfig(invoiceField.getId(), invoiceId);
         referenceConfig.setAutoTitle(true);
+        referenceConfig.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
         referenceConfig.setTitleOutputField("invoiceTitle");
         referenceConfig.setProjectionMappings("code:invoiceCode");
         referenceConfigService.insert(referenceConfig);
@@ -422,6 +426,7 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(reference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
         assertThat(reference.autoTitle()).isTrue();
         assertThat(reference.titleOutputField()).isEqualTo("invoiceTitle");
+        assertThat(reference.integrity().onTargetUnavailable()).isEqualTo(ReferenceTargetUnavailablePolicy.RESTRICT);
         assertThat(reference.projections()).hasSize(1);
         assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
         assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");

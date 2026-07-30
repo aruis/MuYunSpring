@@ -5,11 +5,15 @@ import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +41,7 @@ public final class ModuleUiDescriptorCompiler {
         ModuleUiDefinition uiDefinition = definition.uiDefinition() == null
                 ? new ModuleUiDefinition(definition.moduleAlias(), List.of(), List.of())
                 : definition.uiDefinition();
-        validateFields(uiDefinition, definition.entities(), definition.moduleAlias(),
-                readProjectionOutputFields(definition));
+        validateFields(uiDefinition, definition.entities(), definition.moduleAlias(), readOutputFields(definition));
         return new ModuleUiCompilationResult(
                 compile(uiDefinition, ModuleKind.STATIC, definition.title(),
                         staticOptionFields(definition.modelClass()), staticRecordLabelField(definition)),
@@ -288,6 +291,9 @@ public final class ModuleUiDescriptorCompiler {
                     true
             ));
         }
+        for (String outputField : referenceOutputFields(definition)) {
+            putReadField(fields, new ResolvedModuleReadField(mainEntity.alias(), null, outputField, true));
+        }
         for (ViewDefinition view : uiDefinition.views()) {
             for (ViewFieldDefinition field : view.fields()) {
                 ViewFieldRef fieldRef = field.fieldRef();
@@ -333,12 +339,28 @@ public final class ModuleUiDescriptorCompiler {
         return entity.alias();
     }
 
-    private static Set<String> readProjectionOutputFields(StaticModuleDefinition definition) {
-        if (definition.readProjections().isEmpty()) {
+    private static Set<String> readOutputFields(StaticModuleDefinition definition) {
+        LinkedHashMap<String, Boolean> fields = new LinkedHashMap<>();
+        definition.readProjections().stream()
+                .map(StaticModuleReadProjectionDefinition::outputField)
+                .forEach(field -> fields.put(field, Boolean.TRUE));
+        referenceOutputFields(definition).forEach(field -> fields.put(field, Boolean.TRUE));
+        return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
+    }
+
+    private static Set<String> referenceOutputFields(StaticModuleDefinition definition) {
+        if (definition.modelClass() == null) {
             return Set.of();
         }
-        return definition.readProjections().stream()
-                .map(StaticModuleReadProjectionDefinition::outputField)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        LinkedHashMap<String, Boolean> fields = new LinkedHashMap<>();
+        for (ReferencePlan plan : StaticReferenceResolver.plans(definition.modelClass())) {
+            if (plan.autoTitle()) {
+                fields.put(plan.titleOutputField(), Boolean.TRUE);
+            }
+            for (ReferenceProjection projection : plan.projections()) {
+                fields.put(projection.outputField(), Boolean.TRUE);
+            }
+        }
+        return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
     }
 }

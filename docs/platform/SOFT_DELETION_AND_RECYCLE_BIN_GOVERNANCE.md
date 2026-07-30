@@ -76,6 +76,8 @@ A.delete(a)
 
 静态注解原有的 `onTargetSoftDelete` 与 `ReferenceTargetDeletionPolicy` 保留为弃用兼容入口；其 `RESTRICT` 映射为新的 `onTargetUnavailable = RESTRICT`。新代码不得继续使用旧名称，动态元数据只使用新策略。
 
+静态与动态记录引用都由 `@ReferenceTo` / `EntityReferenceDefinition` 编译为同一份 `ReferenceIntegrity` 策略和反向删除关系图。未被声明为引用的流程、审计、配置和快照 ID 继续按其各自业务边界处理，不因字段名以 `Id` 结尾而自动纳入引用治理。
+
 ## 回收站与恢复
 
 回收站是业务域入口，不是把全部资源混在一起的全局业务页面：

@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.reference.ModuleFieldRef;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 
@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-final class StaticModuleReferencePathResolver {
-    private StaticModuleReferencePathResolver() {
+final class StaticReferencePathResolver {
+    private StaticReferencePathResolver() {
     }
 
     static Traversal resolve(Map<String, StaticModuleDefinition> modules,
@@ -56,13 +56,13 @@ final class StaticModuleReferencePathResolver {
 
     static Traversal resolve(Map<String, StaticModuleDefinition> modules,
                              StaticModuleDefinition start,
-                             ModuleReferencePath referencePath) {
+                             ReferencePath referencePath) {
         return resolve(modules, start, referencePath, RelationProjectionPlanningOptions.defaults());
     }
 
     static Traversal resolve(Map<String, StaticModuleDefinition> modules,
                              StaticModuleDefinition start,
-                             ModuleReferencePath referencePath,
+                             ReferencePath referencePath,
                              RelationProjectionPlanningOptions options) {
         if (referencePath == null) {
             return null;
@@ -75,7 +75,7 @@ final class StaticModuleReferencePathResolver {
         String currentAlias = RelationProjectionSqlNames.MAIN_ALIAS;
         List<JoinStep> joins = new ArrayList<>();
         String pathAlias = "";
-        for (ModuleReferencePath.Step segment : referencePath.steps()) {
+        for (ReferencePath.Step segment : referencePath.steps()) {
             ResolvedStep step = switch (segment.direction()) {
                 case DIRECT -> resolveDirectReference(modules, current, currentAlias,
                         segment.referenceField(), pathAlias);
@@ -114,7 +114,7 @@ final class StaticModuleReferencePathResolver {
                                                        String currentAlias,
                                                        String segment,
                                                        String pathAlias) {
-        for (StaticModuleReferenceDefinition reference : current.references()) {
+        for (StaticReferenceDefinition reference : current.references()) {
             if (!reference.code().equals(segment)) {
                 continue;
             }
@@ -136,7 +136,7 @@ final class StaticModuleReferencePathResolver {
                             new RelationProjectionJoinCondition(currentAlias,
                                     RelationProjectionQueryPlanner.columnName(sourceEntity, reference.sourceField()),
                                     tableAlias,
-                                    RelationProjectionQueryPlanner.columnName(targetEntity, reference.targetField()))
+                                    RelationProjectionQueryPlanner.columnName(targetEntity, StandardEntitySchema.ID_FIELD))
                     )
             ));
         }
@@ -151,7 +151,7 @@ final class StaticModuleReferencePathResolver {
         if (!matchesModelClass(current, referenceField.ownerType())) {
             return null;
         }
-        for (StaticModuleReferenceDefinition reference : current.references()) {
+        for (StaticReferenceDefinition reference : current.references()) {
             if (!reference.sourceField().equals(referenceField.fieldName())) {
                 continue;
             }
@@ -173,7 +173,7 @@ final class StaticModuleReferencePathResolver {
                             new RelationProjectionJoinCondition(currentAlias,
                                     RelationProjectionQueryPlanner.columnName(sourceEntity, reference.sourceField()),
                                     tableAlias,
-                                    RelationProjectionQueryPlanner.columnName(targetEntity, reference.targetField()))
+                                    RelationProjectionQueryPlanner.columnName(targetEntity, StandardEntitySchema.ID_FIELD))
                     )
             ));
         }
@@ -193,7 +193,7 @@ final class StaticModuleReferencePathResolver {
             if (!segment.equals(candidateEntity.alias())) {
                 continue;
             }
-            for (StaticModuleReferenceDefinition reference : candidate.references()) {
+            for (StaticReferenceDefinition reference : candidate.references()) {
                 if (!reference.targetModuleAlias().equals(current.moduleAlias())) {
                     continue;
                 }
@@ -208,7 +208,7 @@ final class StaticModuleReferencePathResolver {
                                 new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                         tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
                                 new RelationProjectionJoinCondition(currentAlias,
-                                        RelationProjectionQueryPlanner.columnName(currentEntity, reference.targetField()),
+                                        RelationProjectionQueryPlanner.columnName(currentEntity, StandardEntitySchema.ID_FIELD),
                                         tableAlias,
                                         RelationProjectionQueryPlanner.columnName(candidateEntity, reference.sourceField()))
                         )
@@ -221,7 +221,7 @@ final class StaticModuleReferencePathResolver {
     private static ResolvedStep resolveInverseReference(Map<String, StaticModuleDefinition> modules,
                                                         StaticModuleDefinition current,
                                                         String currentAlias,
-                                                        ModuleReferencePath.Step segment,
+                                                        ReferencePath.Step segment,
                                                         String pathAlias) {
         ModuleFieldRef referenceField = segment.referenceField();
         for (StaticModuleDefinition candidate : modules.values()) {
@@ -229,7 +229,7 @@ final class StaticModuleReferencePathResolver {
                 continue;
             }
             EntityDefinition candidateEntity = candidate.entities().getFirst();
-            for (StaticModuleReferenceDefinition reference : candidate.references()) {
+            for (StaticReferenceDefinition reference : candidate.references()) {
                 if (!reference.sourceField().equals(referenceField.fieldName())
                         || !reference.targetModuleAlias().equals(current.moduleAlias())) {
                     continue;
@@ -247,7 +247,7 @@ final class StaticModuleReferencePathResolver {
                                 new RelationProjectionJoinCondition(currentAlias, StandardEntitySchema.TENANT_ID_COLUMN,
                                         tableAlias, StandardEntitySchema.TENANT_ID_COLUMN),
                                 new RelationProjectionJoinCondition(currentAlias,
-                                        RelationProjectionQueryPlanner.columnName(currentEntity, reference.targetField()),
+                                        RelationProjectionQueryPlanner.columnName(currentEntity, StandardEntitySchema.ID_FIELD),
                                         tableAlias,
                                         RelationProjectionQueryPlanner.columnName(candidateEntity, reference.sourceField()))
                         )

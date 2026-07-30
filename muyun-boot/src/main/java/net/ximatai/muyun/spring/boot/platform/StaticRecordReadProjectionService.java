@@ -16,6 +16,8 @@ import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
@@ -81,7 +83,7 @@ public class StaticRecordReadProjectionService {
         if (projection == null) {
             return response;
         }
-        return projectResponse(response, projection);
+        return projectResponse(response, withReferenceSourceFields(recordService, projection), modelClass(recordService));
     }
 
     public boolean supportsDefaultListQuery(String moduleAlias, Object recordService) {
@@ -162,12 +164,11 @@ public class StaticRecordReadProjectionService {
         if (compilation == null || compilation.uiDescriptor() == null || compilation.readModel() == null) {
             return Optional.empty();
         }
-        RecordReadProjection projection = RecordReadProjectionPlanner.defaultList(
+        RecordReadProjection projection = withReferenceSourceFields(recordService, RecordReadProjectionPlanner.defaultList(
                 compilation.uiDescriptor(),
                 compilation.readModel(),
                 recordService,
-                ActionExecutionContextHolder.current().orElse(null)
-        );
+                ActionExecutionContextHolder.current().orElse(null)));
         PageResult<Map<String, Object>> page = relationProjectionReadService.queryList(
                 staticModuleDefinitionCatalog.definitions(),
                 definition,
@@ -179,12 +180,12 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = RecordReadProjectionPostProcessor.applyStaticOutput(
+        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass(recordService),
+                RecordReadProjectionPostProcessor.applyStaticOutput(
                 modelClass(recordService),
                 projection,
                 page.getRecords(),
-                optionSourceRegistry
-        );
+                optionSourceRegistry), outputFieldNames(projection));
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -222,14 +223,13 @@ public class StaticRecordReadProjectionService {
         if (compilation == null || compilation.readModel() == null) {
             return Optional.empty();
         }
-        RecordReadProjection projection = RecordReadProjectionPlanner.explicit(
+        RecordReadProjection projection = withReferenceSourceFields(recordService, RecordReadProjectionPlanner.explicit(
                 moduleAlias,
                 compilation.readModel(),
                 viewCode,
                 outputFields,
                 recordService,
-                ActionExecutionContextHolder.current().orElse(null)
-        );
+                ActionExecutionContextHolder.current().orElse(null)));
         PageResult<Map<String, Object>> page = relationProjectionReadService.queryList(
                 staticModuleDefinitionCatalog.definitions(),
                 definition,
@@ -241,12 +241,12 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = RecordReadProjectionPostProcessor.applyStaticOutput(
+        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass(recordService),
+                RecordReadProjectionPostProcessor.applyStaticOutput(
                 modelClass(recordService),
                 projection,
                 page.getRecords(),
-                optionSourceRegistry
-        );
+                optionSourceRegistry), outputFieldNames(projection));
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -325,10 +325,41 @@ public class StaticRecordReadProjectionService {
                 ));
     }
 
+    private List<String> outputFieldNames(RecordReadProjection projection) {
+        return projection.outputFields().stream().map(ViewFieldRef::fieldName).toList();
+    }
+
+    private RecordReadProjection withReferenceSourceFields(Object recordService, RecordReadProjection projection) {
+        Class<?> modelClass = modelClass(recordService);
+        if (modelClass == null || projection == null) {
+            return projection;
+        }
+        Set<String> output = Set.copyOf(outputFieldNames(projection));
+        List<String> internal = new java.util.ArrayList<>(projection.internalReadFields());
+        for (ReferencePlan plan : StaticReferenceResolver.plans(modelClass)) {
+            boolean titleRequested = plan.autoTitle() && output.contains(plan.titleOutputField());
+            boolean projectionRequested = plan.projections().stream()
+                    .anyMatch(item -> output.contains(item.outputField()));
+            if ((titleRequested || projectionRequested) && !output.contains(plan.sourceField())) {
+                internal.add(plan.sourceField());
+            }
+        }
+        List<String> normalizedInternal = internal.stream().distinct().toList();
+        if (normalizedInternal.equals(projection.internalReadFields())) {
+            return projection;
+        }
+        return new RecordReadProjection(projection.moduleAlias(), projection.viewCode(), projection.actionCode(),
+                projection.permissionCode(), projection.permissionActionCode(), projection.fieldReadPolicies(),
+                projection.outputFields(), normalizedInternal, projection.postReadTransforms());
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private <T> WebPageResponse<T> projectResponse(WebPageResponse<T> response,
-                                                   RecordReadProjection projection) {
-        List<Map<String, Object>> records = RecordReadProjectionProjector.project(response.records(), projection);
+                                                   RecordReadProjection projection,
+                                                   Class<?> modelClass) {
+        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
+                RecordReadProjectionProjector.projectWithInternalFields(response.records(), projection),
+                outputFieldNames(projection));
         return new WebPageResponse(
                 records,
                 response.total(),

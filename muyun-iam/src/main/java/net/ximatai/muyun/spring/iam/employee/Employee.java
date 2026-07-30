@@ -5,7 +5,9 @@ import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
-import net.ximatai.muyun.spring.ability.reference.ModuleReference;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
@@ -25,12 +27,14 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 public class Employee extends StandardEnabledSortableEntity {
     @Column(name = "organization_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Organization id")
-    @ModuleReference(target = OrganizationService.class)
+    @ReferenceTo(target = OrganizationService.class,
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT))
     private String organizationId;
 
     @Column(name = "department_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Department id")
-    @ModuleReference(target = DepartmentService.class)
+    @ReferenceTo(target = DepartmentService.class,
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT))
     private String departmentId;
 
     @Column(name = "employee_no", type = ColumnType.VARCHAR, length = 64, nullable = false,

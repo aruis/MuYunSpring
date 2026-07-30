@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 
 import java.util.Set;
 
@@ -46,6 +47,11 @@ public class ModuleMetadataField extends StandardSortableEntity {
 
     @Column(name = "reference_module_alias", type = ColumnType.VARCHAR, length = 128, comment = "Reference module alias")
     private String referenceModuleAlias;
+
+    @Column(name = "reference_target_unavailable_policy", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Reference target unavailable policy",
+            defaultVal = @Default(varchar = "PRESERVE_HISTORY"))
+    private ReferenceTargetUnavailablePolicy referenceTargetUnavailablePolicy = ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY;
 
     @Column(name = "reference_module_key_field", type = ColumnType.VARCHAR, length = 64, comment = "Reference module key field")
     private String referenceModuleKeyField;

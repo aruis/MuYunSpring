@@ -5,7 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
@@ -442,7 +442,7 @@ class RelationProjectionReadServiceTest {
                        .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getEmployeeNo),
                                 "employeeNo",
@@ -451,7 +451,7 @@ class RelationProjectionReadServiceTest {
                                 true
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getTitle),
                                 "employeeTitle"
@@ -484,7 +484,7 @@ class RelationProjectionReadServiceTest {
                         )
                 )))
                        .uiDefinition(null)
-                       .references(List.of(new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id")))
+                       .references(List.of(new StaticReferenceDefinition("employee", "employeeId", "iam.employee")))
                        .readProjections(List.of())
                        .modelClass(UserAccount.class)
                        .projectionJoins(List.of())
@@ -508,8 +508,8 @@ class RelationProjectionReadServiceTest {
                 )))
                        .uiDefinition(null)
                        .references(List.of(
-                        new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
-                        new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
+                        new StaticReferenceDefinition("employee", "employeeId", "iam.employee"),
+                        new StaticReferenceDefinition("user", "userId", "iam.user")
                 ))
                        .readProjections(List.of())
                        .modelClass(EmployeeAccount.class)

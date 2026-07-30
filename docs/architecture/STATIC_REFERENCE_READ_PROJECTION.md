@@ -21,7 +21,7 @@ iam.employee -> iam.organization
 静态引用关系声明在 Java 模型字段上：
 
 ```java
-@ModuleReference(target = EmployeeService.class)
+@ReferenceTo(target = EmployeeService.class)
 private String employeeId;
 ```
 
@@ -29,16 +29,14 @@ private String employeeId;
 
 | 字段 | 含义 |
 | --- | --- |
-| `code` | 引用短码，主要用于展示、兼容和动态侧保留。静态读投影不应依赖它作为主契约。 |
-| `target` | 目标静态 service 类型。目标类型必须暴露 `public static String MODULE_ALIAS`。 |
-| `targetModuleAlias` | 目标模块别名。保留给静态引用动态模块或无 service 类型的场景。 |
-| `targetField` | 目标字段。当前静态运行态只支持 `id`。 |
+| `target` | 静态业务的首选目标声明。目标 service 必须暴露 `public static String MODULE_ALIAS`。 |
+| `moduleAlias`、`entityAlias` | 成对使用的别名后备声明，适用于动态、外部或无法直接依赖目标 class 的场景。 |
+| `integrity` | 目标不可用时保留历史、阻断或级联删除的生命周期策略。 |
 
-`target` 和 `targetModuleAlias` 必须二选一。当前不支持非主键引用；需要唯一键引用时，应先补清楚索引、唯一性、字段类型和运行态校验契约。
+`target` 与 `moduleAlias` / `entityAlias` 必须二选一。记录引用始终指向目标主键 `id`；字典 code 由独立字典能力处理，不作为记录引用或 join 预留。
 
 引用关系描述的是模型事实，不描述 UI 要展示哪些字段，也不描述 SQL join。普通业务模块不应手写 join SQL。
-同一模块内引用 `code` 必须唯一，避免兼容路径解析出现隐式歧义。静态 service 推荐使用字段引用链，
-以模型字段本身作为引用路径抓手。
+静态 service 推荐使用字段引用链，以模型字段本身作为引用路径抓手。
 
 ## 读投影声明
 
@@ -50,12 +48,12 @@ class UserAccountService implements ModuleReadProjectionContributor {
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
                 ModuleReadProjection.filterable(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getEmployeeNo),
                         "employeeNo"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle")
@@ -67,13 +65,13 @@ class UserAccountService implements ModuleReadProjectionContributor {
 静态链路优先使用 Java getter method reference 描述引用路径：
 
 ```java
-ModuleReferencePath.from(Employee::getOrganizationId)
+ReferencePath.from(Employee::getOrganizationId)
         .select(Organization::getTitle)
 ```
 
 `from(...)` 表示从当前模块主模型的引用字段出发，`then(...)` 表示沿上一跳目标模型继续走一个引用字段，
 `inverseOne(...)` 表示通过一个候选桥接模型的字段反向唯一命中当前模块。每一跳都必须落到真实 Java 字段，
-并且该字段必须声明 `@ModuleReference`。列表读投影会生成分页 SQL join，反向桥接必须显式使用
+并且该字段必须声明 `@ReferenceTo`。列表读投影会生成分页 SQL join，反向桥接必须显式使用
 `inverseOne(...)` / `thenInverseOne(...)` 声明一对一唯一关系；未声明唯一性的 `inverse(...)` / `thenInverse(...)`
 视为不安全路径，不能进入分页 join。
 
@@ -150,15 +148,27 @@ UI 不直接写跨模块路径，也不声明 SQL join。跨模块字段引用�
 `RelationProjectionJoinContributor` 已标记为兼容逃生口。普通静态模块应优先使用：
 
 ```text
-@ModuleReference + ModuleReadProjectionContributor
+@ReferenceTo + ModuleReadProjectionContributor
 ```
 
 只有无法被引用图表达的特殊旧场景，才使用手写 join contributor。
 
+## 跨动静引用读取
+
+`@ReferenceTo` 的 `autoTitle` 和 `projections` 不以 SQL join 为前提。列表读取在完成源记录查询后，
+会按 `ReferenceTarget` 聚合源记录中的目标 ID 与所需字段，通过统一 `ReferenceAbility` 批量读取并回填输出。
+因此静态模块引用动态模块时，仍可获得标题和字段投影；每个目标最多各执行一次标题读取和字段投影读取，
+不会产生逐行查询。
+
+静态目标可被当前引用图安全解析时，SQL join 仍是列表筛选、排序和摘要读取的优化路径。动态目标或不能安全
+编译为 join 的目标自动走上述批量补齐路径；该路径只负责输出，不让动态目标字段隐式成为源列表的筛选或排序字段。
+如需跨模块筛选、排序，必须先形成可验证的数据权限与查询语义，再扩展为独立能力。
+
 ## 当前限制
 
-1. 动态主实体 `ONE` 引用投影已通过 adapter 接入同一 SQL planner；模块关系、子实体引用、`MANY` 聚合和字典标题仍未接入。
-2. `targetField` 当前只支持 `id`。
+1. 动态主实体 `ONE` 引用投影在可解析时可进入同一 SQL planner；静态到动态目标的标题和字段投影走批量补齐，
+   当前不承诺其筛选或排序。模块关系、子实体引用、`MANY` 聚合和字典标题仍未接入 SQL planner。
+2. 记录引用固定使用目标 `id`；字典值和枚举值不进入记录引用图。
 3. 引用路径已有默认 join 深度和 join 数量保护；显式有限回环路径允许规划，自引用裁剪、诊断响应和 plan 缓存仍未实现。
 4. 当前数据权限仍以源模块列表读取为主，目标模块数据权限如何叠加需要单独治理。
 5. 动态 SQL 投影的引用输出字段已支持输出脱敏；受保护主字段以及加密、签名等存储保护字段仍回退实体查询。

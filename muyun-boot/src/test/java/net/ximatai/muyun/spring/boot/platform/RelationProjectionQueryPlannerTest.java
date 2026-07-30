@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.metadata.DBInfo;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -331,7 +331,7 @@ class RelationProjectionQueryPlannerTest {
     void shouldRejectDuplicateReferenceCode() {
         assertThatThrownBy(this::duplicateReferenceCodeDefinition)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("duplicate static module reference code: iam.employee.organization");
+                .hasMessageContaining("duplicate static reference code: iam.employee.organization");
     }
 
     @Test
@@ -382,7 +382,7 @@ class RelationProjectionQueryPlannerTest {
     @Test
     void shouldRejectUnsafeInverseReferencePathProjection() {
         StaticModuleDefinition user = userReferenceDefinitionWithOutput(
-                ModuleReferencePath.inverse(EmployeeAccount::getUserId)
+                ReferencePath.inverse(EmployeeAccount::getUserId)
                         .then(EmployeeAccount::getEmployeeId)
                         .select(Employee::getTitle),
                 "employeeTitle");
@@ -488,7 +488,7 @@ class RelationProjectionQueryPlannerTest {
 
     private StaticModuleDefinition userReferenceDefinition() {
         return userReferenceDefinitionWithOutput(
-                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                         .then(EmployeeAccount::getEmployeeId)
                         .select(Employee::getTitle),
                 "employeeTitle");
@@ -512,43 +512,43 @@ class RelationProjectionQueryPlannerTest {
                        .references(List.of())
                        .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .select(EmployeeAccount::getEmployeeId),
                                 "employeeId"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getEmployeeNo),
                                 "employeeNo"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getTitle),
                                 "employeeTitle"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getOrganizationId),
                                 "employeeOrganizationId"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .then(Employee::getOrganizationId)
                                         .select(Organization::getTitle),
                                 "organizationTitle"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getDepartmentId),
                                 "employeeDepartmentId"
                         ),
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .then(Employee::getDepartmentId)
                                         .select(Department::getTitle),
@@ -582,7 +582,7 @@ class RelationProjectionQueryPlannerTest {
                        .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getEmployeeNo),
                                 "employeeNo",
@@ -600,7 +600,7 @@ class RelationProjectionQueryPlannerTest {
                        .build();
     }
 
-    private StaticModuleDefinition userReferenceDefinitionWithOutput(ModuleReferencePath readProjectionPath,
+    private StaticModuleDefinition userReferenceDefinitionWithOutput(ReferencePath readProjectionPath,
                                                                      String outputField) {
         return StaticModuleDefinition.builder("iam", "iam.user", "用户管理")
                        .parentModuleAlias(null)
@@ -623,7 +623,7 @@ class RelationProjectionQueryPlannerTest {
                        .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                                ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                         .then(EmployeeAccount::getEmployeeId)
                                         .select(Employee::getEmployeeNo),
                                 "employeeNo",
@@ -658,8 +658,8 @@ class RelationProjectionQueryPlannerTest {
                 )))
                        .uiDefinition(null)
                        .references(List.of(
-                        new StaticModuleReferenceDefinition("employee", "employeeId", "iam.employee", "id"),
-                        new StaticModuleReferenceDefinition("user", "userId", "iam.user", "id")
+                        new StaticReferenceDefinition("employee", "employeeId", "iam.employee"),
+                        new StaticReferenceDefinition("user", "userId", "iam.user")
                 ))
                        .readProjections(List.of())
                        .modelClass(EmployeeAccount.class)
@@ -709,8 +709,8 @@ class RelationProjectionQueryPlannerTest {
                 )))
                        .uiDefinition(null)
                        .references(List.of(
-                        new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id"),
-                        new StaticModuleReferenceDefinition("department", "departmentId", "iam.department", "id")
+                        new StaticReferenceDefinition("organization", "organizationId", "iam.organization"),
+                        new StaticReferenceDefinition("department", "departmentId", "iam.department")
                 ))
                        .readProjections(List.of())
                        .modelClass(Employee.class)
@@ -744,7 +744,7 @@ class RelationProjectionQueryPlannerTest {
                                 .field(outputField)
                                 .field("title"))
                         .build())
-                       .references(List.of(new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id")))
+                       .references(List.of(new StaticReferenceDefinition("organization", "organizationId", "iam.organization")))
                        .readProjections(List.of(new StaticModuleReadProjectionDefinition(readProjectionPath, outputField)))
                        .modelClass(Employee.class)
                        .projectionJoins(List.of())
@@ -829,8 +829,8 @@ class RelationProjectionQueryPlannerTest {
                 )))
                        .uiDefinition(null)
                        .references(List.of(
-                        new StaticModuleReferenceDefinition("organization", "organizationId", "iam.organization", "id"),
-                        new StaticModuleReferenceDefinition("organization", "departmentId", "iam.department", "id")
+                        new StaticReferenceDefinition("organization", "organizationId", "iam.organization"),
+                        new StaticReferenceDefinition("organization", "departmentId", "iam.department")
                 ))
                        .readProjections(List.of())
                        .build();
@@ -854,7 +854,7 @@ class RelationProjectionQueryPlannerTest {
                        .uiDefinition(ModuleUiDefinition.builder("test.a")
                         .listView(list -> list.field("bTitle"))
                         .build())
-                       .references(List.of(new StaticModuleReferenceDefinition("b", "bId", "test.b", "id")))
+                       .references(List.of(new StaticReferenceDefinition("b", "bId", "test.b")))
                        .readProjections(List.of(new StaticModuleReadProjectionDefinition("b.a.title", "bTitle")))
                        .build();
     }
@@ -872,7 +872,7 @@ class RelationProjectionQueryPlannerTest {
                         List.of(FieldDefinition.string("aId", "A").column("a_id"))
                 )))
                        .uiDefinition(null)
-                       .references(List.of(new StaticModuleReferenceDefinition("a", "aId", "test.a", "id")))
+                       .references(List.of(new StaticReferenceDefinition("a", "aId", "test.a")))
                        .readProjections(List.of())
                        .build();
     }

@@ -136,14 +136,14 @@ class PlatformModelSchemaTest {
                 .contains("id", "metadata_field_id", "enabled", "encryption_mode", "signature_mode", "masking_policy");
         assertThat(columnNames(mapper.toTable(MetadataFieldReferenceConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "target_module_alias", "target_metadata_id",
-                        "cardinality", "auto_title", "title_output_field", "projection_mappings");
+                        "cardinality", "target_unavailable_policy", "auto_title", "title_output_field", "projection_mappings");
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");
         assertThat(columnNames(mapper.toTable(ModuleMetadataField.class)))
                 .contains("id", "relation_id", "metadata_field_id", "default_value", "cloneable",
                         "validation_regex", "dictionary_application_alias", "dictionary_category_alias",
-                        "reference_module_alias", "reference_module_key_field", "reference_module_label_field",
+                        "reference_module_alias", "reference_target_unavailable_policy", "reference_module_key_field", "reference_module_label_field",
                         "reference_generate_rule_id", "reference_query_template_id",
                         "reference_module_plus_fields", "unit_category_alias", "unit_mode",
                         "fixed_unit_code", "default_unit_code", "unit_field_id", "base_value_field_id",
@@ -448,6 +448,8 @@ class PlatformModelSchemaTest {
         assertThat(columnDefault(mapper.toTable(PlatformModuleAction.class), "data_auth")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(ModuleMetadataRelation.class), "relation_role")).isEqualTo("'main'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "cardinality")).isEqualTo("'ONE'");
+        assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "target_unavailable_policy"))
+                .isEqualTo("'PRESERVE_HISTORY'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldConfig.class), "queryable")).isNull();
         assertThat(columnDefault(mapper.toTable(MetadataFieldProtectionConfig.class), "enabled")).isEqualTo("TRUE");
         assertThat(columnDefault(mapper.toTable(MetadataField.class), "required")).isEqualTo("FALSE");
