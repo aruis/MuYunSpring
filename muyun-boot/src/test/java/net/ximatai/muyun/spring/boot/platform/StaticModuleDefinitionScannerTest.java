@@ -199,9 +199,9 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeDelegatedToMe"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
-                assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::code)
+                assertThat(definition.references()).extracting(StaticReferenceDefinition::code)
                         .containsExactly("organization", "department");
-                assertThat(definition.references()).extracting(StaticModuleReferenceDefinition::targetModuleAlias)
+                assertThat(definition.references()).extracting(StaticReferenceDefinition::targetModuleAlias)
                         .containsExactly("iam.organization", "iam.department");
                 assertThat(definition.readProjections()).extracting(StaticModuleReadProjectionDefinition::path)
                         .containsOnlyNulls();

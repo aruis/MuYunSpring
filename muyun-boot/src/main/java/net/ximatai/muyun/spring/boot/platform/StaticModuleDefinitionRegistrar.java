@@ -86,7 +86,7 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
         }
         for (StaticModuleDefinition definition : definitions) {
             if (applicationCatalog.find(definition.applicationAlias()).isEmpty()) {
-                throw new IllegalStateException("static module references undeclared static application: "
+                throw new IllegalStateException("static references undeclared static application: "
                         + definition.moduleAlias() + " -> " + definition.applicationAlias());
             }
         }

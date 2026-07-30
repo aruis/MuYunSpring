@@ -3,14 +3,14 @@ package net.ximatai.muyun.spring.ability.reference;
 import java.util.ArrayList;
 import java.util.List;
 
-public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) {
-    public ModuleReferencePath {
+public record ReferencePath(List<Step> steps, ModuleFieldRef targetField) {
+    public ReferencePath {
         if (steps == null || steps.isEmpty()) {
-            throw new IllegalArgumentException("module reference path steps must not be empty");
+            throw new IllegalArgumentException("reference path steps must not be empty");
         }
         steps = List.copyOf(steps);
         if (targetField == null) {
-            throw new IllegalArgumentException("module reference path target field must not be null");
+            throw new IllegalArgumentException("reference path target field must not be null");
         }
     }
 
@@ -34,10 +34,10 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
     public record Step(Direction direction, ModuleFieldRef referenceField, boolean safeForPageJoin) {
         public Step {
             if (direction == null) {
-                throw new IllegalArgumentException("module reference path step direction must not be null");
+                throw new IllegalArgumentException("reference path step direction must not be null");
             }
             if (referenceField == null) {
-                throw new IllegalArgumentException("module reference path step field must not be null");
+                throw new IllegalArgumentException("reference path step field must not be null");
             }
             safeForPageJoin = direction == Direction.DIRECT || safeForPageJoin;
         }
@@ -65,8 +65,8 @@ public record ModuleReferencePath(List<Step> steps, ModuleFieldRef targetField) 
             return this;
         }
 
-        public <T, R> ModuleReferencePath select(ModuleProperty<T, R> targetField) {
-            return new ModuleReferencePath(steps, ModuleFieldRef.of(targetField));
+        public <T, R> ReferencePath select(ModuleProperty<T, R> targetField) {
+            return new ReferencePath(steps, ModuleFieldRef.of(targetField));
         }
     }
 }

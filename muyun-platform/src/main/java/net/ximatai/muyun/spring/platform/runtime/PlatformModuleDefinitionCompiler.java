@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -405,7 +406,8 @@ public class PlatformModuleDefinitionCompiler {
                 moduleField.getReferenceGenerateRuleId(),
                 moduleField.getReferenceQueryTemplateId(),
                 moduleField.getReferenceModulePlusFields()
-        ).withInteractionRules(
+        ).withIntegrity(new ReferenceIntegrityPolicy(moduleField.getReferenceTargetUnavailablePolicy()))
+        .withInteractionRules(
                 referenceFilters(moduleField),
                 referenceAffects(moduleField)
         );
@@ -501,7 +503,7 @@ public class PlatformModuleDefinitionCompiler {
                 config.getCardinality(),
                 Boolean.TRUE.equals(config.getAutoTitle()),
                 config.getTitleOutputField()
-        );
+        ).withIntegrity(new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy()));
         for (ReferenceProjection projection : config.projections()) {
             definition = definition.withProjection(projection.targetField(), projection.outputField());
         }

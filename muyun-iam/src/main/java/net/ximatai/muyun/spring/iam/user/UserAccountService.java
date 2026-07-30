@@ -13,7 +13,7 @@ import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -196,37 +196,37 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
                 ModuleReadProjection.filterable(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getEmployeeNo),
                         "employeeNo"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getTitle),
                         "employeeTitle"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .select(EmployeeAccount::getEmployeeId),
                         "employeeId"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getOrganizationId),
                         "employeeOrganizationId"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .then(Employee::getOrganizationId)
                                 .select(Organization::getTitle),
                         "organizationTitle"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .select(Employee::getDepartmentId),
                         "employeeDepartmentId"),
                 ModuleReadProjection.of(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getUserId)
+                        ReferencePath.inverseOne(EmployeeAccount::getUserId)
                                 .then(EmployeeAccount::getEmployeeId)
                                 .then(Employee::getDepartmentId)
                                 .select(Department::getTitle),

@@ -39,6 +39,26 @@ public final class RecordReadProjectionProjector {
                 .toList();
     }
 
+    static List<Map<String, Object>> projectWithInternalFields(List<?> records, RecordReadProjection projection) {
+        if (records == null || records.isEmpty()) {
+            return List.of();
+        }
+        return records.stream().map(record -> projectWithInternalFields(record, projection)).toList();
+    }
+
+    private static Map<String, Object> projectWithInternalFields(Object record, RecordReadProjection projection) {
+        if (record == null) {
+            return Map.of();
+        }
+        BeanWrapper wrapper = PropertyAccessorFactory.forBeanPropertyAccess(record);
+        LinkedHashMap<String, Object> output = new LinkedHashMap<>();
+        java.util.stream.Stream.concat(responseFields(projection).stream(), projection.internalReadFields().stream())
+                .distinct()
+                .filter(wrapper::isReadableProperty)
+                .forEach(fieldName -> output.put(fieldName, wrapper.getPropertyValue(fieldName)));
+        return Collections.unmodifiableMap(output);
+    }
+
     private static List<String> responseFields(RecordReadProjection projection) {
         return java.util.stream.Stream.concat(
                         java.util.stream.Stream.of(

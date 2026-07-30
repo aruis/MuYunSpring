@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.ability.reference;
 
 public record ModuleReadProjection(String path,
-                                   ModuleReferencePath referencePath,
+                                   ReferencePath referencePath,
                                    String outputField,
                                    ProjectionType projectionType,
                                    boolean filterable,
@@ -35,11 +35,11 @@ public record ModuleReadProjection(String path,
         return new ModuleReadProjection(path, outputField);
     }
 
-    public static ModuleReadProjection of(ModuleReferencePath referencePath) {
+    public static ModuleReadProjection of(ReferencePath referencePath) {
         return new ModuleReadProjection(null, referencePath, null, ProjectionType.FIELD, false, true);
     }
 
-    public static ModuleReadProjection of(ModuleReferencePath referencePath, String outputField) {
+    public static ModuleReadProjection of(ReferencePath referencePath, String outputField) {
         return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, false, true);
     }
 
@@ -47,11 +47,11 @@ public record ModuleReadProjection(String path,
         return new ModuleReadProjection(path, outputField, true, true);
     }
 
-    public static ModuleReadProjection filterable(ModuleReferencePath referencePath, String outputField) {
+    public static ModuleReadProjection filterable(ReferencePath referencePath, String outputField) {
         return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, true, true);
     }
 
-    public static ModuleReadProjection filterableOnly(ModuleReferencePath referencePath, String outputField) {
+    public static ModuleReadProjection filterableOnly(ReferencePath referencePath, String outputField) {
         return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, true, false);
     }
 
@@ -59,11 +59,11 @@ public record ModuleReadProjection(String path,
         return new ModuleReadProjection(path, outputField, false, true);
     }
 
-    public static ModuleReadProjection sortableOnly(ModuleReferencePath referencePath, String outputField) {
+    public static ModuleReadProjection sortableOnly(ReferencePath referencePath, String outputField) {
         return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.FIELD, false, true);
     }
 
-    public static ModuleReadProjection exists(ModuleReferencePath referencePath, String outputField) {
+    public static ModuleReadProjection exists(ReferencePath referencePath, String outputField) {
         return new ModuleReadProjection(null, referencePath, outputField, ProjectionType.EXISTS, true, false);
     }
 

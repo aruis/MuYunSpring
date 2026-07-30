@@ -33,11 +33,11 @@ final class RecordReadProjectionReferenceResolver {
         StaticModuleReadProjectionDefinition readProjection = field.relationCode() == null
                 ? readProjection(definition, field.fieldName())
                 : null;
-        StaticModuleReferencePathResolver.Traversal traversal;
+        StaticReferencePathResolver.Traversal traversal;
         String targetFieldName;
         String unresolvedPath;
         if (readProjection != null && readProjection.referencePath() != null) {
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition,
+            traversal = StaticReferencePathResolver.resolve(modules, definition,
                     readProjection.referencePath(), options);
             targetFieldName = readProjection.referencePath().targetField().fieldName();
             unresolvedPath = readProjection.referencePath().toString();
@@ -55,7 +55,7 @@ final class RecordReadProjectionReferenceResolver {
             }
             String relationPath = path.substring(0, lastSeparator);
             targetFieldName = path.substring(lastSeparator + 1);
-            traversal = StaticModuleReferencePathResolver.resolve(modules, definition, relationPath, options);
+            traversal = StaticReferencePathResolver.resolve(modules, definition, relationPath, options);
             unresolvedPath = relationPath;
         }
         if (traversal == null) {
@@ -65,7 +65,7 @@ final class RecordReadProjectionReferenceResolver {
             }
             return null;
         }
-        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+        for (StaticReferencePathResolver.JoinStep join : traversal.joins()) {
             if (!join.cardinality().safeForPageJoin()) {
                 throw new IllegalArgumentException("projection reference path cardinality is not safe for page join: "
                         + definition.moduleAlias() + "." + field.fieldName() + "."
@@ -92,7 +92,7 @@ final class RecordReadProjectionReferenceResolver {
                 .orElse(null);
     }
 
-    record ResolvedOutput(StaticModuleReferencePathResolver.Traversal traversal,
+    record ResolvedOutput(StaticReferencePathResolver.Traversal traversal,
                           String targetFieldName,
                           boolean existsProjection,
                           StaticModuleReadProjectionDefinition readProjection) {

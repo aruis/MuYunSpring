@@ -54,18 +54,17 @@ public final class DynamicRelationProjectionDefinitionAdapter {
                 .build();
     }
 
-    private static List<StaticModuleReferenceDefinition> references(ModuleDefinition definition,
+    private static List<StaticReferenceDefinition> references(ModuleDefinition definition,
                                                                     EntityDefinition mainEntity,
                                                                     Map<String, ModuleDefinition> definitionsByAlias) {
         return definition.references().stream()
                 .filter(reference -> mainEntity.alias().equals(reference.sourceEntityAlias()))
                 .filter(reference -> reference.cardinality() == ReferenceCardinality.ONE)
                 .filter(reference -> targetMainEntity(reference, definitionsByAlias))
-                .map(reference -> new StaticModuleReferenceDefinition(
+                .map(reference -> new StaticReferenceDefinition(
                         referenceCode(reference.sourceField()),
                         reference.sourceField(),
-                        reference.target().moduleAlias(),
-                        "id"
+                        reference.target().moduleAlias()
                 ))
                 .toList();
     }

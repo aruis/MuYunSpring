@@ -5,7 +5,9 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.PageRequests;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
@@ -96,7 +98,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
     }
 
     default PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
-        PageResult<T> page = pageQuery(criteria, pageRequest);
+        PageResult<T> page = referenceOptionPage(criteria, pageRequest);
         return PageResult.of(
                 page.getRecords().stream()
                         .map(entity -> new ReferenceOption(entity.getId(), referenceTitleForOutput(entity)))
@@ -104,6 +106,15 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
                 page.getTotal(),
                 pageRequest
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private PageResult<T> referenceOptionPage(Criteria criteria, PageRequest pageRequest) {
+        if (this instanceof DataScopeAbility<?> dataScopeAbility) {
+            return ((DataScopeAbility<T>) dataScopeAbility)
+                    .pageQueryForAction(PlatformAction.REFERENCE, criteria, pageRequest);
+        }
+        return pageQuery(criteria, pageRequest);
     }
 
     default String referenceTitle(T entity) {

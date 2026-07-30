@@ -15,6 +15,8 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +110,50 @@ class CrossBoundaryReferenceDeletionGuardTest {
         assertThat(childContext.getValue().operationId()).isEqualTo(context.operationId());
         assertThat(childContext.getValue().parent()).isEqualTo(node.resource());
         assertThat(childContext.getValue().trigger().name()).isEqualTo("CASCADE");
+    }
+
+    @Test
+    void shouldRestrictOrganizationDeletionForActualEmployeeModuleReference() {
+        CrudAbility<?> organization = mock(CrudAbility.class);
+        when(organization.getModuleAlias()).thenReturn("iam.organization");
+        EntityContract target = mock(EntityContract.class);
+        when(target.getId()).thenReturn("organization-1");
+
+        @SuppressWarnings("rawtypes")
+        CrudAbility employee = mock(CrudAbility.class);
+        when(employee.modelClass()).thenReturn(Employee.class);
+        when(employee.getModuleAlias()).thenReturn("iam.employee");
+        when(employee.count(any(Criteria.class))).thenReturn(1L);
+
+        assertThatThrownBy(() -> new StaticReferenceDeletionGuard(List.of(employee))
+                .beforeTargetUnavailable(organization, target))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("iam.organization")
+                .hasMessageContaining("iam.employee.organizationId");
+    }
+
+    @Test
+    void shouldCascadeActualEmployeeAccountModuleReference() {
+        CrudAbility<?> employeeTarget = mock(CrudAbility.class);
+        when(employeeTarget.getModuleAlias()).thenReturn("iam.employee");
+        EntityContract target = mock(EntityContract.class);
+        when(target.getId()).thenReturn("employee-1");
+
+        @SuppressWarnings("rawtypes")
+        CrudAbility accountBinding = mock(CrudAbility.class);
+        EntityContract binding = mock(EntityContract.class);
+        when(binding.getId()).thenReturn("binding-1");
+        when(binding.getVersion()).thenReturn(2);
+        when(accountBinding.modelClass()).thenReturn(EmployeeAccount.class);
+        when(accountBinding.getModuleAlias()).thenReturn("iam.employee_account");
+        when(accountBinding.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(binding), List.of());
+
+        DeletionContext context = DeletionContext.root("iam.employee", "employee-1");
+        DeletionNode node = DeletionNode.transientNode(new DeletionResource("iam.employee", "employee-1"));
+        new StaticReferenceDeletionGuard(List.of(accountBinding)).beforeTargetUnavailable(
+                employeeTarget, target, context, node, DeletionMode.HARD);
+
+        verify(accountBinding).delete(eq("binding-1"), eq(2), any(DeletionContext.class));
     }
 
     static final class StaticContractLink {

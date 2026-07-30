@@ -16,7 +16,7 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -249,16 +249,16 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     public List<ModuleReadProjection> moduleReadProjections() {
         return List.of(
                 ModuleReadProjection.of(
-                        ModuleReferencePath.from(Employee::getOrganizationId)
+                        ReferencePath.from(Employee::getOrganizationId)
                                 .select(Organization::getTitle),
                         "organizationTitle"),
                 ModuleReadProjection.filterableOnly(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                        ReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                 .then(EmployeeAccount::getUserId)
                                 .select(UserAccount::getUsername),
                         "username"),
                 ModuleReadProjection.exists(
-                        ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                        ReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                 .select(EmployeeAccount::getId),
                         "accountBound")
         );

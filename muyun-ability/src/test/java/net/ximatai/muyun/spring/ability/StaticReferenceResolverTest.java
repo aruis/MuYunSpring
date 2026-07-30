@@ -2,8 +2,10 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 
@@ -62,6 +64,17 @@ class StaticReferenceResolverTest {
     }
 
     @Test
+    void plansShouldResolveClassTargetAndIntegrity() {
+        assertThat(StaticReferenceResolver.plans(ClassTargetReferenceRecord.class))
+                .singleElement()
+                .satisfies(plan -> {
+                    assertThat(plan.target()).isEqualTo(ReferenceTarget.of("iam", "organization"));
+                    assertThat(plan.integrity().onTargetUnavailable())
+                            .isEqualTo(ReferenceTargetUnavailablePolicy.RESTRICT);
+                });
+    }
+
+    @Test
     void collectResultShouldBeReadOnly() {
         DemoReferencingRecord record = new DemoReferencingRecord("customer-1", "user-owner");
         var references = StaticReferenceResolver.collect(record);
@@ -102,6 +115,16 @@ class StaticReferenceResolverTest {
     private static final class CollectionReferenceRecord {
         @ReferenceTo(moduleAlias = "iam", entityAlias = "user", cardinality = ReferenceCardinality.MANY)
         private List<String> userIds;
+    }
+
+    private static final class ClassTargetReferenceRecord {
+        @ReferenceTo(target = OrganizationService.class,
+                integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT))
+        private String organizationId;
+    }
+
+    public static final class OrganizationService {
+        public static final String MODULE_ALIAS = "iam.organization";
     }
 
     private static final class WrongTitleTypeRecord {

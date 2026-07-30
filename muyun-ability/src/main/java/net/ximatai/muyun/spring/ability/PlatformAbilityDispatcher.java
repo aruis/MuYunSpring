@@ -9,9 +9,15 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionTransactionOperator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+
+import java.util.List;
+import java.util.Map;
 
 final class PlatformAbilityDispatcher {
     private static volatile StaticOptionFieldValueValidator staticOptionFieldValueValidator =
@@ -224,6 +230,26 @@ final class PlatformAbilityDispatcher {
     private static <T extends EntityContract> void runReferenceIntegrityValidation(CrudAbility<T> ability, T entity) {
         if (ability instanceof ReferencerAbility referencerAbility) {
             referencerAbility.validateReferenceIntegrity(entity);
+            return;
+        }
+        if (entity == null || referenceTargetResolver == ReferenceTargetResolver.NONE) {
+            return;
+        }
+        for (StaticReferenceResolver.ReferenceRule rule : StaticReferenceResolver.rules(ability.modelClass())) {
+            List<String> ids = StaticReferenceResolver.values(entity, rule.plan());
+            if (ids.isEmpty()) {
+                continue;
+            }
+            ReferenceAbility<?> target = referenceTargetResolver.resolve(rule.target())
+                    .orElseThrow(() -> new PlatformException("reference target is not registered: "
+                            + rule.target().qualifiedName()));
+            Map<String, String> resolved = target.titles(ids);
+            List<String> unavailable = ids.stream().filter(id -> !resolved.containsKey(id)).toList();
+            if (!unavailable.isEmpty()) {
+                throw new PlatformException("reference target is unavailable: "
+                        + rule.target().qualifiedName() + "." + rule.plan().sourceField()
+                        + " -> " + unavailable);
+            }
         }
     }
 

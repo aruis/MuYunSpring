@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.ability.reference;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -91,22 +92,51 @@ public final class StaticReferenceResolver {
                     throw new PlatformException("cannot access reference field: "
                             + modelClass.getName() + "." + field.getName(), e);
                 }
-                rules.putIfAbsent(field.getName(), new ReferenceRule(
-                        field,
-                        new ReferencePlan(
-                                field.getName(),
-                                ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityAlias()),
-                                referenceTo.cardinality(),
-                                referenceTo.autoTitle(),
-                                referenceTo.titleOutputField(),
-                                projections(referenceTo),
-                                ReferenceIntegrityPolicy.from(referenceTo.integrity())
-                        )
-                ));
+                rules.putIfAbsent(field.getName(), new ReferenceRule(field, referenceToPlan(field, referenceTo)));
             }
             current = current.getSuperclass();
         }
         return List.copyOf(rules.values());
+    }
+
+    private static ReferencePlan referenceToPlan(Field field, ReferenceTo referenceTo) {
+        return new ReferencePlan(
+                field.getName(),
+                targetOf(referenceTo),
+                referenceTo.cardinality(),
+                referenceTo.autoTitle(),
+                referenceTo.titleOutputField(),
+                projections(referenceTo),
+                ReferenceIntegrityPolicy.from(referenceTo.integrity())
+        );
+    }
+
+    private static ReferenceTarget targetOf(ReferenceTo reference) {
+        boolean hasTargetClass = reference.target() != null && reference.target() != Void.class;
+        boolean hasTargetAlias = reference.moduleAlias() != null && !reference.moduleAlias().isBlank();
+        boolean hasEntityAlias = reference.entityAlias() != null && !reference.entityAlias().isBlank();
+        if (hasTargetClass == hasTargetAlias || hasTargetAlias != hasEntityAlias) {
+            throw new PlatformException("ReferenceTo requires exactly one of target or moduleAlias/entityAlias");
+        }
+        if (hasTargetAlias) {
+            return ReferenceTarget.of(reference.moduleAlias(), reference.entityAlias());
+        }
+        try {
+            Field moduleAliasField = reference.target().getField("MODULE_ALIAS");
+            if (!Modifier.isStatic(moduleAliasField.getModifiers()) || moduleAliasField.getType() != String.class) {
+                throw new PlatformException("ReferenceTo target MODULE_ALIAS must be public static String: "
+                        + reference.target().getName());
+            }
+            String moduleAlias = (String) moduleAliasField.get(null);
+            int separator = moduleAlias.lastIndexOf('.');
+            if (separator <= 0 || separator == moduleAlias.length() - 1) {
+                throw new PlatformException("ReferenceTo target requires '<moduleAlias>.<entityAlias>': " + moduleAlias);
+            }
+            return ReferenceTarget.of(moduleAlias.substring(0, separator), moduleAlias.substring(separator + 1));
+        } catch (ReflectiveOperationException ex) {
+            throw new PlatformException("ReferenceTo target requires public MODULE_ALIAS: "
+                    + reference.target().getName(), ex);
+        }
     }
 
     private static List<ReferenceProjection> projections(ReferenceTo referenceTo) {

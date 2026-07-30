@@ -15,7 +15,7 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.action.ActionMessage;
 import net.ximatai.muyun.spring.ability.action.DataChangeIntent;
@@ -25,7 +25,7 @@ import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleReadProjectionDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
+import net.ximatai.muyun.spring.boot.platform.StaticReferenceCompiler;
 import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.ActionEndpointWebConfiguration;
 import net.ximatai.muyun.spring.boot.web.ActionResultResponseAdvice;
@@ -1087,15 +1087,15 @@ class IamWebControllerIT {
                        .actions(List.of())
                        .entities(List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)))
                        .uiDefinition(controller.moduleUiDefinition())
-                       .references(StaticModuleReferenceCompiler.compile(Employee.class))
+                       .references(StaticReferenceCompiler.compile(Employee.class))
                        .readProjections(List.of(
                         new StaticModuleReadProjectionDefinition(
-                                ModuleReferencePath.from(Employee::getOrganizationId)
+                                ReferencePath.from(Employee::getOrganizationId)
                                         .select(Organization::getTitle),
                                 "organizationTitle"),
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                ReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                         .then(EmployeeAccount::getUserId)
                                         .select(UserAccount::getUsername),
                                 "username",
@@ -1104,7 +1104,7 @@ class IamWebControllerIT {
                                 false),
                         new StaticModuleReadProjectionDefinition(
                                 null,
-                                ModuleReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
+                                ReferencePath.inverseOne(EmployeeAccount::getEmployeeId)
                                         .select(EmployeeAccount::getId),
                                 "accountBound",
                                 ModuleReadProjection.ProjectionType.EXISTS,

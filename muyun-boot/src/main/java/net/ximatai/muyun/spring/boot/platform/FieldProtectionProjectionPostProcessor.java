@@ -92,7 +92,7 @@ final class FieldProtectionProjectionPostProcessor {
             return false;
         }
         for (ViewFieldRef field : projection.outputFields()) {
-            StaticModuleReferencePathResolver.Traversal traversal = referenceOutput(modules, definition, field)
+            StaticReferencePathResolver.Traversal traversal = referenceOutput(modules, definition, field)
                     .map(RecordReadProjectionReferenceResolver.ResolvedOutput::traversal)
                     .orElse(null);
             if (traversal != null && hasStorageProtectedJoinField(definition, traversal)) {
@@ -103,13 +103,13 @@ final class FieldProtectionProjectionPostProcessor {
     }
 
     private static boolean hasStorageProtectedJoinField(StaticModuleDefinition definition,
-                                                        StaticModuleReferencePathResolver.Traversal traversal) {
+                                                        StaticReferencePathResolver.Traversal traversal) {
         Map<String, EntityDefinition> entitiesByAlias = new LinkedHashMap<>();
         entitiesByAlias.put(RelationProjectionSqlNames.MAIN_ALIAS, definition.entities().getFirst());
-        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+        for (StaticReferencePathResolver.JoinStep join : traversal.joins()) {
             entitiesByAlias.put(join.tableAlias(), join.entity());
         }
-        for (StaticModuleReferencePathResolver.JoinStep join : traversal.joins()) {
+        for (StaticReferencePathResolver.JoinStep join : traversal.joins()) {
             for (RelationProjectionJoinCondition condition : join.conditions()) {
                 if (storageProtectedColumn(entitiesByAlias.get(condition.leftAlias()), condition.leftColumn())
                         || storageProtectedColumn(entitiesByAlias.get(condition.rightAlias()), condition.rightColumn())) {
@@ -155,7 +155,7 @@ final class FieldProtectionProjectionPostProcessor {
         if (localRelationField != null) {
             return localRelationField;
         }
-        StaticModuleReferencePathResolver.Traversal traversal =
+        StaticReferencePathResolver.Traversal traversal =
                 referenceOutput(modules, definition, ViewFieldRef.relation(relationCode, fieldName))
                         .map(RecordReadProjectionReferenceResolver.ResolvedOutput::traversal)
                         .orElse(null);

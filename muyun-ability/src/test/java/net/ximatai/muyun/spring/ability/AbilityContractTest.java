@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +48,7 @@ class AbilityContractTest {
         ReferenceDependencyRegistryTestAccess.clearAll();
         CacheRegistry.resetPolicy();
         PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
+        PlatformAbilityRuntime.resetReferenceTargetResolver();
         PlatformAbilityRuntime.resetDeletionLifecycleListener();
         TenantContext.clear();
         clearTransactionState();
@@ -1180,6 +1182,24 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceToShouldValidateWritesWithoutReferencerAbility() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        String customerId = customerService.insert(new DemoCustomer("Customer One", "ACTIVE"));
+        PlatformAbilityRuntime.configureReferenceTargetResolver(target ->
+                ReferenceTarget.of("demo", "customer").equals(target)
+                        ? Optional.of(customerService)
+                        : Optional.empty());
+        PlainReferenceRecordService service = new PlainReferenceRecordService();
+
+        service.insert(new PlainReferenceRecord(customerId));
+
+        assertThatThrownBy(() -> service.insert(new PlainReferenceRecord("missing-customer")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reference target is unavailable")
+                .hasMessageContaining("demo.customer.customerId");
+    }
+
+    @Test
     void referenceLookupShouldRejectMismatchedTargetAndAbility() {
         DemoCustomerService customerService = new DemoCustomerService();
 
@@ -1870,6 +1890,21 @@ class AbilityContractTest {
     }
 
     private static class StaticReferenceBaseRecord extends net.ximatai.muyun.spring.common.model.standard.StandardEntity {
+    }
+
+    private static final class PlainReferenceRecord extends StandardEntity {
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "customer")
+        private final String customerId;
+
+        private PlainReferenceRecord(String customerId) {
+            this.customerId = customerId;
+        }
+    }
+
+    private static final class PlainReferenceRecordService extends AbstractAbilityService<PlainReferenceRecord> {
+        private PlainReferenceRecordService() {
+            super("demo.plain-reference", PlainReferenceRecord.class, new InMemoryBaseDao<>());
+        }
     }
 
     private static final class StaticReferenceProxyRecord extends StaticReferenceBaseRecord {

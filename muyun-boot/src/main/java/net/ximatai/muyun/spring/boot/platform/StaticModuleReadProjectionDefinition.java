@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.ability.reference.ModuleReferencePath;
+import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 public record StaticModuleReadProjectionDefinition(String path,
-                                                   ModuleReferencePath referencePath,
+                                                   ReferencePath referencePath,
                                                    String outputField,
                                                    ModuleReadProjection.ProjectionType projectionType,
                                                    boolean filterable,
@@ -14,7 +14,7 @@ public record StaticModuleReadProjectionDefinition(String path,
         this(path, null, outputField, ModuleReadProjection.ProjectionType.FIELD, false, true);
     }
 
-    public StaticModuleReadProjectionDefinition(ModuleReferencePath referencePath, String outputField) {
+    public StaticModuleReadProjectionDefinition(ReferencePath referencePath, String outputField) {
         this(null, referencePath, outputField, ModuleReadProjection.ProjectionType.FIELD, false, true);
     }
 
@@ -40,7 +40,7 @@ public record StaticModuleReadProjectionDefinition(String path,
         this(path, null, outputField, ModuleReadProjection.ProjectionType.FIELD, filterable, sortable);
     }
 
-    private static String defaultOutputField(String path, ModuleReferencePath referencePath) {
+    private static String defaultOutputField(String path, ReferencePath referencePath) {
         if (referencePath != null) {
             return referencePath.targetField().fieldName();
         }

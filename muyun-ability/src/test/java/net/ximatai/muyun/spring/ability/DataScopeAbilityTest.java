@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -23,6 +24,8 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +72,25 @@ class DataScopeAbilityTest {
                         assertThat(exception.scope().moduleAlias()).isEqualTo("demo.dataScoped");
                     })
                     .hasMessageContaining("record data permission denied");
+        }
+    }
+
+    @Test
+    void shouldApplyReferenceScopeToCandidatesWithoutHidingReferenceTitles() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new OwnerDataScopeCriteriaService());
+        String ownId;
+        String othersId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            ownId = service.insert(record("Own", "user-1"));
+            othersId = service.insert(record("Others", "user-2"));
+        }
+
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                    .containsExactly(new ReferenceOption(ownId, "Own"));
+            assertThat(service.titles(java.util.List.of(ownId, othersId)))
+                    .containsExactlyEntriesOf(java.util.Map.of(ownId, "Own", othersId, "Others"));
         }
     }
 
@@ -371,12 +393,12 @@ class DataScopeAbilityTest {
 
     @Getter
     @Setter
-    private static final class DemoDataScopedRecord extends StandardDataScopedEntity {
+    private static final class DemoDataScopedRecord extends StandardDataScopedEntity implements TitledCapable {
         private String title;
     }
 
     private static final class DemoDataScopedRecordService extends AbstractAbilityService<DemoDataScopedRecord>
-            implements DataScopeAbility<DemoDataScopedRecord> {
+            implements DataScopeAbility<DemoDataScopedRecord>, ReferenceAbility<DemoDataScopedRecord> {
         private final DataScopeCriteriaService dataScopeCriteriaService;
         private int afterSelectCount;
 

@@ -18,7 +18,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleReferenceCompiler;
+import net.ximatai.muyun.spring.boot.platform.StaticReferenceCompiler;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionRegistrar;
@@ -164,7 +164,7 @@ public class MuYunSpringIdentityConfiguration {
                         "职员账号绑定",
                         EmployeeAccount.class
                 )))
-                .references(StaticModuleReferenceCompiler.compile(EmployeeAccount.class))
+                .references(StaticReferenceCompiler.compile(EmployeeAccount.class))
                 .modelClass(EmployeeAccount.class)
                 .build();
     }

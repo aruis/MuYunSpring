@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
 import java.util.Arrays;
@@ -35,6 +36,11 @@ public class MetadataFieldReferenceConfig extends StandardEntity {
     @Column(name = "cardinality", type = ColumnType.VARCHAR, length = 16, nullable = false,
             comment = "Reference cardinality", defaultVal = @Default(varchar = "ONE"))
     private ReferenceCardinality cardinality = ReferenceCardinality.ONE;
+
+    @Column(name = "target_unavailable_policy", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Reference target unavailable policy",
+            defaultVal = @Default(varchar = "PRESERVE_HISTORY"))
+    private ReferenceTargetUnavailablePolicy targetUnavailablePolicy = ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY;
 
     @Column(name = "auto_title", type = ColumnType.BOOLEAN, comment = "Auto populate title",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
