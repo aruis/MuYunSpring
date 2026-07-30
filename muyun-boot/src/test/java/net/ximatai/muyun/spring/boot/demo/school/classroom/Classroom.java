@@ -33,8 +33,7 @@ public class Classroom extends StandardSortableEntity {
             childModel = ClassMember.class,
             childEntityAlias = "classMember",
             childForeignKeyField = "classroomId",
-            autoPopulate = true,
-            autoDeleteWithParent = true
+            autoPopulate = true
     )
     private List<ClassMember> members;
 

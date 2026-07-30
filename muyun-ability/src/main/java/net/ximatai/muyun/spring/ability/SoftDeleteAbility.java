@@ -87,22 +87,23 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (id == null || id.isBlank()) {
             return 0;
         }
-        DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
-                getModuleAlias(), id, deletionContext);
-        beforeDelete(id, context);
-        T entity = selectIgnoreSoftDelete(id);
-        if (isSoftDeleted(entity)) {
-            return 0;
-        }
-        PlatformManagedMutationGuard.beforeDelete(this, entity);
-        if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
-            throw new OptimisticLockException("record version conflict: " + id);
-        }
-        Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
-        beforeSoftDelete(entity);
-        PlatformAbilityDispatcher.beforeSoftDelete(this, entity);
-        DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.SOFT);
-        try {
+        return PlatformAbilityDispatcher.inDeletionTransaction(() -> {
+            DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
+                    getModuleAlias(), id, deletionContext);
+            beforeDelete(id, context);
+            T entity = selectIgnoreSoftDelete(id);
+            if (isSoftDeleted(entity)) {
+                return 0;
+            }
+            PlatformManagedMutationGuard.beforeDelete(this, entity);
+            if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
+                throw new OptimisticLockException("record version conflict: " + id);
+            }
+            Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+            beforeSoftDelete(entity);
+            DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.SOFT);
+            try {
+            PlatformAbilityDispatcher.beforeTargetUnavailable(this, entity, context, node, DeletionMode.SOFT);
             EntityLifecycle.prepareDelete(entity, Instant.now());
             int deleted;
             try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
@@ -117,10 +118,11 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             CacheInvalidationSupport.clearAfterChanged(this, entity);
             PlatformAbilityDispatcher.deletionSucceeded(this, entity, context, node, DeletionMode.SOFT);
             return deleted;
-        } catch (RuntimeException exception) {
-            PlatformAbilityDispatcher.deletionFailed(this, entity, context, node, DeletionMode.SOFT, exception);
-            throw exception;
-        }
+            } catch (RuntimeException exception) {
+                PlatformAbilityDispatcher.deletionFailed(this, entity, context, node, DeletionMode.SOFT, exception);
+                throw exception;
+            }
+        });
     }
 
     /**

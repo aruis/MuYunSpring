@@ -2,20 +2,26 @@ package net.ximatai.muyun.spring.ability.reference;
 
 /** Resolved reference lifecycle policy shared by static and dynamic models. */
 public record ReferenceIntegrityPolicy(
-        ReferenceTargetDeletionPolicy onTargetSoftDelete
+        ReferenceTargetUnavailablePolicy onTargetUnavailable
 ) {
     public static final ReferenceIntegrityPolicy DEFAULT = new ReferenceIntegrityPolicy(
-            ReferenceTargetDeletionPolicy.PRESERVE_HISTORY);
+            ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
 
     public ReferenceIntegrityPolicy {
-        onTargetSoftDelete = onTargetSoftDelete == null
-                ? ReferenceTargetDeletionPolicy.PRESERVE_HISTORY
-                : onTargetSoftDelete;
+        onTargetUnavailable = onTargetUnavailable == null
+                ? ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY
+                : onTargetUnavailable;
     }
 
     public static ReferenceIntegrityPolicy from(ReferenceIntegrity integrity) {
-        return integrity == null
-                ? DEFAULT
-                : new ReferenceIntegrityPolicy(integrity.onTargetSoftDelete());
+        if (integrity == null) {
+            return DEFAULT;
+        }
+        ReferenceTargetUnavailablePolicy unavailable = integrity.onTargetUnavailable();
+        if (unavailable == ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY
+                && integrity.onTargetSoftDelete() == ReferenceTargetDeletionPolicy.RESTRICT) {
+            unavailable = ReferenceTargetUnavailablePolicy.RESTRICT;
+        }
+        return new ReferenceIntegrityPolicy(unavailable);
     }
 }

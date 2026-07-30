@@ -7,6 +7,11 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionResource;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
@@ -34,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -284,10 +290,53 @@ class DynamicRelationRuntimeTest {
         ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
         verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture(), eq("id"));
-        assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
-        assertThat(where.getAllValues().get(0)).containsEntry("id", "invoice-1");
-        assertThat(where.getAllValues().get(1)).containsEntry("id", "line-1");
-        assertThat(body.getAllValues().get(1)).containsEntry("deleted", Boolean.TRUE);
+        assertThat(table.getAllValues()).containsExactly("app_invoice_line", "app_invoice");
+        assertThat(where.getAllValues().get(0)).containsEntry("id", "line-1");
+        assertThat(where.getAllValues().get(1)).containsEntry("id", "invoice-1");
+        assertThat(body.getAllValues().get(0)).containsEntry("deleted", Boolean.TRUE);
+    }
+
+    @Test
+    void shouldCascadeDynamicReferenceReferrersThroughRuntimeIndex() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(cascadeInvoiceModule());
+        DeletionContext context = DeletionContext.root(MODULE + ".invoice", "invoice-1");
+        DeletionNode node = DeletionNode.transientNode(new DeletionResource(MODULE + ".invoice", "invoice-1"));
+
+        runtime.cascadeReferenceTargetUnavailable(ReferenceTarget.of(MODULE, "invoice"), "invoice-1", context, node);
+
+        ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), table.capture(), anyMap(), anyMap(), eq("id"));
+        assertThat(table.getValue()).isEqualTo("app_invoice_line");
+    }
+
+    @Test
+    void shouldRebuildDynamicReferenceCascadeIndexAfterRefresh() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DeletionContext context = DeletionContext.root(MODULE + ".invoice", "invoice-1");
+        DeletionNode node = DeletionNode.transientNode(new DeletionResource(MODULE + ".invoice", "invoice-1"));
+
+        runtime.refresh(cascadeInvoiceModule());
+        runtime.cascadeReferenceTargetUnavailable(ReferenceTarget.of(MODULE, "invoice"), "invoice-1", context, node);
+
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_invoice_line"), anyMap(), anyMap(), eq("id"));
+    }
+
+    @Test
+    void shouldRestrictDynamicReferenceTargetWithoutCascadeSideEffect() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(restrictInvoiceModule());
+
+        assertThatThrownBy(() -> runtime.validateReferenceTargetDeletion(
+                ReferenceTarget.of(MODULE, "invoice"), "invoice-1"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot make reference target unavailable");
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -1063,6 +1112,26 @@ class DynamicRelationRuntimeTest {
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceTitle")
                         .withProjection("title", "invoiceDisplayTitle")))
+                .build();
+    }
+
+    private ModuleDefinition cascadeInvoiceModule() {
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId",
+                                ReferenceTarget.of(MODULE, "invoice"))
+                        .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
+                .build();
+    }
+
+    private ModuleDefinition restrictInvoiceModule() {
+        return ModuleDefinition.builder(MODULE, "Invoice")
+                .entities(List.of(invoiceEntity(), invoiceLineEntity()))
+                .relations(List.of())
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId",
+                                ReferenceTarget.of(MODULE, "invoice"))
+                        .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetUnavailablePolicy.RESTRICT))))
                 .build();
     }
 

@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.boot.reference;
 
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetProvider;
@@ -17,11 +20,29 @@ public final class DynamicReferenceDeletionGuard implements ReferenceDeletionGua
     }
 
     @Override
-    public void beforeSoftDelete(CrudAbility<?> targetAbility, EntityContract target) {
+    public void validateTargetUnavailable(CrudAbility<?> targetAbility, EntityContract target) {
         if (targetAbility == null || target == null || target.getId() == null || target.getId().isBlank()) {
             return;
         }
         runtime.validateReferenceTargetDeletion(targetOf(targetAbility), target.getId());
+    }
+
+    @Override
+    @Deprecated(since = "0.1", forRemoval = false)
+    public void beforeSoftDelete(CrudAbility<?> targetAbility, EntityContract target) {
+        validateTargetUnavailable(targetAbility, target);
+    }
+
+    @Override
+    public void cascadeTargetUnavailable(CrudAbility<?> targetAbility,
+                                         EntityContract target,
+                                         DeletionContext context,
+                                         DeletionNode node,
+                                         DeletionMode mode) {
+        if (targetAbility == null || target == null || target.getId() == null || target.getId().isBlank()) {
+            return;
+        }
+        runtime.cascadeReferenceTargetUnavailable(targetOf(targetAbility), target.getId(), context, node);
     }
 
     private ReferenceTarget targetOf(CrudAbility<?> ability) {

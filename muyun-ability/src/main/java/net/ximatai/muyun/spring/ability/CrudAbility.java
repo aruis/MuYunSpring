@@ -145,19 +145,24 @@ public interface CrudAbility<T extends EntityContract> {
         if (id == null || id.isBlank()) {
             return 0;
         }
-        DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
-                getModuleAlias(), id, deletionContext);
-        beforeDelete(id, context);
-        DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.DELETE, id);
-        return withTenantScope(mutationScope, () -> {
+        return PlatformAbilityDispatcher.inDeletionTransaction(() -> {
+            DeletionContext context = PlatformAbilityDispatcher.resolveDeletionContext(
+                    getModuleAlias(), id, deletionContext);
+            beforeDelete(id, context);
+            DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.DELETE, id);
+            return withTenantScope(mutationScope, () -> {
             T entity = selectActiveRaw(id);
             if (entity == null) {
                 return 0;
             }
             PlatformManagedMutationGuard.beforeDelete(this, entity);
             Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+            if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
+                throw new OptimisticLockException("record version conflict: " + id);
+            }
             DeletionNode node = PlatformAbilityDispatcher.deletionStarted(this, entity, context, DeletionMode.HARD);
             try {
+                PlatformAbilityDispatcher.beforeTargetUnavailable(this, entity, context, node, DeletionMode.HARD);
                 int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
                 if (deleted <= 0) {
                     throw new OptimisticLockException("record version conflict: " + id);
@@ -172,6 +177,7 @@ public interface CrudAbility<T extends EntityContract> {
                 PlatformAbilityDispatcher.deletionFailed(this, entity, context, node, DeletionMode.HARD, exception);
                 throw exception;
             }
+            });
         });
     }
 

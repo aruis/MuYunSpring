@@ -7,7 +7,7 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTargetDeletionPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
@@ -16,6 +16,11 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 @Setter
 @Table(name = "education_class_member", comment = "班级成员")
 public class ClassMember extends StandardEntity implements SortCapable {
+    @ReferenceTo(
+            moduleAlias = "education",
+            entityAlias = "classroom",
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.CASCADE_DELETE)
+    )
     @Column(name = "classroom_id", type = ColumnType.VARCHAR, length = 32, nullable = false)
     private String classroomId;
 
@@ -23,7 +28,7 @@ public class ClassMember extends StandardEntity implements SortCapable {
             moduleAlias = "education",
             entityAlias = "student",
             autoTitle = true,
-            integrity = @ReferenceIntegrity(onTargetSoftDelete = ReferenceTargetDeletionPolicy.RESTRICT)
+            integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT)
     )
     @Column(name = "student_id", type = ColumnType.VARCHAR, length = 32, nullable = false)
     private String studentId;
