@@ -15,6 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "platform_record_write_back_rule", comment = "Record write-back rule")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "triggerModuleAlias")
 public class RecordWriteBackRule extends StandardEnabledSortableEntity {
     @Indexed
     @Column(name = "trigger_module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false,

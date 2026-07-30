@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 @Getter
 @Setter
 @Table(name = "platform_dictionary_category", comment = "Platform dictionary category")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "applicationAlias")
 @TenantUniqueConstraint(fields = {"applicationAlias", "alias"})
 public class DictionaryCategory extends StandardEnabledTreeEntity {
     @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Application alias")

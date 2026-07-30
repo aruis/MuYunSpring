@@ -45,17 +45,6 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
     }
 
     @Override
-    public Criteria sortScope(DictionaryCategory category) {
-        return scopedTreeCriteria(category, "applicationAlias");
-    }
-
-    @Override
-    public void validateSortScope(DictionaryCategory left, DictionaryCategory right) {
-        validateTreeSortScopeByFields(left, right,
-                "Dictionary category sort can only move records within the same application", "applicationAlias");
-    }
-
-    @Override
     public List<DictionaryCategory> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
             rejectRootChildrenLookup("rootCategories(applicationAlias)");

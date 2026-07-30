@@ -47,18 +47,6 @@ public class PlatformFieldUiTypeFieldMappingService extends AbstractAbilityServi
         normalizeAndValidate(mapping);
     }
 
-    @Override
-    public Criteria sortScope(PlatformFieldUiTypeFieldMapping mapping) {
-        return Criteria.of().eq("fieldUiTypeAlias", mapping.getFieldUiTypeAlias());
-    }
-
-    @Override
-    public void validateSortScope(PlatformFieldUiTypeFieldMapping left, PlatformFieldUiTypeFieldMapping right) {
-        if (!Objects.equals(left.getFieldUiTypeAlias(), right.getFieldUiTypeAlias())) {
-            throw new PlatformException("Field UI type mapping sort can only move records within the same UI type");
-        }
-    }
-
     public List<PlatformFieldUiTypeFieldMapping> listByFieldUiTypeAliases(List<String> aliases) {
         if (aliases == null || aliases.isEmpty()) {
             return List.of();

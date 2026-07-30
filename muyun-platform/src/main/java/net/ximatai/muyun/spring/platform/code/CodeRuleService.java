@@ -210,21 +210,6 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         normalizeAndValidate(rule);
     }
 
-    @Override
-    public Criteria sortScope(CodeRule rule) {
-        return Criteria.of()
-                .eq("moduleAlias", rule.getModuleAlias())
-                .eq("entityAlias", rule.getEntityAlias());
-    }
-
-    @Override
-    public void validateSortScope(CodeRule left, CodeRule right) {
-        if (!Objects.equals(left.getModuleAlias(), right.getModuleAlias())
-                || !Objects.equals(left.getEntityAlias(), right.getEntityAlias())) {
-            throw new PlatformException("Code rule sort can only move records within the same business object");
-        }
-    }
-
     private void replaceSequencePolicy(CodeRule rule, CodeSequencePolicy incoming) {
         CodeSequencePolicy existing = sequencePolicyService.selectByRuleId(rule.getId());
         if (existing != null) {

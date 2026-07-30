@@ -90,7 +90,8 @@ class DataScopeAbilityTest {
             assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                     .containsExactly(new ReferenceOption(ownId, "Own"));
             assertThat(service.titles(java.util.List.of(ownId, othersId)))
-                    .containsExactlyEntriesOf(java.util.Map.of(ownId, "Own", othersId, "Others"));
+                    .hasSize(2)
+                    .containsAllEntriesOf(java.util.Map.of(ownId, "Own", othersId, "Others"));
         }
     }
 

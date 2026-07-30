@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 @Setter
 @Table(name = "platform_field_ui_type_attribute", comment = "Platform field UI type attribute")
 @CompositeIndex(columns = {"field_ui_type_alias", "attribute_alias"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "fieldUiTypeAlias")
 public class PlatformFieldUiTypeAttribute extends StandardSortableEntity {
     @Column(name = "field_ui_type_alias", type = ColumnType.VARCHAR, length = 64, nullable = false,
             comment = "Field UI type alias")

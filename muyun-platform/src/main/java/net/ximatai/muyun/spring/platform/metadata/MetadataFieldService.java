@@ -98,18 +98,6 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     }
 
     @Override
-    public Criteria sortScope(MetadataField field) {
-        return Criteria.of().eq("metadataId", field.getMetadataId());
-    }
-
-    @Override
-    public void validateSortScope(MetadataField left, MetadataField right) {
-        if (!java.util.Objects.equals(left.getMetadataId(), right.getMetadataId())) {
-            throw new PlatformException("Metadata field sort can only move records within the same metadata");
-        }
-    }
-
-    @Override
     public void afterInsert(String id, MetadataField field) {
         PlatformMetadataSchemaEnsureService schemaEnsureService = schemaEnsureService();
         if (schemaEnsureService != null) {

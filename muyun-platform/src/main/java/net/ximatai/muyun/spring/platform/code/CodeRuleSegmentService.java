@@ -38,18 +38,6 @@ public class CodeRuleSegmentService extends AbstractAbilityService<CodeRuleSegme
         normalizeAndValidate(segment);
     }
 
-    @Override
-    public Criteria sortScope(CodeRuleSegment segment) {
-        return Criteria.of().eq("ruleId", segment.getRuleId());
-    }
-
-    @Override
-    public void validateSortScope(CodeRuleSegment left, CodeRuleSegment right) {
-        if (!Objects.equals(left.getRuleId(), right.getRuleId())) {
-            throw new PlatformException("Code segment sort can only move records within the same rule");
-        }
-    }
-
     private void normalizeAndValidate(CodeRuleSegment segment) {
         if (segment.getRuleId() == null || segment.getRuleId().isBlank()) {
             throw new PlatformException("Code segment requires ruleId");

@@ -57,18 +57,6 @@ public class ModuleMetadataFieldAffectService extends AbstractAbilityService<Mod
     }
 
     @Override
-    public Criteria sortScope(ModuleMetadataFieldAffect affect) {
-        return Criteria.of().eq("moduleMetadataFieldId", affect.getModuleMetadataFieldId());
-    }
-
-    @Override
-    public void validateSortScope(ModuleMetadataFieldAffect left, ModuleMetadataFieldAffect right) {
-        if (!Objects.equals(left.getModuleMetadataFieldId(), right.getModuleMetadataFieldId())) {
-            throw new PlatformException("Module metadata field affect sort can only move records within the same field");
-        }
-    }
-
-    @Override
     public void afterChanged(ModuleMetadataFieldAffect affect) {
         if (runtimeRefreshCoordinator != null) {
             runtimeRefreshCoordinator.refreshByFieldAffect(affect);

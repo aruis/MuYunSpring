@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Getter
 @Setter
 @Table(name = "platform_metadata_field", comment = "Platform metadata field")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "metadataId")
 public class MetadataField extends StandardEnabledSortableEntity implements PlatformManagedCapable {
     @Column(name = "metadata_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata id")
     private String metadataId;

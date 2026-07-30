@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 @Getter
 @Setter
 @Table(name = "platform_record_generation_field_mapping", comment = "Record generation field mapping")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "objectMappingId")
 public class RecordGenerationFieldMapping extends StandardSortableEntity {
     @Indexed
     @Column(name = "object_mapping_id", type = ColumnType.VARCHAR, length = 32, nullable = false,

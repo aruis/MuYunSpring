@@ -90,18 +90,6 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
     }
 
     @Override
-    public Criteria sortScope(MetadataViewField viewField) {
-        return Criteria.of().eq("viewId", viewField.getViewId());
-    }
-
-    @Override
-    public void validateSortScope(MetadataViewField left, MetadataViewField right) {
-        if (!Objects.equals(left.getViewId(), right.getViewId())) {
-            throw new PlatformException("Metadata view field sort can only move records within the same view");
-        }
-    }
-
-    @Override
     public void afterChanged(MetadataViewField viewField) {
         if (runtimeRefreshCoordinator != null) {
             runtimeRefreshCoordinator.refreshByMetadataViewField(viewField);

@@ -14,6 +14,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "platform_record_generation_rule", comment = "Platform record generation rule")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "sourceModuleAlias")
 public class RecordGenerationRule extends StandardEnabledSortableEntity {
     @Indexed
     @Column(name = "source_module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false,

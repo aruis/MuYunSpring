@@ -90,18 +90,6 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         }
     }
 
-    @Override
-    public Criteria sortScope(PlatformUiConfigField field) {
-        return Criteria.of().eq("uiConfigId", field.getUiConfigId());
-    }
-
-    @Override
-    public void validateSortScope(PlatformUiConfigField left, PlatformUiConfigField right) {
-        if (!Objects.equals(left.getUiConfigId(), right.getUiConfigId())) {
-            throw new PlatformException("UI config field sort can only move records within the same UI config");
-        }
-    }
-
     public List<PlatformUiConfigField> listByUiConfigIds(List<String> uiConfigIds) {
         if (uiConfigIds == null || uiConfigIds.isEmpty()) {
             return List.of();

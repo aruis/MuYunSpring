@@ -17,6 +17,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "platform_code_rule", comment = "Platform code rule")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = {"moduleAlias", "entityAlias"})
 public class CodeRule extends StandardEnabledSortableEntity {
     @Indexed
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")

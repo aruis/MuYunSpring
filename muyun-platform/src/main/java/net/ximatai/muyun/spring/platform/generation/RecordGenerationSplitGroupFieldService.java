@@ -42,18 +42,6 @@ public class RecordGenerationSplitGroupFieldService extends AbstractAbilityServi
         normalizeAndValidate(groupField);
     }
 
-    @Override
-    public Criteria sortScope(RecordGenerationSplitGroupField groupField) {
-        return Criteria.of().eq("splitPolicyId", groupField.getSplitPolicyId());
-    }
-
-    @Override
-    public void validateSortScope(RecordGenerationSplitGroupField left, RecordGenerationSplitGroupField right) {
-        if (!Objects.equals(left.getSplitPolicyId(), right.getSplitPolicyId())) {
-            throw new PlatformException("Split group field sort can only move records within the same split policy");
-        }
-    }
-
     private void normalizeAndValidate(RecordGenerationSplitGroupField groupField) {
         if (groupField.getSplitPolicyId() == null || groupField.getSplitPolicyId().isBlank()) {
             throw new PlatformException("Split group field requires splitPolicyId");

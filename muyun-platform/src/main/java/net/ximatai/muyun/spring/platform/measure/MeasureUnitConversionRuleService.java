@@ -61,21 +61,17 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
     }
 
     @Override
-    public Criteria sortScope(MeasureUnitConversionRule rule) {
-        return Criteria.of()
-                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
-                .eq("applicationAlias", rule.getApplicationAlias())
-                .eq("scopeType", rule.getScopeType())
-                .eq("moduleAlias", rule.getModuleAlias())
-                .eq("contextObjectType", rule.getContextObjectType())
-                .eq("contextObjectId", rule.getContextObjectId());
-    }
-
-    @Override
-    public void validateSortScope(MeasureUnitConversionRule left, MeasureUnitConversionRule right) {
-        validateSortScopeByFields(left, right,
+    public net.ximatai.muyun.spring.ability.SortPartition<MeasureUnitConversionRule> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(rule -> Criteria.of()
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
+                        .eq("applicationAlias", rule.getApplicationAlias())
+                        .eq("scopeType", rule.getScopeType())
+                        .eq("moduleAlias", rule.getModuleAlias())
+                        .eq("contextObjectType", rule.getContextObjectType())
+                        .eq("contextObjectId", rule.getContextObjectId()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
                 "Measure unit conversion rule sort can only move records within the same tenant and scope",
-                "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId");
+                "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId"));
     }
 
     public List<MeasureUnitConversionRule> applicableRules(MeasureUnitConversionContext context) {

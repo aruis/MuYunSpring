@@ -127,20 +127,14 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     }
 
     @Override
-    public Criteria sortScope(MenuScheme scheme) {
-        return Criteria.of()
-                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
-                .eq("scopeType", scheme.getScopeType())
-                .eq("scopeId", scheme.getScopeId());
-    }
-
-    @Override
-    public void validateSortScope(MenuScheme left, MenuScheme right) {
-        if (!Objects.equals(left.getTenantId(), right.getTenantId())
-                || left.getScopeType() != right.getScopeType()
-                || !Objects.equals(left.getScopeId(), right.getScopeId())) {
-            throw new PlatformException("Menu scheme sort can only move records within the same scope");
-        }
+    public net.ximatai.muyun.spring.ability.SortPartition<MenuScheme> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(scheme -> Criteria.of()
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
+                        .eq("scopeType", scheme.getScopeType())
+                        .eq("scopeId", scheme.getScopeId()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
+                        "Menu scheme sort can only move records within the same scope",
+                        "tenantId", "scopeType", "scopeId"));
     }
 
     private void normalizeAndValidate(MenuScheme scheme) {

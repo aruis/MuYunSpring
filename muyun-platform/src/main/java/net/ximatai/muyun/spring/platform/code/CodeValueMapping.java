@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Getter
 @Setter
 @Table(name = "platform_code_value_mapping", comment = "Platform code value mapping")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "segmentId")
 public class CodeValueMapping extends StandardEnabledSortableEntity {
     @Indexed
     @Column(name = "segment_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Code segment id")

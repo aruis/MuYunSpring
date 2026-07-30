@@ -70,18 +70,6 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
     }
 
     @Override
-    public Criteria sortScope(PlatformModuleAction action) {
-        return Criteria.of().eq("moduleAlias", action.getModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(PlatformModuleAction left, PlatformModuleAction right) {
-        if (!Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
-            throw new PlatformException("Module action sort can only move records within the same module");
-        }
-    }
-
-    @Override
     public void afterChanged(PlatformModuleAction action) {
         PlatformModule module = action == null || action.getModuleAlias() == null
                 ? null

@@ -48,8 +48,8 @@
 
 | 能力 | 核心解决问题 | 主要依赖 | 注意点 |
 | --- | --- | --- | --- |
-| `SortAbility` | 统一排序字段、完整 scope 重排、相邻移动 | `SortCapable.sortOrder` | `reorder` 要覆盖完整排序 scope，避免局部重排造成数据不一致；非树业务可用 `sortScopeByFields` / `validateSortScopeByFields` 声明排序 scope。 |
-| `TreeAbility` | 统一树形父子关系、根节点、子节点、祖先后代、环保护 | `TreeCapable.parentId`，天然包含排序能力 | 树天然支持同父级排序；有业务 scope 的树应使用显式 scope 查询、`scopedTreeCriteria`、`validateTreeSortScopeByFields` 和 scoped `moveInTree`。 |
+| `SortAbility` | 统一排序字段、完整分区重排、相邻移动 | `SortCapable.sortOrder` | `reorder` 必须覆盖完整排序分区；静态模型以 `@SortPartitionBy` 一次声明分区字段，动态实体以 `sortPartitionFields` 声明。查询范围与跨分区校验由同一 `SortPartition` 派生。 |
+| `TreeAbility` | 统一树形父子关系、根节点、子节点、祖先后代、环保护 | `TreeCapable.parentId`，天然包含排序能力 | 树天然支持同父级排序；`parentId` 是隐式排序分区键，静态/动态声明的业务分区字段会自动与它组合。 |
 
 ## 引用与聚合
 

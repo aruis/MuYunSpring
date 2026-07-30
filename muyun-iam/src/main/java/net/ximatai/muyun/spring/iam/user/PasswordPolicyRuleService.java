@@ -71,16 +71,6 @@ public class PasswordPolicyRuleService extends AbstractAbilityService<PasswordPo
         normalizeAndValidate(rule);
     }
 
-    @Override
-    public Criteria sortScope(PasswordPolicyRule rule) {
-        return Criteria.of().eq("scopeKey", scopeKey(rule));
-    }
-
-    @Override
-    public void validateSortScope(PasswordPolicyRule left, PasswordPolicyRule right) {
-        validateSortScopeByFields(left, right,
-                "password policy rules can only move within the same scope", "scopeKey");
-    }
 
     public List<PasswordPolicyRule> activeGlobalRules() {
         List<PasswordPolicyRule> rules = list(Criteria.of()

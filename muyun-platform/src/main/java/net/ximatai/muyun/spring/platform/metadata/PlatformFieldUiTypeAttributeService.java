@@ -50,18 +50,6 @@ public class PlatformFieldUiTypeAttributeService extends AbstractAbilityService<
         normalizeAndValidate(attribute);
     }
 
-    @Override
-    public Criteria sortScope(PlatformFieldUiTypeAttribute attribute) {
-        return Criteria.of().eq("fieldUiTypeAlias", attribute.getFieldUiTypeAlias());
-    }
-
-    @Override
-    public void validateSortScope(PlatformFieldUiTypeAttribute left, PlatformFieldUiTypeAttribute right) {
-        if (!Objects.equals(left.getFieldUiTypeAlias(), right.getFieldUiTypeAlias())) {
-            throw new PlatformException("Field UI type attribute sort can only move records within the same UI type");
-        }
-    }
-
     public List<PlatformFieldUiTypeAttribute> listByFieldUiTypeAliases(List<String> aliases) {
         if (aliases == null || aliases.isEmpty()) {
             return List.of();

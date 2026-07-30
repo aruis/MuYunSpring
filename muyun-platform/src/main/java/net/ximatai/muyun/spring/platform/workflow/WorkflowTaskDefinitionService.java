@@ -30,11 +30,6 @@ public class WorkflowTaskDefinitionService extends AbstractAbilityService<Workfl
         normalizeAndValidate(taskDefinition);
     }
 
-    @Override
-    public Criteria sortScope(WorkflowTaskDefinition taskDefinition) {
-        return Criteria.of().eq("moduleAlias", taskDefinition.getModuleAlias());
-    }
-
     private void normalizeAndValidate(WorkflowTaskDefinition taskDefinition) {
         taskDefinition.setModuleAlias(PlatformNameRules.requireModuleAlias(taskDefinition.getModuleAlias()));
         taskDefinition.setAlias(PlatformNameRules.requireIdentifier(taskDefinition.getAlias(), "workflowTaskAlias"));

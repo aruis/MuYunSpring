@@ -37,11 +37,6 @@ public class RecordWriteBackFieldRuleService extends AbstractAbilityService<Reco
         normalizeAndValidate(rule);
     }
 
-    @Override
-    public Criteria sortScope(RecordWriteBackFieldRule rule) {
-        return Criteria.of().eq("ruleId", rule.getRuleId());
-    }
-
     private void normalizeAndValidate(RecordWriteBackFieldRule rule) {
         if (rule == null) {
             throw new PlatformException("Record write-back field rule must not be null");

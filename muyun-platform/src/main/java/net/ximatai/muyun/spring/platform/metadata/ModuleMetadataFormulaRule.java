@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Setter
 @Table(name = "platform_module_metadata_formula_rule", comment = "Module metadata formula rule")
 @CompositeIndex(columns = {"relation_id", "alias"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "relationId")
 public class ModuleMetadataFormulaRule extends StandardEnabledSortableEntity {
     @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module metadata relation id")
     private String relationId;

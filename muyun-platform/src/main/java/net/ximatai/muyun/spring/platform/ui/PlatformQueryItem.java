@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 @Getter
 @Setter
 @Table(name = "platform_query_item", comment = "Platform query item")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "queryTemplateId")
 public class PlatformQueryItem extends StandardEnabledTreeEntity {
     @Column(name = "query_template_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Query template id")

@@ -65,11 +65,6 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         rejectChanged(existing, fieldType, "Field type alias", PlatformFieldType::getAlias);
     }
 
-    @Override
-    public Criteria sortScope(PlatformFieldType fieldType) {
-        return Criteria.of();
-    }
-
     public PlatformFieldType requireFieldType(String alias) {
         String validAlias = PlatformNameRules.requireIdentifier(alias, "fieldTypeAlias");
         PlatformFieldType fieldType = findOne(Criteria.of().eq("alias", validAlias));

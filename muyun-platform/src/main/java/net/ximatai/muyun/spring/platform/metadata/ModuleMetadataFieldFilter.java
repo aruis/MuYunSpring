@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 @Getter
 @Setter
 @Table(name = "platform_module_metadata_field_filter", comment = "Module metadata field reference filter")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "moduleMetadataFieldId")
 public class ModuleMetadataFieldFilter extends StandardSortableEntity {
     @Column(name = "module_metadata_field_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Module metadata field id")

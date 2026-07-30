@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
@@ -16,6 +17,7 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 @Getter
 @Setter
 @Table(name = "iam_department", comment = "Department")
+@SortPartitionBy(fields = "organizationId", message = "Department sort can only move records within the same organization")
 @TenantUniqueConstraint(fields = {"organizationId", "code"})
 @InitialDataFields(managed = {"organizationId", "code"}, operator = {"title", "enabled", "sortOrder", "parentId"})
 public class Department extends StandardEnabledTreeEntity {

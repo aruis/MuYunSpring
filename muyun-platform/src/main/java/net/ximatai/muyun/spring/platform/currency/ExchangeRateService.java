@@ -62,19 +62,15 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
     }
 
     @Override
-    public Criteria sortScope(ExchangeRate rate) {
-        return Criteria.of()
-                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
-                .eq("fromCurrencyCode", rate.getFromCurrencyCode())
-                .eq("toCurrencyCode", rate.getToCurrencyCode())
-                .eq("rateTypeCode", rate.getRateTypeCode());
-    }
-
-    @Override
-    public void validateSortScope(ExchangeRate left, ExchangeRate right) {
-        validateSortScopeByFields(left, right,
+    public net.ximatai.muyun.spring.ability.SortPartition<ExchangeRate> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(rate -> Criteria.of()
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
+                        .eq("fromCurrencyCode", rate.getFromCurrencyCode())
+                        .eq("toCurrencyCode", rate.getToCurrencyCode())
+                        .eq("rateTypeCode", rate.getRateTypeCode()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
                 "Exchange rate sort can only move records within the same currency pair and rate type",
-                "tenantId", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode");
+                "tenantId", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode"));
     }
 
     public ExchangeRate resolveEffectiveRate(String fromCurrencyCode,

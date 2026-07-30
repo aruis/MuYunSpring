@@ -233,17 +233,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .build();
     }
 
-    @Override
-    public Criteria sortScope(Role entity) {
-        return sortScopeByFields(entity, "ownerScopeType", "ownerScopeKey");
-    }
-
-    @Override
-    public void validateSortScope(Role left, Role right) {
-        validateSortScopeByFields(left, right,
-                "role sort scope must stay inside the same owner scope",
-                "ownerScopeType", "ownerScopeKey");
-    }
 
     @Override
     public void normalizeBeforeMutation(Role role) {

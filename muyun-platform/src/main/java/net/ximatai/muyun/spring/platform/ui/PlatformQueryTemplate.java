@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Setter
 @Table(name = "platform_query_template", comment = "Platform query template")
 @CompositeIndex(columns = {"module_alias", "alias"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "moduleAlias")
 public class PlatformQueryTemplate extends StandardEnabledSortableEntity {
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String moduleAlias;

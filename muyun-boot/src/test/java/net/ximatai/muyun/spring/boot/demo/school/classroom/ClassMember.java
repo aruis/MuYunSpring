@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
@@ -15,6 +16,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 @Getter
 @Setter
 @Table(name = "education_class_member", comment = "班级成员")
+@SortPartitionBy(fields = "classroomId")
 public class ClassMember extends StandardEntity implements SortCapable {
     @ReferenceTo(
             moduleAlias = "education",

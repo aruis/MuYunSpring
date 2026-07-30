@@ -106,11 +106,6 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     }
 
     @Override
-    public Criteria sortScope(ModuleMetadataField moduleField) {
-        return Criteria.of().eq("relationId", moduleField.getRelationId());
-    }
-
-    @Override
     @Transactional
     public String insert(ModuleMetadataField moduleField) {
         return SoftDeleteAbility.super.insert(moduleField);
@@ -120,13 +115,6 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     @Transactional
     public int update(ModuleMetadataField moduleField) {
         return SoftDeleteAbility.super.update(moduleField);
-    }
-
-    @Override
-    public void validateSortScope(ModuleMetadataField left, ModuleMetadataField right) {
-        if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
-            throw new PlatformException("Module metadata field sort can only move records within the same relation");
-        }
     }
 
     @Override

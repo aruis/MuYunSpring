@@ -54,18 +54,6 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
         rejectChanged(existing, uiSet, "UI set alias", PlatformUiSet::getAlias);
     }
 
-    @Override
-    public Criteria sortScope(PlatformUiSet uiSet) {
-        return Criteria.of().eq("moduleAlias", uiSet.getModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(PlatformUiSet left, PlatformUiSet right) {
-        if (!Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
-            throw new PlatformException("UI set sort can only move records within the same module");
-        }
-    }
-
     public PlatformUiSet requireUiSet(String id) {
         PlatformUiSet uiSet = id == null || id.isBlank() ? null : select(id);
         if (uiSet == null) {

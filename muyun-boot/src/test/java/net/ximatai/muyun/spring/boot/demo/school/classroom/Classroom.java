@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.child.ChildRef;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "education_classroom", comment = "班级")
+@SortPartitionBy(fields = "academicYear")
 public class Classroom extends StandardSortableEntity {
     @Column(name = "class_code", type = ColumnType.VARCHAR, length = 32, nullable = false)
     private String classCode;

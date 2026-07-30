@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
@@ -62,7 +63,7 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, Metadata.class, java.util.List.of("id", "applicationAlias", "alias", "schemaName", "tableName", "dataScopeEnabled", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, Metadata.class, java.util.List.of("id", "applicationAlias", "alias", "schemaName", "tableName", "dataScopeEnabled", "sortPartitionFields", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -74,17 +75,6 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     @Override
     public void beforeUpdate(Metadata metadata) {
         normalizeAndValidate(metadata);
-    }
-
-    @Override
-    public Criteria sortScope(Metadata metadata) {
-        return sortScopeByFields(metadata, "applicationAlias");
-    }
-
-    @Override
-    public void validateSortScope(Metadata left, Metadata right) {
-        validateSortScopeByFields(left, right,
-                "Metadata sort can only move records within the same application", "applicationAlias");
     }
 
     @Override
@@ -134,6 +124,13 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
         PlatformNameRules.requireDatabaseName(metadata.getTableName(), "tableName");
         if (metadata.getDataScopeEnabled() == null) {
             metadata.setDataScopeEnabled(Boolean.FALSE);
+        }
+        if (metadata.getSortPartitionFields() != null) {
+            LinkedHashSet<String> fields = new LinkedHashSet<>();
+            for (String fieldName : metadata.getSortPartitionFields()) {
+                fields.add(PlatformNameRules.requireIdentifier(fieldName, "sortPartitionField"));
+            }
+            metadata.setSortPartitionFields(fields);
         }
         rejectDuplicateMetadataAlias(metadata);
         rejectDuplicatePhysicalTable(metadata);

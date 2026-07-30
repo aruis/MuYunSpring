@@ -8,10 +8,14 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
+
+import java.util.Set;
 
 @Getter
 @Setter
 @Table(name = "platform_metadata", comment = "Platform metadata")
+@SortPartitionBy(fields = "applicationAlias")
 public class Metadata extends StandardEnabledSortableEntity {
     @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Application alias")
     private String applicationAlias;
@@ -28,4 +32,7 @@ public class Metadata extends StandardEnabledSortableEntity {
     @Column(name = "data_scope_enabled", type = ColumnType.BOOLEAN, comment = "Data scope enabled",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean dataScopeEnabled = Boolean.FALSE;
+
+    @Column(name = "sort_partition_fields", type = ColumnType.JSON_SET, comment = "Sort partition fields")
+    private Set<String> sortPartitionFields;
 }

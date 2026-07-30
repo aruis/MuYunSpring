@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 @Getter
 @Setter
 @Table(name = "platform_module_metadata_field_affect", comment = "Module metadata field reference affect")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "moduleMetadataFieldId")
 public class ModuleMetadataFieldAffect extends StandardSortableEntity {
     @Column(name = "module_metadata_field_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Module metadata field id")

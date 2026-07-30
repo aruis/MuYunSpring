@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.model.constraint.StaticTenantUniqueConstraints;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -36,8 +37,14 @@ public class StaticEntityDefinitionCompiler {
                 fields(modelClass),
                 Set.of(net.ximatai.muyun.spring.common.platform.EntityCapability.CRUD),
                 List.of(),
-                StaticTenantUniqueConstraints.resolve(modelClass)
+                StaticTenantUniqueConstraints.resolve(modelClass),
+                sortPartitionFields(modelClass)
         );
+    }
+
+    private List<String> sortPartitionFields(Class<?> modelClass) {
+        SortPartitionBy partition = modelClass.getAnnotation(SortPartitionBy.class);
+        return partition == null ? List.of() : List.of(partition.fields());
     }
 
     private String tableName(Table table, Class<?> modelClass) {
