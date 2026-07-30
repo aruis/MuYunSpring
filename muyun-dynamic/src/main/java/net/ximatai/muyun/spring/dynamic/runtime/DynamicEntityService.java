@@ -522,7 +522,7 @@ public class DynamicEntityService implements
     private Criteria sortCriteria(DynamicRecord record) {
         Criteria scope;
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            scope = treeRuntime().sortScope(new DynamicTreeRecord(record));
+            scope = Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, record.parentId());
         } else {
             scope = Criteria.of();
         }
@@ -541,8 +541,9 @@ public class DynamicEntityService implements
 
             @Override
             public void requireSamePartition(DynamicRecord left, DynamicRecord right) {
-                if (dao.getEntity().supports(EntityCapability.TREE)) {
-                    treeRuntime().validateSortScope(new DynamicTreeRecord(left), new DynamicTreeRecord(right));
+                if (dao.getEntity().supports(EntityCapability.TREE)
+                        && !SortAbility.sameValue(left.parentId(), right.parentId())) {
+                    throw new PlatformException("Tree sort can only move records within the same parent");
                 }
                 for (String fieldName : dao.getEntity().sortPartitionFields()) {
                     if (!SortAbility.sameValue(left.getValue(fieldName), right.getValue(fieldName))) {
