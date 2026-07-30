@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 
 @Getter
 @Setter
+@SortPartitionBy(fields = "invoiceId")
 final class DemoInvoiceLine extends StandardSortableEntity {
     private String invoiceId;
 

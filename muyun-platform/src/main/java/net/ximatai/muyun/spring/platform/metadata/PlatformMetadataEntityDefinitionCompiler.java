@@ -51,7 +51,9 @@ public class PlatformMetadataEntityDefinitionCompiler {
                 metadata.getTitle(),
                 fields,
                 capabilities(metadata, fields),
-                List.of()
+                List.of(),
+                List.of(),
+                metadata.getSortPartitionFields() == null ? List.of() : List.copyOf(metadata.getSortPartitionFields())
         );
     }
 

@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
@@ -19,6 +20,7 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 @Getter
 @Setter
 @Table(name = "iam_employee", comment = "Employee")
+@SortPartitionBy(fields = {"organizationId", "departmentId"}, message = "Employee sort can only move records within the same department")
 @TenantUniqueConstraint(fields = {"organizationId", "employeeNo"})
 @InitialDataFields(
         managed = {"organizationId", "departmentId", "employeeNo"},

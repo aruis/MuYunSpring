@@ -75,18 +75,6 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
     }
 
     @Override
-    public Criteria sortScope(ModuleMetadataFormulaRule rule) {
-        return Criteria.of().eq("relationId", rule.getRelationId());
-    }
-
-    @Override
-    public void validateSortScope(ModuleMetadataFormulaRule left, ModuleMetadataFormulaRule right) {
-        if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
-            throw new PlatformException("Metadata formula rule sort can only move records within the same relation");
-        }
-    }
-
-    @Override
     public void afterChanged(ModuleMetadataFormulaRule rule) {
         if (runtimeRefreshCoordinator != null) {
             runtimeRefreshCoordinator.refreshByFormulaRule(rule);

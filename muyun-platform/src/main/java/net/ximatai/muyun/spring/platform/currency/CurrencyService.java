@@ -58,14 +58,11 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
     }
 
     @Override
-    public Criteria sortScope(Currency currency) {
-        return Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId());
-    }
-
-    @Override
-    public void validateSortScope(Currency left, Currency right) {
-        validateSortScopeByFields(left, right,
-                "Currency sort can only move records within the same tenant scope", "tenantId");
+    public net.ximatai.muyun.spring.ability.SortPartition<Currency> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(
+                currency -> Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
+                        "Currency sort can only move records within the same tenant scope", "tenantId"));
     }
 
     public Currency resolveCurrency(String currencyCode) {

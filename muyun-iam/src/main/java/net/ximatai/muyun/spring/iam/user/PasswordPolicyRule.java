@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
@@ -14,6 +15,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 @Getter
 @Setter
 @Table(name = "iam_password_policy_rule", comment = "Password policy regex rule")
+@SortPartitionBy(fields = "scopeKey")
 @InitialDataFields(
         managed = {"scopeType", "scopeId", "scopeKey", "pattern", "message", "description"},
         operator = {"title", "enabled", "sortOrder"}

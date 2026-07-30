@@ -76,15 +76,12 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     }
 
     @Override
-    default Criteria sortScope(T entity) {
-        return Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, entity.getParentId());
-    }
-
-    @Override
-    default void validateSortScope(T left, T right) {
-        if (!SortAbility.sameValue(left.getParentId(), right.getParentId())) {
-            throw new PlatformException("Tree sort can only move records within the same parent");
-        }
+    default SortPartition<T> sortPartition() {
+        return SortPartitions.compose(
+                SortPartitions.byFieldsWithMessage("Tree sort can only move records within the same parent",
+                        PlatformAbilityFields.TREE_PARENT_FIELD),
+                SortPartitions.fromModel(modelClass())
+        );
     }
 
     default void validateTreeSortScopeByFields(T left, T right, String message, String... fieldNames) {

@@ -43,11 +43,6 @@ public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDe
         normalizeAndValidate(definition);
     }
 
-    @Override
-    public Criteria sortScope(WorkflowDefinition definition) {
-        return Criteria.of().eq("moduleAlias", definition.getModuleAlias());
-    }
-
     private void normalizeAndValidate(WorkflowDefinition definition) {
         definition.setApplicationAlias(PlatformNameRules.requireApplicationAlias(definition.getApplicationAlias()));
         definition.setModuleAlias(PlatformNameRules.requireModuleAlias(definition.getModuleAlias()));

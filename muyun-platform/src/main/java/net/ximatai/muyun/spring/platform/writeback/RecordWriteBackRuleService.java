@@ -107,18 +107,6 @@ public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWri
         normalizeAndValidate(rule);
     }
 
-    @Override
-    public Criteria sortScope(RecordWriteBackRule rule) {
-        return Criteria.of().eq("triggerModuleAlias", rule.getTriggerModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(RecordWriteBackRule left, RecordWriteBackRule right) {
-        if (!Objects.equals(left.getTriggerModuleAlias(), right.getTriggerModuleAlias())) {
-            throw new PlatformException("Write-back rule sort can only move records within the same trigger module");
-        }
-    }
-
     private void replaceChildren(RecordWriteBackRule rule,
                                  List<RecordWriteBackMatchRule> matchRules,
                                  List<RecordWriteBackFieldRule> fieldRules) {

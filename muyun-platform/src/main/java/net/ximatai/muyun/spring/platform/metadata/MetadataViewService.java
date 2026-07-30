@@ -64,18 +64,6 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
     }
 
     @Override
-    public Criteria sortScope(MetadataView view) {
-        return Criteria.of().eq("relationId", view.getRelationId());
-    }
-
-    @Override
-    public void validateSortScope(MetadataView left, MetadataView right) {
-        if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
-            throw new PlatformException("Metadata view sort can only move records within the same relation");
-        }
-    }
-
-    @Override
     public void afterChanged(MetadataView view) {
         if (runtimeRefreshCoordinator != null) {
             runtimeRefreshCoordinator.refreshByMetadataView(view);

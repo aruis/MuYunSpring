@@ -1429,8 +1429,8 @@ public class DynamicRecordService {
         if (moving == null || target == null) {
             return recordIds;
         }
-        service.validateSortScope(moving, target);
-        service.sortedList(service.sortScope(moving)).stream()
+        service.sortPartition().requireSamePartition(moving, target);
+        service.sortedList(service.sortPartition().criteriaFor(moving)).stream()
                 .map(DynamicRecord::getId)
                 .forEach(recordIds::add);
         return recordIds;

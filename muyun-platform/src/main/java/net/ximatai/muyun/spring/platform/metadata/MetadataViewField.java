@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 @Setter
 @Table(name = "platform_metadata_view_field", comment = "Metadata view field")
 @CompositeIndex(columns = {"view_id", "metadata_field_id"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "viewId")
 public class MetadataViewField extends StandardEnabledSortableEntity {
     @Column(name = "view_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata view id")
     private String viewId;

@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
@@ -14,6 +15,7 @@ import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 @Getter
 @Setter
 @Table(name = "iam_position", comment = "Position")
+@SortPartitionBy(fields = "categoryId", message = "Position sort can only move records within the same category")
 @TenantUniqueConstraint(fields = "code")
 public class Position extends StandardEnabledSortableEntity {
     @Column(name = "category_id", type = ColumnType.VARCHAR, length = 32, nullable = false,

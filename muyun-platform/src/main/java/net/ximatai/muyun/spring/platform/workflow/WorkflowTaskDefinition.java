@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 @Setter
 @Table(name = "platform_workflow_task_definition", comment = "Workflow task definition")
 @TenantUniqueConstraint(fields = {"moduleAlias", "alias"})
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "moduleAlias")
 public class WorkflowTaskDefinition extends StandardEnabledSortableEntity {
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String moduleAlias;

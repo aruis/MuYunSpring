@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 @Getter
 @Setter
 @Table(name = "platform_record_write_back_field_rule", comment = "Record write-back field rule")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "ruleId")
 public class RecordWriteBackFieldRule extends StandardSortableEntity {
     @Indexed
     @Column(name = "rule_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Rule id")

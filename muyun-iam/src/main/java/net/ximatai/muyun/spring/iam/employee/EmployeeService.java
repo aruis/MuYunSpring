@@ -306,17 +306,6 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         return text.isBlank() ? null : text;
     }
 
-    @Override
-    public Criteria sortScope(Employee employee) {
-        return sortScopeByFields(employee, "organizationId", "departmentId");
-    }
-
-    @Override
-    public void validateSortScope(Employee left, Employee right) {
-        validateSortScopeByFields(left, right,
-                "Employee sort can only move records within the same department",
-                "organizationId", "departmentId");
-    }
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();

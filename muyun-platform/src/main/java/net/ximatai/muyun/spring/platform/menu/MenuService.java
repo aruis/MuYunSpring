@@ -155,16 +155,14 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     @Override
-    public Criteria sortScope(Menu menu) {
-        return scopedTreeCriteria(schemeScope(menu.getSchemeId()), menu.getParentId());
-    }
-
-    @Override
-    public void validateSortScope(Menu left, Menu right) {
-        if (!Objects.equals(left.getSchemeId(), right.getSchemeId())) {
-            throw new PlatformException("Menu sort can only move records within the same scheme");
-        }
-        TreeAbility.super.validateSortScope(left, right);
+    public net.ximatai.muyun.spring.ability.SortPartition<Menu> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(
+                menu -> scopedTreeCriteria(schemeScope(menu.getSchemeId()), menu.getParentId()),
+                net.ximatai.muyun.spring.ability.SortPartitions.compose(
+                        net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
+                                "Menu sort can only move records within the same scheme", "schemeId"),
+                        net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
+                                "Tree sort can only move records within the same parent", "parentId")));
     }
 
     @Override

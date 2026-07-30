@@ -4,9 +4,12 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.model.constraint.StaticTenantUniqueConstraints;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -33,11 +36,27 @@ public class StaticEntityDefinitionCompiler {
                 EntityDefinition.DEFAULT_SCHEMA_NAME,
                 table.name(),
                 entityName == null || entityName.isBlank() ? tableName(table, modelClass) : entityName.trim(),
-                fields(modelClass),
-                Set.of(net.ximatai.muyun.spring.common.platform.EntityCapability.CRUD),
+                fields(modelClass, hasSortPartition(modelClass)),
+                capabilities(modelClass),
                 List.of(),
-                StaticTenantUniqueConstraints.resolve(modelClass)
+                StaticTenantUniqueConstraints.resolve(modelClass),
+                sortPartitionFields(modelClass)
         );
+    }
+
+    private List<String> sortPartitionFields(Class<?> modelClass) {
+        SortPartitionBy partition = modelClass.getAnnotation(SortPartitionBy.class);
+        return partition == null ? List.of() : List.of(partition.fields());
+    }
+
+    private boolean hasSortPartition(Class<?> modelClass) {
+        return !sortPartitionFields(modelClass).isEmpty();
+    }
+
+    private Set<EntityCapability> capabilities(Class<?> modelClass) {
+        return sortPartitionFields(modelClass).isEmpty()
+                ? Set.of(EntityCapability.CRUD)
+                : Set.of(EntityCapability.CRUD, EntityCapability.SORT);
     }
 
     private String tableName(Table table, Class<?> modelClass) {
@@ -47,7 +66,7 @@ public class StaticEntityDefinitionCompiler {
         return modelClass.getSimpleName();
     }
 
-    private List<FieldDefinition> fields(Class<?> modelClass) {
+    private List<FieldDefinition> fields(Class<?> modelClass, boolean sortable) {
         List<FieldDefinition> fields = new ArrayList<>();
         for (Field field : declaredFields(modelClass)) {
             Column column = field.getAnnotation(Column.class);
@@ -56,6 +75,10 @@ public class StaticEntityDefinitionCompiler {
             }
             String columnName = columnName(field, column);
             if (isPlatformManagedField(field.getName(), columnName)) {
+                continue;
+            }
+            if (PlatformAbilityFields.SORT_FIELD.equals(field.getName())) {
+                fields.add(FieldDefinition.sortOrder());
                 continue;
             }
             FieldType fieldType = fieldType(column.type());
@@ -78,6 +101,9 @@ public class StaticEntityDefinitionCompiler {
             definition = StaticMeasureUnitFieldDefinitionCompiler.compile(definition, field);
             definition = StaticMoneyFieldDefinitionCompiler.compile(definition, field);
             fields.add(definition);
+        }
+        if (sortable && fields.stream().noneMatch(field -> field.fieldName().equals("sortOrder"))) {
+            fields.add(FieldDefinition.sortOrder());
         }
         return List.copyOf(fields);
     }

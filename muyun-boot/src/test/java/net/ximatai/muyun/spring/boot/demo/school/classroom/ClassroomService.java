@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.boot.demo.school.classroom;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
@@ -38,16 +37,6 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
     @Override
     public String getDeletionEntityAlias() {
         return "classroom";
-    }
-
-    @Override
-    public Criteria sortScope(Classroom entity) {
-        return sortScopeByFields(entity, "academicYear");
-    }
-
-    @Override
-    public void validateSortScope(Classroom left, Classroom right) {
-        validateSortScopeByFields(left, right, "classrooms must stay in one academic year", "academicYear");
     }
 
     @Override

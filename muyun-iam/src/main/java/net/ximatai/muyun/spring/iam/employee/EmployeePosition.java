@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -16,6 +17,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 @Getter
 @Setter
 @Table(name = "iam_employee_position", comment = "Employee position")
+@SortPartitionBy(fields = "employeeId", message = "Employee position sort can only move records within the same employee")
 @CompositeIndex(columns = {"tenant_id", "employee_id", "organization_id", "department_id", "position_id"},
         unique = true)
 public class EmployeePosition extends StandardEntity implements EnabledCapable, SortCapable {

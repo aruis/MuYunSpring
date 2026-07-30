@@ -123,6 +123,7 @@ public class ModuleDefinitionValidator {
             validateMoney(entity, field, fields);
         }
         validateTenantUniqueConstraints(entity, fields);
+        validateSortPartition(entity, fields);
         if (!entity.supports(EntityCapability.CRUD)) {
             throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.alias());
         }
@@ -155,6 +156,27 @@ public class ModuleDefinitionValidator {
         }
         FieldCompanionRules.validateEntity(entity);
         validateFormulaRules(entity);
+    }
+
+    private void validateSortPartition(EntityDefinition entity, List<FieldDefinition> fields) {
+        if (entity.sortPartitionFields().isEmpty()) {
+            return;
+        }
+        if (!entity.supports(EntityCapability.SORT)) {
+            throw new ModuleDefinitionException("sort partition requires SORT capability: " + entity.alias());
+        }
+        Set<String> declared = new HashSet<>();
+        for (String fieldName : entity.sortPartitionFields()) {
+            requireFieldName(fieldName, "sort partition field");
+            if (!declared.add(fieldName)) {
+                throw new ModuleDefinitionException("duplicate sort partition field: " + entity.alias() + "." + fieldName);
+            }
+            boolean physical = fields.stream().anyMatch(field -> field.fieldName().equals(fieldName) && field.isPhysical());
+            if (!physical) {
+                throw new ModuleDefinitionException("sort partition requires physical field: "
+                        + entity.alias() + "." + fieldName);
+            }
+        }
     }
 
     private void validateTenantUniqueConstraints(EntityDefinition entity, List<FieldDefinition> fields) {

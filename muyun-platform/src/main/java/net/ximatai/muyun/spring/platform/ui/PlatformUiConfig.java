@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Setter
 @Table(name = "platform_ui_config", comment = "Platform low-code UI config")
 @CompositeIndex(columns = {"ui_set_id", "client_type"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "uiSetId")
 public class PlatformUiConfig extends StandardEnabledSortableEntity {
     @Column(name = "ui_set_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "UI set id")
     private String uiSetId;

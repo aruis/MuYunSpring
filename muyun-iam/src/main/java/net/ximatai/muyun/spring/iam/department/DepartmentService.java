@@ -97,16 +97,6 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
         requireActiveOrganization(department.getOrganizationId());
     }
 
-    @Override
-    public Criteria sortScope(Department department) {
-        return scopedTreeCriteria(department, "organizationId");
-    }
-
-    @Override
-    public void validateSortScope(Department left, Department right) {
-        validateTreeSortScopeByFields(left, right,
-                "Department sort can only move records within the same organization", "organizationId");
-    }
 
     @Override
     public void validateTreePlacement(Department department) {

@@ -77,16 +77,6 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
                         "该职员已存在相同任职"));
     }
 
-    @Override
-    public Criteria sortScope(EmployeePosition relation) {
-        return sortScopeByFields(relation, "employeeId");
-    }
-
-    @Override
-    public void validateSortScope(EmployeePosition left, EmployeePosition right) {
-        validateSortScopeByFields(left, right,
-                "Employee position sort can only move records within the same employee", "employeeId");
-    }
 
     public List<EmployeePosition> positions(String employeeId) {
         String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");

@@ -37,11 +37,6 @@ public class RecordWriteBackMatchRuleService extends AbstractAbilityService<Reco
         normalizeAndValidate(rule);
     }
 
-    @Override
-    public Criteria sortScope(RecordWriteBackMatchRule rule) {
-        return Criteria.of().eq("ruleId", rule.getRuleId());
-    }
-
     private void normalizeAndValidate(RecordWriteBackMatchRule rule) {
         if (rule == null) {
             throw new PlatformException("Record write-back match rule must not be null");

@@ -42,18 +42,6 @@ public class RecordGenerationObjectMappingService extends AbstractAbilityService
         normalizeAndValidate(mapping);
     }
 
-    @Override
-    public Criteria sortScope(RecordGenerationObjectMapping mapping) {
-        return Criteria.of().eq("ruleId", mapping.getRuleId());
-    }
-
-    @Override
-    public void validateSortScope(RecordGenerationObjectMapping left, RecordGenerationObjectMapping right) {
-        if (!Objects.equals(left.getRuleId(), right.getRuleId())) {
-            throw new PlatformException("Object mapping sort can only move records within the same generation rule");
-        }
-    }
-
     private void normalizeAndValidate(RecordGenerationObjectMapping mapping) {
         if (mapping.getRuleId() == null || mapping.getRuleId().isBlank()) {
             throw new PlatformException("Object mapping requires ruleId");

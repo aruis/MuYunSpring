@@ -14,6 +14,8 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 @Getter
 @Setter
 @Table(name = "platform_module", comment = "Platform module")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(
+        fields = "applicationAlias", message = "Module sort can only move records within the same application")
 public class PlatformModule extends StandardEnabledTreeEntity implements PlatformManagedCapable {
     @Id
     @Column(name = "id", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")

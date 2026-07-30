@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantUniqueConstraintProvider;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.SortPartition;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -340,7 +341,7 @@ public class DynamicEntityService implements
     }
 
     private int nextSortOrder(DynamicRecord record) {
-        Criteria scope = sortScope(record);
+        Criteria scope = sortCriteria(record);
         int maxOrder = sortedList(scope).stream()
                 .map(DynamicRecord::sortOrder)
                 .filter(Objects::nonNull)
@@ -518,17 +519,39 @@ public class DynamicEntityService implements
         }
     }
 
-    public Criteria sortScope(DynamicRecord record) {
+    private Criteria sortCriteria(DynamicRecord record) {
+        Criteria scope;
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            return treeRuntime().sortScope(new DynamicTreeRecord(record));
+            scope = Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, record.parentId());
+        } else {
+            scope = Criteria.of();
         }
-        return Criteria.of();
+        for (String fieldName : dao.getEntity().sortPartitionFields()) {
+            scope.eq(fieldName, record.getValue(fieldName));
+        }
+        return scope;
     }
 
-    public void validateSortScope(DynamicRecord left, DynamicRecord right) {
-        if (dao.getEntity().supports(EntityCapability.TREE)) {
-            treeRuntime().validateSortScope(new DynamicTreeRecord(left), new DynamicTreeRecord(right));
-        }
+    public SortPartition<DynamicRecord> sortPartition() {
+        return new SortPartition<>() {
+            @Override
+            public Criteria criteriaFor(DynamicRecord record) {
+                return sortCriteria(record);
+            }
+
+            @Override
+            public void requireSamePartition(DynamicRecord left, DynamicRecord right) {
+                if (dao.getEntity().supports(EntityCapability.TREE)
+                        && !SortAbility.sameValue(left.parentId(), right.parentId())) {
+                    throw new PlatformException("Tree sort can only move records within the same parent");
+                }
+                for (String fieldName : dao.getEntity().sortPartitionFields()) {
+                    if (!SortAbility.sameValue(left.getValue(fieldName), right.getValue(fieldName))) {
+                        throw new PlatformException("Sort can only move records within the same partition: " + fieldName);
+                    }
+                }
+            }
+        };
     }
 
     public String title(String id) {

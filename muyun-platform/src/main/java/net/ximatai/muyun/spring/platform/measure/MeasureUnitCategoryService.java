@@ -59,17 +59,13 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
     }
 
     @Override
-    public Criteria sortScope(MeasureUnitCategory category) {
-        return Criteria.of()
-                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
-                .eq("applicationAlias", category.getApplicationAlias());
-    }
-
-    @Override
-    public void validateSortScope(MeasureUnitCategory left, MeasureUnitCategory right) {
-        validateSortScopeByFields(left, right,
+    public net.ximatai.muyun.spring.ability.SortPartition<MeasureUnitCategory> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(category -> Criteria.of()
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
+                        .eq("applicationAlias", category.getApplicationAlias()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
                 "Measure unit category sort can only move records within the same tenant and application",
-                "tenantId", "applicationAlias");
+                "tenantId", "applicationAlias"));
     }
 
     public MeasureUnitCategory requireCategory(String applicationAlias, String categoryAlias) {

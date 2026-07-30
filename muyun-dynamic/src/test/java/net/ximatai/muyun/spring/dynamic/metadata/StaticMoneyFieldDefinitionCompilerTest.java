@@ -4,7 +4,10 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 import net.ximatai.muyun.spring.common.money.MoneyField;
+import net.ximatai.muyun.spring.ability.SortPartitionBy;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -79,6 +82,17 @@ class StaticMoneyFieldDefinitionCompilerTest {
         assertThat(entity.fields()).filteredOn(field -> field.fieldName().equals("amount"))
                 .singleElement()
                 .satisfies(field -> assertThat(field.money().baseAmountFieldName()).isEqualTo("amountBase"));
+    }
+
+    @Test
+    void shouldCompileSortPartitionAsSortableStaticDefinition() {
+        EntityDefinition entity = new StaticEntityDefinitionCompiler()
+                .compile("sorted_order", "Sorted order", StaticSortedOrderEntity.class);
+
+        new ModuleDefinitionValidator().validateEntity(entity);
+        assertThat(entity.capabilities()).contains(EntityCapability.SORT);
+        assertThat(entity.sortPartitionFields()).containsExactly("customerId");
+        assertThat(entity.fields()).anySatisfy(field -> assertThat(field.isSortable()).isTrue());
     }
 
     @Test
@@ -213,5 +227,12 @@ class StaticMoneyFieldDefinitionCompilerTest {
 
         @Column(name = "amount_rate", type = ColumnType.NUMERIC, precision = 24, scale = 12)
         private BigDecimal amountRate;
+    }
+
+    @Table(name = "sales_sorted_order", comment = "Sorted order")
+    @SortPartitionBy(fields = "customerId")
+    private static final class StaticSortedOrderEntity extends StandardSortableEntity {
+        @Column(name = "customer_id", type = ColumnType.VARCHAR, length = 64)
+        private String customerId;
     }
 }

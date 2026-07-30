@@ -1260,6 +1260,42 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldRejectDynamicSortMoveAcrossDeclaredPartition() {
+        IDatabaseOperations<Object> operations = operations();
+        stubPartitionRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(
+                new DynamicRecordDao(operations, partitionSortableEntity()), "sales.contract");
+
+        assertThatThrownBy(() -> entityService.moveBefore("left", "right"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("same partition: groupId");
+
+        entityService.reorder(List.of("left"));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement).contains("\"group_id\" ="));
+    }
+
+    @Test
+    void shouldRejectDynamicTreeSortMoveAcrossDeclaredBusinessPartition() {
+        IDatabaseOperations<Object> operations = operations();
+        stubPartitionRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(
+                new DynamicRecordDao(operations, partitionTreeEntity()), "sales.contract");
+
+        assertThatThrownBy(() -> entityService.moveBefore("left", "right"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("same partition: groupId");
+
+        entityService.reorder(List.of("left"));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"parent_id\" =")
+                .contains("\"group_id\" ="));
+    }
+
+    @Test
     void shouldResolveDynamicReferenceTitlesAndOptions() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -1629,6 +1665,19 @@ class DynamicRecordDaoTest {
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT);
     }
 
+    private EntityDefinition partitionSortableEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("groupId", "Group").column("group_id").length(64).required(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT)
+                .withSortPartitionFields("groupId");
+    }
+
     private EntityDefinition referenceEntity() {
         return new EntityDefinition(
                 "contract",
@@ -1655,6 +1704,20 @@ class DynamicRecordDaoTest {
         ).withCapabilities(EntityCapability.TREE);
     }
 
+    private EntityDefinition partitionTreeEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("groupId", "Group").column("group_id").length(64).required(),
+                        FieldDefinition.parentId(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.TREE)
+                .withSortPartitionFields("groupId");
+    }
+
     private Map<String, Object> row(String id, int sortOrder) {
         return Map.of(
                 "id", id,
@@ -1677,6 +1740,20 @@ class DynamicRecordDaoTest {
                 "deleted", Boolean.FALSE,
                 "version", 0
         );
+    }
+
+    private Map<String, Object> partitionRow(String id, String groupId, String parentId, int sortOrder) {
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("id", id);
+        row.put("tenant_id", "tenant-a");
+        row.put("group_id", groupId);
+        row.put("sort_order", sortOrder);
+        row.put("deleted", Boolean.FALSE);
+        row.put("version", 0);
+        if (parentId != null) {
+            row.put("parent_id", parentId);
+        }
+        return row;
     }
 
     private Map<String, Object> referenceRow(String id, String name) {
@@ -1706,6 +1783,20 @@ class DynamicRecordDaoTest {
                 return List.of(row("third", 300));
             }
             return List.of(row("first", 100), row("second", 200), row("third", 300));
+        });
+    }
+
+    private void stubPartitionRows(IDatabaseOperations<Object> operations) {
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("left")) {
+                return List.of(partitionRow("left", "group-a", "root", 100));
+            }
+            if (params.containsValue("right")) {
+                return List.of(partitionRow("right", "group-b", "root", 200));
+            }
+            return List.of(partitionRow("left", "group-a", "root", 100));
         });
     }
 

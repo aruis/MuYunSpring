@@ -249,7 +249,9 @@ public class PlatformModuleDefinitionCompiler {
                 metadata.getTitle(),
                 fields,
                 capabilities,
-                formulaRules(relation));
+                formulaRules(relation),
+                List.of(),
+                metadata.getSortPartitionFields() == null ? List.of() : List.copyOf(metadata.getSortPartitionFields()));
     }
 
     private List<EntityFormulaRuleDefinition> formulaRules(ModuleMetadataRelation relation) {

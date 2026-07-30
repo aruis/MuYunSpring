@@ -59,14 +59,11 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
     }
 
     @Override
-    public Criteria sortScope(ExchangeRateType rateType) {
-        return Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId());
-    }
-
-    @Override
-    public void validateSortScope(ExchangeRateType left, ExchangeRateType right) {
-        validateSortScopeByFields(left, right,
-                "Exchange rate type sort can only move records within the same tenant scope", "tenantId");
+    public net.ximatai.muyun.spring.ability.SortPartition<ExchangeRateType> sortPartition() {
+        return net.ximatai.muyun.spring.ability.SortPartitions.of(
+                rateType -> Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId()),
+                net.ximatai.muyun.spring.ability.SortPartitions.byFieldsWithMessage(
+                        "Exchange rate type sort can only move records within the same tenant scope", "tenantId"));
     }
 
     public ExchangeRateType resolveRateType(String rateTypeCode) {

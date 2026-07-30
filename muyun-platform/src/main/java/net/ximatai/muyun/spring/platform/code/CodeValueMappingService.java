@@ -40,18 +40,6 @@ public class CodeValueMappingService extends AbstractAbilityService<CodeValueMap
         normalizeAndValidate(mapping);
     }
 
-    @Override
-    public Criteria sortScope(CodeValueMapping mapping) {
-        return Criteria.of().eq("segmentId", mapping.getSegmentId());
-    }
-
-    @Override
-    public void validateSortScope(CodeValueMapping left, CodeValueMapping right) {
-        if (!Objects.equals(left.getSegmentId(), right.getSegmentId())) {
-            throw new PlatformException("Code value mapping sort can only move records within the same segment");
-        }
-    }
-
     private void normalizeAndValidate(CodeValueMapping mapping) {
         if (mapping.getSegmentId() == null || mapping.getSegmentId().isBlank()) {
             throw new PlatformException("Code value mapping requires segmentId");

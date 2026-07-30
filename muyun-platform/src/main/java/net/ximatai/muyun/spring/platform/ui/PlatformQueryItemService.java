@@ -124,21 +124,6 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         }
     }
 
-    @Override
-    public Criteria sortScope(PlatformQueryItem item) {
-        return Criteria.of()
-                .eq("queryTemplateId", item.getQueryTemplateId())
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, item.getParentId());
-    }
-
-    @Override
-    public void validateSortScope(PlatformQueryItem left, PlatformQueryItem right) {
-        if (!Objects.equals(left.getQueryTemplateId(), right.getQueryTemplateId())
-                || !Objects.equals(left.getParentId(), right.getParentId())) {
-            throw new PlatformException("Query item sort can only move records within the same query group");
-        }
-    }
-
     public List<PlatformQueryItem> listByTemplateIds(List<String> templateIds) {
         if (templateIds == null || templateIds.isEmpty()) {
             return List.of();

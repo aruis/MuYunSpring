@@ -71,18 +71,6 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
         }
     }
 
-    @Override
-    public Criteria sortScope(PlatformQueryTemplate template) {
-        return Criteria.of().eq("moduleAlias", template.getModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(PlatformQueryTemplate left, PlatformQueryTemplate right) {
-        if (!Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
-            throw new PlatformException("Query template sort can only move records within the same module");
-        }
-    }
-
     public PlatformQueryTemplate requireQueryTemplate(String id) {
         PlatformQueryTemplate template = id == null || id.isBlank() ? null : select(id);
         if (template == null) {

@@ -148,18 +148,6 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         }
     }
 
-    @Override
-    public Criteria sortScope(RecordGenerationRule rule) {
-        return Criteria.of().eq("sourceModuleAlias", rule.getSourceModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(RecordGenerationRule left, RecordGenerationRule right) {
-        if (!Objects.equals(left.getSourceModuleAlias(), right.getSourceModuleAlias())) {
-            throw new PlatformException("Generation rule sort can only move records within the same source module");
-        }
-    }
-
     private void replaceObjectMappings(RecordGenerationRule rule, List<RecordGenerationObjectMapping> incoming) {
         for (RecordGenerationObjectMapping existing : objectMappingService.selectByRuleId(rule.getId())) {
             for (RecordGenerationFieldMapping fieldMapping : fieldMappingService.selectByObjectMappingId(existing.getId())) {

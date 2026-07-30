@@ -18,12 +18,13 @@ public record EntityDefinition(
         List<FieldDefinition> fields,
         Set<EntityCapability> capabilities,
         List<EntityFormulaRuleDefinition> formulaRules,
-        List<TenantUniqueConstraintDefinition> tenantUniqueConstraints
+        List<TenantUniqueConstraintDefinition> tenantUniqueConstraints,
+        List<String> sortPartitionFields
 ) {
     public static final String DEFAULT_SCHEMA_NAME = "public";
 
     public EntityDefinition(String alias, String tableName, String name, List<FieldDefinition> fields) {
-        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of(), List.of());
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of(), List.of(), List.of());
     }
 
     public EntityDefinition(String alias,
@@ -31,7 +32,7 @@ public record EntityDefinition(
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of(), List.of());
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of(), List.of(), List.of());
     }
 
     public EntityDefinition(String alias,
@@ -40,7 +41,7 @@ public record EntityDefinition(
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(alias, schemaName, tableName, name, fields, capabilities, List.of(), List.of());
+        this(alias, schemaName, tableName, name, fields, capabilities, List.of(), List.of(), List.of());
     }
 
     public EntityDefinition(String alias,
@@ -50,7 +51,18 @@ public record EntityDefinition(
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities,
                             List<EntityFormulaRuleDefinition> formulaRules) {
-        this(alias, schemaName, tableName, name, fields, capabilities, formulaRules, List.of());
+        this(alias, schemaName, tableName, name, fields, capabilities, formulaRules, List.of(), List.of());
+    }
+
+    public EntityDefinition(String alias,
+                            String schemaName,
+                            String tableName,
+                            String name,
+                            List<FieldDefinition> fields,
+                            Set<EntityCapability> capabilities,
+                            List<EntityFormulaRuleDefinition> formulaRules,
+                            List<TenantUniqueConstraintDefinition> tenantUniqueConstraints) {
+        this(alias, schemaName, tableName, name, fields, capabilities, formulaRules, tenantUniqueConstraints, List.of());
     }
 
     public EntityDefinition {
@@ -59,21 +71,27 @@ public record EntityDefinition(
         capabilities = normalizeCapabilities(capabilities);
         formulaRules = formulaRules == null ? List.of() : List.copyOf(formulaRules);
         tenantUniqueConstraints = tenantUniqueConstraints == null ? List.of() : List.copyOf(tenantUniqueConstraints);
+        sortPartitionFields = sortPartitionFields == null ? List.of() : List.copyOf(sortPartitionFields);
     }
 
     public EntityDefinition withCapabilities(EntityCapability... values) {
         return new EntityDefinition(alias, schemaName, tableName, name, fields, Set.of(values), formulaRules,
-                tenantUniqueConstraints);
+                tenantUniqueConstraints, sortPartitionFields);
     }
 
     public EntityDefinition withFormulaRules(EntityFormulaRuleDefinition... values) {
         return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities,
-                values == null ? List.of() : List.of(values), tenantUniqueConstraints);
+                values == null ? List.of() : List.of(values), tenantUniqueConstraints, sortPartitionFields);
     }
 
     public EntityDefinition withTenantUniqueConstraints(TenantUniqueConstraintDefinition... values) {
         return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities, formulaRules,
-                values == null ? List.of() : List.of(values));
+                values == null ? List.of() : List.of(values), sortPartitionFields);
+    }
+
+    public EntityDefinition withSortPartitionFields(String... values) {
+        return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities, formulaRules,
+                tenantUniqueConstraints, values == null ? List.of() : List.of(values));
     }
 
     /**

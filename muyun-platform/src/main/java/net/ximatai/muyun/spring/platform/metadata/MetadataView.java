@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 @Setter
 @Table(name = "platform_metadata_view", comment = "Metadata view")
 @CompositeIndex(columns = {"relation_id", "view_type"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "relationId")
 public class MetadataView extends StandardEnabledSortableEntity {
     @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module metadata relation id")
     private String relationId;

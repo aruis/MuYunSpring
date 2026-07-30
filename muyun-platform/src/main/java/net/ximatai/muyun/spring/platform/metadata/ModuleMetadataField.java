@@ -20,6 +20,7 @@ import java.util.Set;
 @Setter
 @Table(name = "platform_module_metadata_field", comment = "Module metadata field config")
 @CompositeIndex(columns = {"relation_id", "metadata_field_id"}, unique = true)
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "relationId")
 public class ModuleMetadataField extends StandardSortableEntity {
     @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Module metadata relation id")

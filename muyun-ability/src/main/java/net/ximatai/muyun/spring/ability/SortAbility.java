@@ -68,11 +68,27 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
         return getDao().query(activeCriteria(criteria), PageRequests.all(), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
-    default Criteria sortScope(T entity) {
-        return Criteria.of();
+    /**
+     * Declares the one business partition that owns a record's order sequence.
+     * Business services should normally return {@link SortPartitions#byFields(String...)}.
+     * Override this only when the partition has semantics that cannot be expressed as
+     * equality over persisted fields.
+     */
+    default SortPartition<T> sortPartition() {
+        return SortPartitions.fromModel(modelClass());
     }
 
+    /**
+     * Compatibility projection of {@link #sortPartition()}. Existing services
+     * with exceptional partition semantics may override it while being migrated.
+     */
+    default Criteria sortScope(T entity) {
+        return sortPartition().criteriaFor(entity);
+    }
+
+    /** Compatibility projection of {@link #sortPartition()}. */
     default void validateSortScope(T left, T right) {
+        sortPartition().requireSamePartition(left, right);
     }
 
     default Criteria sortScopeByFields(T entity, String... fieldNames) {

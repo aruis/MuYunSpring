@@ -489,6 +489,21 @@ class AbilityContractTest {
     }
 
     @Test
+    void sortPartitionAnnotationShouldKeepChildOrderInsideItsParent() {
+        DemoInvoiceLineService service = new DemoInvoiceLineService();
+        DemoInvoiceLine first = new DemoInvoiceLine("First");
+        first.setInvoiceId("invoice-a");
+        DemoInvoiceLine second = new DemoInvoiceLine("Second");
+        second.setInvoiceId("invoice-b");
+        service.insert(first);
+        service.insert(second);
+
+        assertThatThrownBy(() -> service.moveBefore(first.getId(), second.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("invoiceId");
+    }
+
+    @Test
     void childrenAbilitySingleRelationShortcutShouldUseStaticChildRef() {
         SingleChildInvoiceService invoiceService = new SingleChildInvoiceService();
         DemoInvoiceLine line = new DemoInvoiceLine("Single line");

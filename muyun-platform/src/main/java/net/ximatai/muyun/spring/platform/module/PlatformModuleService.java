@@ -60,17 +60,6 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     }
 
     @Override
-    public Criteria sortScope(PlatformModule module) {
-        return scopedTreeCriteria(module, "applicationAlias");
-    }
-
-    @Override
-    public void validateSortScope(PlatformModule left, PlatformModule right) {
-        validateTreeSortScopeByFields(left, right,
-                "Module sort can only move records within the same application", "applicationAlias");
-    }
-
-    @Override
     public List<PlatformModule> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
             rejectRootChildrenLookup("rootModules(applicationAlias)");

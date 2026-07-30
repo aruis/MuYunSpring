@@ -61,16 +61,6 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
                 "positionCode must be unique within tenant: " + position.getCode());
     }
 
-    @Override
-    public Criteria sortScope(Position position) {
-        return Criteria.of().eq("categoryId", position.getCategoryId());
-    }
-
-    @Override
-    public void validateSortScope(Position left, Position right) {
-        validateSortScopeByFields(left, right,
-                "Position sort can only move records within the same category", "categoryId");
-    }
 
     @Override
     public void beforeDelete(String id) {

@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 @Getter
 @Setter
 @Table(name = "platform_record_generation_split_group_field", comment = "Record generation split group field")
+@net.ximatai.muyun.spring.ability.SortPartitionBy(fields = "splitPolicyId")
 public class RecordGenerationSplitGroupField extends StandardSortableEntity {
     @Indexed
     @Column(name = "split_policy_id", type = ColumnType.VARCHAR, length = 32, nullable = false,

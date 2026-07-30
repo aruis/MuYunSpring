@@ -63,18 +63,6 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
     }
 
     @Override
-    public Criteria sortScope(ModuleMetadataRelation relation) {
-        return Criteria.of().eq("moduleAlias", relation.getModuleAlias());
-    }
-
-    @Override
-    public void validateSortScope(ModuleMetadataRelation left, ModuleMetadataRelation right) {
-        if (!java.util.Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
-            throw new PlatformException("Module metadata relation sort can only move records within the same module");
-        }
-    }
-
-    @Override
     public void afterChanged(ModuleMetadataRelation relation) {
         if (runtimeRefreshCoordinator != null) {
             runtimeRefreshCoordinator.refreshByRelation(relation);
