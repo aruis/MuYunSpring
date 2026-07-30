@@ -132,9 +132,30 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                                      int deleted,
                                      DeletionContext deletionContext,
                                      DeletionNode deletionNode) {
-        if (deleted <= 0) {
+        if (deleted > 0) {
+            deleteAutoDeleteChildren(id, deletionContext, deletionNode);
+        }
+    }
+
+    /**
+     * Executes legacy aggregate cascades before the parent becomes unavailable.
+     * New cross-aggregate cascades are declared by {@code @ReferenceTo}; this
+     * hook keeps existing {@code @ChildRef(autoDeleteWithParent = true)}
+     * relations on the same deletion context and ordering.
+     */
+    default void beforeChildrenDelete(String id,
+                                      P parent,
+                                      DeletionContext deletionContext,
+                                      DeletionNode deletionNode) {
+        if (parent == null || id == null || id.isBlank()) {
             return;
         }
+        deleteAutoDeleteChildren(id, deletionContext, deletionNode);
+    }
+
+    private void deleteAutoDeleteChildren(String id,
+                                          DeletionContext deletionContext,
+                                          DeletionNode deletionNode) {
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
             if (relation.isAutoDeleteWithParent()) {
                 relation.clearChildren(id, deletionContext, deletionNode);

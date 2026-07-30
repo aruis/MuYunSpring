@@ -36,9 +36,13 @@ public record ReferencePlan(
         }
         projections = projections == null ? List.of() : List.copyOf(projections);
         integrity = integrity == null ? ReferenceIntegrityPolicy.DEFAULT : integrity;
-        if (integrity.onTargetSoftDelete() == ReferenceTargetDeletionPolicy.RESTRICT
-                && cardinality == ReferenceCardinality.MANY) {
+        if (cardinality == ReferenceCardinality.MANY
+                && integrity.onTargetUnavailable() == ReferenceTargetUnavailablePolicy.RESTRICT) {
             throw new PlatformException("RESTRICT reference deletion requires cardinality ONE: " + sourceField);
+        }
+        if (cardinality == ReferenceCardinality.MANY
+                && integrity.onTargetUnavailable() == ReferenceTargetUnavailablePolicy.CASCADE_DELETE) {
+            throw new PlatformException("CASCADE_DELETE reference deletion requires cardinality ONE: " + sourceField);
         }
         validateOutputFields(sourceField, titleOutputField, projections);
     }

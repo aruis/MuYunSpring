@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.ability.reference;
 
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.List;
@@ -16,9 +19,36 @@ public final class CompositeReferenceDeletionGuard implements ReferenceDeletionG
     }
 
     @Override
+    public void validateTargetUnavailable(CrudAbility<?> ability, EntityContract entity) {
+        for (ReferenceDeletionGuard guard : guards) {
+            guard.validateTargetUnavailable(ability, entity);
+        }
+    }
+
+    @Override
+    @Deprecated(since = "0.1", forRemoval = false)
     public void beforeSoftDelete(CrudAbility<?> ability, EntityContract entity) {
         for (ReferenceDeletionGuard guard : guards) {
             guard.beforeSoftDelete(ability, entity);
+        }
+    }
+
+    @Override
+    public void cascadeTargetUnavailable(CrudAbility<?> ability, EntityContract entity, DeletionContext context,
+                                         DeletionNode node, DeletionMode mode) {
+        for (ReferenceDeletionGuard guard : guards) {
+            guard.cascadeTargetUnavailable(ability, entity, context, node, mode);
+        }
+    }
+
+    @Override
+    public void beforeTargetUnavailable(CrudAbility<?> ability,
+                                        EntityContract entity,
+                                        DeletionContext context,
+                                        DeletionNode node,
+                                        DeletionMode mode) {
+        for (ReferenceDeletionGuard guard : guards) {
+            guard.beforeTargetUnavailable(ability, entity, context, node, mode);
         }
     }
 }

@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
 import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionTransactionOperator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
@@ -16,6 +17,7 @@ final class PlatformAbilityDispatcher {
     private static volatile StaticOptionFieldValueValidator staticOptionFieldValueValidator =
             StaticOptionFieldValueValidator.NONE;
     private static volatile DeletionLifecycleListener deletionLifecycleListener = DeletionLifecycleListener.NONE;
+    private static volatile DeletionTransactionOperator deletionTransactionOperator = DeletionTransactionOperator.NONE;
     private static volatile ReferenceDeletionGuard referenceDeletionGuard = ReferenceDeletionGuard.NONE;
     private static volatile ReferenceTargetResolver referenceTargetResolver = ReferenceTargetResolver.NONE;
 
@@ -38,6 +40,18 @@ final class PlatformAbilityDispatcher {
         deletionLifecycleListener = DeletionLifecycleListener.NONE;
     }
 
+    static void setDeletionTransactionOperator(DeletionTransactionOperator operator) {
+        deletionTransactionOperator = operator == null ? DeletionTransactionOperator.NONE : operator;
+    }
+
+    static void resetDeletionTransactionOperator() {
+        deletionTransactionOperator = DeletionTransactionOperator.NONE;
+    }
+
+    static <T> T inDeletionTransaction(java.util.function.Supplier<T> work) {
+        return deletionTransactionOperator.execute(work);
+    }
+
     static void setReferenceDeletionGuard(ReferenceDeletionGuard guard) {
         referenceDeletionGuard = guard == null ? ReferenceDeletionGuard.NONE : guard;
     }
@@ -58,8 +72,14 @@ final class PlatformAbilityDispatcher {
         return referenceTargetResolver;
     }
 
-    static <T extends EntityContract> void beforeSoftDelete(CrudAbility<T> ability, T entity) {
-        referenceDeletionGuard.beforeSoftDelete(ability, entity);
+    static <T extends EntityContract> void beforeTargetUnavailable(CrudAbility<T> ability,
+                                                                    T entity,
+                                                                    DeletionContext context,
+                                                                    DeletionNode node,
+                                                                    DeletionMode mode) {
+        referenceDeletionGuard.validateTargetUnavailable(ability, entity);
+        runChildrenBeforeDelete(ability, entity, context, node);
+        referenceDeletionGuard.cascadeTargetUnavailable(ability, entity, context, node, mode);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -134,7 +154,6 @@ final class PlatformAbilityDispatcher {
                                                         int deleted,
                                                         DeletionContext context,
                                                         DeletionNode node) {
-        runChildrenAfterDelete(ability, id, entity, deleted, context, node);
         ability.afterPlatformDelete(id, entity, deleted);
     }
 
@@ -177,14 +196,12 @@ final class PlatformAbilityDispatcher {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static <T extends EntityContract> void runChildrenAfterDelete(CrudAbility<T> ability,
-                                                                           String id,
-                                                                           T entity,
-                                                                           int deleted,
-                                                                           DeletionContext context,
-                                                                           DeletionNode node) {
+    private static <T extends EntityContract> void runChildrenBeforeDelete(CrudAbility<T> ability,
+                                                                            T entity,
+                                                                            DeletionContext context,
+                                                                            DeletionNode node) {
         if (ability instanceof ChildrenAbility childrenAbility) {
-            childrenAbility.afterChildrenDelete(id, entity, deleted, context, node);
+            childrenAbility.beforeChildrenDelete(entity.getId(), entity, context, node);
         }
     }
 

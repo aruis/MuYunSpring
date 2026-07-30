@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.boot.demo.school.teacher.TeacherService;
@@ -21,6 +22,7 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         SortAbility<Classroom>,
         ChildrenAbility<Classroom>,
         ReferencerAbility<Classroom>,
+        ReferenceAbility<Classroom>,
         CacheAbility<Classroom> {
     private final TeacherService teacherService;
     private final ClassMemberService memberService;

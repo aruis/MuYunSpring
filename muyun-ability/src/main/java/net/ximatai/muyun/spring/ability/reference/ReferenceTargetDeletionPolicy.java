@@ -1,9 +1,10 @@
 package net.ximatai.muyun.spring.ability.reference;
 
 /**
- * Declares how a reference participates when its target enters soft deletion.
- * Lifecycle ownership and cascading remain the concern of child relations.
+ * @deprecated Use {@link ReferenceTargetUnavailablePolicy}. Kept only for
+ * source compatibility while clients migrate their annotations.
  */
+@Deprecated(since = "0.1", forRemoval = false)
 public enum ReferenceTargetDeletionPolicy {
     PRESERVE_HISTORY,
     RESTRICT

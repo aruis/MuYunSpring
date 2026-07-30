@@ -5,6 +5,8 @@ import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
 import net.ximatai.muyun.spring.ability.security.FieldSigner;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
@@ -13,18 +15,24 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTargetDeletionPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 
 import java.util.Objects;
+import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class DynamicRecordRuntime implements AutoCloseable {
     private static final AtomicLong CACHE_NAMESPACE_SEQUENCE = new AtomicLong();
+    private static final int CASCADE_BATCH_SIZE = 200;
 
     private final IDatabaseOperations<?> operations;
     private final DynamicModuleRegistry registry;
+    private volatile Map<ReferenceTarget, List<DynamicInboundReference>> inboundReferences = Map.of();
     private final String cacheNamespacePrefix;
     private final DynamicFieldValueValidator fieldValueValidator;
     private final RuntimeEventPublisher eventPublisher;
@@ -55,6 +63,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         this.timeService = Objects.requireNonNull(builder.timeService, "timeService must not be null");
         this.valueConverter = Objects.requireNonNull(builder.valueConverter, "valueConverter must not be null");
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
+        rebuildInboundReferenceIndex();
     }
 
     public static Builder builder(IDatabaseOperations<?> operations) {
@@ -132,11 +141,13 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
     public DynamicRecordRuntime register(ModuleDefinition module) {
         registry.register(module);
+        rebuildInboundReferenceIndex();
         return this;
     }
 
     public DynamicRecordRuntime refresh(ModuleDefinition module) {
         registry.refresh(module);
+        rebuildInboundReferenceIndex();
         return this;
     }
 
@@ -213,21 +224,68 @@ public class DynamicRecordRuntime implements AutoCloseable {
         if (target == null || targetId == null || targetId.isBlank()) {
             return;
         }
-        for (ModuleDefinition sourceModule : registry.modules()) {
-            for (var reference : sourceModule.references()) {
-                if (!target.equals(reference.target())
-                        || reference.integrity().onTargetSoftDelete() != ReferenceTargetDeletionPolicy.RESTRICT) {
-                    continue;
-                }
-                DynamicEntityService source = entityService(sourceModule.moduleAlias(), reference.sourceEntityAlias());
+        for (DynamicInboundReference inbound : inboundReferences.getOrDefault(target, List.of())) {
+            var reference = inbound.reference();
+            if (reference.integrity().onTargetUnavailable() != ReferenceTargetUnavailablePolicy.RESTRICT) {
+                continue;
+            }
+            DynamicEntityService source = entityService(inbound.moduleAlias(), reference.sourceEntityAlias());
                 long count = source.count(Criteria.of().eq(reference.sourceField(), targetId));
                 if (count > 0) {
-                    throw new PlatformException("cannot soft-delete reference target " + target.qualifiedName()
-                            + ": " + count + " active records in " + sourceModule.moduleAlias()
+                    throw new PlatformException("cannot make reference target unavailable " + target.qualifiedName()
+                            + ": active records in " + inbound.moduleAlias()
                             + "." + reference.sourceField() + " still reference it");
+                }
+        }
+    }
+
+    /**
+     * Deletes dynamic CASCADE referrers in the same deletion tree, then verifies
+     * that no dynamic RESTRICT referrer remains.
+     */
+    public void cascadeReferenceTargetUnavailable(ReferenceTarget target,
+                                                  String targetId,
+                                                  DeletionContext context,
+                                                  DeletionNode node) {
+        if (target == null || targetId == null || targetId.isBlank()) {
+            return;
+        }
+        for (DynamicInboundReference inbound : inboundReferences.getOrDefault(target, List.of())) {
+            var reference = inbound.reference();
+            if (reference.integrity().onTargetUnavailable()
+                    != ReferenceTargetUnavailablePolicy.CASCADE_DELETE) {
+                continue;
+            }
+            DynamicEntityService source = entityService(inbound.moduleAlias(), reference.sourceEntityAlias());
+            while (true) {
+                List<DynamicRecord> referrers = source.list(Criteria.of().eq(reference.sourceField(), targetId),
+                        PageRequest.of(1, CASCADE_BATCH_SIZE));
+                if (referrers.isEmpty()) {
+                    break;
+                }
+                for (DynamicRecord referrer : referrers) {
+                    source.delete(referrer.getId(), referrer.getVersion(),
+                            context.child(node, source.getModuleAlias(), referrer.getId()));
                 }
             }
         }
+    }
+
+    private void rebuildInboundReferenceIndex() {
+        Map<ReferenceTarget, List<DynamicInboundReference>> index = new LinkedHashMap<>();
+        for (ModuleDefinition module : registry.modules()) {
+            for (var reference : module.references()) {
+                index.computeIfAbsent(reference.target(), ignored -> new java.util.ArrayList<>())
+                        .add(new DynamicInboundReference(module.moduleAlias(), reference));
+            }
+        }
+        inboundReferences = index.entrySet().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,
+                        entry -> List.copyOf(entry.getValue())));
+    }
+
+    private record DynamicInboundReference(String moduleAlias,
+                                           net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition reference) {
     }
 
     public void clearCache() {

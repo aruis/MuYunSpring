@@ -4,7 +4,7 @@ package net.ximatai.muyun.spring.dynamic.metadata;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTargetDeletionPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,12 +26,32 @@ class ModuleDefinitionValidatorTest {
                 .references(List.of(EntityReferenceDefinition
                         .to("line", "invoiceIds", "sales.invoice.invoice")
                         .many()
-                        .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetDeletionPolicy.RESTRICT))))
+                        .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetUnavailablePolicy.RESTRICT))))
                 .build();
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("RESTRICT reference deletion requires cardinality ONE: invoiceIds");
+    }
+
+    @Test
+    void shouldRejectCascadeDeletePolicyForManyReference() {
+        ModuleDefinition module = ModuleDefinition.builder("sales.invoice", "Invoice")
+                .entities(List.of(
+                        new EntityDefinition("invoice", "sales_invoice", "Invoice", List.of(
+                                FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE)),
+                        new EntityDefinition("line", "sales_invoice_line", "Line", List.of(
+                                FieldDefinition.string("invoiceIds", "Invoices").column("invoice_ids").length(256)))))
+                .references(List.of(EntityReferenceDefinition
+                        .to("line", "invoiceIds", "sales.invoice.invoice")
+                        .many()
+                        .withIntegrity(new ReferenceIntegrityPolicy(
+                                ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
+                .build();
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("CASCADE_DELETE reference deletion requires cardinality ONE: invoiceIds");
     }
 
     @Test
