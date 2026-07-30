@@ -2,6 +2,10 @@ package net.ximatai.muyun.spring.ability.child;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -35,7 +39,7 @@ public final class StaticChildResolver {
         if (rules.isEmpty()) {
             throw new PlatformException("expected exactly one child relation plan: "
                     + parentModelClass.getName()
-                    + ", actual relationCodes: [], add @ChildRef or use explicit childRelation(...)");
+                    + ", actual relationCodes: [], add @Children/@ChildOf or use explicit childRelation(...)");
         }
         if (rules.size() != 1) {
             throw new PlatformException("expected exactly one child relation plan: "
@@ -82,64 +86,57 @@ public final class StaticChildResolver {
         Class<?> current = parentModelClass;
         while (current != null && !Object.class.equals(current)) {
             for (Field field : current.getDeclaredFields()) {
-                ChildRef childRef = field.getAnnotation(ChildRef.class);
-                if (childRef == null) {
+                Children children = field.getAnnotation(Children.class);
+                if (children == null) {
                     continue;
                 }
-                validateListField(parentModelClass, field, childRef);
-                try {
-                    field.setAccessible(true);
-                } catch (RuntimeException e) {
-                    throw new PlatformException("cannot access child relation field: "
-                            + parentModelClass.getName() + "." + field.getName(), e);
-                }
-                String relationCode = childRef.relationCode().isBlank() ? field.getName() : childRef.relationCode();
-                String childEntityAlias = childRef.childEntityAlias().isBlank()
-                        ? defaultEntityAlias(childRef.childModel())
-                        : childRef.childEntityAlias();
-                Field childForeignKeyField = validateChildForeignKeyField(
-                        parentModelClass,
-                        field,
-                        childRef.childModel(),
-                        childRef.childForeignKeyField()
-                );
-                String parentEntityAlias = childRef.parentEntityAlias().isBlank()
-                        ? defaultEntityAlias(parentModelClass)
-                        : childRef.parentEntityAlias();
-                ChildPlan plan = new ChildPlan(
-                        relationCode,
-                        parentEntityAlias,
-                        childEntityAlias,
-                        childRef.childForeignKeyField(),
-                        childRef.autoPopulate(),
-                        childRef.autoDeleteWithParent()
-                );
-                Field previous = relationCodeFields.putIfAbsent(plan.relationCode(), field);
+                ChildRule rule = childrenRule(parentModelClass, field, children);
+                Field previous = relationCodeFields.putIfAbsent(rule.plan().relationCode(), field);
                 if (previous != null) {
                     throw new PlatformException("duplicate child relationCode: "
-                            + parentModelClass.getName() + "." + plan.relationCode());
+                            + parentModelClass.getName() + "." + rule.plan().relationCode());
                 }
-                rules.putIfAbsent(field.getName(), new ChildRule(field, plan, childRef.childModel(), childForeignKeyField));
+                rules.putIfAbsent(field.getName(), rule);
             }
             current = current.getSuperclass();
         }
         return List.copyOf(rules.values());
     }
 
-    private static void validateListField(Class<?> parentModelClass, Field field, ChildRef childRef) {
-        if (!List.class.isAssignableFrom(field.getType())) {
-            throw new PlatformException("@ChildRef field must be List: " + parentModelClass.getName() + "." + field.getName());
-        }
-        Type genericType = field.getGenericType();
-        if (!(genericType instanceof ParameterizedType parameterizedType)) {
-            throw new PlatformException("@ChildRef field must declare child generic type: "
+    private static ChildRule childrenRule(Class<?> parentModelClass, Field field, Children children) {
+        if (!List.class.isAssignableFrom(field.getType()) || !(field.getGenericType() instanceof ParameterizedType type)
+                || !(type.getActualTypeArguments()[0] instanceof Class<?> childClass)
+                || !EntityContract.class.isAssignableFrom(childClass)) {
+            throw new PlatformException("@Children field must declare List<EntityContract>: "
                     + parentModelClass.getName() + "." + field.getName());
         }
-        Type actualType = parameterizedType.getActualTypeArguments()[0];
-        if (!(actualType instanceof Class<?> actualClass) || !childRef.childModel().equals(actualClass)) {
-            throw new PlatformException("@ChildRef childModel not assignable to field generic type: "
-                    + parentModelClass.getName() + "." + field.getName());
+        @SuppressWarnings("unchecked")
+        Class<? extends EntityContract> childModel = (Class<? extends EntityContract>) childClass;
+        String parentAlias = defaultEntityAlias(parentModelClass);
+        List<ReferencePlan> referencePlans = StaticReferenceResolver.plans(childModel);
+        List<Field> foreignKeys = fields(childModel).stream()
+                .filter(candidate -> candidate.getAnnotation(ChildOf.class) != null)
+                .filter(candidate -> candidate.getAnnotation(ReferenceTo.class) != null)
+                .filter(candidate -> referencePlans.stream().anyMatch(plan ->
+                        plan.sourceField().equals(candidate.getName()) && parentAlias.equals(plan.target().entityAlias())))
+                .toList();
+        if (foreignKeys.size() != 1) {
+            throw new PlatformException("@Children requires exactly one @ChildOf @ReferenceTo foreign key to "
+                    + parentModelClass.getName() + " on " + childModel.getName());
         }
+        Field foreignKey = foreignKeys.getFirst();
+        validateChildForeignKeyField(parentModelClass, field, childModel, foreignKey.getName());
+        field.setAccessible(true);
+        foreignKey.setAccessible(true);
+        ReferencePlan referencePlan = referencePlans.stream()
+                .filter(plan -> plan.sourceField().equals(foreignKey.getName()))
+                .findFirst()
+                .orElseThrow();
+        String relationCode = children.relationCode().isBlank() ? field.getName() : children.relationCode();
+        return new ChildRule(field, new ChildPlan(relationCode, parentAlias, defaultEntityAlias(childModel),
+                foreignKey.getName(), true,
+                referencePlan.integrity().onTargetUnavailable() == ReferenceTargetUnavailablePolicy.CASCADE_DELETE),
+                childModel, foreignKey);
     }
 
     private static Field validateChildForeignKeyField(Class<?> parentModelClass,
@@ -147,12 +144,12 @@ public final class StaticChildResolver {
                                                       Class<? extends EntityContract> childModel,
                                                       String childForeignKeyField) {
         if (childForeignKeyField == null || childForeignKeyField.isBlank()) {
-            throw new PlatformException("@ChildRef childForeignKeyField must not be blank: "
+            throw new PlatformException("child foreign key field must not be blank: "
                     + parentModelClass.getName() + "." + relationField.getName());
         }
         Field field = childField(childModel, childForeignKeyField);
         if (!String.class.equals(field.getType())) {
-            throw new PlatformException("@ChildRef childForeignKeyField must be String: "
+            throw new PlatformException("child foreign key field must be String: "
                     + childModel.getName() + "." + childForeignKeyField);
         }
         try {
@@ -175,6 +172,16 @@ public final class StaticChildResolver {
         }
         throw new PlatformException("cannot find child foreign key field: "
                 + childClass.getName() + "." + fieldName);
+    }
+
+    private static List<Field> fields(Class<?> modelClass) {
+        List<Field> fields = new java.util.ArrayList<>();
+        Class<?> current = modelClass;
+        while (current != null && !Object.class.equals(current)) {
+            fields.addAll(List.of(current.getDeclaredFields()));
+            current = current.getSuperclass();
+        }
+        return fields;
     }
 
     private static String defaultEntityAlias(Class<?> modelClass) {

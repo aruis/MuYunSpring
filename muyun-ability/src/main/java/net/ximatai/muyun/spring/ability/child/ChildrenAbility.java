@@ -43,6 +43,20 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         );
     }
 
+    /** Resolves a declared child relation from an explicit parent model. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
+                                                                          ChildAbility<C> childAbility) {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(parentModelClass);
+        validateChildModel(rule, childAbility);
+        return childAbility.toChildRelation(
+                rule.plan(),
+                rule::setParentId,
+                rule::children,
+                rule::populate
+        );
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
                                                                          ChildAbility<C> childAbility) {
@@ -138,10 +152,8 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     /**
-     * Executes legacy aggregate cascades before the parent becomes unavailable.
-     * New cross-aggregate cascades are declared by {@code @ReferenceTo}; this
-     * hook keeps existing {@code @ChildRef(autoDeleteWithParent = true)}
-     * relations on the same deletion context and ordering.
+     * Executes aggregate cascades derived from child foreign-key reference integrity
+     * before the parent becomes unavailable.
      */
     default void beforeChildrenDelete(String id,
                                       P parent,
@@ -157,7 +169,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                                           DeletionContext deletionContext,
                                           DeletionNode deletionNode) {
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
-            if (relation.isAutoDeleteWithParent()) {
+            if (relation.isCascadeOnParentUnavailable()) {
                 relation.clearChildren(id, deletionContext, deletionNode);
             }
         }

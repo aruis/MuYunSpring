@@ -7,7 +7,7 @@ public record ChildPlan(
         String childEntityAlias,
         String childForeignKeyField,
         boolean autoPopulate,
-        boolean autoDeleteWithParent
+        boolean cascadeOnParentUnavailable
 ) {
     public ChildPlan {
         requireText(relationCode, "child relationCode");
@@ -27,10 +27,10 @@ public record ChildPlan(
     }
 
     public ChildPlan withAutoPopulate() {
-        return new ChildPlan(relationCode, parentEntityAlias, childEntityAlias, childForeignKeyField, true, autoDeleteWithParent);
+        return new ChildPlan(relationCode, parentEntityAlias, childEntityAlias, childForeignKeyField, true, cascadeOnParentUnavailable);
     }
 
-    public ChildPlan withAutoDeleteWithParent() {
+    public ChildPlan withCascadeOnParentUnavailable() {
         return new ChildPlan(relationCode, parentEntityAlias, childEntityAlias, childForeignKeyField, autoPopulate, true);
     }
 

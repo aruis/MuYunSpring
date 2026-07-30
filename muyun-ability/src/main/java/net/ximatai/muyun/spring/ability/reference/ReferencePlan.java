@@ -10,8 +10,6 @@ public record ReferencePlan(
         String sourceField,
         ReferenceTarget target,
         ReferenceCardinality cardinality,
-        boolean autoTitle,
-        String titleOutputField,
         List<ReferenceProjection> projections,
         ReferenceIntegrityPolicy integrity
 ) {
@@ -25,15 +23,6 @@ public record ReferencePlan(
         if (cardinality == null) {
             cardinality = ReferenceCardinality.ONE;
         }
-        if (titleOutputField == null) {
-            titleOutputField = "";
-        }
-        if (autoTitle && titleOutputField.isBlank()) {
-            titleOutputField = sourceField + "Title";
-        }
-        if (!autoTitle && !titleOutputField.isBlank()) {
-            throw new PlatformException("reference titleOutputField requires autoTitle: " + sourceField);
-        }
         projections = projections == null ? List.of() : List.copyOf(projections);
         integrity = integrity == null ? ReferenceIntegrityPolicy.DEFAULT : integrity;
         if (cardinality == ReferenceCardinality.MANY
@@ -44,37 +33,21 @@ public record ReferencePlan(
                 && integrity.onTargetUnavailable() == ReferenceTargetUnavailablePolicy.CASCADE_DELETE) {
             throw new PlatformException("CASCADE_DELETE reference deletion requires cardinality ONE: " + sourceField);
         }
-        validateOutputFields(sourceField, titleOutputField, projections);
+        validateOutputFields(sourceField, projections);
     }
 
     public ReferencePlan(String sourceField,
                          ReferenceTarget target,
-                         ReferenceCardinality cardinality,
-                         boolean autoTitle,
-                         String titleOutputField) {
-        this(sourceField, target, cardinality, autoTitle, titleOutputField, List.of(), ReferenceIntegrityPolicy.DEFAULT);
-    }
-
-    public ReferencePlan(String sourceField,
-                         ReferenceTarget target,
-                         ReferenceCardinality cardinality,
-                         boolean autoTitle,
-                         String titleOutputField,
-                         List<ReferenceProjection> projections) {
-        this(sourceField, target, cardinality, autoTitle, titleOutputField, projections,
-                ReferenceIntegrityPolicy.DEFAULT);
+                         ReferenceCardinality cardinality) {
+        this(sourceField, target, cardinality, List.of(), ReferenceIntegrityPolicy.DEFAULT);
     }
 
     public static ReferencePlan of(String sourceField, ReferenceTarget target, ReferenceCardinality cardinality) {
-        return new ReferencePlan(sourceField, target, cardinality, false, "");
-    }
-
-    public ReferencePlan withAutoTitle(String titleOutputField) {
-        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField, projections, integrity);
+        return new ReferencePlan(sourceField, target, cardinality, List.of(), ReferenceIntegrityPolicy.DEFAULT);
     }
 
     public ReferencePlan withProjection(String targetField, String outputField) {
-        return new ReferencePlan(sourceField(), target, cardinality, autoTitle, titleOutputField,
+        return new ReferencePlan(sourceField(), target, cardinality,
                 appendProjection(new ReferenceProjection(targetField, outputField)), integrity);
     }
 
@@ -128,13 +101,8 @@ public record ReferencePlan(
         return List.copyOf(next);
     }
 
-    private static void validateOutputFields(String sourceField,
-                                             String titleOutputField,
-                                             List<ReferenceProjection> projections) {
+    private static void validateOutputFields(String sourceField, List<ReferenceProjection> projections) {
         LinkedHashSet<String> outputFields = new LinkedHashSet<>();
-        if (!titleOutputField.isBlank()) {
-            outputFields.add(titleOutputField);
-        }
         for (ReferenceProjection projection : projections) {
             if (!outputFields.add(projection.outputField())) {
                 throw new PlatformException("duplicate reference outputField: "

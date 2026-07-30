@@ -7,13 +7,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.context.annotation.Profile;
 
+/**
+ * 班级的标准 Web 交付入口。
+ * 成员随班级请求中的 {@code members} 保存，故不暴露脱离聚合生命周期的成员 Controller；
+ * 排序与回收站端点由 Service Ability 自动投射。
+ */
 @RestController
 @Profile("school-demo")
 @PlatformStaticModule(application = "education", alias = "education.classroom", title = "班级")
 @RequestMapping("/education.classroom")
 public class ClassroomWebController extends WebSupport<ClassroomService>
         implements CrudWeb<Classroom, ClassroomService> {
-    // 成员是班级聚合的子表，随班级新增/更新请求中的 members 一起保存，
-    // 因而不暴露脱离班级生命周期的 ClassMemberController。
-    // 班级服务声明的排序和回收站 Ability 端点由平台自动投射。
 }

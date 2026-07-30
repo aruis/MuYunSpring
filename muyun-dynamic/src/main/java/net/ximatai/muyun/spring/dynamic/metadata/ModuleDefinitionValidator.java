@@ -61,6 +61,12 @@ public class ModuleDefinitionValidator {
         for (EntityReferenceDefinition reference : module.references()) {
             validateReference(reference, entities, module.moduleAlias());
         }
+        for (EntityReferenceLoadDefinition load : module.referenceLoads()) {
+            validateReferenceLoad(load, entities, module.moduleAlias(), module.references());
+        }
+        for (EntityReferencedByDefinition referencedBy : module.referencedBys()) {
+            validateReferencedBy(referencedBy, entities, module.moduleAlias(), module.references());
+        }
         Set<String> associationViewKeys = new HashSet<>();
         for (EntityAssociationViewDefinition view : module.associationViews()) {
             validateAssociationView(view, entities, module.moduleAlias(), module.relations(), module.references());
@@ -937,16 +943,74 @@ public class ModuleDefinitionValidator {
                 requireUnique(outputFields, projection.outputField(), "reference output field");
             }
         }
-        if (reference.autoTitle()) {
-            if (targetEntity != null) {
-                requireReferenceTargetCapability(targetEntity, target);
-            }
-            String outputField = plan.titleOutputField();
-            requireFieldName(outputField, "reference title output field");
-            requireReferenceOutputField(source, outputField, "reference title output field");
-            requireUnique(outputFields, outputField, "reference output field");
-        }
         validateReferenceInteractionRules(reference, source, target, entities, moduleAlias);
+    }
+
+    private void validateReferenceLoad(EntityReferenceLoadDefinition load,
+                                       Map<String, EntityDefinition> entities,
+                                       String moduleAlias,
+                                       List<EntityReferenceDefinition> references) {
+        if (load == null) {
+            throw new ModuleDefinitionException("reference load must not be null");
+        }
+        EntityDefinition source = requireEntity(entities, load.sourceEntityAlias(), "reference load source entity");
+        EntityReferenceDefinition sourceReference = requireReference(references, load.sourceEntityAlias(), load.sourceField());
+        requireFieldName(load.terminalField(), "reference load terminal field");
+        requireFieldName(load.outputField(), "reference load output field");
+        requireReferenceOutputField(source, load.outputField(), "reference load output field");
+        ReferenceTarget current = sourceReference.target();
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath.Hop hop : load.hops()) {
+            if (hop == null || hop.target() == null || hop.viaField() == null) {
+                throw new ModuleDefinitionException("reference load hop requires target and via field: "
+                        + load.sourceEntityAlias() + "." + load.sourceField());
+            }
+            requireFieldName(hop.viaField(), "reference load hop via field");
+            if (moduleAlias.equals(current.moduleAlias())) {
+                EntityDefinition currentEntity = requireEntity(entities, current.entityAlias(), "reference load hop source entity");
+                requireField(currentEntity, hop.viaField(), "reference load hop via field");
+                EntityReferenceDefinition hopReference = requireReference(references, current.entityAlias(), hop.viaField());
+                if (!hop.target().equals(hopReference.target())) {
+                    throw new ModuleDefinitionException("reference load hop target does not match reference: "
+                            + current.qualifiedName() + "." + hop.viaField());
+                }
+            }
+            current = hop.target();
+        }
+        if (moduleAlias.equals(current.moduleAlias())) {
+            EntityDefinition terminal = requireEntity(entities, current.entityAlias(), "reference load terminal entity");
+            requireReferenceTargetCapability(terminal, current);
+            requireField(terminal, load.terminalField(), "reference load terminal field");
+        }
+    }
+
+    private void validateReferencedBy(EntityReferencedByDefinition referencedBy,
+                                      Map<String, EntityDefinition> entities,
+                                      String moduleAlias,
+                                      List<EntityReferenceDefinition> references) {
+        if (referencedBy == null) {
+            throw new ModuleDefinitionException("referenced-by declaration must not be null");
+        }
+        EntityDefinition target = requireEntity(entities, referencedBy.targetEntityAlias(), "referenced-by target entity");
+        EntityDefinition source = requireEntity(entities, referencedBy.sourceEntityAlias(), "referenced-by source entity");
+        requireFieldName(referencedBy.sourceField(), "referenced-by source field");
+        requireFieldName(referencedBy.outputField(), "referenced-by output field");
+        requireReferenceOutputField(target, referencedBy.outputField(), "referenced-by output field");
+        EntityReferenceDefinition reference = requireReference(references, source.alias(), referencedBy.sourceField());
+        if (!ReferenceTarget.of(moduleAlias, target.alias()).equals(reference.target())) {
+            throw new ModuleDefinitionException("referenced-by source does not target entity: "
+                    + source.alias() + "." + referencedBy.sourceField());
+        }
+    }
+
+    private EntityReferenceDefinition requireReference(List<EntityReferenceDefinition> references,
+                                                        String sourceEntityAlias,
+                                                        String sourceField) {
+        return references.stream()
+                .filter(reference -> sourceEntityAlias.equals(reference.sourceEntityAlias()))
+                .filter(reference -> sourceField.equals(reference.sourceField()))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown reference: "
+                        + sourceEntityAlias + "." + sourceField));
     }
 
     private void validateReferenceInteractionRules(EntityReferenceDefinition reference,

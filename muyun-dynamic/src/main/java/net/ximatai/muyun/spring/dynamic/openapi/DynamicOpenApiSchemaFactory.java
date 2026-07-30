@@ -321,7 +321,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("childEntityAlias", stringProperty(false));
         properties.put("childForeignKeyField", stringProperty(false));
         properties.put("autoPopulate", booleanProperty(false));
-        properties.put("autoDeleteWithParent", booleanProperty(false));
+        properties.put("cascadeOnParentUnavailable", booleanProperty(false));
         return new DynamicOpenApiDocument.Schema("DynamicRelationDescriptor", "object", null,
                 List.of("code", "parentEntityAlias", "childEntityAlias"), properties, null);
     }
@@ -333,8 +333,6 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("targetModuleAlias", stringProperty(false));
         properties.put("targetEntityAlias", stringProperty(false));
         properties.put("cardinality", stringProperty(false));
-        properties.put("autoTitle", booleanProperty(false));
-        properties.put("titleOutputField", stringProperty(true));
         properties.put("projections", arrayProperty("DynamicReferenceProjectionDescriptor"));
         return new DynamicOpenApiDocument.Schema("DynamicReferenceDescriptor", "object", null,
                 List.of("sourceEntityAlias", "sourceField", "targetModuleAlias", "targetEntityAlias"),

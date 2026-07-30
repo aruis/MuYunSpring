@@ -7,11 +7,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.context.annotation.Profile;
 
+/** 教师的标准 Web 交付入口；教学学科候选项由字段字典声明统一交付，无需专用枚举接口。 */
 @RestController
 @Profile("school-demo")
 @PlatformStaticModule(application = "education", alias = "education.teacher", title = "教师")
 @RequestMapping("/education.teacher")
 public class TeacherWebController extends WebSupport<TeacherService>
         implements CrudWeb<Teacher, TeacherService> {
-    // 教学学科字段的字典选项由模型字段声明和平台字典能力统一交付，Controller 无需单独维护枚举接口。
 }

@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,7 +85,8 @@ public class StaticRecordReadProjectionService {
         if (projection == null) {
             return response;
         }
-        return projectResponse(response, withReferenceSourceFields(recordService, projection), modelClass(recordService));
+        return projectResponse(response, withReferenceSourceFields(moduleAlias, recordService, projection),
+                modelClass(moduleAlias, recordService));
     }
 
     public boolean supportsDefaultListQuery(String moduleAlias, Object recordService) {
@@ -117,7 +120,8 @@ public class StaticRecordReadProjectionService {
     }
 
     public QuerySchema querySchema(String moduleAlias, Object recordService) {
-        return QuerySchema.from(projectionAwareQueryDescriptor(moduleAlias, recordService), modelClass(recordService));
+        return QuerySchema.from(projectionAwareQueryDescriptor(moduleAlias, recordService),
+                modelClass(moduleAlias, recordService));
     }
 
     /**
@@ -164,7 +168,7 @@ public class StaticRecordReadProjectionService {
         if (compilation == null || compilation.uiDescriptor() == null || compilation.readModel() == null) {
             return Optional.empty();
         }
-        RecordReadProjection projection = withReferenceSourceFields(recordService, RecordReadProjectionPlanner.defaultList(
+        RecordReadProjection projection = withReferenceSourceFields(moduleAlias, recordService, RecordReadProjectionPlanner.defaultList(
                 compilation.uiDescriptor(),
                 compilation.readModel(),
                 recordService,
@@ -180,12 +184,13 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass(recordService),
+        Class<?> modelClass = modelClass(moduleAlias, recordService);
+        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
                 RecordReadProjectionPostProcessor.applyStaticOutput(
-                modelClass(recordService),
+                modelClass,
                 projection,
                 page.getRecords(),
-                optionSourceRegistry), outputFieldNames(projection));
+                optionSourceRegistry), outputFieldNames(projection, modelClass));
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -223,7 +228,7 @@ public class StaticRecordReadProjectionService {
         if (compilation == null || compilation.readModel() == null) {
             return Optional.empty();
         }
-        RecordReadProjection projection = withReferenceSourceFields(recordService, RecordReadProjectionPlanner.explicit(
+        RecordReadProjection projection = withReferenceSourceFields(moduleAlias, recordService, RecordReadProjectionPlanner.explicit(
                 moduleAlias,
                 compilation.readModel(),
                 viewCode,
@@ -241,12 +246,13 @@ public class StaticRecordReadProjectionService {
         if (page == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass(recordService),
+        Class<?> modelClass = modelClass(moduleAlias, recordService);
+        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
                 RecordReadProjectionPostProcessor.applyStaticOutput(
-                modelClass(recordService),
+                modelClass,
                 projection,
                 page.getRecords(),
-                optionSourceRegistry), outputFieldNames(projection));
+                optionSourceRegistry), outputFieldNames(projection, modelClass));
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -259,11 +265,16 @@ public class StaticRecordReadProjectionService {
         return Optional.of(response);
     }
 
-    private Class<?> modelClass(Object recordService) {
+    private Class<?> modelClass(String moduleAlias, Object recordService) {
         if (recordService instanceof CrudAbility<?> crudAbility) {
-            return crudAbility.modelClass();
+            Class<?> modelClass = crudAbility.modelClass();
+            if (modelClass != null) {
+                return modelClass;
+            }
         }
-        return null;
+        return staticModuleDefinitionCatalog.find(moduleAlias)
+                .map(StaticModuleDefinition::modelClass)
+                .orElse(null);
     }
 
     private QueryDescriptor projectionAwareQueryDescriptor(String moduleAlias, Object recordService) {
@@ -282,14 +293,16 @@ public class StaticRecordReadProjectionService {
                 .stream()
                 .flatMap(definition -> definition.readProjections().stream())
                 .filter(projection -> projection.filterable() || projection.sortable())
-                .forEach(projection -> builder.field(queryField(recordService, projection)));
+                .forEach(projection -> builder.field(queryField(moduleAlias, recordService, projection)));
         return builder.build();
     }
 
-    private QueryField queryField(Object recordService, StaticModuleReadProjectionDefinition projection) {
+    private QueryField queryField(String moduleAlias,
+                                  Object recordService,
+                                  StaticModuleReadProjectionDefinition projection) {
         QueryField field = projection.projectionType() == ModuleReadProjection.ProjectionType.EXISTS
                 ? QueryField.of(projection.outputField(), QueryValueType.BOOLEAN, QueryOperator.EQ)
-                : QueryDescriptors.field(modelClass(recordService), projection.outputField());
+                : QueryDescriptors.field(modelClass(moduleAlias, recordService), projection.outputField());
         if (!projection.filterable()) {
             return new QueryField(
                     field.fieldName(),
@@ -325,22 +338,39 @@ public class StaticRecordReadProjectionService {
                 ));
     }
 
-    private List<String> outputFieldNames(RecordReadProjection projection) {
-        return projection.outputFields().stream().map(ViewFieldRef::fieldName).toList();
+    private List<String> outputFieldNames(RecordReadProjection projection, Class<?> modelClass) {
+        LinkedHashSet<String> fields = projection.outputFields().stream()
+                .map(ViewFieldRef::fieldName)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (modelClass != null) {
+            Set<String> optionTitleSources = projection.postReadTransforms().stream()
+                    .map(RecordReadPostTransform::parse)
+                    .flatMap(Optional::stream)
+                    .filter(RecordReadPostTransform::isOptionTitle)
+                    .map(RecordReadPostTransform::fieldName)
+                    .collect(java.util.stream.Collectors.toSet());
+            OptionFieldResolver.resolve(modelClass).stream()
+                    .filter(definition -> optionTitleSources.contains(definition.fieldName()))
+                    .filter(definition -> definition.hasTitleOutput())
+                    .map(definition -> definition.titleOutputField())
+                    .forEach(fields::add);
+        }
+        return List.copyOf(fields);
     }
 
-    private RecordReadProjection withReferenceSourceFields(Object recordService, RecordReadProjection projection) {
-        Class<?> modelClass = modelClass(recordService);
+    private RecordReadProjection withReferenceSourceFields(String moduleAlias,
+                                                            Object recordService,
+                                                            RecordReadProjection projection) {
+        Class<?> modelClass = modelClass(moduleAlias, recordService);
         if (modelClass == null || projection == null) {
             return projection;
         }
-        Set<String> output = Set.copyOf(outputFieldNames(projection));
+        Set<String> output = Set.copyOf(outputFieldNames(projection, modelClass));
         List<String> internal = new java.util.ArrayList<>(projection.internalReadFields());
         for (ReferencePlan plan : StaticReferenceResolver.plans(modelClass)) {
-            boolean titleRequested = plan.autoTitle() && output.contains(plan.titleOutputField());
             boolean projectionRequested = plan.projections().stream()
                     .anyMatch(item -> output.contains(item.outputField()));
-            if ((titleRequested || projectionRequested) && !output.contains(plan.sourceField())) {
+            if (projectionRequested && !output.contains(plan.sourceField())) {
                 internal.add(plan.sourceField());
             }
         }
@@ -359,7 +389,7 @@ public class StaticRecordReadProjectionService {
                                                    Class<?> modelClass) {
         List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
                 RecordReadProjectionProjector.projectWithInternalFields(response.records(), projection),
-                outputFieldNames(projection));
+                outputFieldNames(projection, modelClass));
         return new WebPageResponse(
                 records,
                 response.total(),

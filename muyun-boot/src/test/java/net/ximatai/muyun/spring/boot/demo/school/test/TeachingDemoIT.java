@@ -223,7 +223,10 @@ public class TeachingDemoIT {
     @Test
     void shouldResolveHomeroomTeacherAndPopulateClassMembers() {
         try (TenantContext.Scope ignored = TenantContext.system("school demo aggregate")) {
-            String teacherId = teachers.insert(teacher("T-" + serial(), "王老师", "mathematics"));
+            String assistantId = students.insert(student("S-" + serial(), "李同学", "二年级"));
+            Teacher homeroomTeacher = teacher("T-" + serial(), "王老师", "mathematics");
+            homeroomTeacher.setStudentAssistantId(assistantId);
+            String teacherId = teachers.insert(homeroomTeacher);
             String studentId = students.insert(student("S-" + serial(), "陈同学", "二年级"));
             ClassMember member = classMember(studentId);
             Classroom classroom = classroom("G2-" + serial(), "二年级一班", "2026", teacherId);
@@ -239,6 +242,10 @@ public class TeachingDemoIT {
                 assertThat(loaded.getSortOrder()).isEqualTo(100);
             });
             assertThat(members.select(member.getId()).getStudentIdTitle()).isEqualTo("陈同学");
+            assertThat(members.select(member.getId()).getHomeroomTeacherAssistantTitle()).isEqualTo("李同学");
+            assertThat(students.select(studentId).getClassMemberships())
+                    .extracting(ClassMember::getId)
+                    .containsExactly(member.getId());
         }
     }
 

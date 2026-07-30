@@ -30,8 +30,8 @@ public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
             }
             relation.autoPopulate(populateChildren);
         }
-        if (plan.autoDeleteWithParent()) {
-            relation.autoDeleteWithParent();
+        if (plan.cascadeOnParentUnavailable()) {
+            relation.cascadeOnParentUnavailable();
         }
         return relation;
     }

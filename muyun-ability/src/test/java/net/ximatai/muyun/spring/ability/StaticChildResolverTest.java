@@ -2,7 +2,11 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.child.ChildPlan;
-import net.ximatai.muyun.spring.ability.child.ChildRef;
+import net.ximatai.muyun.spring.ability.child.ChildOf;
+import net.ximatai.muyun.spring.ability.child.Children;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
 import net.ximatai.muyun.spring.ability.child.StaticChildResolverTestAccess;
 
@@ -23,27 +27,28 @@ class StaticChildResolverTest {
     }
 
     @Test
-    void plansShouldCompileChildRefAnnotation() {
+    void plansShouldCompileChildrenFromChildOwnership() {
         assertThat(StaticChildResolver.plans(DemoInvoice.class))
                 .containsExactly(
-                        new ChildPlan("lines", "invoice", "invoiceLine", "invoiceId", true, true),
-                        new ChildPlan("notes", "invoice", "invoiceNote", "invoiceId", true, true)
+                        new ChildPlan("lines", "demoInvoice", "demoInvoiceLine", "invoiceId", true, true),
+                        new ChildPlan("notes", "demoInvoice", "demoInvoiceNote", "invoiceId", true, true)
                 );
         assertThat(StaticChildResolver.plan(DemoInvoice.class, "notes"))
-                .isEqualTo(new ChildPlan("notes", "invoice", "invoiceNote", "invoiceId", true, true));
+                .isEqualTo(new ChildPlan("notes", "demoInvoice", "demoInvoiceNote", "invoiceId", true, true));
     }
 
     @Test
-    void plansShouldDefaultEntityAliasesWhenAnnotationOmitsThem() {
-        assertThat(StaticChildResolver.plans(DefaultChildParent.class))
-                .containsExactly(new ChildPlan(
-                        "items",
-                        "defaultChildParent",
-                        "defaultChildItem",
-                        "parentId",
-                        true,
-                        false
-                ));
+    void plansShouldCompileAggregateOwnershipFromChildForeignKey() {
+        assertThat(StaticChildResolver.plans(OwnedParent.class))
+                .containsExactly(new ChildPlan("items", "ownedParent", "ownedItem", "parentId", true, true));
+    }
+
+    @Test
+    void aggregateOwnershipShouldDelegateParentDeletionToReferenceIntegrity() {
+        assertThat(StaticChildResolver.plans(PreservedOwnedParent.class))
+                .containsExactly(new ChildPlan("items", "preservedOwnedParent", "preservedOwnedItem", "parentId", true, false));
+        assertThat(StaticChildResolver.plans(RestrictedOwnedParent.class))
+                .containsExactly(new ChildPlan("items", "restrictedOwnedParent", "restrictedOwnedItem", "parentId", true, false));
     }
 
     @Test
@@ -76,7 +81,7 @@ class StaticChildResolverTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("expected exactly one child relation plan")
                 .hasMessageContaining("actual relationCodes: []")
-                .hasMessageContaining("@ChildRef");
+                .hasMessageContaining("@Children/@ChildOf");
     }
 
     @Test
@@ -100,89 +105,53 @@ class StaticChildResolverTest {
                 .hasMessageContaining("parentModelClass");
     }
 
-    @Test
-    void rulesShouldRejectNonListChildField() {
-        assertThatThrownBy(() -> StaticChildResolver.plans(InvalidChildFieldRecord.class))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("must be List");
-    }
-
-    @Test
-    void rulesShouldRejectMismatchedChildGeneric() {
-        assertThatThrownBy(() -> StaticChildResolver.plans(MismatchedChildFieldRecord.class))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("not assignable");
-    }
-
-    @Test
-    void rulesShouldRejectDuplicateRelationCodes() {
-        assertThatThrownBy(() -> StaticChildResolver.plans(DuplicateRelationCodeRecord.class))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("duplicate child relationCode");
-    }
-
-    @Test
-    void rulesShouldRejectMissingChildForeignKeyField() {
-        assertThatThrownBy(() -> StaticChildResolver.plans(MissingForeignKeyRecord.class))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("cannot find child foreign key field")
-                .hasMessageContaining(MissingForeignKeyChild.class.getName())
-                .hasMessageContaining("invoiceId");
-    }
-
-    @Test
-    void rulesShouldRejectNonStringChildForeignKeyField() {
-        assertThatThrownBy(() -> StaticChildResolver.plans(NonStringForeignKeyRecord.class))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("childForeignKeyField must be String")
-                .hasMessageContaining(NonStringForeignKeyChild.class.getName())
-                .hasMessageContaining("invoiceId");
-    }
-
-    private static final class InvalidChildFieldRecord extends StandardEntity {
-        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
-        private DemoInvoiceLine line;
-    }
-
-    private static final class MismatchedChildFieldRecord extends StandardEntity {
-        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
-        private List<DemoPlainRecord> lines;
-    }
-
-    private static final class DuplicateRelationCodeRecord extends StandardEntity {
-        @ChildRef(relationCode = "lines", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
-        private List<DemoInvoiceLine> firstLines;
-
-        @ChildRef(relationCode = "lines", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
-        private List<DemoInvoiceLine> secondLines;
-    }
-
-    private static final class MissingForeignKeyRecord extends StandardEntity {
-        @ChildRef(childModel = MissingForeignKeyChild.class, childForeignKeyField = "invoiceId")
-        private List<MissingForeignKeyChild> lines;
-    }
-
-    private static final class MissingForeignKeyChild extends StandardEntity {
-    }
-
-    private static final class NonStringForeignKeyRecord extends StandardEntity {
-        @ChildRef(childModel = NonStringForeignKeyChild.class, childForeignKeyField = "invoiceId")
-        private List<NonStringForeignKeyChild> lines;
-    }
-
-    private static final class NonStringForeignKeyChild extends StandardEntity {
-        private Integer invoiceId;
-    }
-
     private static final class NoChildRecord extends StandardEntity {
     }
 
-    private static final class DefaultChildParent extends StandardEntity {
-        @ChildRef(childModel = DefaultChildItem.class, childForeignKeyField = "parentId")
-        private List<DefaultChildItem> items;
+    private static final class OwnedParent extends StandardEntity {
+        @Children
+        private List<OwnedItem> items;
     }
 
-    private static final class DefaultChildItem extends StandardEntity {
+    private static final class OwnedItem extends StandardEntity {
+        @ChildOf
+        @ReferenceTo(target = OwnedParentService.class,
+                integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.CASCADE_DELETE))
         private String parentId;
+    }
+
+    public static final class OwnedParentService {
+        public static final String MODULE_ALIAS = "demo.ownedParent";
+    }
+
+    private static final class PreservedOwnedParent extends StandardEntity {
+        @Children
+        private List<PreservedOwnedItem> items;
+    }
+
+    private static final class PreservedOwnedItem extends StandardEntity {
+        @ChildOf
+        @ReferenceTo(target = PreservedOwnedParentService.class)
+        private String parentId;
+    }
+
+    public static final class PreservedOwnedParentService {
+        public static final String MODULE_ALIAS = "demo.preservedOwnedParent";
+    }
+
+    private static final class RestrictedOwnedParent extends StandardEntity {
+        @Children
+        private List<RestrictedOwnedItem> items;
+    }
+
+    private static final class RestrictedOwnedItem extends StandardEntity {
+        @ChildOf
+        @ReferenceTo(target = RestrictedOwnedParentService.class,
+                integrity = @ReferenceIntegrity(onTargetUnavailable = ReferenceTargetUnavailablePolicy.RESTRICT))
+        private String parentId;
+    }
+
+    public static final class RestrictedOwnedParentService {
+        public static final String MODULE_ALIAS = "demo.restrictedOwnedParent";
     }
 }

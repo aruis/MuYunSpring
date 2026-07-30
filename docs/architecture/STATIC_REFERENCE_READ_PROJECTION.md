@@ -36,7 +36,53 @@ private String employeeId;
 `target` 与 `moduleAlias` / `entityAlias` 必须二选一。记录引用始终指向目标主键 `id`；字典 code 由独立字典能力处理，不作为记录引用或 join 预留。
 
 引用关系描述的是模型事实，不描述 UI 要展示哪些字段，也不描述 SQL join。普通业务模块不应手写 join SQL。
-静态 service 推荐使用字段引用链，以模型字段本身作为引用路径抓手。
+静态 service 不绑定目标 service；平台按 `ReferenceTo.target` 通过全局 `ReferenceTargetResolver` 解析标题和投影，
+以模型字段本身作为引用路径抓手。
+
+引用字段的派生输出声明在输出字段上，而不是作为 `@ReferenceTo` 的附带开关：
+
+```java
+@ReferenceLoad(source = "employeeId", field = "title")
+private transient String employeeTitle;
+```
+
+`@ReferencedBy` 则表达只读反向关联。它从 `List` 的泛型来源模型中寻找唯一指向当前模型的
+`@ReferenceTo`；多条引用时以 `sourceField` 消歧。平台启动时按来源模型自动解析唯一的 CRUD service，
+读取目标记录后按该外键装配列表；缺少或重复来源 service 会在启动期失败。该注解不属于聚合、不会写入
+来源记录，也不会改变删除策略或触发父删联动。
+
+```java
+@ReferencedBy(sourceField = "departmentId")
+private transient List<Employee> employees;
+```
+
+来源 service 继续负责其自身的数据域、软删和排序规则；反向关联只复用该读取入口，不要求来源 service
+成为 `ChildAbility`，目标 service 也不需要重复声明关联配置。
+
+## 多跳引用读取
+
+当 `A.bId -> B.cId -> C`，A 需要读取 C 的字段时，用起点字段和类型化终点声明：
+
+```java
+@ReferenceLoad(source = "bId", hops = @ReferenceHop(target = CService.class))
+private transient String cTitle;
+```
+
+终点字段默认是 `title`；读取其他字段时显式给出 `field`。平台在 B 的引用中寻找唯一指向
+`CService` 的字段，并在启动期校验 A→B→C 链路。B 有多个可达 C 的引用时，才在对应 hop 上用 `via`
+指出 B 的单个外键字段：
+
+```java
+@ReferenceLoad(
+    source = "bId",
+    hops = @ReferenceHop(target = CService.class, via = "primaryCId"),
+    field = "status"
+)
+private transient String cStatus;
+```
+
+`source` 和每个 `via` 都必须是实际 `@ReferenceTo` 字段；每个 hop 的 `target` 都是 service class，不使用
+点分路径字符串。四级及更深链路只需继续添加 hop；平台会按统一引用投影契约逐层批量解析。
 
 ## 读投影声明
 
@@ -155,7 +201,7 @@ UI 不直接写跨模块路径，也不声明 SQL join。跨模块字段引用�
 
 ## 跨动静引用读取
 
-`@ReferenceTo` 的 `autoTitle` 和 `projections` 不以 SQL join 为前提。列表读取在完成源记录查询后，
+`@ReferenceLoad` 不以 SQL join 为前提。列表读取在完成源记录查询后，
 会按 `ReferenceTarget` 聚合源记录中的目标 ID 与所需字段，通过统一 `ReferenceAbility` 批量读取并回填输出。
 因此静态模块引用动态模块时，仍可获得标题和字段投影；每个目标最多各执行一次标题读取和字段投影读取，
 不会产生逐行查询。

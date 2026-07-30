@@ -299,8 +299,6 @@ class DynamicImportExecutorTest {
                 MODULE,
                 "customer",
                 ReferenceCardinality.ONE,
-                false,
-                "",
                 List.of()
         );
         return new DynamicImportPlan(MODULE, null, List.of(
@@ -329,8 +327,6 @@ class DynamicImportExecutorTest {
                 MODULE,
                 "tag",
                 ReferenceCardinality.MANY,
-                false,
-                "",
                 List.of()
         );
         return new DynamicImportPlan(MODULE, null, List.of(

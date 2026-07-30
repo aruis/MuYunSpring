@@ -9,13 +9,15 @@ public final class ModuleDefinition {
     private final List<EntityDefinition> entities;
     private final List<EntityRelationDefinition> relations;
     private final List<EntityReferenceDefinition> references;
+    private final List<EntityReferenceLoadDefinition> referenceLoads;
+    private final List<EntityReferencedByDefinition> referencedBys;
     private final List<EntityViewDefinition> views;
     private final List<EntityAssociationViewDefinition> associationViews;
     private final List<EntityActionDefinition> actions;
     private final String mainEntityAlias;
 
     public ModuleDefinition(String moduleAlias, String name, List<EntityDefinition> entities) {
-        this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of(), List.of(), null);
+        this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null);
     }
 
     private ModuleDefinition(String moduleAlias,
@@ -23,6 +25,8 @@ public final class ModuleDefinition {
                              List<EntityDefinition> entities,
                              List<EntityRelationDefinition> relations,
                              List<EntityReferenceDefinition> references,
+                             List<EntityReferenceLoadDefinition> referenceLoads,
+                             List<EntityReferencedByDefinition> referencedBys,
                              List<EntityViewDefinition> views,
                              List<EntityAssociationViewDefinition> associationViews,
                              List<EntityActionDefinition> actions,
@@ -30,6 +34,8 @@ public final class ModuleDefinition {
         entities = entities == null ? List.of() : List.copyOf(entities);
         relations = relations == null ? List.of() : List.copyOf(relations);
         references = references == null ? List.of() : List.copyOf(references);
+        referenceLoads = referenceLoads == null ? List.of() : List.copyOf(referenceLoads);
+        referencedBys = referencedBys == null ? List.of() : List.copyOf(referencedBys);
         views = views == null ? List.of() : List.copyOf(views);
         associationViews = associationViews == null ? List.of() : List.copyOf(associationViews);
         actions = actions == null ? List.of() : List.copyOf(actions);
@@ -41,6 +47,8 @@ public final class ModuleDefinition {
         this.entities = entities;
         this.relations = relations;
         this.references = references;
+        this.referenceLoads = referenceLoads;
+        this.referencedBys = referencedBys;
         this.views = views;
         this.associationViews = associationViews;
         this.actions = actions;
@@ -52,6 +60,8 @@ public final class ModuleDefinition {
     public List<EntityDefinition> entities() { return entities; }
     public List<EntityRelationDefinition> relations() { return relations; }
     public List<EntityReferenceDefinition> references() { return references; }
+    public List<EntityReferenceLoadDefinition> referenceLoads() { return referenceLoads; }
+    public List<EntityReferencedByDefinition> referencedBys() { return referencedBys; }
     public List<EntityViewDefinition> views() { return views; }
     public List<EntityAssociationViewDefinition> associationViews() { return associationViews; }
     public List<EntityActionDefinition> actions() { return actions; }
@@ -62,6 +72,8 @@ public final class ModuleDefinition {
     public List<EntityDefinition> getEntities() { return entities; }
     public List<EntityRelationDefinition> getRelations() { return relations; }
     public List<EntityReferenceDefinition> getReferences() { return references; }
+    public List<EntityReferenceLoadDefinition> getReferenceLoads() { return referenceLoads; }
+    public List<EntityReferencedByDefinition> getReferencedBys() { return referencedBys; }
     public List<EntityViewDefinition> getViews() { return views; }
     public List<EntityAssociationViewDefinition> getAssociationViews() { return associationViews; }
     public List<EntityActionDefinition> getActions() { return actions; }
@@ -76,6 +88,8 @@ public final class ModuleDefinition {
                 && Objects.equals(entities, that.entities)
                 && Objects.equals(relations, that.relations)
                 && Objects.equals(references, that.references)
+                && Objects.equals(referenceLoads, that.referenceLoads)
+                && Objects.equals(referencedBys, that.referencedBys)
                 && Objects.equals(views, that.views)
                 && Objects.equals(associationViews, that.associationViews)
                 && Objects.equals(actions, that.actions)
@@ -84,7 +98,7 @@ public final class ModuleDefinition {
 
     @Override
     public int hashCode() {
-        return Objects.hash(moduleAlias, name, entities, relations, references, views, associationViews, actions,
+        return Objects.hash(moduleAlias, name, entities, relations, references, referenceLoads, referencedBys, views, associationViews, actions,
                 mainEntityAlias);
     }
 
@@ -95,6 +109,8 @@ public final class ModuleDefinition {
                 + ", entities=" + entities
                 + ", relations=" + relations
                 + ", references=" + references
+                + ", referenceLoads=" + referenceLoads
+                + ", referencedBys=" + referencedBys
                 + ", views=" + views
                 + ", associationViews=" + associationViews
                 + ", actions=" + actions
@@ -114,6 +130,8 @@ public final class ModuleDefinition {
                 .entities(entities)
                 .relations(relations)
                 .references(references)
+                .referenceLoads(referenceLoads)
+                .referencedBys(referencedBys)
                 .views(views)
                 .associationViews(associationViews)
                 .actions(actions)
@@ -126,6 +144,8 @@ public final class ModuleDefinition {
         private List<EntityDefinition> entities = List.of();
         private List<EntityRelationDefinition> relations = List.of();
         private List<EntityReferenceDefinition> references = List.of();
+        private List<EntityReferenceLoadDefinition> referenceLoads = List.of();
+        private List<EntityReferencedByDefinition> referencedBys = List.of();
         private List<EntityViewDefinition> views = List.of();
         private List<EntityAssociationViewDefinition> associationViews = List.of();
         private List<EntityActionDefinition> actions = List.of();
@@ -151,6 +171,16 @@ public final class ModuleDefinition {
             return this;
         }
 
+        public Builder referenceLoads(List<EntityReferenceLoadDefinition> referenceLoads) {
+            this.referenceLoads = referenceLoads;
+            return this;
+        }
+
+        public Builder referencedBys(List<EntityReferencedByDefinition> referencedBys) {
+            this.referencedBys = referencedBys;
+            return this;
+        }
+
         public Builder views(List<EntityViewDefinition> views) {
             this.views = views;
             return this;
@@ -172,7 +202,7 @@ public final class ModuleDefinition {
         }
 
         public ModuleDefinition build() {
-            return new ModuleDefinition(moduleAlias, name, entities, relations, references, views, associationViews,
+            return new ModuleDefinition(moduleAlias, name, entities, relations, references, referenceLoads, referencedBys, views, associationViews,
                     actions, mainEntityAlias);
         }
     }

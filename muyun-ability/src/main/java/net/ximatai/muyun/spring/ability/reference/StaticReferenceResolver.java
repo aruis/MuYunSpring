@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability.reference;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class StaticReferenceResolver {
     private static final Map<Class<?>, List<ReferenceRule>> RULES = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, List<ReferenceLoadPath>> LOAD_PATHS = new ConcurrentHashMap<>();
 
     private StaticReferenceResolver() {
     }
@@ -55,6 +57,13 @@ public final class StaticReferenceResolver {
                 .toList();
     }
 
+    public static List<ReferenceLoadPath> loadPaths(Class<?> modelClass) {
+        if (modelClass == null) {
+            return List.of();
+        }
+        return LOAD_PATHS.computeIfAbsent(modelClass, StaticReferenceResolver::compileLoadPaths);
+    }
+
     public static List<String> values(Object record, ReferencePlan plan) {
         if (record == null || plan == null) {
             return List.of();
@@ -66,22 +75,29 @@ public final class StaticReferenceResolver {
                 .orElseGet(() -> plan.normalizeValues(readByFieldName(record, plan.sourceField())));
     }
 
-    public static void writeTitleValue(Object record, String titleOutputField, Object titleValue) {
-        if (record == null || titleOutputField == null || titleOutputField.isBlank()) {
+    public static void writeLoadedValue(Object record, String outputField, Object value) {
+        if (record == null || outputField == null || outputField.isBlank()) {
             return;
         }
-        writeByFieldName(record, titleOutputField, titleValue);
+        writeByFieldName(record, outputField, value);
+    }
+
+    public static void requireReadableField(Class<?> modelClass, String fieldName, String purpose) {
+        if (modelClass == null || fieldName == null || fieldName.isBlank()) {
+            throw new PlatformException(purpose + " field must not be blank");
+        }
+        readField(modelClass, fieldName);
     }
 
     static void clearCacheForTests() {
         RULES.clear();
+        LOAD_PATHS.clear();
     }
 
     private static List<ReferenceRule> loadRules(Class<?> modelClass) {
+        LinkedHashMap<String, Field> fields = fields(modelClass);
         LinkedHashMap<String, ReferenceRule> rules = new LinkedHashMap<>();
-        Class<?> current = modelClass;
-        while (current != null && !Object.class.equals(current)) {
-            for (Field field : current.getDeclaredFields()) {
+        for (Field field : fields.values()) {
                 ReferenceTo referenceTo = field.getAnnotation(ReferenceTo.class);
                 if (referenceTo == null) {
                     continue;
@@ -93,10 +109,58 @@ public final class StaticReferenceResolver {
                             + modelClass.getName() + "." + field.getName(), e);
                 }
                 rules.putIfAbsent(field.getName(), new ReferenceRule(field, referenceToPlan(field, referenceTo)));
+        }
+        Set<String> outputFields = new LinkedHashSet<>();
+        for (Field output : fields.values()) {
+            ReferenceLoad load = output.getAnnotation(ReferenceLoad.class);
+            if (load == null) {
+                continue;
             }
-            current = current.getSuperclass();
+            ReferenceRule source = rules.get(load.source());
+            if (source == null) {
+                throw new PlatformException("ReferenceLoad source must declare @ReferenceTo: "
+                        + modelClass.getName() + "." + load.source());
+            }
+            validateLoadField(modelClass, output, source, load);
+            if (!outputFields.add(output.getName())) {
+                throw new PlatformException("duplicate reference load output field: "
+                        + modelClass.getName() + "." + output.getName());
+            }
+            if (load.hops().length == 0) {
+                ReferencePlan plan = source.plan().withProjection(load.field(), output.getName());
+                rules.put(load.source(), new ReferenceRule(source.field(), plan));
+            }
         }
         return List.copyOf(rules.values());
+    }
+
+    private static List<ReferenceLoadPath> compileLoadPaths(Class<?> modelClass) {
+        LinkedHashMap<String, Field> fields = fields(modelClass);
+        Map<String, ReferenceRule> rulesByField = rules(modelClass).stream()
+                .collect(java.util.stream.Collectors.toMap(rule -> rule.plan().sourceField(), rule -> rule,
+                        (first, ignored) -> first, LinkedHashMap::new));
+        List<ReferenceLoadPath> paths = new java.util.ArrayList<>();
+        for (Field output : fields.values()) {
+            ReferenceLoad load = output.getAnnotation(ReferenceLoad.class);
+            if (load == null || load.hops().length == 0) {
+                continue;
+            }
+            ReferenceRule source = rulesByField.get(load.source());
+            if (source == null) {
+                throw new PlatformException("ReferenceLoad source must declare @ReferenceTo: "
+                        + modelClass.getName() + "." + load.source());
+            }
+            validateLoadField(modelClass, output, source, load);
+            if (source.cardinality() != ReferenceCardinality.ONE) {
+                throw new PlatformException("multi-hop ReferenceLoad source must have cardinality ONE: "
+                        + modelClass.getName() + "." + load.source());
+            }
+            List<ReferenceLoadPath.Hop> hops = java.util.Arrays.stream(load.hops())
+                    .map(hop -> new ReferenceLoadPath.Hop(targetOfService(hop.target()), normalize(hop.via())))
+                    .toList();
+            paths.add(new ReferenceLoadPath(load.source(), source.target(), hops, load.field(), output.getName()));
+        }
+        return List.copyOf(paths);
     }
 
     private static ReferencePlan referenceToPlan(Field field, ReferenceTo referenceTo) {
@@ -104,9 +168,7 @@ public final class StaticReferenceResolver {
                 field.getName(),
                 targetOf(referenceTo),
                 referenceTo.cardinality(),
-                referenceTo.autoTitle(),
-                referenceTo.titleOutputField(),
-                projections(referenceTo),
+                List.of(),
                 ReferenceIntegrityPolicy.from(referenceTo.integrity())
         );
     }
@@ -122,10 +184,21 @@ public final class StaticReferenceResolver {
             return ReferenceTarget.of(reference.moduleAlias(), reference.entityAlias());
         }
         try {
-            Field moduleAliasField = reference.target().getField("MODULE_ALIAS");
+            return targetOfService(reference.target());
+        } catch (PlatformException ex) {
+            throw ex;
+        }
+    }
+
+    public static ReferenceTarget targetOfService(Class<?> serviceType) {
+        if (serviceType == null || serviceType == Void.class) {
+            throw new PlatformException("ReferenceLoad target must declare a service class");
+        }
+        try {
+            Field moduleAliasField = serviceType.getField("MODULE_ALIAS");
             if (!Modifier.isStatic(moduleAliasField.getModifiers()) || moduleAliasField.getType() != String.class) {
                 throw new PlatformException("ReferenceTo target MODULE_ALIAS must be public static String: "
-                        + reference.target().getName());
+                        + serviceType.getName());
             }
             String moduleAlias = (String) moduleAliasField.get(null);
             int separator = moduleAlias.lastIndexOf('.');
@@ -134,15 +207,47 @@ public final class StaticReferenceResolver {
             }
             return ReferenceTarget.of(moduleAlias.substring(0, separator), moduleAlias.substring(separator + 1));
         } catch (ReflectiveOperationException ex) {
-            throw new PlatformException("ReferenceTo target requires public MODULE_ALIAS: "
-                    + reference.target().getName(), ex);
+            throw new PlatformException("ReferenceTo target requires public MODULE_ALIAS: " + serviceType.getName(), ex);
         }
     }
 
-    private static List<ReferenceProjection> projections(ReferenceTo referenceTo) {
-        return java.util.Arrays.stream(referenceTo.projections())
-                .map(projection -> new ReferenceProjection(projection.targetField(), projection.outputField()))
-                .toList();
+    private static String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static LinkedHashMap<String, Field> fields(Class<?> modelClass) {
+        LinkedHashMap<String, Field> fields = new LinkedHashMap<>();
+        Class<?> current = modelClass;
+        while (current != null && !Object.class.equals(current)) {
+            for (Field field : current.getDeclaredFields()) {
+                fields.putIfAbsent(field.getName(), field);
+            }
+            current = current.getSuperclass();
+        }
+        return fields;
+    }
+
+    private static void validateLoadField(Class<?> modelClass,
+                                          Field output,
+                                          ReferenceRule source,
+                                          ReferenceLoad load) {
+        if (load.field() == null || load.field().isBlank()) {
+            throw new PlatformException("ReferenceLoad field must not be blank: "
+                    + modelClass.getName() + "." + output.getName());
+        }
+        if (!Modifier.isTransient(output.getModifiers())) {
+            throw new PlatformException("ReferenceLoad output must be transient: "
+                    + modelClass.getName() + "." + output.getName());
+        }
+        boolean collection = Collection.class.isAssignableFrom(output.getType());
+        if (source.cardinality() == ReferenceCardinality.MANY && !collection) {
+            throw new PlatformException("ReferenceLoad output for MANY reference must be a Collection: "
+                    + modelClass.getName() + "." + output.getName());
+        }
+        if (source.cardinality() == ReferenceCardinality.ONE && collection) {
+            throw new PlatformException("ReferenceLoad output for ONE reference must not be a Collection: "
+                    + modelClass.getName() + "." + output.getName());
+        }
     }
 
     public record ReferenceRule(Field field, ReferencePlan plan) {
@@ -168,19 +273,25 @@ public final class StaticReferenceResolver {
     }
 
     private static Object readByFieldName(Object record, String fieldName) {
-        Class<?> current = record.getClass();
+        Field field = readField(record.getClass(), fieldName);
+        try {
+            field.setAccessible(true);
+            return field.get(record);
+        } catch (IllegalAccessException e) {
+            throw new PlatformException("Cannot read reference field: " + fieldName, e);
+        }
+    }
+
+    private static Field readField(Class<?> modelClass, String fieldName) {
+        Class<?> current = modelClass;
         while (current != null && !Object.class.equals(current)) {
             try {
-                Field field = current.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field.get(record);
+                return current.getDeclaredField(fieldName);
             } catch (NoSuchFieldException ignored) {
                 current = current.getSuperclass();
-            } catch (IllegalAccessException e) {
-                throw new PlatformException("Cannot read reference field: " + fieldName, e);
             }
         }
-        throw new PlatformException("Cannot find reference field: " + record.getClass().getName() + "." + fieldName);
+        throw new PlatformException("Cannot find reference field: " + modelClass.getName() + "." + fieldName);
     }
 
     private static void writeByFieldName(Object record, String fieldName, Object value) {

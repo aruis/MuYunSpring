@@ -26,6 +26,7 @@
 | TD-029 | 关联投影查询仍需继续平台化 | 当前已将静态列表 SQL join 上移到来源无关的 `RelationProjectionReadService` / `RelationProjection*` 能力，并收敛输出字段、cardinality、递归深度、join 数量和 relation 字段查询边界；动态主实体 `ONE` 引用投影已有最小 adapter，动态列表 `uiConfigId` 查询已能复用同一 SQL 投影门面，SQL Map 输出已支持输出脱敏字段保护；加密、签名等存储保护字段、projection plan 缓存、模块关系、子实体引用、`MANY` 聚合和字典标题尚未完成 | 按 [关联投影查询治理](architecture/RELATION_PROJECTION_GOVERNANCE.md) 分阶段回收，动态表单业务推进时继续把动态引用字段、模块关系和字典标题编译到同一套 `RelationProjection` |
 | TD-034 | 动态模块回收站尚未形成端到端交付链路 | `RECYCLE_BIN` 已能进入动态模块运行时能力和动作目录，但动态 Web 端点、动态记录运行态执行、页面宿主 mode 切换及恢复/清理交互尚未接入；若仅凭能力自动暴露入口，会产生不可用操作 | 进入动态模块软删治理或动态页面生命周期动作交付时，补齐动态回收站查询、恢复、清理、范围校验和宿主 mode 契约，再允许动态页面按能力自动展示入口 |
 | TD-035 | 动态复合租户唯一约束尚无持久化元数据事实源 | `EntityDefinition` 已能表达复合租户唯一约束，schema 映射与运行态预查也会使用同一事实；但配置管理侧尚未持久化该声明，现有 metadata compiler 只会从 `FieldDefinition.isUnique` 编译单字段唯一。因此不能将动态复合唯一配置视为已交付能力 | 出现真实动态模块需要复合租户唯一时，成套建设持久化定义、compiler、校验、schema 刷新、发布和配置 UI，再开放该配置入口 |
+| TD-036 | 动态引用加载与反向引用尚未进入配置持久化和页面交付 | 运行态已支持 `EntityReferenceLoadDefinition` 编译为与静态一致的 `ReferenceLoadPath`，并由共享 `ReferenceLoadReader` 执行多跳读取；`EntityReferencedByDefinition` 也能按动态 CRUD 链路装配反向集合。但二者尚无平台配置的持久化事实、metadata compiler 输入和动态页面 descriptor 表达，不能视为低代码可配置能力 | 出现真实动态模块需要配置多跳展示字段或反向集合视图时，成套建设配置定义、保存校验、compiler、运行态 refresh、页面 descriptor 与关联视图交付；引用加载输出字段保持只读虚拟字段，反向集合优先进入关联视图而非普通表单字段 |
 
 ### 待决策
 

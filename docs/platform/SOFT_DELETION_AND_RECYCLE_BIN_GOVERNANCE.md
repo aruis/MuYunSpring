@@ -72,7 +72,7 @@ A.delete(a)
 
 普通引用的写入完整性与目标生命周期实现分开处理：非空引用在新增、更新和恢复时必须解析到当前租户范围内可用的目标；该校验不能由引用 title 或业务 service 的重复查询承担。引用字段可显式声明目标不可用策略：`PRESERVE_HISTORY` 允许目标退出正常引用解析且保留引用方，适用于历史事实；`RESTRICT` 在存在活跃引用方时拒绝目标变为不可用，适用于当前业务关系；`CASCADE_DELETE` 将引用方纳入同一删除链，由引用方自身决定软删或硬删，适用于生命周期从属。策略对标准软删和直接硬删一致生效；最终清理仍按原删除链执行。级联必须显式声明，不从普通引用或数据库字段自动推断。
 
-`@ChildRef` 与动态 `EntityRelationDefinition` 负责聚合载入、嵌套写入和归属字段；它们已有的 `autoDeleteWithParent` 仅作为存量兼容配置，并在目标不可用前、使用同一删除上下文执行。新业务的删除从属关系应声明在子项的引用字段上，以便静态模型与动态元数据编译成同一份反向删除关系计划；同一条关系不应同时配置旧级联开关和 `CASCADE_DELETE`。
+`@Children` / `@ChildOf` 与动态 `EntityRelationDefinition` 负责聚合载入、嵌套写入和归属字段。父删除始终以子项 FK 的引用完整性为准：仅 `CASCADE_DELETE` 清理子项，`RESTRICT` 阻断，`PRESERVE_HISTORY` 保留。静态模型通过 `@ReferenceTo.integrity` 声明，动态模型通过同一条 `EntityReferenceDefinition.integrity` 声明；关系定义不再拥有独立的级联删除开关。
 
 静态注解原有的 `onTargetSoftDelete` 与 `ReferenceTargetDeletionPolicy` 保留为弃用兼容入口；其 `RESTRICT` 映射为新的 `onTargetUnavailable = RESTRICT`。新代码不得继续使用旧名称，动态元数据只使用新策略。
 

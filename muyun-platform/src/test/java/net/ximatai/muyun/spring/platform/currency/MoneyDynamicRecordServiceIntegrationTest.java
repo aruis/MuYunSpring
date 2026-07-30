@@ -320,7 +320,7 @@ class MoneyDynamicRecordServiceIntegrationTest {
                 .entities(List.of(orderEntity(), orderLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .build();
     }
 

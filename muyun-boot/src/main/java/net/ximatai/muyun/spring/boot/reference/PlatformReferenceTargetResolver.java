@@ -5,25 +5,25 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 
-import java.util.List;
 import java.util.Optional;
 
 /** Resolves static and dynamic reference targets through one platform boundary. */
 public final class PlatformReferenceTargetResolver implements ReferenceTargetResolver {
-    private final List<ReferenceAbility<?>> staticAbilities;
+    private final StaticAbilityCatalog staticAbilities;
     private final DynamicRecordRuntime dynamicRuntime;
 
-    public PlatformReferenceTargetResolver(List<ReferenceAbility<?>> staticAbilities,
+    public PlatformReferenceTargetResolver(StaticAbilityCatalog staticAbilities,
                                            DynamicRecordRuntime dynamicRuntime) {
-        this.staticAbilities = staticAbilities == null ? List.of() : List.copyOf(staticAbilities);
+        this.staticAbilities = staticAbilities;
         this.dynamicRuntime = dynamicRuntime;
     }
 
     @Override
     public Optional<ReferenceAbility<?>> resolve(ReferenceTarget target) {
-        for (ReferenceAbility<?> ability : staticAbilities) {
-            if (target.equals(ability.referenceTarget())) {
-                return Optional.of(ability);
+        if (staticAbilities != null) {
+            Optional<ReferenceAbility<?>> resolved = staticAbilities.findReference(target);
+            if (resolved.isPresent()) {
+                return resolved;
             }
         }
         return dynamicRuntime == null ? Optional.empty() : dynamicRuntime.referenceAbility(target);

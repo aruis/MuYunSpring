@@ -1919,7 +1919,7 @@ class DynamicRecordServiceTest {
         });
         EntityReferenceDefinition reference = EntityReferenceDefinition
                 .to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
-                .withAutoTitle("contractTitle")
+                .withProjection("title", "contractTitle")
                 .withProjection("code", "contractCode")
                 .withInteractionRules(
                         List.of(new EntityReferenceFilterDefinition("contractRegion", "region", DynamicQueryOperator.EQ)),
@@ -3016,7 +3016,7 @@ class DynamicRecordServiceTest {
                         .relations(List.of())
                         .references(List.of(EntityReferenceDefinition
                                 .to("line", "contractId", ReferenceTarget.of("crm.customer", "customer"))
-                                .withAutoTitle("customerTitle")
+                                .withProjection("title", "customerTitle")
                                 .withProjection("code", "customerCode")))
                         .build())
                 .register(new ModuleDefinition(
@@ -3384,7 +3384,7 @@ class DynamicRecordServiceTest {
                                                            DataScopeCriteriaService dataScopeCriteriaService) {
         return referenceResolvingService(operations, referenceEntity(), lineEntity(),
                 EntityReferenceDefinition.to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
-                        .withAutoTitle("contractTitle")
+                        .withProjection("title", "contractTitle")
                         .withProjection("code", "contractCode"),
                 dataScopeCriteriaService);
     }

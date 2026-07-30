@@ -698,7 +698,7 @@ class DynamicCodeCoordinatorRepositoryIT {
                 ))
                 .relations(List.of(EntityRelationDefinition.child("lines", "main", "line", "mainId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .build());
         return new Scenario(moduleAlias);
     }

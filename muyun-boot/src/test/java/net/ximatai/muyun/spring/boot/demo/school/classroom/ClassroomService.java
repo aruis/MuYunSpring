@@ -8,13 +8,12 @@ import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.boot.demo.school.teacher.TeacherService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/** 班级聚合根 Service：声明成员关系，并作为可引用、可排序、可回收的班级主数据入口。 */
 @Service
 public class ClassroomService extends AbstractAbilityService<Classroom> implements
         RecycleBinAbility<Classroom>,
@@ -23,14 +22,12 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         ReferencerAbility<Classroom>,
         ReferenceAbility<Classroom>,
         CacheAbility<Classroom> {
-    private final TeacherService teacherService;
+    public static final String MODULE_ALIAS = "education.classroom";
     private final ClassMemberService memberService;
 
     public ClassroomService(ClassroomDao dao,
-                            TeacherService teacherService,
                             ClassMemberService memberService) {
-        super("education.classroom", Classroom.class, dao);
-        this.teacherService = teacherService;
+        super(MODULE_ALIAS, Classroom.class, dao);
         this.memberService = memberService;
     }
 
@@ -44,8 +41,4 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         return List.of(childRelation("members", memberService));
     }
 
-    @Override
-    public List<ReferenceLookup> referenceLookups() {
-        return List.of(referenceLookup(teacherService));
-    }
 }

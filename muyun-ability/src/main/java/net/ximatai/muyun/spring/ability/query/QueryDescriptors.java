@@ -25,7 +25,6 @@ public final class QueryDescriptors {
             "approvalEnabled",
             "autoTitle",
             "autoPopulate",
-            "cascadeDelete",
             "cloneable",
             "unitRequired",
             "moneyCurrencyRequired",

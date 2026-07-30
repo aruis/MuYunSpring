@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
-import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -266,9 +266,13 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     private static final class ReferenceOrder {
-        @ReferenceTo(moduleAlias = "crm", entityAlias = "customer", autoTitle = true,
-                titleOutputField = "customerTitle",
-                projections = @ReferenceProject(targetField = "level", outputField = "customerLevel"))
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
+
+        @ReferenceLoad(source = "customerId", field = "title")
+        private transient String customerTitle;
+
+        @ReferenceLoad(source = "customerId", field = "level")
+        private transient String customerLevel;
     }
 }

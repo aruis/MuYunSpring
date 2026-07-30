@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
+import java.util.List;
 
 public record DynamicRelationDescriptor(
         String code,
@@ -8,16 +10,18 @@ public record DynamicRelationDescriptor(
         String childEntityAlias,
         String childForeignKeyField,
         boolean autoPopulate,
-        boolean autoDeleteWithParent
+        boolean cascadeOnParentUnavailable
 ) {
-    public static DynamicRelationDescriptor from(EntityRelationDefinition relation) {
+    public static DynamicRelationDescriptor from(String moduleAlias,
+                                                 EntityRelationDefinition relation,
+                                                 List<EntityReferenceDefinition> references) {
         return new DynamicRelationDescriptor(
                 relation.code(),
                 relation.parentEntityAlias(),
                 relation.childEntityAlias(),
                 relation.childForeignKeyField(),
                 relation.autoPopulate(),
-                relation.autoDeleteWithParent()
+                relation.cascadeOnParentUnavailable(moduleAlias, references)
         );
     }
 }

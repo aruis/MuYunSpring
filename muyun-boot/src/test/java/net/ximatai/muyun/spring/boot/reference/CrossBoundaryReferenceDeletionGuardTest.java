@@ -17,6 +17,8 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplication;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
@@ -154,6 +156,31 @@ class CrossBoundaryReferenceDeletionGuardTest {
                 employeeTarget, target, context, node, DeletionMode.HARD);
 
         verify(accountBinding).delete(eq("binding-1"), eq(2), any(DeletionContext.class));
+    }
+
+    @Test
+    void shouldCascadeActualTenantApplicationReferenceWithoutManualChildRelation() {
+        CrudAbility<?> tenantTarget = mock(CrudAbility.class);
+        when(tenantTarget.getModuleAlias()).thenReturn(TenantService.MODULE_ALIAS);
+        EntityContract target = mock(EntityContract.class);
+        when(target.getId()).thenReturn("tenant-a");
+
+        @SuppressWarnings("rawtypes")
+        CrudAbility tenantApplication = mock(CrudAbility.class);
+        EntityContract entitlement = mock(EntityContract.class);
+        when(entitlement.getId()).thenReturn("tenant-a-sales");
+        when(entitlement.getVersion()).thenReturn(2);
+        when(tenantApplication.modelClass()).thenReturn(TenantApplication.class);
+        when(tenantApplication.getModuleAlias()).thenReturn("iam.tenant_application");
+        when(tenantApplication.list(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(entitlement), List.of());
+
+        DeletionContext context = DeletionContext.root(TenantService.MODULE_ALIAS, "tenant-a");
+        DeletionNode node = DeletionNode.transientNode(new DeletionResource(TenantService.MODULE_ALIAS, "tenant-a"));
+        new StaticReferenceDeletionGuard(List.of(tenantApplication)).beforeTargetUnavailable(
+                tenantTarget, target, context, node, DeletionMode.HARD);
+
+        verify(tenantApplication).delete(eq("tenant-a-sales"), eq(2), any(DeletionContext.class));
     }
 
     static final class StaticContractLink {

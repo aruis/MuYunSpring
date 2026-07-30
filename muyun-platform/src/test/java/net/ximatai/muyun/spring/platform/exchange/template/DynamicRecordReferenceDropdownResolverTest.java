@@ -53,8 +53,6 @@ class DynamicRecordReferenceDropdownResolverTest {
                 MODULE,
                 "customer",
                 ReferenceCardinality.ONE,
-                false,
-                "",
                 List.of()
         );
     }

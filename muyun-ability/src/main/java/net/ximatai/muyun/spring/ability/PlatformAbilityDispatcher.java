@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionTransactionOperator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferencedByResolver;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoadResolver;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver;
@@ -26,6 +28,8 @@ final class PlatformAbilityDispatcher {
     private static volatile DeletionTransactionOperator deletionTransactionOperator = DeletionTransactionOperator.NONE;
     private static volatile ReferenceDeletionGuard referenceDeletionGuard = ReferenceDeletionGuard.NONE;
     private static volatile ReferenceTargetResolver referenceTargetResolver = ReferenceTargetResolver.NONE;
+    private static volatile ReferencedByResolver referencedByResolver = ReferencedByResolver.NONE;
+    private static volatile ReferenceLoadResolver referenceLoadResolver = ReferenceLoadResolver.NONE;
 
     private PlatformAbilityDispatcher() {
     }
@@ -76,6 +80,22 @@ final class PlatformAbilityDispatcher {
 
     static ReferenceTargetResolver referenceTargetResolver() {
         return referenceTargetResolver;
+    }
+
+    static void setReferencedByResolver(ReferencedByResolver resolver) {
+        referencedByResolver = resolver == null ? ReferencedByResolver.NONE : resolver;
+    }
+
+    static void resetReferencedByResolver() {
+        referencedByResolver = ReferencedByResolver.NONE;
+    }
+
+    static void setReferenceLoadResolver(ReferenceLoadResolver resolver) {
+        referenceLoadResolver = resolver == null ? ReferenceLoadResolver.NONE : resolver;
+    }
+
+    static void resetReferenceLoadResolver() {
+        referenceLoadResolver = ReferenceLoadResolver.NONE;
     }
 
     static <T extends EntityContract> void beforeTargetUnavailable(CrudAbility<T> ability,
@@ -167,6 +187,8 @@ final class PlatformAbilityDispatcher {
         runFieldProtectionAfterSelect(ability, entity);
         runChildrenAfterSelect(ability, entity);
         runReferenceAfterSelect(ability, entity);
+        runReferenceLoadAfterSelect(ability, entity);
+        runReferencedByAfterSelect(ability, entity);
         ability.afterPlatformSelect(entity);
     }
 
@@ -224,6 +246,14 @@ final class PlatformAbilityDispatcher {
             referencerAbility.afterReferenceSelect(entity);
             referencerAbility.refreshReferenceDependencies(entity);
         }
+    }
+
+    private static <T extends EntityContract> void runReferencedByAfterSelect(CrudAbility<T> ability, T entity) {
+        referencedByResolver.populate(ability, entity);
+    }
+
+    private static <T extends EntityContract> void runReferenceLoadAfterSelect(CrudAbility<T> ability, T entity) {
+        referenceLoadResolver.populate(ability, entity);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

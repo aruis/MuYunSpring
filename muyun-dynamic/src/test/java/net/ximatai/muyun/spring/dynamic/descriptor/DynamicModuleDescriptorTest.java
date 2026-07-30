@@ -104,7 +104,7 @@ class DynamicModuleDescriptorTest {
                 .relations(List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")
                         .withAutoPopulate()))
                 .references(List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
-                        .withAutoTitle("customerTitle")
+                        .withProjection("title", "customerTitle")
                         .withProjection("title", "customerTitle")
                         .withIntegrity(new ReferenceIntegrityPolicy(
                                 ReferenceTargetUnavailablePolicy.RESTRICT))))
@@ -169,6 +169,7 @@ class DynamicModuleDescriptorTest {
                 .containsExactly("EQ", "NOT_EQUAL", "LIKE", "IN", "NOT_IN", "NULL", "NOT_NULL");
         assertThat(descriptor.relations().getFirst().code()).isEqualTo("contacts");
         assertThat(descriptor.relations().getFirst().autoPopulate()).isTrue();
+        assertThat(descriptor.relations().getFirst().cascadeOnParentUnavailable()).isFalse();
         assertThat(descriptor.associationViews())
                 .extracting(DynamicAssociationViewDescriptor::code)
                 .containsExactly("contacts", "customerId");
@@ -191,7 +192,10 @@ class DynamicModuleDescriptorTest {
         assertThat(reference.sourceEntityAlias()).isEqualTo("contact");
         assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
         assertThat(reference.targetEntityAlias()).isEqualTo("customer");
-        assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
+        assertThat(reference.projections()).anySatisfy(projection -> {
+            assertThat(projection.targetField()).isEqualTo("title");
+            assertThat(projection.outputField()).isEqualTo("customerTitle");
+        });
         assertThat(reference.integrity().onTargetUnavailable()).isEqualTo(ReferenceTargetUnavailablePolicy.RESTRICT);
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
@@ -201,6 +205,23 @@ class DynamicModuleDescriptorTest {
                     assertThat(fieldReference.targetModuleAlias()).isEqualTo("crm.customer");
                     assertThat(fieldReference.targetEntityAlias()).isEqualTo("customer");
                 });
+    }
+
+    @Test
+    void relationCascadeShouldBeDerivedFromForeignKeyReferenceIntegrity() {
+        ModuleDefinition module = ModuleDefinition.builder("crm.customer", "Customer")
+                .entities(List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer", List.of(FieldDefinition.titleField())),
+                        new EntityDefinition("contact", "crm_contact", "Contact", List.of(
+                                FieldDefinition.string("customerId", "Customer")))
+                ))
+                .relations(List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")))
+                .references(List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
+                        .withIntegrity(new ReferenceIntegrityPolicy(
+                                ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
+                .build();
+
+        assertThat(DynamicModuleDescriptor.from(module).relations().getFirst().cascadeOnParentUnavailable()).isTrue();
     }
 
     @Test

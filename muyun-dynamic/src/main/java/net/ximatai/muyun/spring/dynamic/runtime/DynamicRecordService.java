@@ -1191,7 +1191,7 @@ public class DynamicRecordService {
         }
         List<RelationChildMutation> mutations = new ArrayList<>();
         for (DynamicRelationDescriptor relation : childRelations(moduleAlias, entityAlias).stream()
-                .filter(DynamicRelationDescriptor::autoDeleteWithParent)
+                .filter(DynamicRelationDescriptor::cascadeOnParentUnavailable)
                 .toList()) {
             childrenById(moduleAlias, relation, before.getId()).values()
                     .forEach(child -> mutations.add(RelationChildMutation.delete(relation, child)));

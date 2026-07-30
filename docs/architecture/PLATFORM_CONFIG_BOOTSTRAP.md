@@ -121,7 +121,6 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | `foreignKey`       | 子表指向父表的字段             |
 | `relationAlias`    | 关系别名，在模块下唯一         |
 | `autoPopulate`     | 读取主记录时是否装配子记录     |
-| `cascadeDelete`    | 删除父记录时是否联动删除子记录 |
 | `sortOrder`        | 关系排序                       |
 
 约束：

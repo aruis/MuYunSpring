@@ -682,8 +682,9 @@ class DynamicRelationRuntimeTest {
 
     @Test
     void shouldCompileDynamicChildRelationToPlan() {
-        assertThat(invoiceModule().relations())
-                .extracting(EntityRelationDefinition::plan)
+        ModuleDefinition module = invoiceModule();
+        assertThat(module.relations())
+                .extracting(relation -> relation.plan(MODULE, module.references()))
                 .containsExactly(new net.ximatai.muyun.spring.ability.child.ChildPlan(
                         "lines",
                         "invoice",
@@ -701,12 +702,11 @@ class DynamicRelationRuntimeTest {
                 "invoiceId",
                 ReferenceTarget.of("sales.invoice", "invoice").qualifiedName(),
                 null,
-                false,
-                null
+                List.of(), null, null, null, null, Set.of(), List.of(), List.of(), null
         );
 
         assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
-        assertThat(reference.titleOutputField()).isEmpty();
+        assertThat(reference.projections()).isEmpty();
     }
 
     @Test
@@ -945,7 +945,7 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of())
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle")))
+                        .withProjection("title", "invoiceTitle")))
                 .build();
 
         new ModuleDefinitionValidator().validate(module);
@@ -965,17 +965,17 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
-    void shouldRejectDynamicReferenceAutoTitleFieldConflicts() {
+    void shouldRejectDynamicReferenceLoadFieldConflicts() {
         ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of())
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("title")))
+                        .withProjection("title", "title")))
                 .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("title output field conflicts");
+                .hasMessageContaining("projection output field conflicts");
     }
 
     @Test
@@ -990,7 +990,7 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceWithoutTitle, invoiceLineEntity()))
                 .relations(List.of())
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle")))
+                        .withProjection("title", "invoiceTitle")))
                 .build();
 
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
@@ -1025,18 +1025,16 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
-    void shouldRejectDuplicateDynamicReferenceOutputFields() {
+    void shouldNormalizeDuplicateDynamicReferenceLoads() {
         ModuleDefinition module = ModuleDefinition.builder(MODULE, "Invoice")
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of())
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("invoiceDisplay")
+                        .withProjection("title", "invoiceDisplay")
                         .withProjection("title", "invoiceDisplay")))
                 .build();
 
-        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
-                .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("reference output field");
+        new ModuleDefinitionValidator().validate(module);
     }
 
     @Test
@@ -1108,10 +1106,12 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle")
-                        .withProjection("title", "invoiceDisplayTitle")))
+                        .withProjection("title", "invoiceTitle")
+                        .withProjection("title", "invoiceDisplayTitle")
+                        .withIntegrity(new ReferenceIntegrityPolicy(
+                                ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
                 .build();
     }
 
@@ -1198,7 +1198,7 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceEntity(), sortableInvoiceLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .build();
     }
 
@@ -1214,7 +1214,7 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")).many()))
                 .build();
     }
@@ -1224,7 +1224,7 @@ class DynamicRelationRuntimeTest {
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
+                        ))
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withProjection("title", "invoiceDisplayTitle")))
                 .build();

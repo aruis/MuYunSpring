@@ -799,8 +799,6 @@ class PlatformModuleRuntimeContextServiceTest {
                 "base.product",
                 "product",
                 ReferenceCardinality.ONE,
-                true,
-                null,
                 List.of()
         );
     }

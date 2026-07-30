@@ -6,8 +6,7 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTargetProvider;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargets;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 
@@ -46,14 +45,6 @@ public final class DynamicReferenceDeletionGuard implements ReferenceDeletionGua
     }
 
     private ReferenceTarget targetOf(CrudAbility<?> ability) {
-        if (ability instanceof ReferenceTargetProvider provider) {
-            return provider.referenceTarget();
-        }
-        String moduleAlias = ability.getModuleAlias();
-        int separator = moduleAlias == null ? -1 : moduleAlias.lastIndexOf('.');
-        if (separator <= 0 || separator == moduleAlias.length() - 1) {
-            throw new PlatformException("reference target requires '<applicationAlias>.<entityAlias>': " + moduleAlias);
-        }
-        return ReferenceTarget.of(moduleAlias.substring(0, separator), moduleAlias.substring(separator + 1));
+        return ReferenceTargets.of(ability);
     }
 }

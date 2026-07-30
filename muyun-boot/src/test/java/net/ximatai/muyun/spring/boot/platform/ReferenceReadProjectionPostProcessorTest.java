@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import org.junit.jupiter.api.AfterEach;
@@ -27,12 +28,10 @@ class ReferenceReadProjectionPostProcessorTest {
         @SuppressWarnings("unchecked")
         ReferenceAbility<?> target = mock(ReferenceAbility.class);
         ReferenceTarget customer = ReferenceTarget.of("crm", "customer");
-        when(target.titles(List.of("customer-1", "customer-2")))
-                .thenReturn(Map.of("customer-1", "客户一", "customer-2", "客户二"));
-        when(target.projections(eq(List.of("customer-1", "customer-2")), eq(List.of("level"))))
+        when(target.projections(eq(List.of("customer-1", "customer-2")), eq(List.of("title", "level"))))
                 .thenReturn(Map.of(
-                        "customer-1", Map.of("level", "A"),
-                        "customer-2", Map.of("level", "B")
+                        "customer-1", Map.of("title", "客户一", "level", "A"),
+                        "customer-2", Map.of("title", "客户二", "level", "B")
                 ));
         PlatformAbilityRuntime.configureReferenceTargetResolver(reference -> customer.equals(reference)
                 ? java.util.Optional.of(target)
@@ -47,14 +46,39 @@ class ReferenceReadProjectionPostProcessorTest {
                 Map.of("id", "order-1", "customerId", "customer-1", "customerTitle", "客户一", "customerLevel", "A"),
                 Map.of("id", "order-2", "customerId", "customer-2", "customerTitle", "客户二", "customerLevel", "B")
         );
-        verify(target).titles(List.of("customer-1", "customer-2"));
-        verify(target).projections(List.of("customer-1", "customer-2"), List.of("level"));
+        verify(target).projections(List.of("customer-1", "customer-2"), List.of("title", "level"));
+    }
+
+    @Test
+    void shouldStripInternalReadFieldsEvenWhenNoReferenceProjectionIsRequested() {
+        List<Map<String, Object>> result = ReferenceReadProjectionPostProcessor.apply(PlainRecord.class, List.of(
+                Map.of("id", "record-1", "version", 2, "tenantId", "tenant-a", "title", "Visible")
+        ), List.of("title"));
+
+        assertThat(result).containsExactly(Map.of("id", "record-1", "version", 2, "title", "Visible"));
+    }
+
+    @Test
+    void shouldStripInternalReadFieldsWhenTheModelIsUnavailable() {
+        List<Map<String, Object>> result = ReferenceReadProjectionPostProcessor.apply(null, List.of(
+                Map.of("id", "record-1", "version", 2, "tenantId", "tenant-a", "title", "Visible")
+        ), List.of("title"));
+
+        assertThat(result).containsExactly(Map.of("id", "record-1", "version", 2, "title", "Visible"));
     }
 
     private static final class StaticOrder {
-        @ReferenceTo(moduleAlias = "crm", entityAlias = "customer", autoTitle = true, titleOutputField = "customerTitle",
-                projections = @net.ximatai.muyun.spring.ability.reference.ReferenceProject(
-                        targetField = "level", outputField = "customerLevel"))
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
+
+        @ReferenceLoad(source = "customerId", field = "title")
+        private transient String customerTitle;
+
+        @ReferenceLoad(source = "customerId", field = "level")
+        private transient String customerLevel;
+    }
+
+    private static final class PlainRecord {
+        private String title;
     }
 }

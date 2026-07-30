@@ -16,8 +16,9 @@ public class HobbyService extends AbstractAbilityService<Hobby> implements
         TreeAbility<Hobby>,
         CacheAbility<Hobby>,
         ReferenceAbility<Hobby> {
+    public static final String MODULE_ALIAS = "education.hobby";
 
     public HobbyService(HobbyDao dao) {
-        super("education.hobby", Hobby.class, dao);
+        super(MODULE_ALIAS, Hobby.class, dao);
     }
 }

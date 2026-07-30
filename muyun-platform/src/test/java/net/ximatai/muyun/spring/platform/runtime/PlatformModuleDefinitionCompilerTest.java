@@ -372,7 +372,6 @@ class PlatformModuleDefinitionCompilerTest {
         relationService.insert(mainRelation("sales.invoice", invoiceId));
         ModuleMetadataRelation child = childRelation("sales.invoice", lineId, invoiceId);
         child.setAutoPopulate(true);
-        child.setCascadeDelete(true);
         relationService.insert(child);
 
         ModuleDefinition definition = compiler.compile("sales.invoice");
@@ -387,7 +386,6 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(relation.childEntityAlias()).isEqualTo("invoice_line");
         assertThat(relation.childForeignKeyField()).isEqualTo("invoiceId");
         assertThat(relation.autoPopulate()).isTrue();
-        assertThat(relation.autoDeleteWithParent()).isTrue();
         assertThat(definition.associationViews()).hasSize(1);
         EntityAssociationViewDefinition associationView = definition.associationViews().getFirst();
         assertThat(associationView.sourceEntityAlias()).isEqualTo("invoice");
@@ -411,10 +409,8 @@ class PlatformModuleDefinitionCompilerTest {
         relationService.insert(mainRelation("sales.invoice", invoiceId));
         relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
         MetadataFieldReferenceConfig referenceConfig = referenceConfig(invoiceField.getId(), invoiceId);
-        referenceConfig.setAutoTitle(true);
         referenceConfig.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
-        referenceConfig.setTitleOutputField("invoiceTitle");
-        referenceConfig.setProjectionMappings("code:invoiceCode");
+        referenceConfig.setProjectionMappings("title:invoiceTitle,code:invoiceCode");
         referenceConfigService.insert(referenceConfig);
 
         ModuleDefinition definition = compiler.compile("sales.invoice");
@@ -424,12 +420,13 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(reference.sourceEntityAlias()).isEqualTo("invoice_line");
         assertThat(reference.sourceField()).isEqualTo("invoiceId");
         assertThat(reference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
-        assertThat(reference.autoTitle()).isTrue();
-        assertThat(reference.titleOutputField()).isEqualTo("invoiceTitle");
+        assertThat(reference.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("invoiceTitle"));
         assertThat(reference.integrity().onTargetUnavailable()).isEqualTo(ReferenceTargetUnavailablePolicy.RESTRICT);
-        assertThat(reference.projections()).hasSize(1);
-        assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
-        assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
+        assertThat(reference.projections()).hasSize(2);
+        assertThat(reference.projections()).anySatisfy(projection -> {
+            assertThat(projection.targetField()).isEqualTo("code");
+            assertThat(projection.outputField()).isEqualTo("invoiceCode");
+        });
         assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityAlias()).isEqualTo("invoice");
         assertThat(DynamicModuleDescriptor.from(definition).entities().get(1).fields().stream()
                 .filter(field -> field.fieldName().equals("invoiceId"))
@@ -520,15 +517,11 @@ class PlatformModuleDefinitionCompilerTest {
         relationService.insert(mainRelation("support.ticket", ticketId));
         String supportLineRelationId = relationService.insert(childRelation("support.ticket", lineId, ticketId, "ownerId"));
         MetadataFieldReferenceConfig defaultReference = referenceConfig(ownerField.getId(), invoiceId);
-        defaultReference.setAutoTitle(true);
-        defaultReference.setTitleOutputField("invoiceTitle");
-        defaultReference.setProjectionMappings("code:invoiceCode");
+        defaultReference.setProjectionMappings("title:invoiceTitle,code:invoiceCode");
         referenceConfigService.insert(defaultReference);
         MetadataFieldReferenceConfig supportReference = referenceConfig(ownerField.getId(), ticketId);
         supportReference.setRelationId(supportLineRelationId);
-        supportReference.setAutoTitle(true);
-        supportReference.setTitleOutputField("ticketTitle");
-        supportReference.setProjectionMappings("code:ticketCode");
+        supportReference.setProjectionMappings("title:ticketTitle,code:ticketCode");
         referenceConfigService.insert(supportReference);
 
         ModuleDefinition salesDefinition = compiler.compile("sales.invoice");
@@ -536,12 +529,12 @@ class PlatformModuleDefinitionCompilerTest {
 
         EntityReferenceDefinition salesReference = salesDefinition.references().getFirst();
         assertThat(salesReference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
-        assertThat(salesReference.titleOutputField()).isEqualTo("invoiceTitle");
-        assertThat(salesReference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
+        assertThat(salesReference.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("invoiceTitle"));
+        assertThat(salesReference.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("invoiceCode"));
         EntityReferenceDefinition supportReferenceDefinition = supportDefinition.references().getFirst();
         assertThat(supportReferenceDefinition.targetQualifiedName()).isEqualTo("support.ticket.ticket");
-        assertThat(supportReferenceDefinition.titleOutputField()).isEqualTo("ticketTitle");
-        assertThat(supportReferenceDefinition.projections().getFirst().outputField()).isEqualTo("ticketCode");
+        assertThat(supportReferenceDefinition.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("ticketTitle"));
+        assertThat(supportReferenceDefinition.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("ticketCode"));
     }
 
     @Test

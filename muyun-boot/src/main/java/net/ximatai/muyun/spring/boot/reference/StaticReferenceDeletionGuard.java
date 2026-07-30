@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTargetProvider;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargets;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -72,6 +72,7 @@ public final class StaticReferenceDeletionGuard implements ReferenceDeletionGuar
             if (inbound.rule().integrity().onTargetUnavailable() != ReferenceTargetUnavailablePolicy.CASCADE_DELETE) {
                 continue;
             }
+            java.util.Set<String> attemptedIds = new java.util.LinkedHashSet<>();
             while (true) {
                 List<? extends EntityContract> referrers = inbound.source().list(
                         Criteria.of().eq(inbound.rule().plan().sourceField(), targetId),
@@ -79,9 +80,17 @@ public final class StaticReferenceDeletionGuard implements ReferenceDeletionGuar
                 if (referrers.isEmpty()) {
                     break;
                 }
+                boolean progressed = false;
                 for (EntityContract referrer : referrers) {
-                    inbound.source().delete(referrer.getId(), referrer.getVersion(),
+                    if (!attemptedIds.add(referrer.getId())) {
+                        continue;
+                    }
+                    int deleted = inbound.source().delete(referrer.getId(), referrer.getVersion(),
                             context.child(node, inbound.source().getModuleAlias(), referrer.getId()));
+                    progressed = progressed || deleted > 0;
+                }
+                if (!progressed) {
+                    break;
                 }
             }
         }
@@ -105,15 +114,7 @@ public final class StaticReferenceDeletionGuard implements ReferenceDeletionGuar
     }
 
     private ReferenceTarget targetOf(CrudAbility<?> ability) {
-        if (ability instanceof ReferenceTargetProvider provider) {
-            return provider.referenceTarget();
-        }
-        String moduleAlias = ability == null ? null : ability.getModuleAlias();
-        int separator = moduleAlias == null ? -1 : moduleAlias.lastIndexOf('.');
-        if (separator <= 0 || separator == moduleAlias.length() - 1) {
-            throw new PlatformException("reference target requires '<applicationAlias>.<entityAlias>': " + moduleAlias);
-        }
-        return ReferenceTarget.of(moduleAlias.substring(0, separator), moduleAlias.substring(separator + 1));
+        return ReferenceTargets.of(ability);
     }
 
     private record InboundReference(CrudAbility<?> source, StaticReferenceResolver.ReferenceRule rule) {

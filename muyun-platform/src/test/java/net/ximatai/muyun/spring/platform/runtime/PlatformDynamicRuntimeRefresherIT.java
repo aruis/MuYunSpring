@@ -130,9 +130,7 @@ class PlatformDynamicRuntimeRefresherIT {
         services.fieldService.insert(customerIdField);
         MetadataFieldReferenceConfig customerReference = referenceConfig(customerIdField.getId(), customerMetadataId);
         customerReference.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
-        customerReference.setAutoTitle(true);
-        customerReference.setTitleOutputField("customerTitle");
-        customerReference.setProjectionMappings("code:customerCode");
+        customerReference.setProjectionMappings("title:customerTitle,code:customerCode");
         services.referenceConfigService.insert(customerReference);
         String mainRelationId = services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
         services.relationService.insert(childRelation("crm.customer", contactMetadataId, customerMetadataId));
@@ -448,7 +446,6 @@ class PlatformDynamicRuntimeRefresherIT {
         relation.setRelationAlias("contacts");
         relation.setForeignKey("customerId");
         relation.setAutoPopulate(true);
-        relation.setCascadeDelete(true);
         relation.setTitle("contacts");
         return relation;
     }

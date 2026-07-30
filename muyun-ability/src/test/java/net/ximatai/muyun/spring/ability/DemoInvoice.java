@@ -1,46 +1,32 @@
 package net.ximatai.muyun.spring.ability;
 
-import net.ximatai.muyun.spring.ability.child.ChildRef;
-import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
+import net.ximatai.muyun.spring.ability.child.ChildOf;
+import net.ximatai.muyun.spring.ability.child.Children;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 
 import java.util.List;
 
 @Getter
 @Setter
-final class DemoInvoice extends StandardEntity {
+final class DemoInvoice extends StandardEntity implements TitledCapable {
     private String title;
-    @ReferenceTo(
-            moduleAlias = "demo",
-            entityAlias = "customer",
-            autoTitle = true,
-            titleOutputField = "customerTitle",
-            projections = @ReferenceProject(targetField = "status", outputField = "customerStatus")
-    )
+    @ReferenceTo(moduleAlias = "demo", entityAlias = "customer")
     private String customerId;
+    @ReferenceLoad(source = "customerId", field = "title")
     private transient String customerTitle;
+    @ReferenceLoad(source = "customerId", field = "status")
     private transient String customerStatus;
-    @ChildRef(
-            parentEntityAlias = "invoice",
-            childModel = DemoInvoiceLine.class,
-            childEntityAlias = "invoiceLine",
-            childForeignKeyField = "invoiceId",
-            autoPopulate = true,
-            autoDeleteWithParent = true
-    )
+    @Children
     private List<DemoInvoiceLine> lines;
-    @ChildRef(
-            parentEntityAlias = "invoice",
-            childModel = DemoInvoiceNote.class,
-            childEntityAlias = "invoiceNote",
-            childForeignKeyField = "invoiceId",
-            autoPopulate = true,
-            autoDeleteWithParent = true
-    )
+    @Children
     private List<DemoInvoiceNote> notes;
 
     DemoInvoice() {

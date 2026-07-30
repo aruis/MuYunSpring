@@ -122,6 +122,8 @@ Schema migration 默认策略由平台运行模式决定：`DEVELOPMENT` 默认�
 UI 配置、查询模板、菜单入口、页面 bootstrap、引用候选、附件页面交付等页面能力应优先编译到静态和动态可共用的 descriptor、读投影和动作语义。短期只落到一侧的能力应记录为阶段限制；能力调用的数据读写、动作权限、数据权限、审计、附件业务关系、事务和生命周期仍必须回到平台统一能力链路，不能绕过静态/动态共用的底层契约。
 
 静态模块引用和 service 级读投影的当前稳定契约见 [静态模块引用与读投影契约](STATIC_REFERENCE_READ_PROJECTION.md)。静态与动态列表读取都按 `ReferenceTarget` 聚合引用 ID，复用同一 `ReferenceAbility` 批量补齐标题和字段投影；静态可安全编译的 SQL join 只是该统一语义的优化路径。
+静态 `@ReferenceLoad` 的多跳声明会先编译为只含 `ReferenceTarget` 与字段 hop 的 `ReferenceLoadPath`，再通过同一引用投影契约执行；动态元数据接入多跳读取时应产出该路径契约，不得另建动态专用读取内核。
+动态侧使用 `EntityReferenceLoadDefinition` 声明来源字段、终端字段、输出字段与类型化 hop；hop 显式给出 `ReferenceTarget` 和当前节点的 `via` 字段，以便配置保存期完成校验。静态与动态路径均由 `ReferenceLoadReader` 执行。动态 `EntityReferencedByDefinition` 只声明目标实体、来源实体、来源引用字段和虚拟输出字段，运行态按同一 CRUD 查询链路装配反向集合，不把反向关系硬编码到 Service。
 引用候选按目标模块的 `REFERENCE` 数据权限过滤；来源记录已取得读取权限后，其标题和字段投影只遵循租户、软删除和字段保护，不额外以目标业务数据范围过滤来源记录。
 
 如果某个能力短期只能挂到一侧，应记录为阶段限制，不能把它包装成最终形态。

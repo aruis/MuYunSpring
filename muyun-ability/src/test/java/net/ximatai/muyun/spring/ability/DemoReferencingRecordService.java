@@ -1,10 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
-import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
-
-
-import java.util.List;
 
 final class DemoReferencingRecordService implements
         CrudAbility<DemoReferencingRecord>,
@@ -14,6 +10,15 @@ final class DemoReferencingRecordService implements
     private final DemoUserService userService = new DemoUserService();
 
     DemoReferencingRecordService() {
+        PlatformAbilityRuntime.configureReferenceTargetResolver(target -> {
+            if (customerService.referenceTarget().equals(target)) {
+                return java.util.Optional.of(customerService);
+            }
+            if (userService.referenceTarget().equals(target)) {
+                return java.util.Optional.of(userService);
+            }
+            return java.util.Optional.empty();
+        });
         DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
         customer.setId("customer-1");
         customerService.insert(customer);
@@ -38,8 +43,4 @@ final class DemoReferencingRecordService implements
         return "demo.referencingRecord";
     }
 
-    @Override
-    public List<ReferenceLookup> referenceLookups() {
-        return List.of(referenceLookup(customerService), referenceLookup(userService));
-    }
 }

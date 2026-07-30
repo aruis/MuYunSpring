@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.SystemManagedAbility;
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantCreationProvisioner;
@@ -32,6 +33,7 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         DeletionRecoveryAbility<Tenant>,
         EnableAbility<Tenant>,
         SortAbility<Tenant>,
+        ReferenceAbility<Tenant>,
         ChildrenAbility<Tenant>,
         ActiveTenantVerifier {
 
@@ -137,11 +139,9 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
 
     @Override
     public List<ChildRelation<? extends EntityContract, Tenant>> childRelations() {
-        if (tenantApplicationService == null) {
-            return List.of();
-        }
-        return List.of(tenantApplicationService.<Tenant>toChildRelation(TenantApplication::setTenantId,
-                "tenantId", tenant -> null).autoDeleteWithParent());
+        return tenantApplicationService == null
+                ? List.of()
+                : List.of(childRelation(Tenant.class, tenantApplicationService));
     }
 
     private String requireTenantAlias(String alias) {

@@ -15,8 +15,6 @@ public record EntityReferenceDefinition(
         String sourceField,
         String targetQualifiedName,
         ReferenceCardinality cardinality,
-        boolean autoTitle,
-        String titleOutputField,
         List<ReferenceProjection> projections,
         String keyField,
         String labelField,
@@ -27,54 +25,21 @@ public record EntityReferenceDefinition(
         List<EntityReferenceAffectDefinition> affects,
         ReferenceIntegrityPolicy integrity
 ) {
-    public EntityReferenceDefinition(String sourceEntityAlias,
-                                     String sourceField,
-                                     String targetQualifiedName,
-                                     ReferenceCardinality cardinality,
-                                     boolean autoTitle,
-                                     String titleOutputField,
-                                     List<ReferenceProjection> projections,
-                                     String keyField,
-                                     String labelField,
-                                     String generateRuleId,
-                                     String queryTemplateId,
-                                     Set<String> plusFields,
-                                     List<EntityReferenceFilterDefinition> filters,
-                                     List<EntityReferenceAffectDefinition> affects) {
-        this(sourceEntityAlias, sourceField, targetQualifiedName, cardinality, autoTitle, titleOutputField,
-                projections, keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects,
-                ReferenceIntegrityPolicy.DEFAULT);
-    }
     public EntityReferenceDefinition(String sourceEntityAlias, String sourceField, String targetQualifiedName) {
-        this(sourceEntityAlias, sourceField, targetQualifiedName, ReferenceCardinality.ONE, false, "");
-    }
-
-    public EntityReferenceDefinition(String sourceEntityAlias,
-                                     String sourceField,
-                                     String targetQualifiedName,
-                                     ReferenceCardinality cardinality,
-                                     boolean autoTitle,
-                                     String titleOutputField) {
-        this(sourceEntityAlias, sourceField, targetQualifiedName, cardinality, autoTitle, titleOutputField, List.of());
-    }
-
-    public EntityReferenceDefinition(String sourceEntityAlias,
-                                     String sourceField,
-                                     String targetQualifiedName,
-                                     ReferenceCardinality cardinality,
-                                     boolean autoTitle,
-                                     String titleOutputField,
-                                     List<ReferenceProjection> projections) {
-        this(sourceEntityAlias, sourceField, targetQualifiedName, cardinality, autoTitle, titleOutputField, projections,
+        this(sourceEntityAlias, sourceField, targetQualifiedName, ReferenceCardinality.ONE, List.of(),
                 null, null, null, null, Set.of(), List.of(), List.of(), ReferenceIntegrityPolicy.DEFAULT);
     }
+
+    public EntityReferenceDefinition(String sourceEntityAlias, String sourceField, String targetQualifiedName,
+                                     ReferenceCardinality cardinality, List<ReferenceProjection> projections) {
+        this(sourceEntityAlias, sourceField, targetQualifiedName, cardinality, projections,
+                null, null, null, null, Set.of(), List.of(), List.of(), ReferenceIntegrityPolicy.DEFAULT);
+    }
+
 
     public EntityReferenceDefinition {
         if (cardinality == null) {
             cardinality = ReferenceCardinality.ONE;
-        }
-        if (titleOutputField == null) {
-            titleOutputField = "";
         }
         projections = projections == null ? List.of() : List.copyOf(projections);
         plusFields = plusFields == null ? Set.of() : Set.copyOf(plusFields);
@@ -96,18 +61,12 @@ public record EntityReferenceDefinition(
     }
 
     public ReferencePlan plan() {
-        return new ReferencePlan(sourceField, target(), cardinality, autoTitle, titleOutputField, projections, integrity);
+        return new ReferencePlan(sourceField, target(), cardinality, projections, integrity);
     }
 
     public EntityReferenceDefinition many() {
         return new EntityReferenceDefinition(sourceEntityAlias, sourceField, targetQualifiedName,
-                ReferenceCardinality.MANY, autoTitle, titleOutputField, projections,
-                keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
-    }
-
-    public EntityReferenceDefinition withAutoTitle(String outputField) {
-        return new EntityReferenceDefinition(sourceEntityAlias, sourceField, targetQualifiedName,
-                cardinality, true, outputField, projections,
+                ReferenceCardinality.MANY, projections,
                 keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
     }
 
@@ -115,9 +74,10 @@ public record EntityReferenceDefinition(
         LinkedHashSet<ReferenceProjection> next = new LinkedHashSet<>(projections);
         next.add(new ReferenceProjection(targetField, outputField));
         return new EntityReferenceDefinition(this.sourceEntityAlias, this.sourceField, targetQualifiedName,
-                cardinality, autoTitle, titleOutputField, List.copyOf(next),
+                cardinality, List.copyOf(next),
                 keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
     }
+
 
     public EntityReferenceDefinition withRuntimeConfig(String keyField,
                                                        String labelField,
@@ -125,20 +85,20 @@ public record EntityReferenceDefinition(
                                                        String queryTemplateId,
                                                        Set<String> plusFields) {
         return new EntityReferenceDefinition(sourceEntityAlias, sourceField, targetQualifiedName,
-                cardinality, autoTitle, titleOutputField, projections,
+                cardinality, projections,
                 keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
     }
 
     public EntityReferenceDefinition withInteractionRules(List<EntityReferenceFilterDefinition> filters,
                                                           List<EntityReferenceAffectDefinition> affects) {
         return new EntityReferenceDefinition(sourceEntityAlias, sourceField, targetQualifiedName,
-                cardinality, autoTitle, titleOutputField, projections,
+                cardinality, projections,
                 keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
     }
 
     public EntityReferenceDefinition withIntegrity(ReferenceIntegrityPolicy integrity) {
         return new EntityReferenceDefinition(sourceEntityAlias, sourceField, targetQualifiedName,
-                cardinality, autoTitle, titleOutputField, projections,
+                cardinality, projections,
                 keyField, labelField, generateRuleId, queryTemplateId, plusFields, filters, affects, integrity);
     }
 }
