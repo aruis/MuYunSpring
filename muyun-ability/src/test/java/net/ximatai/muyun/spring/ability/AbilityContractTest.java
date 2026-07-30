@@ -49,6 +49,7 @@ class AbilityContractTest {
         CacheRegistry.resetPolicy();
         PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
         PlatformAbilityRuntime.resetReferenceTargetResolver();
+        PlatformAbilityRuntime.resetChildAbilityResolver();
         PlatformAbilityRuntime.resetReferencedByResolver();
         PlatformAbilityRuntime.resetReferenceLoadResolver();
         PlatformAbilityRuntime.resetDeletionLifecycleListener();

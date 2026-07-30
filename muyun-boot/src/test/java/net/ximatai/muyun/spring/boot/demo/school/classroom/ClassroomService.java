@@ -4,16 +4,15 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
-/** 班级聚合根 Service：声明成员关系，并作为可引用、可排序、可回收的班级主数据入口。 */
+/**
+ * 班级聚合根的标准 Service：{@link ChildrenAbility} 将 {@code members} 纳入同一保存与删除链路；
+ * {@link ReferenceAbility} 让班级成为可选引用目标，排序、回收站和缓存则复用平台默认能力。
+ */
 @Service
 public class ClassroomService extends AbstractAbilityService<Classroom> implements
         RecycleBinAbility<Classroom>,
@@ -23,22 +22,13 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         ReferenceAbility<Classroom>,
         CacheAbility<Classroom> {
     public static final String MODULE_ALIAS = "education.classroom";
-    private final ClassMemberService memberService;
-
-    public ClassroomService(ClassroomDao dao,
-                            ClassMemberService memberService) {
+    public ClassroomService(ClassroomDao dao) {
         super(MODULE_ALIAS, Classroom.class, dao);
-        this.memberService = memberService;
     }
 
     @Override
     public String getDeletionEntityAlias() {
         return "classroom";
-    }
-
-    @Override
-    public List<ChildRelation<? extends EntityContract, Classroom>> childRelations() {
-        return List.of(childRelation("members", memberService));
     }
 
 }

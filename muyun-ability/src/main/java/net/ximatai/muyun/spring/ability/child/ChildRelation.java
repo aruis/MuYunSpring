@@ -127,21 +127,11 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
-            cascadeDeleteChildAbility.deleteBatchFromParentCascade(ids);
-            return;
-        }
         childAbility.deleteBatch(ids);
     }
 
-    @SuppressWarnings("unchecked")
     private void deleteChildren(List<String> ids, DeletionContext deletionContext, DeletionNode deletionNode) {
         if (ids == null || ids.isEmpty()) {
-            return;
-        }
-        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
-            ((CascadeDeleteChildAbility<C>) cascadeDeleteChildAbility)
-                    .deleteBatchFromParentCascade(ids, deletionContext, deletionNode);
             return;
         }
         for (String id : ids) {

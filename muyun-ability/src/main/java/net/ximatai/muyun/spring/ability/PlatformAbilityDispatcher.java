@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.child.ChildAbilityResolver;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
 import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
@@ -30,6 +31,7 @@ final class PlatformAbilityDispatcher {
     private static volatile ReferenceTargetResolver referenceTargetResolver = ReferenceTargetResolver.NONE;
     private static volatile ReferencedByResolver referencedByResolver = ReferencedByResolver.NONE;
     private static volatile ReferenceLoadResolver referenceLoadResolver = ReferenceLoadResolver.NONE;
+    private static volatile ChildAbilityResolver childAbilityResolver = ChildAbilityResolver.NONE;
 
     private PlatformAbilityDispatcher() {
     }
@@ -80,6 +82,18 @@ final class PlatformAbilityDispatcher {
 
     static ReferenceTargetResolver referenceTargetResolver() {
         return referenceTargetResolver;
+    }
+
+    static void setChildAbilityResolver(ChildAbilityResolver resolver) {
+        childAbilityResolver = resolver == null ? ChildAbilityResolver.NONE : resolver;
+    }
+
+    static void resetChildAbilityResolver() {
+        childAbilityResolver = ChildAbilityResolver.NONE;
+    }
+
+    static ChildAbilityResolver childAbilityResolver() {
+        return childAbilityResolver;
     }
 
     static void setReferencedByResolver(ReferencedByResolver resolver) {

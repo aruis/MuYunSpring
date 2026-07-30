@@ -144,6 +144,12 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
                 : List.of(childRelation(Tenant.class, tenantApplicationService));
     }
 
+    /** Tenant applications are optional in lightweight IAM runtime assemblies. */
+    @Override
+    public boolean usesAutomaticChildRelations() {
+        return false;
+    }
+
     private String requireTenantAlias(String alias) {
         return PlatformNameRules.requireIdentifier(alias, "tenantAlias");
     }

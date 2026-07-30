@@ -2,17 +2,40 @@ package net.ximatai.muyun.spring.ability.child;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P> {
     default List<ChildRelation<? extends EntityContract, P>> childRelations() {
-        return List.of();
+        Class<?> parentModel = requireModelClass("childRelations()");
+        List<ChildRelation<? extends EntityContract, P>> relations = new ArrayList<>();
+        for (StaticChildResolver.ChildRule rule : StaticChildResolver.rules(parentModel)) {
+            relations.add(autoChildRelation(rule));
+        }
+        return List.copyOf(relations);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ChildRelation<? extends EntityContract, P> autoChildRelation(StaticChildResolver.ChildRule rule) {
+        ChildAbility childAbility = PlatformAbilityRuntime.childAbilityResolver()
+                .resolve(ChildAbilityRequest.forStaticModel(rule.childModel()))
+                .orElseThrow(() -> new PlatformException("child ability is not registered: "
+                        + rule.plan().relationCode() + " -> " + rule.childModel().getName()));
+        validateChildModel(rule, childAbility);
+        ChildAbility<EntityContract> typedAbility = (ChildAbility<EntityContract>) childAbility;
+        return typedAbility.toChildRelation(
+                rule.plan(),
+                (child, parentId) -> rule.setParentId(child, parentId),
+                rule::children,
+                rule::populate
+        );
     }
 
     @SuppressWarnings("unchecked")
@@ -135,22 +158,6 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         }
     }
 
-    default void afterChildrenDelete(String id, P parent, int deleted) {
-        afterChildrenDelete(id, parent, deleted,
-                DeletionContext.root(getModuleAlias(), id),
-                DeletionNode.transientNode(new net.ximatai.muyun.spring.ability.deletion.DeletionResource(getModuleAlias(), id)));
-    }
-
-    default void afterChildrenDelete(String id,
-                                     P parent,
-                                     int deleted,
-                                     DeletionContext deletionContext,
-                                     DeletionNode deletionNode) {
-        if (deleted > 0) {
-            deleteAutoDeleteChildren(id, deletionContext, deletionNode);
-        }
-    }
-
     /**
      * Executes aggregate cascades derived from child foreign-key reference integrity
      * before the parent becomes unavailable.
@@ -163,6 +170,14 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
             return;
         }
         deleteAutoDeleteChildren(id, deletionContext, deletionNode);
+    }
+
+    /**
+     * Whether this service uses the default {@code @Children} resolver.
+     * Services with a deliberately conditional or hand-built relation override this to {@code false}.
+     */
+    default boolean usesAutomaticChildRelations() {
+        return true;
     }
 
     private void deleteAutoDeleteChildren(String id,

@@ -7,12 +7,14 @@ import net.ximatai.muyun.spring.ability.reference.CompositeReferenceDeletionGuar
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetResolver;
 import net.ximatai.muyun.spring.ability.reference.ReferencedByResolver;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoadResolver;
+import net.ximatai.muyun.spring.ability.child.ChildAbilityResolver;
 import net.ximatai.muyun.spring.boot.reference.DynamicReferenceDeletionGuard;
 import net.ximatai.muyun.spring.boot.reference.PlatformReferenceTargetResolver;
 import net.ximatai.muyun.spring.boot.reference.PlatformReferencedByResolver;
 import net.ximatai.muyun.spring.boot.reference.PlatformReferenceLoadResolver;
 import net.ximatai.muyun.spring.boot.reference.StaticReferenceDeletionGuard;
 import net.ximatai.muyun.spring.boot.reference.StaticAbilityCatalog;
+import net.ximatai.muyun.spring.boot.reference.PlatformChildAbilityResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -64,6 +66,11 @@ public class MuYunSpringReferenceConfiguration {
         return new ReferenceLoadResolverRegistration(new PlatformReferenceLoadResolver(abilities));
     }
 
+    @Bean
+    ChildAbilityResolverRegistration childAbilityResolverRegistration(StaticAbilityCatalog abilities) {
+        return new ChildAbilityResolverRegistration(new PlatformChildAbilityResolver(abilities));
+    }
+
     static final class ReferenceDeletionGuardRegistration implements DisposableBean {
         ReferenceDeletionGuardRegistration(ReferenceDeletionGuard guard) {
             PlatformAbilityRuntime.configureReferenceDeletionGuard(guard);
@@ -105,6 +112,17 @@ public class MuYunSpringReferenceConfiguration {
         @Override
         public void destroy() {
             PlatformAbilityRuntime.resetReferenceLoadResolver();
+        }
+    }
+
+    static final class ChildAbilityResolverRegistration implements DisposableBean {
+        ChildAbilityResolverRegistration(ChildAbilityResolver resolver) {
+            PlatformAbilityRuntime.configureChildAbilityResolver(resolver);
+        }
+
+        @Override
+        public void destroy() {
+            PlatformAbilityRuntime.resetChildAbilityResolver();
         }
     }
 }

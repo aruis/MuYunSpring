@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.ability.child.ChildAbilityResolver;
 import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
 import net.ximatai.muyun.spring.ability.deletion.DeletionTransactionOperator;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
@@ -54,6 +55,18 @@ public final class PlatformAbilityRuntime {
 
     public static ReferenceTargetResolver referenceTargetResolver() {
         return PlatformAbilityDispatcher.referenceTargetResolver();
+    }
+
+    public static void configureChildAbilityResolver(ChildAbilityResolver resolver) {
+        PlatformAbilityDispatcher.setChildAbilityResolver(resolver);
+    }
+
+    public static void resetChildAbilityResolver() {
+        PlatformAbilityDispatcher.resetChildAbilityResolver();
+    }
+
+    public static ChildAbilityResolver childAbilityResolver() {
+        return PlatformAbilityDispatcher.childAbilityResolver();
     }
 
     public static void configureReferencedByResolver(ReferencedByResolver resolver) {

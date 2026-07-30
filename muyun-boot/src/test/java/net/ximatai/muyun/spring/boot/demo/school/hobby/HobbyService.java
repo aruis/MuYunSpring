@@ -8,7 +8,10 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import org.springframework.stereotype.Service;
 
-/** 为学生多选爱好字段提供候选项的树形引用数据。 */
+/**
+ * 爱好分类树的标准 Service：{@link TreeAbility} 提供层级与同级排序，{@link EnableAbility} 控制候选项可用性；
+ * {@link ReferenceAbility} 将启用的分类节点交付为学生多选引用的统一候选项。
+ */
 @Service
 public class HobbyService extends AbstractAbilityService<Hobby> implements
         SoftDeleteAbility<Hobby>,
