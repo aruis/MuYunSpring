@@ -304,7 +304,7 @@ public class DynamicEntityService implements
 
     @Override
     public void afterReferenceSelect(DynamicRecord record) {
-        populateReferenceTitles(record);
+        populateReferenceReadFields(record == null ? List.of() : List.of(record));
     }
 
     @Override
@@ -652,7 +652,7 @@ public class DynamicEntityService implements
 
     private void applyReadPipeline(DynamicRecord record) {
         restoreProtectedFieldsFromStorage(record);
-        afterReferenceSelect(record);
+        populateReferenceReadFields(record == null ? List.of() : List.of(record));
         refreshReferenceDependencies(record);
     }
 
@@ -661,20 +661,44 @@ public class DynamicEntityService implements
             return;
         }
         records.forEach(this::restoreProtectedFieldsFromStorage);
+        populateReferenceReadFields(records);
+        records.forEach(this::refreshReferenceDependencies);
+    }
+
+    private void populateReferenceReadFields(List<DynamicRecord> records) {
         populateReferenceTitles(records);
         populateReferenceLoads(records);
         populateReferencedBys(records);
-        records.forEach(this::refreshReferenceDependencies);
     }
 
     private void populateReferenceLoads(List<DynamicRecord> records) {
         for (EntityReferenceLoadDefinition definition : referenceLoadDefinitions()) {
-            ReferenceLoadPath path = definition.path(referenceDefinition(definition.sourceField()).target());
+            EntityReferenceDefinition sourceReference = referenceDefinition(definition.sourceField());
+            ReferenceLoadPath path = definition.path(sourceReference.target());
             for (DynamicRecord record : records) {
                 List<String> ids = referencePlan(definition.sourceField()).normalizeValues(record.getValue(path.sourceField()));
-                record.putVirtualValue(path.outputField(), loadReferencePath(path, ids));
+                Object value = path.hops().isEmpty()
+                        ? loadDirectReference(sourceReference, path, ids)
+                        : loadReferencePath(path, ids);
+                record.putVirtualValue(path.outputField(), value);
             }
         }
+    }
+
+    private Object loadDirectReference(EntityReferenceDefinition source,
+                                       ReferenceLoadPath path,
+                                       List<String> ids) {
+        if (ids.isEmpty()) {
+            return source.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY
+                    ? List.of() : null;
+        }
+        Map<String, Map<String, Object>> values = referenceAbility(path.sourceTarget())
+                .projections(ids, List.of(path.terminalField()));
+        if (source.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY) {
+            return ids.stream().map(id -> values.getOrDefault(id, Map.of()).get(path.terminalField()))
+                    .filter(java.util.Objects::nonNull).toList();
+        }
+        return values.getOrDefault(ids.getFirst(), Map.of()).get(path.terminalField());
     }
 
     private Object loadReferencePath(ReferenceLoadPath path, List<String> ids) {

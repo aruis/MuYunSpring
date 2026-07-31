@@ -82,7 +82,8 @@ private transient String cStatus;
 ```
 
 `source` 和每个 `via` 都必须是实际 `@ReferenceTo` 字段；每个 hop 的 `target` 都是 service class，不使用
-点分路径字符串。四级及更深链路只需继续添加 hop；平台会按统一引用投影契约逐层批量解析。
+点分路径字符串。多跳路径的 `source` 与每个 `via` 必须是 `ONE` 基数，保证每条源记录只对应一个终点值；
+直接读取 `MANY` 引用仍可用，并按源 ID 顺序输出非空值集合。四级及更深链路只需继续添加 hop；平台会按统一引用投影契约逐层批量解析。
 
 ## 读投影声明
 

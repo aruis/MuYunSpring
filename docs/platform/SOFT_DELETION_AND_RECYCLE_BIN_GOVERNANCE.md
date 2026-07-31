@@ -165,7 +165,7 @@ A.delete(a)
 
 可恢复资源的稳定身份统一为 `moduleAlias + entityAlias + recordId`。模块 alias 只表达运行时业务边界，不足以在一个模块包含多个实体时定位恢复执行者；`entityAlias` 不是展示字段，也不得由表名或 Java 类名在恢复时临时推断。
 
-静态资源只有实现 `DeletionRecoveryAbility` 后才进入恢复目录，并显式提供稳定 `entityAlias`；普通 `SoftDeleteAbility` 仍可独立使用，不因此承担回收站或恢复责任。动态实体由当前动态运行态提供同一身份，删除日志必须记录其动态实体 alias。级联链上的资源也按相同规则写入完整身份。
+静态资源只有实现 `DeletionRecoveryAbility` 后才进入恢复目录；默认从其稳定的 `ReferenceTarget` 推导 `entityAlias`，仅身份确有特殊映射时才覆盖该默认值。普通 `SoftDeleteAbility` 仍可独立使用，不因此承担回收站或恢复责任。动态实体由当前动态运行态提供同一身份，删除日志必须记录其动态实体 alias。级联链上的资源也按相同规则写入完整身份。
 
 恢复解析遵循下列约束：
 

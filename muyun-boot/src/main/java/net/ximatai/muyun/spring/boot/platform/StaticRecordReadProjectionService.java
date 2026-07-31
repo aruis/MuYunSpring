@@ -374,6 +374,12 @@ public class StaticRecordReadProjectionService {
                 internal.add(plan.sourceField());
             }
         }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath path
+                : StaticReferenceResolver.loadPaths(modelClass)) {
+            if (output.contains(path.outputField()) && !output.contains(path.sourceField())) {
+                internal.add(path.sourceField());
+            }
+        }
         List<String> normalizedInternal = internal.stream().distinct().toList();
         if (normalizedInternal.equals(projection.internalReadFields())) {
             return projection;

@@ -955,6 +955,11 @@ public class ModuleDefinitionValidator {
         }
         EntityDefinition source = requireEntity(entities, load.sourceEntityAlias(), "reference load source entity");
         EntityReferenceDefinition sourceReference = requireReference(references, load.sourceEntityAlias(), load.sourceField());
+        if (!load.hops().isEmpty()
+                && sourceReference.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE) {
+            throw new ModuleDefinitionException("reference load source must have cardinality ONE: "
+                    + load.sourceEntityAlias() + "." + load.sourceField());
+        }
         requireFieldName(load.terminalField(), "reference load terminal field");
         requireFieldName(load.outputField(), "reference load output field");
         requireReferenceOutputField(source, load.outputField(), "reference load output field");
@@ -969,6 +974,10 @@ public class ModuleDefinitionValidator {
                 EntityDefinition currentEntity = requireEntity(entities, current.entityAlias(), "reference load hop source entity");
                 requireField(currentEntity, hop.viaField(), "reference load hop via field");
                 EntityReferenceDefinition hopReference = requireReference(references, current.entityAlias(), hop.viaField());
+                if (hopReference.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE) {
+                    throw new ModuleDefinitionException("reference load hop must have cardinality ONE: "
+                            + current.qualifiedName() + "." + hop.viaField());
+                }
                 if (!hop.target().equals(hopReference.target())) {
                     throw new ModuleDefinitionException("reference load hop target does not match reference: "
                             + current.qualifiedName() + "." + hop.viaField());

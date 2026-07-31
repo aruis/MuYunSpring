@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoadReader;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
@@ -50,7 +52,10 @@ final class ReferenceReadProjectionPostProcessor {
                 .map(plan -> forOutputFields(plan, outputFields))
                 .filter(plan -> plan != null)
                 .toList();
-        if (plans.isEmpty()) {
+        List<ReferenceLoadPath> loadPaths = StaticReferenceResolver.loadPaths(modelClass).stream()
+                .filter(path -> outputFields == null || outputFields.contains(path.outputField()))
+                .toList();
+        if (plans.isEmpty() && loadPaths.isEmpty()) {
             return records.stream()
                     .map(record -> restrictOutput(record, outputFields))
                     .map(Collections::unmodifiableMap)
@@ -66,6 +71,7 @@ final class ReferenceReadProjectionPostProcessor {
                 applyPlan(record, plan, resolved.get(plan.target()));
             }
         }
+        applyLoadPaths(output, modelClass, loadPaths);
         return output.stream()
                 .map(record -> restrictOutput(record, outputFields))
                 .map(Collections::unmodifiableMap)
@@ -159,6 +165,35 @@ final class ReferenceReadProjectionPostProcessor {
     private static Object value(Map<String, Map<String, Object>> values, String id, String field) {
         Map<String, Object> fields = values.get(id);
         return fields == null ? null : fields.get(field);
+    }
+
+    private static void applyLoadPaths(List<Map<String, Object>> records,
+                                       Class<?> modelClass,
+                                       List<ReferenceLoadPath> paths) {
+        if (paths.isEmpty()) {
+            return;
+        }
+        Map<String, ReferencePlan> sourcePlans = StaticReferenceResolver.plans(modelClass).stream()
+                .collect(java.util.stream.Collectors.toMap(ReferencePlan::sourceField, plan -> plan,
+                        (first, ignored) -> first));
+        for (ReferenceLoadPath path : paths) {
+            ReferencePlan source = sourcePlans.get(path.sourceField());
+            if (source == null) {
+                throw new PlatformException("ReferenceLoad source is unavailable: "
+                        + modelClass.getName() + "." + path.sourceField());
+            }
+            List<String> sourceIds = records.stream()
+                    .flatMap(record -> source.normalizeValues(record.get(path.sourceField())).stream())
+                    .distinct()
+                    .toList();
+            Map<String, Object> values = ReferenceLoadReader.readAll(path, sourceIds,
+                    target -> PlatformAbilityRuntime.referenceTargetResolver().resolve(target).orElseThrow(
+                            () -> new PlatformException("reference target is not registered: " + target.qualifiedName())));
+            for (Map<String, Object> record : records) {
+                List<String> ids = source.normalizeValues(record.get(path.sourceField()));
+                record.put(path.outputField(), ids.isEmpty() ? null : values.get(ids.getFirst()));
+            }
+        }
     }
 
     private static final class TargetRequest {

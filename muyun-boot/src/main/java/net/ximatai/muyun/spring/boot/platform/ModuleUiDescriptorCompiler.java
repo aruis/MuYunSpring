@@ -358,6 +358,10 @@ public final class ModuleUiDescriptorCompiler {
                 fields.put(projection.outputField(), Boolean.TRUE);
             }
         }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath path
+                : StaticReferenceResolver.loadPaths(definition.modelClass())) {
+            fields.put(path.outputField(), Boolean.TRUE);
+        }
         return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
     }
 }

@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import org.junit.jupiter.api.AfterEach;
@@ -67,6 +68,34 @@ class ReferenceReadProjectionPostProcessorTest {
         assertThat(result).containsExactly(Map.of("id", "record-1", "version", 2, "title", "Visible"));
     }
 
+    @Test
+    void shouldBatchEnrichStaticRecordsAcrossReferenceLoadHops() {
+        @SuppressWarnings("unchecked") ReferenceAbility<?> middle = mock(ReferenceAbility.class);
+        @SuppressWarnings("unchecked") ReferenceAbility<?> terminal = mock(ReferenceAbility.class);
+        ReferenceTarget middleTarget = ReferenceTarget.of("demo", "middle");
+        ReferenceTarget terminalTarget = ReferenceTarget.of("demo", "terminal");
+        when(middle.projections(eq(List.of("middle-1", "middle-2")), eq(List.of("terminalId"))))
+                .thenReturn(Map.of("middle-1", Map.of("terminalId", "terminal-1"),
+                        "middle-2", Map.of("terminalId", "terminal-2")));
+        when(terminal.projections(eq(List.of("terminal-1", "terminal-2")), eq(List.of("title"))))
+                .thenReturn(Map.of("terminal-1", Map.of("title", "终点一"),
+                        "terminal-2", Map.of("title", "终点二")));
+        PlatformAbilityRuntime.configureReferenceTargetResolver(target -> middleTarget.equals(target)
+                ? java.util.Optional.of(middle)
+                : terminalTarget.equals(target) ? java.util.Optional.of(terminal) : java.util.Optional.empty());
+
+        List<Map<String, Object>> result = ReferenceReadProjectionPostProcessor.apply(TwoHopOrder.class, List.of(
+                Map.of("id", "order-1", "middleId", "middle-1"),
+                Map.of("id", "order-2", "middleId", "middle-2")
+        ), List.of("terminalTitle"));
+
+        assertThat(result).containsExactly(
+                Map.of("id", "order-1", "terminalTitle", "终点一"),
+                Map.of("id", "order-2", "terminalTitle", "终点二"));
+        verify(middle).projections(List.of("middle-1", "middle-2"), List.of("terminalId"));
+        verify(terminal).projections(List.of("terminal-1", "terminal-2"), List.of("title"));
+    }
+
     private static final class StaticOrder {
         @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
@@ -80,5 +109,17 @@ class ReferenceReadProjectionPostProcessorTest {
 
     private static final class PlainRecord {
         private String title;
+    }
+
+    private static final class TwoHopOrder {
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "middle")
+        private String middleId;
+
+        @ReferenceLoad(source = "middleId", hops = @ReferenceHop(target = TerminalService.class, via = "terminalId"))
+        private transient String terminalTitle;
+    }
+
+    public static final class TerminalService {
+        public static final String MODULE_ALIAS = "demo.terminal";
     }
 }

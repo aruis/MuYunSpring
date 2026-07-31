@@ -60,7 +60,6 @@
 | `@ReferencedBy` | 按模型声明装配只读反向引用列表 | `@ReferencedBy`、来源 `CrudAbility` | 平台按列表泛型来源模型自动解析唯一来源 service 并复用其数据域读取；不授予写入、替换或删除来源记录的权限。 |
 | `ChildAbility` | 给子表 Service 提供子记录选择、排序和软删兼容入口 | 子模型 `EntityContract` | 子表自身仍是标准实体能力组合，不应脱离 CRUD 链路。 |
 | `ChildrenAbility` | 给父表 Service 提供父子聚合插入、替换、装配和父删联动 | `ChildRelation`、`@Children` / `@ChildOf` 或动态关系配置 | `@ChildOf` 必须与同字段 `@ReferenceTo` 共存；父删除遵循该引用的 `integrity`：仅 `CASCADE_DELETE` 清理子项，`RESTRICT` 阻断，`PRESERVE_HISTORY` 保留。`null` 子列表表示不改子表，空列表表示清空。普通反向展示使用 `@ReferencedBy`，不进入本能力。 |
-| `CascadeDeleteChildAbility` | 标记子表支持父删级联批量删除 | `ChildAbility` | 当前是轻量语义入口，具体删除仍复用子表标准删除能力。 |
 
 ## 字段治理
 

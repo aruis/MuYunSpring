@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -175,6 +176,25 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldPublishMultiHopReferenceLoadAsStaticReadModelField() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("orderNo").field("assistantTitle"))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("orderNo", "订单号"),
+                                FieldDefinition.string("classroomId", "班级")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(MultiHopReferenceOrder.class)
+                .build();
+
+        ModuleUiCompilationResult result = ModuleUiDescriptorCompiler.compileModule(definition);
+
+        assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
+                .containsExactly("orderNo", "classroomId", "assistantTitle");
+    }
+
+    @Test
     void shouldRejectChildResourceFormWhenRelationIsOutsideModelFacts() {
         ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.position_category")
                 .formView(ModuleUiViewCodes.childResourceDefaultForm("position"), form -> form
@@ -274,5 +294,17 @@ class ModuleUiDescriptorCompilerTest {
 
         @ReferenceLoad(source = "customerId", field = "level")
         private transient String customerLevel;
+    }
+
+    private static final class MultiHopReferenceOrder {
+        @ReferenceTo(moduleAlias = "education.school", entityAlias = "classroom")
+        private String classroomId;
+
+        @ReferenceLoad(source = "classroomId", hops = @ReferenceHop(target = AssistantService.class, via = "assistantId"))
+        private transient String assistantTitle;
+    }
+
+    public static final class AssistantService {
+        public static final String MODULE_ALIAS = "education.school.assistant";
     }
 }
