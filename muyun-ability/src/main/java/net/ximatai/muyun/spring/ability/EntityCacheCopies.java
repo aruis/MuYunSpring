@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.ability.child.ChildRef;
+import net.ximatai.muyun.spring.ability.child.Children;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -55,6 +55,6 @@ final class EntityCacheCopies {
         int modifiers = field.getModifiers();
         return Modifier.isStatic(modifiers)
                 || Modifier.isTransient(modifiers)
-                || field.getAnnotation(ChildRef.class) != null;
+                || field.getAnnotation(Children.class) != null;
     }
 }

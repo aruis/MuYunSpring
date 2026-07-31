@@ -4,17 +4,15 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
-import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.boot.demo.school.teacher.TeacherService;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
+/**
+ * 班级聚合根的标准 Service：{@link ChildrenAbility} 将 {@code members} 纳入同一保存与删除链路；
+ * {@link ReferenceAbility} 让班级成为可选引用目标，排序、回收站和缓存则复用平台默认能力。
+ */
 @Service
 public class ClassroomService extends AbstractAbilityService<Classroom> implements
         RecycleBinAbility<Classroom>,
@@ -23,29 +21,9 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         ReferencerAbility<Classroom>,
         ReferenceAbility<Classroom>,
         CacheAbility<Classroom> {
-    private final TeacherService teacherService;
-    private final ClassMemberService memberService;
-
-    public ClassroomService(ClassroomDao dao,
-                            TeacherService teacherService,
-                            ClassMemberService memberService) {
-        super("education.classroom", Classroom.class, dao);
-        this.teacherService = teacherService;
-        this.memberService = memberService;
+    public static final String MODULE_ALIAS = "education.classroom";
+    public ClassroomService(ClassroomDao dao) {
+        super(MODULE_ALIAS, Classroom.class, dao);
     }
 
-    @Override
-    public String getDeletionEntityAlias() {
-        return "classroom";
-    }
-
-    @Override
-    public List<ChildRelation<? extends EntityContract, Classroom>> childRelations() {
-        return List.of(childRelation("members", memberService));
-    }
-
-    @Override
-    public List<ReferenceLookup> referenceLookups() {
-        return List.of(referenceLookup(teacherService));
-    }
 }

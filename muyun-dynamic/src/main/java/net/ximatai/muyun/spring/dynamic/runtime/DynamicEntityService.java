@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoadReader;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetProvider;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
@@ -39,6 +41,8 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceLoadDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferencedByDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityStandardActionCatalog;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -177,11 +181,6 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return dao.getEntity().alias();
-    }
-
-    @Override
     public ReferenceTarget referenceTarget() {
         return ReferenceTarget.of(moduleAlias, dao.getEntity().alias());
     }
@@ -305,7 +304,7 @@ public class DynamicEntityService implements
 
     @Override
     public void afterReferenceSelect(DynamicRecord record) {
-        populateReferenceTitles(record);
+        populateReferenceReadFields(record == null ? List.of() : List.of(record));
     }
 
     @Override
@@ -621,7 +620,7 @@ public class DynamicEntityService implements
         List<ChildRelation<? extends EntityContract, DynamicRecord>> relations = new ArrayList<>();
         for (EntityRelationDefinition relation : module.relations()) {
             if (dao.getEntity().alias().equals(relation.parentEntityAlias())) {
-                relations.add(toChildRelation(relation.plan()));
+                relations.add(toChildRelation(relation));
             }
         }
         return List.copyOf(relations);
@@ -653,7 +652,7 @@ public class DynamicEntityService implements
 
     private void applyReadPipeline(DynamicRecord record) {
         restoreProtectedFieldsFromStorage(record);
-        afterReferenceSelect(record);
+        populateReferenceReadFields(record == null ? List.of() : List.of(record));
         refreshReferenceDependencies(record);
     }
 
@@ -662,8 +661,59 @@ public class DynamicEntityService implements
             return;
         }
         records.forEach(this::restoreProtectedFieldsFromStorage);
-        populateReferenceTitles(records);
+        populateReferenceReadFields(records);
         records.forEach(this::refreshReferenceDependencies);
+    }
+
+    private void populateReferenceReadFields(List<DynamicRecord> records) {
+        populateReferenceTitles(records);
+        populateReferenceLoads(records);
+        populateReferencedBys(records);
+    }
+
+    private void populateReferenceLoads(List<DynamicRecord> records) {
+        for (EntityReferenceLoadDefinition definition : referenceLoadDefinitions()) {
+            EntityReferenceDefinition sourceReference = referenceDefinition(definition.sourceField());
+            ReferenceLoadPath path = definition.path(sourceReference.target());
+            for (DynamicRecord record : records) {
+                List<String> ids = referencePlan(definition.sourceField()).normalizeValues(record.getValue(path.sourceField()));
+                Object value = path.hops().isEmpty()
+                        ? loadDirectReference(sourceReference, path, ids)
+                        : loadReferencePath(path, ids);
+                record.putVirtualValue(path.outputField(), value);
+            }
+        }
+    }
+
+    private Object loadDirectReference(EntityReferenceDefinition source,
+                                       ReferenceLoadPath path,
+                                       List<String> ids) {
+        if (ids.isEmpty()) {
+            return source.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY
+                    ? List.of() : null;
+        }
+        Map<String, Map<String, Object>> values = referenceAbility(path.sourceTarget())
+                .projections(ids, List.of(path.terminalField()));
+        if (source.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY) {
+            return ids.stream().map(id -> values.getOrDefault(id, Map.of()).get(path.terminalField()))
+                    .filter(java.util.Objects::nonNull).toList();
+        }
+        return values.getOrDefault(ids.getFirst(), Map.of()).get(path.terminalField());
+    }
+
+    private Object loadReferencePath(ReferenceLoadPath path, List<String> ids) {
+        return ReferenceLoadReader.read(path, ids, this::referenceAbility);
+    }
+
+    private void populateReferencedBys(List<DynamicRecord> records) {
+        for (EntityReferencedByDefinition definition : referencedByDefinitions()) {
+            DynamicEntityService source = relationServiceResolver.apply(definition.sourceEntityAlias());
+            for (DynamicRecord record : records) {
+                List<DynamicRecord> rows = record.getId() == null ? List.of()
+                        : source.list(Criteria.of().eq(definition.sourceField(), record.getId()));
+                record.putVirtualValue(definition.outputField(), rows);
+            }
+        }
     }
 
     private void populateReferenceTitles(List<DynamicRecord> records) {
@@ -671,7 +721,7 @@ public class DynamicEntityService implements
             return;
         }
         List<ReferencePlan> plans = referencePlans().stream()
-                .filter(plan -> plan.autoTitle() || !plan.projections().isEmpty())
+                .filter(plan -> !plan.projections().isEmpty())
                 .toList();
         if (plans.isEmpty()) {
             return;
@@ -679,7 +729,6 @@ public class DynamicEntityService implements
         Map<ReferenceTarget, ReferenceReadRequest> requests = new LinkedHashMap<>();
         for (ReferencePlan plan : plans) {
             ReferenceReadRequest request = requests.computeIfAbsent(plan.target(), ignored -> new ReferenceReadRequest());
-            request.titles |= plan.autoTitle();
             plan.projections().stream().map(net.ximatai.muyun.spring.ability.reference.ReferenceProjection::targetField)
                     .forEach(request.fields::add);
             for (DynamicRecord record : records) {
@@ -697,16 +746,12 @@ public class DynamicEntityService implements
             net.ximatai.muyun.spring.ability.reference.ReferenceAbility<?> target = referenceAbility(entry.getKey());
             List<String> ids = List.copyOf(request.ids);
             values.put(entry.getKey(), new ReferenceReadValues(
-                    request.titles ? target.titles(ids) : Map.of(),
+                    Map.of(),
                     request.fields.isEmpty() ? Map.of() : target.projections(ids, List.copyOf(request.fields))));
         }
         for (DynamicRecord record : records) {
             for (ReferencePlan plan : plans) {
                 List<String> ids = plan.normalizeValues(record.getValue(plan.sourceField()));
-                if (plan.autoTitle()) {
-                    record.putVirtualValue(plan.titleOutputField(), ids.isEmpty() ? null
-                            : referenceTitleValue(ids, values.get(plan.target()).titles, plan));
-                }
                 for (net.ximatai.muyun.spring.ability.reference.ReferenceProjection projection : plan.projections()) {
                     record.putVirtualValue(projection.outputField(), ids.isEmpty() ? null : referenceProjectionValue(ids,
                             values.get(plan.target()).projections, plan, projection.targetField()));
@@ -718,7 +763,6 @@ public class DynamicEntityService implements
     private static final class ReferenceReadRequest {
         private final Set<String> ids = new LinkedHashSet<>();
         private final Set<String> fields = new LinkedHashSet<>();
-        private boolean titles;
     }
 
     private record ReferenceReadValues(Map<String, String> titles, Map<String, Map<String, Object>> projections) {
@@ -732,6 +776,24 @@ public class DynamicEntityService implements
         return module.references().stream()
                 .filter(reference -> dao.getEntity().alias().equals(reference.sourceEntityAlias()))
                 .map(EntityReferenceDefinition::plan)
+                .toList();
+    }
+
+    private List<EntityReferenceLoadDefinition> referenceLoadDefinitions() {
+        if (module == null) {
+            return List.of();
+        }
+        return module.referenceLoads().stream()
+                .filter(load -> dao.getEntity().alias().equals(load.sourceEntityAlias()))
+                .toList();
+    }
+
+    private List<EntityReferencedByDefinition> referencedByDefinitions() {
+        if (module == null) {
+            return List.of();
+        }
+        return module.referencedBys().stream()
+                .filter(definition -> dao.getEntity().alias().equals(definition.targetEntityAlias()))
                 .toList();
     }
 
@@ -774,16 +836,6 @@ public class DynamicEntityService implements
                     .resolve(target)
                     .orElseThrow(() -> dynamicResolutionFailure);
         }
-    }
-
-    private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
-        if (plan.cardinality() == ReferenceCardinality.MANY) {
-            return ids.stream()
-                    .map(titles::get)
-                    .filter(Objects::nonNull)
-                    .toList();
-        }
-        return titles.get(ids.getFirst());
     }
 
     private Object referenceProjectionValue(List<String> ids,
@@ -897,7 +949,9 @@ public class DynamicEntityService implements
         return update(entity);
     }
 
-    private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(ChildPlan plan) {
+    private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(EntityRelationDefinition relation) {
+        ChildPlan plan = relation.plan(module == null ? null : module.moduleAlias(),
+                module == null ? List.of() : module.references());
         DynamicEntityService childService = relationServiceResolver.apply(plan.childEntityAlias());
         ChildRelation<DynamicRecord, DynamicRecord> childRelation = new ChildRelation<>(
                 childService,
@@ -908,11 +962,12 @@ public class DynamicEntityService implements
         if (plan.autoPopulate()) {
             childRelation.autoPopulate((parent, children) -> parent.setChildren(plan.relationCode(), children));
         }
-        if (plan.autoDeleteWithParent()) {
-            childRelation.autoDeleteWithParent();
+        if (plan.cascadeOnParentUnavailable()) {
+            childRelation.cascadeOnParentUnavailable();
         }
         return childRelation;
     }
+
 
     private void validateChildPayload(DynamicRecord record) {
         requireSameEntity(record);

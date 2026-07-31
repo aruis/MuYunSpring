@@ -354,12 +354,13 @@ public final class ModuleUiDescriptorCompiler {
         }
         LinkedHashMap<String, Boolean> fields = new LinkedHashMap<>();
         for (ReferencePlan plan : StaticReferenceResolver.plans(definition.modelClass())) {
-            if (plan.autoTitle()) {
-                fields.put(plan.titleOutputField(), Boolean.TRUE);
-            }
             for (ReferenceProjection projection : plan.projections()) {
                 fields.put(projection.outputField(), Boolean.TRUE);
             }
+        }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath path
+                : StaticReferenceResolver.loadPaths(definition.modelClass())) {
+            fields.put(path.outputField(), Boolean.TRUE);
         }
         return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
     }

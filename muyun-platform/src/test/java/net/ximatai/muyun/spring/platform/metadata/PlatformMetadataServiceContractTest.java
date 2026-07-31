@@ -905,15 +905,14 @@ class PlatformMetadataServiceContractTest {
         MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
         fieldService.insert(customerField);
         MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
-        config.setAutoTitle(true);
-        config.setProjectionMappings("code:customerCode");
+        config.setProjectionMappings("title:customerIdTitle,code:customerCode");
 
         String id = referenceConfigService.insert(config);
 
         MetadataFieldReferenceConfig saved = referenceConfigService.select(id);
         assertThat(saved.getCardinality()).isEqualTo(net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE);
-        assertThat(saved.getTitleOutputField()).isEqualTo("customerIdTitle");
-        assertThat(saved.projections()).hasSize(1);
+        assertThat(saved.projections()).anySatisfy(projection -> assertThat(projection.outputField()).isEqualTo("customerIdTitle"));
+        assertThat(saved.projections()).hasSize(2);
     }
 
     @Test
@@ -946,7 +945,7 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
-    void shouldRejectCrossModuleReferenceDisplayConfig() {
+    void shouldRejectCrossModuleReferenceLoadConfig() {
         moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
         String customerId = metadataService.insert(metadata("crm", "customer"));
         String contactId = metadataService.insert(metadata("crm", "contact"));
@@ -954,11 +953,10 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(customerField);
         MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
         config.setTargetModuleAlias("crm.customer");
-        config.setAutoTitle(true);
+        config.setProjectionMappings("title:customerIdTitle");
 
         assertThatThrownBy(() -> referenceConfigService.insert(config))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("Cross-module reference display");
+                .isInstanceOf(PlatformException.class);
     }
 
     @Test
@@ -970,12 +968,11 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(customerField);
         fieldService.insert(field(contactId, "customerTitle", "customer_title", FieldType.STRING));
         MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
-        config.setAutoTitle(true);
-        config.setTitleOutputField("customerTitle");
+        config.setProjectionMappings("title:customerTitle");
 
         assertThatThrownBy(() -> referenceConfigService.insert(config))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("reference title output field conflicts with source field");
+                .hasMessageContaining("reference projection output field conflicts with source field");
     }
 
     @Test

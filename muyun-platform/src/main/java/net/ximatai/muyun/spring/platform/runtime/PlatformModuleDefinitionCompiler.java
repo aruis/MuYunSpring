@@ -352,9 +352,6 @@ public class PlatformModuleDefinitionCompiler {
         if (Boolean.TRUE.equals(relation.getAutoPopulate())) {
             definition = definition.withAutoPopulate();
         }
-        if (Boolean.TRUE.equals(relation.getCascadeDelete())) {
-            definition = definition.withAutoDeleteWithParent();
-        }
         return definition;
     }
 
@@ -503,12 +500,9 @@ public class PlatformModuleDefinitionCompiler {
                 sourceField.getFieldName(),
                 targetModuleAlias + "." + targetMetadata.getAlias(),
                 config.getCardinality(),
-                Boolean.TRUE.equals(config.getAutoTitle()),
-                config.getTitleOutputField()
-        ).withIntegrity(new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy()));
-        for (ReferenceProjection projection : config.projections()) {
-            definition = definition.withProjection(projection.targetField(), projection.outputField());
-        }
+                config.projections(), null, null, null, null, Set.of(), List.of(), List.of(),
+                new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy())
+        );
         return definition;
     }
 

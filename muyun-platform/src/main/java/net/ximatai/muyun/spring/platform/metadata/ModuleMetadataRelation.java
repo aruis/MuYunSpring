@@ -37,7 +37,4 @@ public class ModuleMetadataRelation extends StandardSortableEntity {
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean autoPopulate = Boolean.FALSE;
 
-    @Column(name = "cascade_delete", type = ColumnType.BOOLEAN, comment = "Cascade delete child records",
-            defaultVal = @Default(bool = TrueOrFalse.FALSE))
-    private Boolean cascadeDelete = Boolean.FALSE;
 }

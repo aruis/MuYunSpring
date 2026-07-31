@@ -48,7 +48,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataRelation.class, java.util.List.of("id", "moduleAlias", "metadataId", "relationAlias", "relationRole", "parentMetadataId", "foreignKey", "autoPopulate", "cascadeDelete", "title", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataRelation.class, java.util.List.of("id", "moduleAlias", "metadataId", "relationAlias", "relationRole", "parentMetadataId", "foreignKey", "autoPopulate", "title", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -94,9 +94,6 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         rejectDuplicateRelationAlias(relation);
         if (relation.getAutoPopulate() == null) {
             relation.setAutoPopulate(Boolean.FALSE);
-        }
-        if (relation.getCascadeDelete() == null) {
-            relation.setCascadeDelete(Boolean.FALSE);
         }
         relation.setModuleAlias(moduleAlias);
     }

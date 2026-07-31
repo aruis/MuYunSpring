@@ -3546,8 +3546,6 @@ class DynamicRecordWebControllerTest {
                 "crm.customer",
                 "customer",
                 ReferenceCardinality.ONE,
-                true,
-                null,
                 List.of(),
                 "id",
                 "title",

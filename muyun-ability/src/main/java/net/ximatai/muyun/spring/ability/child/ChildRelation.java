@@ -19,7 +19,7 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
     private final BiConsumer<C, String> setParentId;
     private final String childForeignKeyField;
     private final Function<P, List<C>> extractChildren;
-    private boolean autoDeleteWithParent;
+    private boolean cascadeOnParentUnavailable;
     private BiConsumer<P, List<C>> populateChildren;
 
     public ChildRelation(ChildAbility<C> childAbility,
@@ -37,13 +37,13 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
         return this;
     }
 
-    public ChildRelation<C, P> autoDeleteWithParent() {
-        this.autoDeleteWithParent = true;
+    public ChildRelation<C, P> cascadeOnParentUnavailable() {
+        this.cascadeOnParentUnavailable = true;
         return this;
     }
 
-    public boolean isAutoDeleteWithParent() {
-        return autoDeleteWithParent;
+    public boolean isCascadeOnParentUnavailable() {
+        return cascadeOnParentUnavailable;
     }
 
     public boolean isAutoPopulate() {
@@ -127,21 +127,11 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
-            cascadeDeleteChildAbility.deleteBatchFromParentCascade(ids);
-            return;
-        }
         childAbility.deleteBatch(ids);
     }
 
-    @SuppressWarnings("unchecked")
     private void deleteChildren(List<String> ids, DeletionContext deletionContext, DeletionNode deletionNode) {
         if (ids == null || ids.isEmpty()) {
-            return;
-        }
-        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
-            ((CascadeDeleteChildAbility<C>) cascadeDeleteChildAbility)
-                    .deleteBatchFromParentCascade(ids, deletionContext, deletionNode);
             return;
         }
         for (String id : ids) {

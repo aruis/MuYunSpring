@@ -230,8 +230,9 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 continue;
             }
             DynamicEntityService source = entityService(inbound.moduleAlias(), reference.sourceEntityAlias());
-                long count = source.count(Criteria.of().eq(reference.sourceField(), targetId));
-                if (count > 0) {
+                boolean referenced = !source.list(Criteria.of().eq(reference.sourceField(), targetId),
+                        PageRequest.of(1, 1)).isEmpty();
+                if (referenced) {
                     throw new PlatformException("cannot make reference target unavailable " + target.qualifiedName()
                             + ": active records in " + inbound.moduleAlias()
                             + "." + reference.sourceField() + " still reference it");
@@ -257,15 +258,24 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 continue;
             }
             DynamicEntityService source = entityService(inbound.moduleAlias(), reference.sourceEntityAlias());
+            java.util.Set<String> attemptedIds = new java.util.LinkedHashSet<>();
             while (true) {
                 List<DynamicRecord> referrers = source.list(Criteria.of().eq(reference.sourceField(), targetId),
                         PageRequest.of(1, CASCADE_BATCH_SIZE));
                 if (referrers.isEmpty()) {
                     break;
                 }
+                boolean progressed = false;
                 for (DynamicRecord referrer : referrers) {
-                    source.delete(referrer.getId(), referrer.getVersion(),
+                    if (!attemptedIds.add(referrer.getId())) {
+                        continue;
+                    }
+                    int deleted = source.delete(referrer.getId(), referrer.getVersion(),
                             context.child(node, source.getModuleAlias(), referrer.getId()));
+                    progressed = progressed || deleted > 0;
+                }
+                if (!progressed) {
+                    break;
                 }
             }
         }

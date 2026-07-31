@@ -309,8 +309,6 @@ class DynamicRelationProjectionReadServiceTest {
                         "customerId",
                         "crm.customer.customer",
                         ReferenceCardinality.ONE,
-                        false,
-                        "",
                         List.of(new ReferenceProjection("title", "customerTitle"))
                 )))
                 .build();

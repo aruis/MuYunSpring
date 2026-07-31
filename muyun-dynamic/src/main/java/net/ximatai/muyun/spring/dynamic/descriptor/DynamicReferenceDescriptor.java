@@ -14,8 +14,6 @@ public record DynamicReferenceDescriptor(
         String targetModuleAlias,
         String targetEntityAlias,
         ReferenceCardinality cardinality,
-        boolean autoTitle,
-        String titleOutputField,
         List<DynamicReferenceProjectionDescriptor> projections,
         String keyField,
         String labelField,
@@ -31,11 +29,9 @@ public record DynamicReferenceDescriptor(
                                       String targetModuleAlias,
                                       String targetEntityAlias,
                                       ReferenceCardinality cardinality,
-                                      boolean autoTitle,
-                                      String titleOutputField,
                                       List<DynamicReferenceProjectionDescriptor> projections) {
-        this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality, autoTitle,
-                titleOutputField, projections, null, null, null, null, Set.of(), List.of(), List.of(),
+        this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality,
+                projections, null, null, null, null, Set.of(), List.of(), List.of(),
                 ReferenceIntegrityPolicy.DEFAULT);
     }
 
@@ -44,8 +40,6 @@ public record DynamicReferenceDescriptor(
                                       String targetModuleAlias,
                                       String targetEntityAlias,
                                       ReferenceCardinality cardinality,
-                                      boolean autoTitle,
-                                      String titleOutputField,
                                       List<DynamicReferenceProjectionDescriptor> projections,
                                       String keyField,
                                       String labelField,
@@ -54,8 +48,8 @@ public record DynamicReferenceDescriptor(
                                       Set<String> plusFields,
                                       List<DynamicReferenceFilterDescriptor> filters,
                                       List<DynamicReferenceAffectDescriptor> affects) {
-        this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality, autoTitle,
-                titleOutputField, projections, keyField, labelField, generateRuleId, queryTemplateId,
+        this(sourceEntityAlias, sourceField, targetModuleAlias, targetEntityAlias, cardinality,
+                projections, keyField, labelField, generateRuleId, queryTemplateId,
                 plusFields, filters, affects, ReferenceIntegrityPolicy.DEFAULT);
     }
 
@@ -75,8 +69,6 @@ public record DynamicReferenceDescriptor(
                 target.moduleAlias(),
                 target.entityAlias(),
                 reference.cardinality(),
-                reference.autoTitle(),
-                reference.titleOutputField(),
                 reference.projections().stream().map(DynamicReferenceProjectionDescriptor::from).toList(),
                 reference.keyField(),
                 reference.labelField(),
@@ -88,4 +80,5 @@ public record DynamicReferenceDescriptor(
                 reference.integrity()
         );
     }
+
 }

@@ -6,7 +6,6 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
-import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
@@ -41,13 +40,6 @@ public class MetadataFieldReferenceConfig extends StandardEntity {
             comment = "Reference target unavailable policy",
             defaultVal = @Default(varchar = "PRESERVE_HISTORY"))
     private ReferenceTargetUnavailablePolicy targetUnavailablePolicy = ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY;
-
-    @Column(name = "auto_title", type = ColumnType.BOOLEAN, comment = "Auto populate title",
-            defaultVal = @Default(bool = TrueOrFalse.FALSE))
-    private Boolean autoTitle = Boolean.FALSE;
-
-    @Column(name = "title_output_field", type = ColumnType.VARCHAR, length = 64, comment = "Title output field")
-    private String titleOutputField;
 
     @Column(name = "projection_mappings", type = ColumnType.VARCHAR, length = 512, comment = "Projection mappings")
     private String projectionMappings;

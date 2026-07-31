@@ -5,7 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
-import net.ximatai.muyun.spring.ability.child.CascadeDeleteChildAbility;
+import net.ximatai.muyun.spring.ability.child.ChildAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.ability.deletion.DeletionTrigger;
@@ -28,7 +28,7 @@ import java.util.Set;
 public class TenantApplicationService extends AbstractAbilityService<TenantApplication> implements
         GlobalScopedAbility<TenantApplication>,
         RecycleBinAbility<TenantApplication>,
-        CascadeDeleteChildAbility<TenantApplication> {
+        ChildAbility<TenantApplication> {
     public static final String MODULE_ALIAS = "iam.tenant_application";
     public static final String IAM_APPLICATION_ALIAS = "iam";
 
@@ -160,11 +160,6 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
                 && deletionContext.trigger() != DeletionTrigger.CASCADE) {
             throw new IllegalArgumentException("iam application must remain opened for a tenant");
         }
-    }
-
-    @Override
-    public String getDeletionEntityAlias() {
-        return "tenant_application";
     }
 
     @Override

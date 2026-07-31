@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -839,8 +841,9 @@ class DynamicSchemaServiceIT {
                 .entities(List.of(invoiceEntity(), invoiceLineEntity()))
                 .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
-                        .withAutoDeleteWithParent()))
-                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))))
+                        ))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
                 .build();
     }
 

@@ -82,9 +82,5 @@ class DeletionLogLifecycleListenerTest {
             super("iam.employee", DeletionOperation.class, new TestMemoryDao<>());
         }
 
-        @Override
-        public String getDeletionEntityAlias() {
-            return "employee";
-        }
     }
 }

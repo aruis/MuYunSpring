@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.List;
@@ -12,6 +12,7 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
         SoftDeleteAbility<DemoInvoice>,
         ChildrenAbility<DemoInvoice>,
         ReferencerAbility<DemoInvoice>,
+        ReferenceAbility<DemoInvoice>,
         CacheAbility<DemoInvoice> {
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
     private final DemoInvoiceNoteService noteService = new DemoInvoiceNoteService();
@@ -27,8 +28,17 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     }
 
     DemoInvoiceService(DemoCustomerService customerService) {
-        super("demo.invoice", DemoInvoice.class, new InMemoryBaseDao<>());
+        super("demo.demoInvoice", DemoInvoice.class, new InMemoryBaseDao<>());
         this.customerService = customerService;
+        PlatformAbilityRuntime.configureReferenceTargetResolver(target -> {
+            if (customerService.referenceTarget().equals(target)) {
+                return java.util.Optional.of(customerService);
+            }
+            if (referenceTarget().equals(target)) {
+                return java.util.Optional.of(this);
+            }
+            return java.util.Optional.empty();
+        });
     }
 
     @Override
@@ -49,11 +59,6 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
 
     DemoCustomerService customerService() {
         return customerService;
-    }
-
-    @Override
-    public List<ReferenceLookup> referenceLookups() {
-        return List.of(referenceLookup(customerService));
     }
 
     @Override

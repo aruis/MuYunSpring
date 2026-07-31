@@ -5,11 +5,11 @@ import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
 import net.ximatai.muyun.spring.ability.child.ChildAbility;
-import net.ximatai.muyun.spring.ability.child.ChildRef;
+import net.ximatai.muyun.spring.ability.child.ChildOf;
+import net.ximatai.muyun.spring.ability.child.Children;
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
@@ -49,6 +49,9 @@ class AbilityContractTest {
         CacheRegistry.resetPolicy();
         PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
         PlatformAbilityRuntime.resetReferenceTargetResolver();
+        PlatformAbilityRuntime.resetChildAbilityResolver();
+        PlatformAbilityRuntime.resetReferencedByResolver();
+        PlatformAbilityRuntime.resetReferenceLoadResolver();
         PlatformAbilityRuntime.resetDeletionLifecycleListener();
         TenantContext.clear();
         clearTransactionState();
@@ -429,7 +432,7 @@ class AbilityContractTest {
 
         assertThat(recorded).hasSize(3);
         RecordedDeletion root = recorded.getFirst();
-        assertThat(root.moduleAlias()).isEqualTo("demo.invoice");
+        assertThat(root.moduleAlias()).isEqualTo("demo.demoInvoice");
         assertThat(root.context().trigger()).isEqualTo(net.ximatai.muyun.spring.ability.deletion.DeletionTrigger.DIRECT);
         assertThat(root.context().parentEntryId()).isNull();
         assertThat(recorded.subList(1, recorded.size()))
@@ -504,9 +507,9 @@ class AbilityContractTest {
     }
 
     @Test
-    void childrenAbilitySingleRelationShortcutShouldUseStaticChildRef() {
+    void childrenAbilitySingleRelationShortcutShouldUseAggregateOwnershipDeclaration() {
         SingleChildInvoiceService invoiceService = new SingleChildInvoiceService();
-        DemoInvoiceLine line = new DemoInvoiceLine("Single line");
+        SingleChildInvoiceLine line = new SingleChildInvoiceLine("Single line");
         SingleChildInvoice invoice = new SingleChildInvoice("Invoice", List.of(line));
 
         String invoiceId = invoiceService.insert(invoice);
@@ -514,7 +517,7 @@ class AbilityContractTest {
         assertThat(line.getInvoiceId()).isEqualTo(invoiceId);
         invoice.setLines(null);
         assertThat(invoiceService.select(invoiceId).getLines())
-                .extracting(DemoInvoiceLine::getTitle)
+                .extracting(SingleChildInvoiceLine::getTitle)
                 .containsExactly("Single line");
     }
 
@@ -533,29 +536,18 @@ class AbilityContractTest {
     void childrenAbilityShortcutShouldRequireModelClass() {
         NoModelChildrenService service = new NoModelChildrenService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                new DemoInvoiceLineService(),
-                DemoInvoiceLine::setInvoiceId,
-                DemoInvoice::getLines,
-                DemoInvoice::setLines
-        ))
+        assertThatThrownBy(() -> service.childRelation(new DemoInvoiceLineService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("demo.noModelChildren")
                 .hasMessageContaining("AbstractAbilityService")
-                .hasMessageContaining("childRelation(Class");
+                .hasMessageContaining("childRelation(...)");
     }
 
     @Test
     void childrenAbilityShouldRejectMismatchedRelationCodeAndChildAbility() {
         DemoInvoiceService service = new DemoInvoiceService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                "notes",
-                service.lineService(),
-                DemoInvoiceLine::setInvoiceId,
-                DemoInvoice::getLines,
-                DemoInvoice::setLines
-        ))
+        assertThatThrownBy(() -> service.childRelation("notes", service.lineService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("notes")
@@ -564,34 +556,15 @@ class AbilityContractTest {
     }
 
     @Test
-    void childrenAbilitySinglePlanExplicitLambdaShouldRejectMismatchedChildAbility() {
+    void childrenAbilitySinglePlanShortcutShouldRejectMismatchedChildAbility() {
         SingleChildInvoiceService service = new SingleChildInvoiceService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                SingleChildInvoice.class,
-                new DemoInvoiceNoteService(),
-                DemoInvoiceNote::setInvoiceId,
-                invoice -> List.of(new DemoInvoiceNote("Wrong child")),
-                (invoice, notes) -> {
-                }
-        ))
+        assertThatThrownBy(() -> service.childRelation(new DemoInvoiceNoteService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("lines")
-                .hasMessageContaining(DemoInvoiceLine.class.getName())
+                .hasMessageContaining(SingleChildInvoiceLine.class.getName())
                 .hasMessageContaining(DemoInvoiceNote.class.getName());
-    }
-
-    @Test
-    void childrenAbilityShortcutShouldRejectChildAbilityWithoutModelClass() {
-        DemoInvoiceService service = new DemoInvoiceService();
-
-        assertThatThrownBy(() -> service.childRelation("lines", new NoModelLineService()))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("child relation model mismatch")
-                .hasMessageContaining("lines")
-                .hasMessageContaining(DemoInvoiceLine.class.getName())
-                .hasMessageContaining("actual null");
     }
 
     @Test
@@ -957,7 +930,7 @@ class AbilityContractTest {
     }
 
     @Test
-    void cacheAbilityDefaultCopyShouldSkipChildRefsAndTransientFields() {
+    void cacheAbilityDefaultCopyShouldSkipChildrenAndTransientFields() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
         DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
@@ -1212,38 +1185,6 @@ class AbilityContractTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("reference target is unavailable")
                 .hasMessageContaining("demo.customer.customerId");
-    }
-
-    @Test
-    void referenceLookupShouldRejectMismatchedTargetAndAbility() {
-        DemoCustomerService customerService = new DemoCustomerService();
-
-        assertThatThrownBy(() -> new ReferenceLookup(ReferenceTarget.of("iam", "user"), customerService))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("reference lookup target mismatch")
-                .hasMessageContaining("iam.user")
-                .hasMessageContaining("demo.customer");
-    }
-
-    @Test
-    void referencerAbilityShouldRejectDuplicateLookupTargets() {
-        DuplicateReferenceLookupService service = new DuplicateReferenceLookupService();
-
-        assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("duplicate reference lookup target")
-                .hasMessageContaining("demo.customer");
-    }
-
-    @Test
-    void referencerAbilityShouldReportConfiguredTargetsWhenLookupIsMissing() {
-        MissingUserReferenceLookupService service = new MissingUserReferenceLookupService();
-
-        assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("reference title resolver is not configured")
-                .hasMessageContaining("iam.user")
-                .hasMessageContaining("demo.customer");
     }
 
     @Test
@@ -1856,35 +1797,21 @@ class AbilityContractTest {
         }
     }
 
-    private static final class NoModelLineService implements ChildAbility<DemoInvoiceLine> {
-        private final InMemoryBaseDao<DemoInvoiceLine> dao = new InMemoryBaseDao<>();
-
-        @Override
-        public BaseDao<DemoInvoiceLine, String> getDao() {
-            return dao;
-        }
-
-        @Override
-        public String getModuleAlias() {
-            return "demo.noModelLine";
-        }
-    }
-
     private static final class SingleChildInvoice extends StandardEntity {
         private String title;
-        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
-        private List<DemoInvoiceLine> lines;
+        @Children
+        private List<SingleChildInvoiceLine> lines;
 
-        private SingleChildInvoice(String title, List<DemoInvoiceLine> lines) {
+        private SingleChildInvoice(String title, List<SingleChildInvoiceLine> lines) {
             this.title = title;
             this.lines = lines;
         }
 
-        public List<DemoInvoiceLine> getLines() {
+        public List<SingleChildInvoiceLine> getLines() {
             return lines;
         }
 
-        public void setLines(List<DemoInvoiceLine> lines) {
+        public void setLines(List<SingleChildInvoiceLine> lines) {
             this.lines = lines;
         }
     }
@@ -1892,7 +1819,7 @@ class AbilityContractTest {
     private static final class SingleChildInvoiceService extends AbstractAbilityService<SingleChildInvoice> implements
             SoftDeleteAbility<SingleChildInvoice>,
             ChildrenAbility<SingleChildInvoice> {
-        private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
+        private final SingleChildInvoiceLineService lineService = new SingleChildInvoiceLineService();
 
         private SingleChildInvoiceService() {
             super("demo.singleChildInvoice", SingleChildInvoice.class, new InMemoryBaseDao<>());
@@ -1901,6 +1828,32 @@ class AbilityContractTest {
         @Override
         public List<ChildRelation<? extends EntityContract, SingleChildInvoice>> childRelations() {
             return List.of(childRelation(lineService));
+        }
+    }
+
+    private static final class SingleChildInvoiceLine extends StandardEntity {
+        private String title;
+        @ChildOf
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "singleChildInvoice")
+        private String invoiceId;
+
+        private SingleChildInvoiceLine(String title) {
+            this.title = title;
+        }
+
+        public String getInvoiceId() {
+            return invoiceId;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+    }
+
+    private static final class SingleChildInvoiceLineService extends AbstractAbilityService<SingleChildInvoiceLine> implements
+            ChildAbility<SingleChildInvoiceLine> {
+        private SingleChildInvoiceLineService() {
+            super("demo.singleChildInvoiceLine", SingleChildInvoiceLine.class, new InMemoryBaseDao<>());
         }
     }
 
@@ -1935,44 +1888,6 @@ class AbilityContractTest {
             ReferencerAbility<StaticReferenceBaseRecord> {
         private StaticReferenceBaseService() {
             super("demo.staticReferenceBase", StaticReferenceBaseRecord.class, new InMemoryBaseDao<>());
-        }
-    }
-
-    private static final class DuplicateReferenceLookupService extends AbstractAbilityService<DemoReferencingRecord> implements
-            ReferencerAbility<DemoReferencingRecord> {
-        private final DemoCustomerService customerService = new DemoCustomerService();
-
-        private DuplicateReferenceLookupService() {
-            super("demo.duplicateReferenceLookup", DemoReferencingRecord.class, new InMemoryBaseDao<>());
-            seedCustomer();
-        }
-
-        @Override
-        public List<ReferenceLookup> referenceLookups() {
-            return List.of(referenceLookup(customerService), referenceLookup(customerService));
-        }
-
-        private void seedCustomer() {
-            DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
-            customer.setId("customer-1");
-            customerService.insert(customer);
-        }
-    }
-
-    private static final class MissingUserReferenceLookupService extends AbstractAbilityService<DemoReferencingRecord> implements
-            ReferencerAbility<DemoReferencingRecord> {
-        private final DemoCustomerService customerService = new DemoCustomerService();
-
-        private MissingUserReferenceLookupService() {
-            super("demo.missingUserReferenceLookup", DemoReferencingRecord.class, new InMemoryBaseDao<>());
-            DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
-            customer.setId("customer-1");
-            customerService.insert(customer);
-        }
-
-        @Override
-        public List<ReferenceLookup> referenceLookups() {
-            return List.of(referenceLookup(customerService));
         }
     }
 

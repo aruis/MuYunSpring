@@ -19,11 +19,5 @@ public @interface ReferenceTo {
 
     ReferenceCardinality cardinality() default ReferenceCardinality.ONE;
 
-    boolean autoTitle() default false;
-
-    String titleOutputField() default "";
-
-    ReferenceProject[] projections() default {};
-
     ReferenceIntegrity integrity() default @ReferenceIntegrity;
 }

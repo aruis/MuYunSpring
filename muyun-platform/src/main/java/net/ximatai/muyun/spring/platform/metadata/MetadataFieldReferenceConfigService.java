@@ -72,7 +72,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldReferenceConfig.class, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "targetUnavailablePolicy", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldReferenceConfig.class, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "targetUnavailablePolicy", "projectionMappings", "createdAt", "updatedAt"));
     }
 
     @Override
@@ -141,12 +141,11 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
             config.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
         }
         new ReferencePlan(sourceField.getFieldName(), ReferenceTarget.of("platform", "reference_target"),
-                config.getCardinality(), false, "", List.of(),
+                config.getCardinality(), List.of(),
                 new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy()));
-        normalizeAutoTitle(config);
         validateOutputFields(config, sourceField.getMetadataId());
         if (config.getTargetModuleAlias() != null
-                && (Boolean.TRUE.equals(config.getAutoTitle()) || !config.projections().isEmpty())) {
+                && !config.projections().isEmpty()) {
             throw new PlatformException("Cross-module reference display is not supported yet: " + config.getTargetModuleAlias());
         }
         rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
@@ -185,26 +184,8 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         }
     }
 
-    private void normalizeAutoTitle(MetadataFieldReferenceConfig config) {
-        if (config.getAutoTitle() == null) {
-            config.setAutoTitle(Boolean.FALSE);
-        }
-        if (!config.getAutoTitle()) {
-            config.setTitleOutputField(null);
-            return;
-        }
-        if (config.getTitleOutputField() == null || config.getTitleOutputField().isBlank()) {
-            config.setTitleOutputField(sourceFieldName(config) + "Title");
-        }
-        config.setTitleOutputField(PlatformNameRules.requireFieldName(config.getTitleOutputField(), "titleOutputField"));
-    }
-
     private void validateOutputFields(MetadataFieldReferenceConfig config, String sourceMetadataId) {
         LinkedHashSet<String> outputFields = new LinkedHashSet<>();
-        if (Boolean.TRUE.equals(config.getAutoTitle())) {
-            requireAvailableOutputField(sourceMetadataId, config.getTitleOutputField(), "reference title output field");
-            outputFields.add(config.getTitleOutputField());
-        }
         for (ReferenceProjection projection : config.projections()) {
             PlatformNameRules.requireFieldName(projection.targetField(), "projection.targetField");
             PlatformNameRules.requireFieldName(projection.outputField(), "projection.outputField");
