@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = PlatformFieldUiTypeAttributeService.MODULE_ALIAS,
-        title = "平台字段 UI 类型属性")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = PlatformFieldUiTypeAttributeService.MODULE_ALIAS,
+        title = "平台字段 UI 类型属性", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.field_ui_type/{fieldUiTypeAlias}/attributes")
 public class PlatformFieldUiTypeAttributeWebController
         extends NestedSortableCrudWebSupport<PlatformFieldUiTypeAttribute, PlatformFieldUiTypeAttributeService> {

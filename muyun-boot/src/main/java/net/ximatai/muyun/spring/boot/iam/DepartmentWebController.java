@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理", route = "/iam/departments")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.department", title = "部门管理", route = "/iam/departments")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "部门管理", order = 30)
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements

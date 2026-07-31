@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = PlatformFieldUiTypeService.MODULE_ALIAS, title = "平台字段 UI 类型")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = PlatformFieldUiTypeService.MODULE_ALIAS, title = "平台字段 UI 类型")
 @RequestMapping("/platform.field_ui_type")
 public class PlatformFieldUiTypeWebController extends WebSupport<PlatformFieldUiTypeService> implements
         CrudWeb<PlatformFieldUiType, PlatformFieldUiTypeService>,

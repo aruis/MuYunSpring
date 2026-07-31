@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.position_category", title = "岗位管理",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.position_category", title = "岗位管理",
         route = "/iam/positions")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "岗位管理", order = 40)
 @RequestMapping("/iam.position_category")

@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionScanner;
+import net.ximatai.muyun.spring.boot.platform.StaticDeclarationPreflightTask;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
@@ -136,13 +137,11 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
-    public StaticApplicationDefinition platformStaticApplicationDefinition() {
-        return StaticApplicationDefinition.of("platform", "平台能力", 10);
-    }
-
-    @Bean
-    public StaticApplicationDefinition iamStaticApplicationDefinition() {
-        return StaticApplicationDefinition.of("iam", "身份权限", 20);
+    @ConditionalOnMissingBean(StaticDeclarationPreflightTask.class)
+    public StaticDeclarationPreflightTask staticDeclarationPreflightTask(
+            StaticApplicationDefinitionCatalog applicationCatalog,
+            StaticModuleDefinitionCatalog moduleCatalog) {
+        return new StaticDeclarationPreflightTask(applicationCatalog, moduleCatalog);
     }
 
     @Bean

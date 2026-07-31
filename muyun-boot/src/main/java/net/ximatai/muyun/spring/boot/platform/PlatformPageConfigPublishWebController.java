@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = "platform.page_config_publish", title = "平台页面配置发布")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = "platform.page_config_publish", title = "平台页面配置发布")
 @RequestMapping("/platform.page_config_publish")
 public class PlatformPageConfigPublishWebController extends WebSupport<PlatformPageConfigPublishService>
         implements SystemScope<PlatformPageConfigPublishService> {

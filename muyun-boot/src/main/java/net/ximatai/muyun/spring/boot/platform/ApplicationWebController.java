@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ApplicationService.MODULE_ALIAS, title = "平台应用")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ApplicationService.MODULE_ALIAS, title = "平台应用")
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "应用管理", order = 10)
 @RequestMapping("/platform.application")
 public class ApplicationWebController extends WebSupport<ApplicationService> implements

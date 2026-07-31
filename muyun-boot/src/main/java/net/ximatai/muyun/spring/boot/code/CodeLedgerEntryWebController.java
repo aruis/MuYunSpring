@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = CodeLedgerEntryService.MODULE_ALIAS, title = "编码台账")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = CodeLedgerEntryService.MODULE_ALIAS, title = "编码台账", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.code_ledger_entry", "/platform/code/ledger-entry"})
 public class CodeLedgerEntryWebController extends WebSupport<CodeLedgerEntryService> implements
         ReadOnlyWeb<CodeLedgerEntry, CodeLedgerEntryService> {

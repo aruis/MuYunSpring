@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = PasswordPolicyRuleService.MODULE_ALIAS, title = "密码策略规则",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = PasswordPolicyRuleService.MODULE_ALIAS, title = "密码策略规则",
         route = "/platform/security/passwords")
 @PlatformMenu(parent = PlatformMenuGroups.SECURITY_AUDIT, title = "密码管理", order = 10)
 @RequestMapping("/iam.password_policy_rule")

@@ -21,7 +21,8 @@ import java.util.Objects;
 
 /** Standard child resource for a tenant's application entitlements. */
 @RestController
-@PlatformStaticModule(application = "iam", alias = TenantApplicationService.MODULE_ALIAS, title = "租户已开通应用")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = TenantApplicationService.MODULE_ALIAS, title = "租户已开通应用",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/iam.tenant/{tenantId}/applications")
 public class TenantApplicationWebController
         extends NestedCrudWebSupport<TenantApplication, TenantApplicationService> {

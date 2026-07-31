@@ -29,9 +29,9 @@ import java.util.Set;
 
 @RestController
 @RequestMapping({"/platform.workflow_delegation", "/workflow/delegation"})
-@PlatformStaticModule(application = "platform",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class,
         alias = WorkflowDelegationService.MODULE_ALIAS,
-        title = "Workflow Delegation")
+        title = "Workflow Delegation", webScope = PlatformStaticModule.WebScope.CUSTOM)
 public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelegationService> {
     private static final Set<String> QUERY_ALLOWED_FIELDS = Set.of(
             "title", "enabled", "principalCanProcess", "moduleScopeType", "orgScopeType");

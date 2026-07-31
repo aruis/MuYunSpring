@@ -20,8 +20,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MeasureUnitConversionRuleService.MODULE_ALIAS,
-        title = "平台计量单位换算规则")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MeasureUnitConversionRuleService.MODULE_ALIAS,
+        title = "平台计量单位换算规则", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-conversion-rules")
 public class MeasureUnitConversionRuleWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitConversionRule, MeasureUnitConversionRuleService> {

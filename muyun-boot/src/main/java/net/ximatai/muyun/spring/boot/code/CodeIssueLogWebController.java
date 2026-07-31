@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = CodeIssueLogService.MODULE_ALIAS, title = "编码日志")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = CodeIssueLogService.MODULE_ALIAS, title = "编码日志", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.code_issue_log", "/platform/code/issue-log"})
 public class CodeIssueLogWebController extends WebSupport<CodeIssueLogService> implements
         ReadOnlyWeb<CodeIssueLog, CodeIssueLogService> {

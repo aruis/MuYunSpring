@@ -23,7 +23,8 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units")
 public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
 

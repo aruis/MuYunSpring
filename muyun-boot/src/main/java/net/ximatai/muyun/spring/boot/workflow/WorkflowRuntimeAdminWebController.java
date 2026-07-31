@@ -40,9 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/workflow/runtime/admin")
-@PlatformStaticModule(application = "platform",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class,
         alias = WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS,
-        title = "Workflow Admin")
+        title = "Workflow Admin", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @PlatformMenu(parent = PlatformMenuGroups.OPS, title = "工作流运维", order = 20)
 public class WorkflowRuntimeAdminWebController {
     private final WorkflowAdminFacade adminFacade;

@@ -57,7 +57,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.role", title = "角色管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.role", title = "角色管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 70)
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements

@@ -327,7 +327,7 @@ class StaticAbilityWebEndpointRegistrarTest {
         }
     }
 
-    @PlatformStaticModule(application = "demo", alias = "demo.resource", title = "Demo")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.resource", title = "Demo")
     @RequestMapping("/demo.resource")
     static class DemoController implements ScopedWeb<Object> {
         private final Object service;
@@ -428,7 +428,7 @@ class StaticAbilityWebEndpointRegistrarTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.resource", title = "Demo")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.resource", title = "Demo")
     @RequestMapping("/demo.resource")
     static final class ExplicitReplacementController extends DemoController {
         ExplicitReplacementController(Object service) {
@@ -443,7 +443,7 @@ class StaticAbilityWebEndpointRegistrarTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.resource", title = "Demo")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.resource", title = "Demo")
     @RequestMapping("/demo.resource")
     static final class ConflictingExplicitController extends DemoController {
         ConflictingExplicitController(Object service) {
@@ -471,7 +471,7 @@ class StaticAbilityWebEndpointRegistrarTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.read_only", title = "Read only")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.read_only", title = "Read only")
     @RequestMapping("/demo.read_only")
     static final class DisabledCrudController implements CrudWeb<DemoRecord, CrudAbility<DemoRecord>> {
         private final CrudAbility<DemoRecord> service;

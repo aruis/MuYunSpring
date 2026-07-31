@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ModuleMetadataFormulaRuleService.MODULE_ALIAS,
-        title = "平台模块公式规则")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ModuleMetadataFormulaRuleService.MODULE_ALIAS,
+        title = "平台模块公式规则", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules")
 public class PlatformModuleMetadataFormulaRuleWebController
         extends NestedEnabledSortableCrudWebSupport<ModuleMetadataFormulaRule, ModuleMetadataFormulaRuleService> {

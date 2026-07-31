@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
-        title = "平台字段保护配置")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
+        title = "平台字段保护配置", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs")
 public class MetadataFieldProtectionConfigWebController
         extends NestedCrudWebSupport<MetadataFieldProtectionConfig, MetadataFieldProtectionConfigService> {

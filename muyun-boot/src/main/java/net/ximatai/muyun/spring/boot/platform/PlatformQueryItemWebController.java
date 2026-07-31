@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = PlatformQueryItemService.MODULE_ALIAS, title = "平台查询项")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = PlatformQueryItemService.MODULE_ALIAS, title = "平台查询项",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.query-template/{queryTemplateId}/items")
 public class PlatformQueryItemWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformQueryItem, PlatformQueryItemService> {

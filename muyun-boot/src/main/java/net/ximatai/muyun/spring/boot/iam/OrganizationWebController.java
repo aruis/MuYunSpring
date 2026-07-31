@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20)
 @RequestMapping("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements

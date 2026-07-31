@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = CurrencyService.MODULE_ALIAS, title = "平台币种")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = CurrencyService.MODULE_ALIAS, title = "平台币种", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.currency", "/platform.currencies"})
 public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<Currency, CurrencyService> {
 

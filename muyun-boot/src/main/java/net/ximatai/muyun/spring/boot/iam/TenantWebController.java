@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.tenant", title = "租户管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.tenant", title = "租户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
 @RequestMapping("/iam.tenant")
 public class TenantWebController extends WebSupport<TenantService> implements
