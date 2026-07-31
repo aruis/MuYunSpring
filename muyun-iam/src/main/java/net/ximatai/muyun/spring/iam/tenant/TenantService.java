@@ -133,15 +133,10 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return "tenant";
-    }
-
-    @Override
     public List<ChildRelation<? extends EntityContract, Tenant>> childRelations() {
         return tenantApplicationService == null
                 ? List.of()
-                : List.of(childRelation(Tenant.class, tenantApplicationService));
+                : List.of(childRelation(tenantApplicationService));
     }
 
     /** Tenant applications are optional in lightweight IAM runtime assemblies. */

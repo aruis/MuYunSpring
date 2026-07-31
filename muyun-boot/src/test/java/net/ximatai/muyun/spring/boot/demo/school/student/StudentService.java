@@ -26,9 +26,4 @@ public class StudentService extends AbstractAbilityService<Student> implements
         super(MODULE_ALIAS, Student.class, dao);
     }
 
-    @Override
-    public String getDeletionEntityAlias() {
-        return "student";
-    }
-
 }

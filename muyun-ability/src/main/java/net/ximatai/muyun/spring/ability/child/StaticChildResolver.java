@@ -46,7 +46,7 @@ public final class StaticChildResolver {
                     + parentModelClass.getName()
                     + ", actual relationCodes: "
                     + rules.stream().map(rule -> rule.plan().relationCode()).toList()
-                    + ", use childRelation(relationCode, ...) or childRelation(Class, relationCode, ...)");
+                    + ", use childRelation(relationCode, ...)");
         }
         return rules.getFirst();
     }

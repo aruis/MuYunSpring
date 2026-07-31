@@ -9,8 +9,6 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P> {
     default List<ChildRelation<? extends EntityContract, P>> childRelations() {
@@ -38,39 +36,11 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         );
     }
 
-    @SuppressWarnings("unchecked")
-    default <C extends EntityContract> ChildRelation<C, P> childRelation(ChildAbility<C> childAbility,
-                                                                         BiConsumer<C, String> setParentId,
-                                                                         Function<P, List<C>> extractChildren,
-                                                                         BiConsumer<P, List<C>> populateChildren) {
-        return childRelation(
-                (Class<P>) requireModelClass("childRelation(Class, ...)"),
-                childAbility,
-                setParentId,
-                extractChildren,
-                populateChildren
-        );
-    }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     default <C extends EntityContract> ChildRelation<C, P> childRelation(ChildAbility<C> childAbility) {
         StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(
-                requireModelClass("childRelation(Class, ...)")
+                requireModelClass("childRelation(...)")
         );
-        validateShortcutChildModel(rule, childAbility);
-        return childAbility.toChildRelation(
-                rule.plan(),
-                rule::setParentId,
-                rule::children,
-                rule::populate
-        );
-    }
-
-    /** Resolves a declared child relation from an explicit parent model. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
-                                                                          ChildAbility<C> childAbility) {
-        StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(parentModelClass);
         validateChildModel(rule, childAbility);
         return childAbility.toChildRelation(
                 rule.plan(),
@@ -84,62 +54,15 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
                                                                          ChildAbility<C> childAbility) {
         StaticChildResolver.ChildRule rule = StaticChildResolver.rule(
-                requireModelClass("childRelation(Class, String, ...)"),
+                requireModelClass("childRelation(relationCode, ...)"),
                 relationCode
         );
-        validateShortcutChildModel(rule, childAbility);
+        validateChildModel(rule, childAbility);
         return childAbility.toChildRelation(
                 rule.plan(),
                 rule::setParentId,
                 rule::children,
                 rule::populate
-        );
-    }
-
-    @SuppressWarnings("unchecked")
-    default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
-                                                                         ChildAbility<C> childAbility,
-                                                                         BiConsumer<C, String> setParentId,
-                                                                         Function<P, List<C>> extractChildren,
-                                                                         BiConsumer<P, List<C>> populateChildren) {
-        return childRelation(
-                (Class<P>) requireModelClass("childRelation(Class, String, ...)"),
-                relationCode,
-                childAbility,
-                setParentId,
-                extractChildren,
-                populateChildren
-        );
-    }
-
-    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
-                                                                         ChildAbility<C> childAbility,
-                                                                         BiConsumer<C, String> setParentId,
-                                                                         Function<P, List<C>> extractChildren,
-                                                                         BiConsumer<P, List<C>> populateChildren) {
-        StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(parentModelClass);
-        validateChildModel(rule, childAbility);
-        return childAbility.toChildRelation(
-                rule.plan(),
-                setParentId,
-                extractChildren,
-                populateChildren
-        );
-    }
-
-    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
-                                                                         String relationCode,
-                                                                         ChildAbility<C> childAbility,
-                                                                         BiConsumer<C, String> setParentId,
-                                                                         Function<P, List<C>> extractChildren,
-                                                                         BiConsumer<P, List<C>> populateChildren) {
-        StaticChildResolver.ChildRule rule = StaticChildResolver.rule(parentModelClass, relationCode);
-        validateChildModel(rule, childAbility);
-        return childAbility.toChildRelation(
-                rule.plan(),
-                setParentId,
-                extractChildren,
-                populateChildren
         );
     }
 
@@ -217,15 +140,4 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                 + ", actual " + actualChildModel.getName());
     }
 
-    private void validateShortcutChildModel(StaticChildResolver.ChildRule rule, ChildAbility<?> childAbility) {
-        Class<?> actualChildModel = childAbility.modelClass();
-        if (rule.childModel().equals(actualChildModel)) {
-            return;
-        }
-        String actual = actualChildModel == null ? "null" : actualChildModel.getName();
-        throw new PlatformException("child relation model mismatch: "
-                + rule.plan().relationCode()
-                + ", expected " + rule.childModel().getName()
-                + ", actual " + actual);
-    }
 }

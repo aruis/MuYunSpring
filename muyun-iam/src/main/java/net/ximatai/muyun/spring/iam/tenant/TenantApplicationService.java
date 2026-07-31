@@ -163,11 +163,6 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return "tenant_application";
-    }
-
-    @Override
     public boolean isRecycleBinPurgeEnabled() {
         return true;
     }

@@ -75,11 +75,6 @@ public class ApplicationService extends StandardBusinessService<Application> imp
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return "application";
-    }
-
-    @Override
     public boolean isEnabledForTenant(String applicationAlias) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         Application application = select(validApplicationAlias);

@@ -141,11 +141,6 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return "employee";
-    }
-
-    @Override
     public DataScopeFieldMapping dataScopeFieldMapping() {
         return DATA_SCOPE_FIELD_MAPPING;
     }

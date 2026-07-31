@@ -536,29 +536,18 @@ class AbilityContractTest {
     void childrenAbilityShortcutShouldRequireModelClass() {
         NoModelChildrenService service = new NoModelChildrenService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                new DemoInvoiceLineService(),
-                DemoInvoiceLine::setInvoiceId,
-                DemoInvoice::getLines,
-                DemoInvoice::setLines
-        ))
+        assertThatThrownBy(() -> service.childRelation(new DemoInvoiceLineService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("demo.noModelChildren")
                 .hasMessageContaining("AbstractAbilityService")
-                .hasMessageContaining("childRelation(Class");
+                .hasMessageContaining("childRelation(...)");
     }
 
     @Test
     void childrenAbilityShouldRejectMismatchedRelationCodeAndChildAbility() {
         DemoInvoiceService service = new DemoInvoiceService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                "notes",
-                service.lineService(),
-                DemoInvoiceLine::setInvoiceId,
-                DemoInvoice::getLines,
-                DemoInvoice::setLines
-        ))
+        assertThatThrownBy(() -> service.childRelation("notes", service.lineService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("notes")
@@ -567,34 +556,15 @@ class AbilityContractTest {
     }
 
     @Test
-    void childrenAbilitySinglePlanExplicitLambdaShouldRejectMismatchedChildAbility() {
+    void childrenAbilitySinglePlanShortcutShouldRejectMismatchedChildAbility() {
         SingleChildInvoiceService service = new SingleChildInvoiceService();
 
-        assertThatThrownBy(() -> service.childRelation(
-                SingleChildInvoice.class,
-                new DemoInvoiceNoteService(),
-                DemoInvoiceNote::setInvoiceId,
-                invoice -> List.of(new DemoInvoiceNote("Wrong child")),
-                (invoice, notes) -> {
-                }
-        ))
+        assertThatThrownBy(() -> service.childRelation(new DemoInvoiceNoteService()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("lines")
                 .hasMessageContaining(SingleChildInvoiceLine.class.getName())
                 .hasMessageContaining(DemoInvoiceNote.class.getName());
-    }
-
-    @Test
-    void childrenAbilityShortcutShouldRejectChildAbilityWithoutModelClass() {
-        DemoInvoiceService service = new DemoInvoiceService();
-
-        assertThatThrownBy(() -> service.childRelation("lines", new NoModelLineService()))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("child relation model mismatch")
-                .hasMessageContaining("lines")
-                .hasMessageContaining(DemoInvoiceLine.class.getName())
-                .hasMessageContaining("actual null");
     }
 
     @Test
@@ -1824,20 +1794,6 @@ class AbilityContractTest {
         @Override
         public String getModuleAlias() {
             return "demo.noModelChildren";
-        }
-    }
-
-    private static final class NoModelLineService implements ChildAbility<DemoInvoiceLine> {
-        private final InMemoryBaseDao<DemoInvoiceLine> dao = new InMemoryBaseDao<>();
-
-        @Override
-        public BaseDao<DemoInvoiceLine, String> getDao() {
-            return dao;
-        }
-
-        @Override
-        public String getModuleAlias() {
-            return "demo.noModelLine";
         }
     }
 

@@ -181,11 +181,6 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public String getDeletionEntityAlias() {
-        return dao.getEntity().alias();
-    }
-
-    @Override
     public ReferenceTarget referenceTarget() {
         return ReferenceTarget.of(moduleAlias, dao.getEntity().alias());
     }

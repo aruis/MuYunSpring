@@ -26,9 +26,4 @@ public class ClassroomService extends AbstractAbilityService<Classroom> implemen
         super(MODULE_ALIAS, Classroom.class, dao);
     }
 
-    @Override
-    public String getDeletionEntityAlias() {
-        return "classroom";
-    }
-
 }

@@ -201,11 +201,7 @@ public final class StaticReferenceResolver {
                         + serviceType.getName());
             }
             String moduleAlias = (String) moduleAliasField.get(null);
-            int separator = moduleAlias.lastIndexOf('.');
-            if (separator <= 0 || separator == moduleAlias.length() - 1) {
-                throw new PlatformException("ReferenceTo target requires '<moduleAlias>.<entityAlias>': " + moduleAlias);
-            }
-            return ReferenceTarget.of(moduleAlias.substring(0, separator), moduleAlias.substring(separator + 1));
+            return ReferenceTargets.fromModuleAlias(moduleAlias);
         } catch (ReflectiveOperationException ex) {
             throw new PlatformException("ReferenceTo target requires public MODULE_ALIAS: " + serviceType.getName(), ex);
         }

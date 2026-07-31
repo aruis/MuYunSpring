@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability.deletion;
 
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargets;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 /**
@@ -10,5 +11,10 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
  * itself remains independent of recycle-bin and recovery participation.</p>
  */
 public interface DeletionRecoveryAbility<T extends EntityContract> extends SoftDeleteAbility<T> {
-    String getDeletionEntityAlias();
+    /**
+     * Uses the same stable entity alias as reference resolution.
+     */
+    default String getDeletionEntityAlias() {
+        return ReferenceTargets.of(this).entityAlias();
+    }
 }
