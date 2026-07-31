@@ -54,10 +54,18 @@ muyun-ability     平台能力接口、默认实现、生命周期和数据访�
 muyun-dynamic     动态元数据、动态记录运行态和动态运行态刷新
 muyun-platform    平台配置、页面交付、自动化、工作流和治理能力
 muyun-iam         租户、组织、用户、角色、权限和身份上下文
-muyun-boot        Spring Boot 启动与装配入口
+muyun-web-adapter 通用 HTTP 协议适配、请求生命周期和 Web 基础能力
+muyun-platform-web 平台能力的静态 Web 交付、端点投影和实时推送适配
+muyun-iam-web     IAM 领域的 Web 交付
+muyun-dynamic-web 动态记录和元数据的 Web 交付
+muyun-demo        演示业务模型与服务
+muyun-demo-web    演示业务的 Web 交付
+muyun-boot        Spring Boot 应用、装配、配置和本地启动入口
 muyun-web         Vue 前端工作台、平台 UI adapter、动态页面骨架和业务示例
 docs              架构原则、平台专题、前端路线和技术债记录
 ```
+
+领域模块不承载 HTTP 入口；`*-web` 模块依赖领域模块和 `muyun-web-adapter` 完成交付。`muyun-boot` 只负责组装这些模块并启动应用，不沉淀领域模型、Controller 或可复用测试构造。
 
 ## 技术栈
 
@@ -95,11 +103,7 @@ docs              架构原则、平台专题、前端路线和技术债记录
 ./scripts/dev-local.sh
 ```
 
-该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。默认启用演示初始化，便于本地验证租户、机构和角色基础数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。需要关闭演示初始化时：
-
-```bash
-MUYUN_DEMO_BOOTSTRAP_ENABLED=false ./scripts/dev-local.sh
-```
+该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。脚本以 `school-demo` 运行完整学校演示环境，并准备对应的租户、机构、角色和学校业务数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。纯平台开发请直接运行标准 `bootRun`，不加载 Demo。
 
 也可以按下面步骤分开启动。
 
@@ -126,13 +130,29 @@ docker run --name muyun-spring-postgres \
 2. 启动后端：
 
 ```bash
-./gradlew :muyun-boot:bootRun --args='--muyun.runtime.mode=development --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring --spring.datasource.username=postgres --spring.datasource.password=muyun_dev'
+cp muyun-boot/src/main/resources/application-local.yml.example \
+  muyun-boot/src/main/resources/application-local.yml
+./gradlew :muyun-boot:bootRun --args='--spring.profiles.active=local'
 ```
 
-后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。分终端开发时，额外在另一个终端运行下列连续编译命令；它与开发态 DevTools 共同保证跨模块代码变化会重启本地后端：
+需要启动完整学校演示环境时，使用可选 Demo 运行任务；它会在标准平台 classpath 之外追加 Demo 交付，并自动包含 `school-demo` profile：
+
+```bash
+./gradlew :muyun-boot:demoBootRun --args='--spring.profiles.active=local'
+```
+
+`application-local.yml` 只属于本机开发环境，已被 Git 忽略；可用同名环境变量覆盖样例中的数据库和初始管理员密码。生产或共享环境不要启用 `local` profile。
+
+后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。分终端开发时，额外在另一个终端运行连续编译命令；它与开发态 DevTools 共同保证跨模块代码变化会重启本地后端。纯平台运行使用：
 
 ```bash
 ./gradlew :muyun-boot:classes --continuous
+```
+
+学校演示运行使用：
+
+```bash
+./gradlew demoClasses --continuous
 ```
 
 3. 启动前端：
@@ -155,10 +175,9 @@ npm run dev:backend
 
 初始密码可通过 `muyun.initial-admin.initial-password` 调整。平台超级管理员是系统用户，不归属默认租户。
 
-本地演示环境如需同时创建一组租户业务治理数据，可显式启用演示初始化：
+`school-demo` profile 表示完整的学校演示环境：它会创建学校模块以及一组租户、组织、部门、职员、租户管理员和角色授权示例数据。演示数据不是平台 baseline，纯平台启动不会加载 Demo 模块或这些数据。需要调整示例数据文案时可配置：
 
 ```properties
-muyun.demo-bootstrap.enabled=true
 muyun.demo-bootstrap.tenant-title=演示租户
 muyun.demo-bootstrap.organization-title=戏码台
 muyun.demo-bootstrap.department-title=综合管理部
@@ -167,7 +186,7 @@ muyun.demo-bootstrap.admin-username=demo_admin
 muyun.demo-bootstrap.admin-initial-password=demo123
 ```
 
-该能力默认关闭，只用于裸库开发和演示启动；生产环境不应把演示租户、组织、部门、职员、租户管理员账号和租户管理员账号角色授权视为平台 baseline 数据。演示租户管理员是普通租户用户，默认授予内置 `tenant.admin` 账号角色，默认登录时租户填写 `demo`，不要和系统超级管理员 `admin` 混用。
+该能力只用于学校演示启动；生产环境不应把演示租户、组织、部门、职员、租户管理员账号和租户管理员账号角色授权视为平台 baseline 数据。演示租户管理员是普通租户用户，默认授予内置 `tenant.admin` 账号角色，默认登录时租户填写 `demo`，不要和系统超级管理员 `admin` 混用。
 
 租户创建成功后，平台会自动准备租户级默认菜单方案和独立菜单数据；当前实现采用每租户复制菜单树，后续会收敛为系统菜单模板加租户覆盖差异。
 

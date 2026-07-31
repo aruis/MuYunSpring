@@ -77,7 +77,7 @@ DynamicRecordService
 
 静态 Service 的 Ability 组合也是标准交互能力的事实源。Ability 只在规范方法上用 `@PlatformOperation(PlatformAction.X)` 声明动作，不声明 URL、HTTP method 或请求 DTO，也不额外重复声明类型级 ability code。具体 Service 确需收窄时，使用 `@DisablePlatformOperations` 直接停用少量动作；停用不影响 Service 内部调用，并使默认 Web、UI、权限声明和后续 OpenAPI 同时看不到该动作。
 
-静态业务应用通过独立的 `@PlatformStaticApplication` 声明类注册一次应用别名、标题和排序；声明类是应用的稳定 Java 身份，不承载通用 Boot Bean 装配。它被组件扫描或显式 `@Import` 后自动进入静态应用注册目录；同一应用下的 Controller 以必填的 `@PlatformStaticModule(application = XxxApplication.class)` 直接指向它。模块别名以 Service 为事实源，Controller 声明会在启动期校验一致并校验模块 alias 属于应用 alias。HTTP 路径仍保留原生 `@RequestMapping`：默认范围只能声明唯一的 `/<moduleAlias>`；父资源、嵌套资源、兼容旧路径或其他非标准路径须显式标记 `webScope = CUSTOM`；没有 Web 映射的模块不因此失效。启动期先协调平台托管 Application，再注册模块和动作；模块引用未声明应用会直接失败。人工在管理台创建的 Application 不属于静态声明协调范围，静态应用被移除时按平台托管规则停用而不物理删除。
+静态业务应用通过独立的 `@PlatformStaticApplication` 声明类注册一次应用别名、标题和排序；声明类是应用的稳定 Java 身份，不承载通用 Boot Bean 装配。它被组件扫描或显式 `@Import` 后自动进入静态应用注册目录；同一应用下的静态模块以必填的 `@PlatformStaticModule(application = XxxApplication.class)` 直接指向它。模块别名以 Service 为事实源，承载模块的 Controller 或声明组件会在启动期校验一致并校验模块 alias 属于应用 alias。仅需注册模块、实体和权限动作而无独立 HTTP 入口时，使用实现 `StaticModuleServiceDeclaration` 的组件承接同一注解，并返回对应 `CrudAbility`；它不产生 Web endpoint。HTTP 路径仍保留原生 `@RequestMapping`：默认范围只能声明唯一的 `/<moduleAlias>`；父资源、嵌套资源、兼容旧路径或其他非标准路径须以 Web 层的 `@PlatformStaticWebScope(CUSTOM)` 显式标记；没有 Web 映射的模块不因此失效。启动期先协调平台托管 Application，再注册模块和动作；模块引用未声明应用会直接失败。人工在管理台创建的 Application 不属于静态声明协调范围，静态应用被移除时按平台托管规则停用而不物理删除。
 
 当前自动 Web 投射范围收敛在启停、排序、树和回收站。CRUD、查询 schema 等仍由稳定的 `CrudWeb` / `ReadOnlyWeb` 基类交付，暂不塞入现有投射编译器；它们仍服从同一份动作声明与停用规则。后续扩展必须先形成唯一的 `PlatformOperationDefinition → WebEndpointProjection → RegisteredWebEndpoint` 编译链，再扩大自动投射范围。
 

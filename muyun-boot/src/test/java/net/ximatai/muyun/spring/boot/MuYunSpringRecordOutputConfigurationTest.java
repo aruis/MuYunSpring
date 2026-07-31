@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.output.RecordOutputContext;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
-import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
+import net.ximatai.muyun.spring.web.WebOutputSupport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;

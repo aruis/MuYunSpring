@@ -1,0 +1,162 @@
+package net.ximatai.muyun.spring.dynamic.web;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonNode;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord> {
+    private final DynamicRecordService recordService;
+
+    DynamicRecordJsonDeserializer(DynamicRecordService recordService) {
+        this.recordService = recordService;
+    }
+
+    @Override
+    public DynamicRecord deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        JsonNode root = parser.getCodec().readTree(parser);
+        JsonNode recordRoot = root.has("record") && root.get("record").isObject() ? root.get("record") : root;
+        DynamicRecord record = record(moduleAlias, recordService.mainEntityAlias(moduleAlias), recordRoot, parser, context);
+        readUiConfigId(record, root);
+        readOriginContext(record, root.has("originContext") ? root : recordRoot, parser, context);
+        readAttachments(record, recordRoot, parser, context);
+        readChildren(moduleAlias, record, recordRoot, parser, context);
+        return record;
+    }
+
+    private void readUiConfigId(DynamicRecord record, JsonNode root) {
+        JsonNode uiConfigId = root.get("uiConfigId");
+        if (uiConfigId != null && !uiConfigId.isNull() && !uiConfigId.asText().isBlank()) {
+            record.putMutationMetadata("uiConfigId", uiConfigId.asText());
+        }
+    }
+
+    private DynamicRecord record(String moduleAlias,
+                                 String entityAlias,
+                                 JsonNode root,
+                                 JsonParser parser,
+                                 DeserializationContext context) throws IOException {
+        String mainEntityAlias = recordService.mainEntityAlias(moduleAlias);
+        DynamicRecord record = Objects.equals(mainEntityAlias, entityAlias)
+                ? recordService.mainEntity(moduleAlias).newRecord()
+                : recordService.newRecord(moduleAlias, entityAlias);
+        JsonNode id = root.get("id");
+        if (id != null && !id.isNull()) {
+            record.setId(id.asText());
+        }
+        JsonNode version = root.get("version");
+        if (version != null && !version.isNull()) {
+            record.setVersion(version.asInt());
+        }
+        JsonNode values = root.has("values") ? root.get("values") : root;
+        if (values == null || values.isNull()) {
+            return record;
+        }
+        Iterator<Map.Entry<String, JsonNode>> fields = values.properties().iterator();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> field = fields.next();
+            if (isEnvelopeField(field.getKey())) {
+                continue;
+            }
+            try (JsonParser valueParser = field.getValue().traverse(parser.getCodec())) {
+                valueParser.nextToken();
+                record.setValue(field.getKey(), context.readValue(valueParser, Object.class));
+            }
+        }
+        return record;
+    }
+
+    private void readOriginContext(DynamicRecord record,
+                                   JsonNode root,
+                                   JsonParser parser,
+                                   DeserializationContext context) throws IOException {
+        JsonNode originContext = root.get("originContext");
+        if (originContext == null || originContext.isNull()) {
+            return;
+        }
+        try (JsonParser originParser = originContext.traverse(parser.getCodec())) {
+            originParser.nextToken();
+            record.putMutationMetadata("originContext", context.readValue(originParser, Object.class));
+        }
+    }
+
+    private void readAttachments(DynamicRecord record,
+                                 JsonNode root,
+                                 JsonParser parser,
+                                 DeserializationContext context) throws IOException {
+        if (!root.has("attachments") || root.get("attachments").isNull()) {
+            return;
+        }
+        JsonNode attachments = root.get("attachments");
+        if (!attachments.isArray()) {
+            throw new IllegalArgumentException("dynamic record attachments must be array");
+        }
+        try (JsonParser attachmentsParser = attachments.traverse(parser.getCodec())) {
+            attachmentsParser.nextToken();
+            record.putMutationMetadata("attachments", context.readValue(attachmentsParser, Object.class));
+        }
+    }
+
+    private void readChildren(String moduleAlias,
+                              DynamicRecord record,
+                              JsonNode root,
+                              JsonParser parser,
+                              DeserializationContext context) throws IOException {
+        JsonNode children = root.get("children");
+        if (children == null || children.isNull()) {
+            return;
+        }
+        if (!children.isObject()) {
+            throw new IllegalArgumentException("dynamic record children must be object");
+        }
+        List<DynamicRelationDescriptor> childRelations = recordService.relations(moduleAlias).stream()
+                .filter(relation -> Objects.equals(record.getEntity().alias(), relation.parentEntityAlias()))
+                .toList();
+        List<String> knownRelations = childRelations.stream()
+                .map(DynamicRelationDescriptor::code)
+                .toList();
+        Iterator<String> relationCodes = children.fieldNames();
+        while (relationCodes.hasNext()) {
+            String relationCode = relationCodes.next();
+            if (!knownRelations.contains(relationCode)) {
+                throw new IllegalArgumentException("unknown dynamic child relation: " + relationCode);
+            }
+        }
+        for (DynamicRelationDescriptor relation : childRelations) {
+            JsonNode relationRows = children.get(relation.code());
+            if (relationRows == null || relationRows.isNull()) {
+                continue;
+            }
+            if (!relationRows.isArray()) {
+                throw new IllegalArgumentException("dynamic child relation must be array: " + relation.code());
+            }
+            List<DynamicRecord> rows = new ArrayList<>();
+            for (JsonNode childNode : relationRows) {
+                rows.add(record(moduleAlias, relation.childEntityAlias(), childNode, parser, context));
+            }
+            record.setChildren(relation.code(), rows);
+        }
+    }
+
+    private boolean isEnvelopeField(String fieldName) {
+        return "id".equals(fieldName)
+                || "version".equals(fieldName)
+                || "uiConfigId".equals(fieldName)
+                || "record".equals(fieldName)
+                || "values".equals(fieldName)
+                || "children".equals(fieldName)
+                || "attachments".equals(fieldName)
+                || "originContext".equals(fieldName);
+    }
+}

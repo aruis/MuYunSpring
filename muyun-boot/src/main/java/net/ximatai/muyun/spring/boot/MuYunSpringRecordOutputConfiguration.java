@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.ability.output.FieldProtectionRecordOutputTransf
 import net.ximatai.muyun.spring.ability.output.OptionTitleRecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
-import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
+import net.ximatai.muyun.spring.web.WebOutputSupport;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/muyun-web"
-DEMO_BOOTSTRAP_ENABLED="${MUYUN_DEMO_BOOTSTRAP_ENABLED:-true}"
 BACKEND_PORT="${MUYUN_BACKEND_PORT:-8080}"
 FRONTEND_PORT="${MUYUN_FRONTEND_PORT:-5173}"
 FORCE_RESTART=false
@@ -25,7 +24,6 @@ Options:
   -f, --force  Stop existing processes listening on backend/frontend ports before startup.
 
 Environment:
-  MUYUN_DEMO_BOOTSTRAP_ENABLED=false  Disable demo tenant bootstrap.
   MUYUN_BACKEND_PORT=8080             Backend port to clean and display.
   MUYUN_FRONTEND_PORT=5173            Frontend port to clean and display.
 USAGE
@@ -160,8 +158,8 @@ force_stop_existing_processes() {
   fi
   force_stop_port "$BACKEND_PORT" "backend"
   force_stop_port "$FRONTEND_PORT" "frontend"
-  force_stop_project_processes "continuous compiler" ":muyun-boot:classes" "--continuous"
-  force_stop_project_processes "boot runner" ":muyun-boot:bootRun"
+  force_stop_project_processes "continuous compiler" "demoClasses" "--continuous"
+  force_stop_project_processes "boot runner" ":muyun-boot:demoBootRun"
   force_stop_project_processes "frontend dev server" "node_modules/.bin/vite" "--port $FRONTEND_PORT"
 }
 
@@ -176,13 +174,11 @@ start_process() {
 backend_args() {
   local args
   args="--muyun.runtime.mode=development"
+  args+=" --spring.profiles.active=local"
   args+=" --server.port=$BACKEND_PORT"
   args+=" --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring"
   args+=" --spring.datasource.username=postgres"
   args+=" --spring.datasource.password=muyun_dev"
-  if [[ "$DEMO_BOOTSTRAP_ENABLED" != "false" ]]; then
-    args+=" --muyun.demo-bootstrap.enabled=true"
-  fi
   printf '%s' "$args"
 }
 
@@ -196,12 +192,12 @@ ensure_frontend_dependencies() {
 
 start_backend() {
   cd "$ROOT_DIR"
-  exec ./gradlew :muyun-boot:bootRun --args="$(backend_args)"
+  exec ./gradlew :muyun-boot:demoBootRun --args="$(backend_args)"
 }
 
 watch_backend_classes() {
   cd "$ROOT_DIR"
-  exec ./gradlew :muyun-boot:classes --continuous
+  exec ./gradlew demoClasses --continuous
 }
 
 start_frontend() {

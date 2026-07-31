@@ -8,6 +8,7 @@ out/
 *.iml
 *.log
 LOCAL_ENVIRONMENT.md
+muyun-boot/src/main/resources/application-local.yml
 
 # Frontend artifacts
 node_modules/

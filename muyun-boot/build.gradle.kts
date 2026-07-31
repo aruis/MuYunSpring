@@ -15,6 +15,10 @@ configurations.configureEach {
 dependencies {
     implementation(project(":muyun-platform"))
     implementation(project(":muyun-iam"))
+    implementation(project(":muyun-web-adapter"))
+    implementation(project(":muyun-platform-web"))
+    implementation(project(":muyun-iam-web"))
+    implementation(project(":muyun-dynamic-web"))
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.websocket)
     implementation(libs.spring.boot.jackson2)
@@ -29,31 +33,72 @@ dependencies {
     testImplementation(libs.spring.boot.starter.restclient.test)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(testFixtures(project(":muyun-iam")))
+    testImplementation(testFixtures(project(":muyun-platform")))
 }
 
-val localRuntimeProjectPaths = listOf(
+val demoRuntimeClasspath by configurations.creating {
+    extendsFrom(configurations.runtimeClasspath.get())
+}
+
+dependencies {
+    add(demoRuntimeClasspath.name, project(":muyun-demo-web"))
+}
+
+val standardRuntimeProjectPaths = listOf(
     ":muyun-common",
     ":muyun-ability",
     ":muyun-dynamic",
     ":muyun-platform",
     ":muyun-iam",
+    ":muyun-web-adapter",
+    ":muyun-platform-web",
+    ":muyun-iam-web",
+    ":muyun-dynamic-web",
 )
-val localRuntimeOutputs = files(localRuntimeProjectPaths.map { projectPath ->
+val demoRuntimeProjectPaths = standardRuntimeProjectPaths + listOf(
+    ":muyun-demo",
+    ":muyun-demo-web",
+)
+val standardRuntimeOutputs = files(standardRuntimeProjectPaths.map { projectPath ->
     rootProject.project(projectPath)
         .extensions
         .getByType<SourceSetContainer>()
         .named("main")
         .map { sourceSet -> sourceSet.output }
 })
-val localRuntimeBuildDirectories = localRuntimeProjectPaths.map { projectPath ->
+val demoRuntimeOutputs = files(demoRuntimeProjectPaths.map { projectPath ->
+    rootProject.project(projectPath)
+        .extensions
+        .getByType<SourceSetContainer>()
+        .named("main")
+        .map { sourceSet -> sourceSet.output }
+})
+val standardRuntimeBuildDirectories = standardRuntimeProjectPaths.map { projectPath ->
+    rootProject.project(projectPath).layout.buildDirectory
+}
+val demoRuntimeBuildDirectories = demoRuntimeProjectPaths.map { projectPath ->
     rootProject.project(projectPath).layout.buildDirectory
 }
 
 tasks.named<BootRun>("bootRun") {
     // DevTools can only restart against mutable class directories. Do not retain the matching
     // project JARs: duplicate platform classes split parent/child types across DevTools loaders.
-    classpath = localRuntimeOutputs + classpath.filter { entry ->
-        localRuntimeBuildDirectories.none { buildDirectory ->
+    classpath = standardRuntimeOutputs + classpath.filter { entry ->
+        standardRuntimeBuildDirectories.none { buildDirectory ->
+            entry.toPath().startsWith(buildDirectory.get().asFile.toPath())
+        }
+    }
+}
+
+tasks.register<BootRun>("demoBootRun") {
+    description = "Runs the standard application with the optional school demo delivery."
+    group = "application"
+    mainClass.set("net.ximatai.muyun.spring.boot.MuYunSpringApplication")
+    systemProperty("spring.profiles.include", "school-demo")
+    // DevTools needs mutable project outputs for every assembled module, including the optional demo.
+    classpath = demoRuntimeOutputs + demoRuntimeClasspath.filter { entry ->
+        demoRuntimeBuildDirectories.none { buildDirectory ->
             entry.toPath().startsWith(buildDirectory.get().asFile.toPath())
         }
     }
