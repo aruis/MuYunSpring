@@ -11,7 +11,6 @@ configurations.configureEach {
 dependencies {
     api(project(":muyun-platform"))
     implementation(project(":muyun-web-adapter"))
-    implementation(project(":muyun-iam"))
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.jdbc)

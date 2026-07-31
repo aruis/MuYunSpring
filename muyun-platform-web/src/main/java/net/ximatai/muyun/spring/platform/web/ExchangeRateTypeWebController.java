@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedEnabledSortableCrudWebSupport;
@@ -18,8 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = ExchangeRateTypeService.MODULE_ALIAS,
-        title = "平台汇率类型", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = ExchangeRateTypeService.MODULE_ALIAS,
+        title = "平台汇率类型")
 @RequestMapping({"/platform.exchange_rate_type", "/platform.exchange-rate-types"})
 public class ExchangeRateTypeWebController
         extends NestedEnabledSortableCrudWebSupport<ExchangeRateType, ExchangeRateTypeService> {

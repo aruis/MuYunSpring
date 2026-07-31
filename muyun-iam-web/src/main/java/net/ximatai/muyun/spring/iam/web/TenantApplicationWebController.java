@@ -2,7 +2,8 @@ package net.ximatai.muyun.spring.iam.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.web.WebListResponse;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -21,8 +22,8 @@ import java.util.Objects;
 
 /** Standard child resource for a tenant's application entitlements. */
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = TenantApplicationService.MODULE_ALIAS, title = "租户已开通应用",
-        webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = TenantApplicationService.MODULE_ALIAS, title = "租户已开通应用")
 @RequestMapping("/iam.tenant/{tenantId}/applications")
 public class TenantApplicationWebController
         extends NestedCrudWebSupport<TenantApplication, TenantApplicationService> {

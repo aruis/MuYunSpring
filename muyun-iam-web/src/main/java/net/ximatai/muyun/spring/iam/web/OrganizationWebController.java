@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.TreeScope;
 import net.ximatai.muyun.spring.web.ScopedTreeWebProjectionPolicy;
 import net.ximatai.muyun.spring.web.WebSupport;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.PlatformMenu;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuGroups;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20)
 @RequestMapping("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements

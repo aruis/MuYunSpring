@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
+
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 
 import java.util.LinkedHashMap;

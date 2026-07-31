@@ -1,5 +1,9 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleDefinitionRegistrar;
+
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -409,34 +413,34 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.module", title = "平台模块")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.module", title = "平台模块")
     @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "模块管理", order = 20)
     @RequestMapping("/platform.module")
     static class PlatformModuleWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.role", title = "角色管理")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.role", title = "角色管理")
     @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
     @RequestMapping("/iam.role")
     static class IamRoleWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.hidden", title = "隐藏模块")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.hidden", title = "隐藏模块")
     @RequestMapping("/platform.hidden")
     static class HiddenModuleWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.window", title = "窗口模块")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.window", title = "窗口模块")
     @PlatformMenu(parent = PlatformMenuGroups.MODELING, openMode = MenuOpenMode.WINDOW)
     @RequestMapping("/platform.window")
     static class WindowModuleWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.route", title = "路由模块",
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.route", title = "路由模块",
             route = "/platform/routes")
     @PlatformMenu(parent = PlatformMenuGroups.MODELING)
     @RequestMapping("/platform.route")

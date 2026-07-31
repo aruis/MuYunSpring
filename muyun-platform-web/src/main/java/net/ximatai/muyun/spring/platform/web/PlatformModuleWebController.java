@@ -1,7 +1,8 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.StandardMutation;
 import net.ximatai.muyun.spring.web.StandardMutationKind;
 import net.ximatai.muyun.spring.web.StandardMutationResultSupport;
@@ -34,7 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "模块管理", order = 20)
 @RequestMapping("/platform.module")
 public class PlatformModuleWebController extends WebSupport<PlatformModuleService> implements

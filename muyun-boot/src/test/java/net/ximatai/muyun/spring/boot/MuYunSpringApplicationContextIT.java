@@ -9,11 +9,11 @@ import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContribution;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticWebProjection;
 import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
-import net.ximatai.muyun.spring.platform.web.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.platform.module.StaticServiceAbilityCompiler;
 import net.ximatai.muyun.spring.web.ScopedWeb;
 import net.ximatai.muyun.spring.web.WebPageRequest;
 import net.ximatai.muyun.spring.web.WebPageResponse;
@@ -155,6 +155,10 @@ class MuYunSpringApplicationContextIT {
 
     @Test
     void shouldLoadApplicationContextWithRealDatabase() {
+        assertThat(applicationContext.containsBean("educationApplication")).isFalse();
+        assertThat(applicationContext.containsBean("studentService")).isFalse();
+        assertThat(applicationContext.containsBean("studentDao")).isFalse();
+        assertThat(staticModuleDefinitionCatalog.find("education.student")).isEmpty();
         assertThat(staticModuleDefinitionCatalog.find(EmployeeAccountService.MODULE_ALIAS))
                 .get()
                 .satisfies(definition -> {

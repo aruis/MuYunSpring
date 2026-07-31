@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.application.PlatformStaticApplication;
+
 /** Shared static application declarations used only by platform contract fixtures. */
 public final class StaticTestApplications {
     private StaticTestApplications() {

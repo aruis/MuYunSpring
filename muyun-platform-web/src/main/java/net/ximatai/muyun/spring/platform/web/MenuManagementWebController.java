@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedEnabledTreeCrudWebSupport;
@@ -11,8 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = MenuService.MODULE_ALIAS, title = "平台菜单",
-        webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = MenuService.MODULE_ALIAS, title = "平台菜单")
 @RequestMapping("/platform.menu-scheme/{schemeId}/menus")
 public class MenuManagementWebController extends NestedEnabledTreeCrudWebSupport<Menu, MenuService> {
 

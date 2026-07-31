@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedCrudWebSupport;
@@ -13,8 +15,9 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = TenantCurrencySettingService.MODULE_ALIAS,
-        title = "平台租户币种设置", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = TenantCurrencySettingService.MODULE_ALIAS,
+        title = "平台租户币种设置")
 @RequestMapping({"/platform.tenant_currency_setting", "/platform.tenant-currency-settings"})
 public class TenantCurrencySettingWebController
         extends NestedCrudWebSupport<TenantCurrencySetting, TenantCurrencySettingService> {

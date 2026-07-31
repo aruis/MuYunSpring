@@ -4,21 +4,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("muyun.demo-bootstrap")
 public class DemoBootstrapProperties {
-    private boolean enabled;
     private String tenantTitle = "演示租户";
     private String organizationTitle = "戏码台";
     private String departmentTitle = "综合管理部";
     private String employeeTitle = "演示租户管理员";
     private String adminUsername = "demo_admin";
     private String adminInitialPassword = "demo123";
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
 
     public String getTenantTitle() {
         return tenantTitle;

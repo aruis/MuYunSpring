@@ -1,5 +1,9 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleDefinitionRegistrar;
+
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;

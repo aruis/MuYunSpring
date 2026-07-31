@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.iam.web;
 
 import net.ximatai.muyun.spring.platform.web.PlatformMenu;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuGroups;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.ModuleUiDefinition;
 import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.platform.web.StaticModuleUiContributor;
@@ -52,7 +52,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.employee", title = "职员管理", route = "/iam/employees")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.employee", title = "职员管理", route = "/iam/employees")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "职员管理", order = 50)
 @RequestMapping("/iam.employee")
 public class EmployeeWebController extends WebSupport<EmployeeService> implements

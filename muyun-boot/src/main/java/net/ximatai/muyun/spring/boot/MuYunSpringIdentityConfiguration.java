@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.iam.role.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.iam.role.BuiltInRolePermissionTemplateService;
-import net.ximatai.muyun.spring.iam.role.RoleGrantableActionResolver;
 import net.ximatai.muyun.spring.platform.menu.DefaultTenantMenuProvisioner;
 import net.ximatai.muyun.spring.iam.tenant.DefaultTenantApplicationProvisioner;
 import net.ximatai.muyun.spring.iam.role.DefaultOrganizationRoleProvisioner;
@@ -12,56 +11,34 @@ import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationReconciliationTask;
 import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.web.StaticModuleDefinition;
-import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
-import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionRegistrar;
-import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionScanner;
-import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinition;
-import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionCatalog;
-import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionRegistrar;
-import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionScanner;
-import net.ximatai.muyun.spring.platform.web.StaticDeclarationPreflightTask;
-import net.ximatai.muyun.spring.iam.web.security.BearerTokenCurrentUserProvider;
-import net.ximatai.muyun.spring.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.web.RequestTraceWebFilter;
-import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
-import net.ximatai.muyun.spring.iam.department.DepartmentService;
-import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
-import net.ximatai.muyun.spring.iam.employee.EmployeeService;
-import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.iam.user.UserAccountService;
-import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
-import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
-import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 
 import java.util.List;
-import java.util.Optional;
 
 @Configuration
 @EnableConfigurationProperties(MuYunSpringInitialAdminProperties.class)
+@Import({MuYunSpringStaticDeclarationConfiguration.class, MuYunSpringIdentityWebConfiguration.class})
 public class MuYunSpringIdentityConfiguration {
     @Bean
     @Primary
@@ -69,25 +46,6 @@ public class MuYunSpringIdentityConfiguration {
             ignored = {TenantService.class, TenantActiveScopedAbility.class})
     public ActiveTenantVerifier activeTenantVerifier(TenantService tenantService) {
         return tenantService;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(CurrentUserProvider.class)
-    public CurrentUserProvider currentUserProvider(ObjectProvider<UserSessionService> userSessionService) {
-        UserSessionService service = userSessionService.getIfAvailable();
-        return service == null ? Optional::empty : new BearerTokenCurrentUserProvider(service);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(CurrentUserWebFilter.class)
-    public CurrentUserWebFilter currentUserWebFilter(CurrentUserProvider currentUserProvider) {
-        return new CurrentUserWebFilter(currentUserProvider);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(RequestTraceWebFilter.class)
-    public RequestTraceWebFilter requestTraceWebFilter() {
-        return new RequestTraceWebFilter();
     }
 
     @Bean
@@ -100,59 +58,6 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(StaticModuleActionRegistry.class)
     public StaticModuleActionRegistry staticModuleActionRegistry() {
         return new StaticModuleActionRegistry();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticModuleDefinitionScanner.class)
-    public StaticModuleDefinitionScanner staticModuleDefinitionScanner(ApplicationContext applicationContext) {
-        return new StaticModuleDefinitionScanner(applicationContext);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticModuleDefinitionCatalog.class)
-    public StaticModuleDefinitionCatalog staticModuleDefinitionCatalog(List<StaticModuleDefinition> definitions,
-                                                                       StaticModuleDefinitionScanner scanner) {
-        return new StaticModuleDefinitionCatalog(definitions, List.of(scanner));
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticApplicationDefinitionScanner.class)
-    public StaticApplicationDefinitionScanner staticApplicationDefinitionScanner(ApplicationContext applicationContext) {
-        return new StaticApplicationDefinitionScanner(applicationContext);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticApplicationDefinitionCatalog.class)
-    public StaticApplicationDefinitionCatalog staticApplicationDefinitionCatalog(
-            List<StaticApplicationDefinition> definitions,
-            StaticApplicationDefinitionScanner scanner) {
-        return new StaticApplicationDefinitionCatalog(definitions, List.of(scanner));
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticDeclarationPreflightTask.class)
-    public StaticDeclarationPreflightTask staticDeclarationPreflightTask(
-            StaticApplicationDefinitionCatalog applicationCatalog,
-            StaticModuleDefinitionCatalog moduleCatalog) {
-        return new StaticDeclarationPreflightTask(applicationCatalog, moduleCatalog);
-    }
-
-    @Bean
-    @ConditionalOnBean(ApplicationService.class)
-    @ConditionalOnMissingBean(StaticApplicationDefinitionRegistrar.class)
-    public StaticApplicationDefinitionRegistrar staticApplicationDefinitionRegistrar(
-            ApplicationService applicationService,
-            StaticApplicationDefinitionCatalog catalog) {
-        return new StaticApplicationDefinitionRegistrar(applicationService, catalog);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(StaticModuleDefinitionRegistrar.class)
-    public StaticModuleDefinitionRegistrar staticModuleDefinitionRegistrar(PlatformModuleService moduleService,
-                                                                          PlatformModuleActionService actionService,
-                                                                          StaticModuleDefinitionCatalog catalog,
-                                                                          StaticApplicationDefinitionCatalog applicationCatalog) {
-        return new StaticModuleDefinitionRegistrar(moduleService, actionService, catalog, true, applicationCatalog);
     }
 
     @Bean

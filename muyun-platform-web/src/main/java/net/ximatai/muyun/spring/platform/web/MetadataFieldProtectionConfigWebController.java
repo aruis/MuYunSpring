@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedCrudWebSupport;
@@ -13,8 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
-        title = "平台字段保护配置", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
+        title = "平台字段保护配置")
 @RequestMapping("/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs")
 public class MetadataFieldProtectionConfigWebController
         extends NestedCrudWebSupport<MetadataFieldProtectionConfig, MetadataFieldProtectionConfigService> {

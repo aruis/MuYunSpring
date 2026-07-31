@@ -1,14 +1,21 @@
 package net.ximatai.muyun.spring.platform.web;
 
-import net.ximatai.muyun.spring.platform.web.CrudWeb;
+import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
+
+import net.ximatai.muyun.spring.platform.application.PlatformStaticApplication;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.StaticModuleActionDefinition;
+import net.ximatai.muyun.spring.platform.module.StaticModuleRegistrationSource;
+import net.ximatai.muyun.spring.platform.module.StaticReferenceCompiler;
+import net.ximatai.muyun.spring.platform.module.StaticReferenceDefinition;
+import net.ximatai.muyun.spring.platform.module.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.platform.module.StaticModuleServiceDeclaration;
+import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.spring.web.EnableWeb;
 import net.ximatai.muyun.spring.web.ReadOnlyWeb;
-import net.ximatai.muyun.spring.platform.web.RecycleBinWeb;
-import net.ximatai.muyun.spring.platform.web.RecycleBinPurgeWeb;
 import net.ximatai.muyun.spring.web.ReferenceWeb;
 import net.ximatai.muyun.spring.web.ScopedWeb;
 import net.ximatai.muyun.spring.web.SortWeb;
-import net.ximatai.muyun.spring.platform.web.StandardWebEndpoint;
 import net.ximatai.muyun.spring.web.TreeWeb;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.reference.ModuleReadProjectionContributor;
@@ -23,6 +30,7 @@ import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
@@ -30,7 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class StaticModuleDefinitionScanner {
+public class StaticModuleDefinitionScanner implements StaticModuleRegistrationSource {
     private final ApplicationContext applicationContext;
 
     public StaticModuleDefinitionScanner(ApplicationContext applicationContext) {
@@ -51,6 +59,11 @@ public class StaticModuleDefinitionScanner {
         }
         addActionContributions(definitions);
         return List.copyOf(definitions.values());
+    }
+
+    @Override
+    public List<StaticModuleDefinition> definitions() {
+        return scan();
     }
 
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
@@ -89,17 +102,27 @@ public class StaticModuleDefinitionScanner {
     private Class<?> modelClass(Object bean) {
         Object service = service(bean);
         if (service instanceof CrudAbility<?> ability) {
-            return ability.modelClass();
+            Class<?> modelClass = ability.modelClass();
+            if (modelClass != null && modelClass != Object.class) {
+                return modelClass;
+            }
+            Class<?> resolvedModelClass = ResolvableType.forClass(AopUtils.getTargetClass(service))
+                    .as(CrudAbility.class)
+                    .getGeneric(0)
+                    .resolve();
+            return resolvedModelClass != null && resolvedModelClass.isAnnotationPresent(Table.class)
+                    ? resolvedModelClass
+                    : null;
         }
         return null;
     }
 
     private List<StaticReferenceDefinition> references(Object bean) {
-        Object service = service(bean);
-        if (!(service instanceof CrudAbility<?> ability)) {
+        Class<?> modelClass = modelClass(bean);
+        if (modelClass == null || modelClass == Object.class) {
             return List.of();
         }
-        return StaticReferenceCompiler.compile(ability.modelClass());
+        return StaticReferenceCompiler.compile(modelClass);
     }
 
     private List<StaticModuleReadProjectionDefinition> readProjections(Object bean) {
@@ -170,11 +193,7 @@ public class StaticModuleDefinitionScanner {
     private List<EntityDefinition> entities(Object bean,
                                             PlatformStaticModule module,
                                             List<RelationProjectionJoinDefinition> projectionJoins) {
-        Object service = service(bean);
-        if (!(service instanceof CrudAbility<?> ability)) {
-            return List.of();
-        }
-        Class<?> modelClass = ability.modelClass();
+        Class<?> modelClass = modelClass(bean);
         if (modelClass == null || modelClass == Object.class) {
             return List.of();
         }
@@ -251,9 +270,10 @@ public class StaticModuleDefinitionScanner {
                 .filter(path -> path != null && !path.isBlank())
                 .distinct()
                 .toList();
-        if (module.webScope() == PlatformStaticModule.WebScope.CUSTOM) {
+        PlatformStaticWebScope webScope = AnnotationUtils.findAnnotation(beanClass, PlatformStaticWebScope.class);
+        if (webScope != null && webScope.value() == PlatformStaticWebScope.Scope.CUSTOM) {
             if (paths.isEmpty()) {
-                throw new IllegalStateException("custom static module web scope requires @RequestMapping: "
+                throw new IllegalStateException("@PlatformStaticWebScope(CUSTOM) requires @RequestMapping: "
                         + module.alias());
             }
             return;
@@ -441,6 +461,12 @@ public class StaticModuleDefinitionScanner {
         } else if (ReadOnlyWeb.class.isAssignableFrom(beanClass)) {
             addPlatformUnlessDisabled(actions, PlatformAction.MENU, disabledActions);
             addPlatformUnlessDisabled(actions, PlatformAction.VIEW, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.QUERY, disabledActions);
+        } else if (bean instanceof StaticModuleServiceDeclaration && service instanceof CrudAbility<?>) {
+            addPlatformUnlessDisabled(actions, PlatformAction.CREATE, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.VIEW, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.UPDATE, disabledActions);
+            addPlatformUnlessDisabled(actions, PlatformAction.DELETE, disabledActions);
             addPlatformUnlessDisabled(actions, PlatformAction.QUERY, disabledActions);
         }
         StaticServiceAbilityCompiler.standardActions(service).forEach(action -> addPlatform(actions, action));

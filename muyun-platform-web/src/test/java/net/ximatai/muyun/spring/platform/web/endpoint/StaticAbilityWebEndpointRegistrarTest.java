@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.ability.DisablePlatformOperations;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticWebProjection;
 import net.ximatai.muyun.spring.web.RecordWebProjectionPolicy;

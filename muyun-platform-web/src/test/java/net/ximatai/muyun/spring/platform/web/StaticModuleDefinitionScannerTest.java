@@ -1,10 +1,21 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
+
+import net.ximatai.muyun.spring.platform.module.StaticServiceAbilityCompiler;
+
+import net.ximatai.muyun.spring.platform.module.StaticReferenceDefinition;
+
+import net.ximatai.muyun.spring.platform.module.StaticModuleActionDefinition;
+
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.spring.platform.web.code.CodeLedgerEntryWebController;
 import net.ximatai.muyun.spring.platform.web.code.CodeIssueLogWebController;
 import net.ximatai.muyun.spring.platform.web.code.CodeRecycleEntryWebController;
 import net.ximatai.muyun.spring.platform.web.code.CodeRuleWebController;
 import net.ximatai.muyun.spring.platform.web.code.CodeSequenceStateWebController;
+import net.ximatai.muyun.spring.platform.application.PlatformStaticApplication;
 import net.ximatai.muyun.spring.iam.web.DepartmentWebController;
 import net.ximatai.muyun.spring.iam.web.EmployeeWebController;
 import net.ximatai.muyun.spring.iam.web.OrganizationWebController;
@@ -18,7 +29,6 @@ import net.ximatai.muyun.spring.iam.web.UserAccountWebController;
 import net.ximatai.muyun.spring.platform.web.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.platform.web.workflow.WorkflowDefinitionWebController;
 import net.ximatai.muyun.spring.platform.web.workflow.WorkflowVersionWebController;
-import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -1026,7 +1036,7 @@ class StaticModuleDefinitionScannerTest {
 
             assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("custom static module web scope requires @RequestMapping");
+                    .hasMessageContaining("@PlatformStaticWebScope(CUSTOM) requires @RequestMapping");
         }
     }
 
@@ -1045,56 +1055,56 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.bad", title = "Bad")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.bad", title = "Bad")
     @RequestMapping("/iam.good")
     static class BadAliasWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.non_scoped_bad", title = "Non scoped bad")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.non_scoped_bad", title = "Non scoped bad")
     @RequestMapping("/iam.other")
     static class NonScopedBadAliasWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class,
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class,
             alias = "demo.canonical_and_legacy", title = "Canonical and legacy")
     @RequestMapping({"/demo.canonical_and_legacy", "/demo/canonical-and-legacy"})
     static class CanonicalAndLegacyScopeWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.field_type", title = "Bad")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.field_type", title = "Bad")
     @RequestMapping("/platform.fieldtype")
     static class MissingSeparatorAliasWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = String.class, alias = "demo.invalid", title = "Invalid")
+@PlatformStaticModule(application = String.class, alias = "demo.invalid", title = "Invalid")
     static class UndeclaredApplicationWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class,
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class,
             alias = "iam.outside", title = "Wrong owner")
     static class WrongApplicationOwnerWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.nested", title = "Nested",
-            webScope = PlatformStaticModule.WebScope.CUSTOM)
+    @PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.nested", title = "Nested")
     @RequestMapping("/demo.parent/{parentId}/nested")
     static class CustomScopeWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.no_mapping", title = "No mapping",
-            webScope = PlatformStaticModule.WebScope.CUSTOM)
+    @PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.no_mapping", title = "No mapping")
     static class CustomScopeWithoutMappingWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.service_alias", title = "Service alias")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.service_alias", title = "Service alias")
     @RequestMapping("/demo.service_alias")
     static class ServiceAliasMismatchWeb extends net.ximatai.muyun.spring.web.WebSupport<MultiSegmentModuleService> {
         ServiceAliasMismatchWeb(MultiSegmentModuleService service) {
@@ -1103,13 +1113,13 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.SalesApplication.class, alias = "sales.contract", title = "合同",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.SalesApplication.class, alias = "sales.contract", title = "合同",
             capabilities = EntityCapability.APPROVAL)
     static class WorkflowEnabledWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.dictionary_category", title = "字典管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.dictionary_category", title = "字典管理")
     static class ConflictingDictionaryCategoryWeb {
         @CustomActionEndpoint("item_query")
         public void itemQuery() {
@@ -1117,7 +1127,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.SalesApplication.class, alias = "sales.order_line", title = "订单明细")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.SalesApplication.class, alias = "sales.order_line", title = "订单明细")
     static class StaticMeasureOrderWeb extends net.ximatai.muyun.spring.web.WebSupport<StaticMeasureOrderService> {
         StaticMeasureOrderWeb(StaticMeasureOrderService service) {
             this.service = service;
@@ -1125,7 +1135,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.service_ability", title = "Service Ability")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.service_ability", title = "Service Ability")
     @RequestMapping("/demo.service_ability")
     static class ServiceDeclaredAbilityWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
         ServiceDeclaredAbilityWeb(Object service) {
@@ -1134,7 +1144,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.redeclared", title = "Redeclared",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.redeclared", title = "Redeclared",
             capabilities = EntityCapability.ENABLE)
     @RequestMapping("/demo.redeclared")
     static class RedeclaredServiceAbilityWeb {
@@ -1154,7 +1164,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.read_only", title = "Read only")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.StaticTestApplications.DemoApplication.class, alias = "demo.read_only", title = "Read only")
     @RequestMapping("/demo.read_only")
     static final class DisabledCrudWeb implements CrudWeb<StandardEntity, ReadOnlyOperationService> {
         private final ReadOnlyOperationService service;
@@ -1182,7 +1192,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.workflow.definition", title = "流程定义")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.workflow.definition", title = "流程定义")
     @RequestMapping("/platform.workflow.definition")
     static class MultiSegmentModuleWeb extends net.ximatai.muyun.spring.web.WebSupport<MultiSegmentModuleService> {
         MultiSegmentModuleWeb(MultiSegmentModuleService service) {

@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.demo.school.student;
 
 import net.ximatai.muyun.spring.demo.school.configuration.EducationApplication;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.WebSupport;
 import org.springframework.web.bind.annotation.RequestMapping;

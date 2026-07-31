@@ -77,9 +77,6 @@ public class DemoBootstrapTask implements PlatformBootstrapTask {
 
     @Override
     public void run() {
-        if (!properties.isEnabled()) {
-            return;
-        }
         try (CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
                 CurrentUser.systemUser(SYSTEM_OPERATOR_ID, "Demo Bootstrap"))) {
             Tenant tenant = ensureTenant();

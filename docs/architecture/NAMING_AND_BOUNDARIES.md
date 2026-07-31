@@ -23,7 +23,9 @@ Gradle 子项目表达稳定的构建、依赖和交付边界，而不是运行�
 | 演示 | `muyun-demo`、`muyun-demo-web` | 可运行的演示领域及其 Web 场景 | `muyun-demo` 不依赖 Web；`muyun-demo-web` 承接 Web 入口 |
 | 应用宿主 | `muyun-boot` | Spring Boot application、装配、配置和本地启动 | 只聚合运行模块，不承载领域或 Web 交付实现 |
 
-依赖方向始终从交付层指向领域层，再由 `muyun-boot` 统一装配；不得以生产依赖把领域模块或 `muyun-web-adapter` 反向依赖到某个 `*-web` 模块。跨模块测试复用应优先放在 Gradle `testFixtures`，不把测试构造提升为生产 API，也不把它们迁回 `muyun-boot`。
+依赖方向始终从交付层指向领域层，再由 `muyun-boot` 统一装配；不得以生产依赖把领域模块或 `muyun-web-adapter` 反向依赖到某个 `*-web` 模块。标准 `muyun-boot` 不依赖 Demo；演示运行任务只在运行时追加 `muyun-demo-web`，并以 `school-demo` profile 装配完整演示环境。跨模块测试复用应优先放在 Gradle `testFixtures`，不把测试构造提升为生产 API，也不把它们迁回 `muyun-boot`。
+
+静态应用身份及其初始数据、领域装配属于所属领域核心：例如 `EducationApplication` 与 `TeachingDemoConfiguration` 位于 `muyun-demo`。应用声明的扫描、目录和协调也属于 `muyun-platform`；静态模块身份以 `muyun-platform` 的 `@PlatformStaticModule(application = XxxApplication.class)` 声明，不得为了被 Controller 引用而迁入 Web 模块。HTTP 是该模块的一种可选投影：`*-web` 通过 `@RequestMapping` 交付入口，非规范路径再以 `@PlatformStaticWebScope(CUSTOM)` 显式标明；没有 HTTP 入口的模块不依赖 Web 交付层。
 
 构建任务 `verifyModuleBoundaries` 会校验生产 Project 依赖白名单（不只是禁止少数反向依赖），并禁止 `muyun-boot` 出现 `@RestController`、`@Controller`、`@Service` 或 `@Repository`。`verifyAll` 已包含该检查；新增模块依赖或在 Boot 放置业务实现时必须先通过它。
 

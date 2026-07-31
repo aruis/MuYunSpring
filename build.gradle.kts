@@ -65,6 +65,18 @@ subprojects {
 val unitTestTasks = subprojects.map { it.tasks.named<Test>("test") }
 val integrationTestTasks = subprojects.map { it.tasks.named<Test>("integrationTest") }
 
+tasks.register("demoClasses") {
+    description = "Compiles the standard application and optional demo delivery for local demo development."
+    group = LifecycleBasePlugin.BUILD_GROUP
+    dependsOn(":muyun-boot:classes", ":muyun-demo-web:classes")
+}
+
+tasks.register("demoBootRun") {
+    description = "Runs the standard application with the optional school demo on its runtime classpath."
+    group = "application"
+    dependsOn(":muyun-boot:demoBootRun")
+}
+
 val coreModulePaths = setOf(
     ":muyun-common",
     ":muyun-ability",
@@ -96,13 +108,13 @@ val allowedProductionProjectDependencies = mapOf(
     ":muyun-iam" to setOf(":muyun-ability", ":muyun-platform"),
     ":muyun-demo" to setOf(":muyun-ability", ":muyun-platform", ":muyun-iam"),
     ":muyun-web-adapter" to setOf(":muyun-ability"),
-    ":muyun-platform-web" to setOf(":muyun-platform", ":muyun-web-adapter", ":muyun-iam"),
+    ":muyun-platform-web" to setOf(":muyun-platform", ":muyun-web-adapter"),
     ":muyun-iam-web" to setOf(":muyun-iam", ":muyun-web-adapter", ":muyun-platform-web"),
     ":muyun-dynamic-web" to setOf(":muyun-dynamic", ":muyun-platform", ":muyun-web-adapter", ":muyun-platform-web"),
     ":muyun-demo-web" to setOf(":muyun-demo", ":muyun-web-adapter", ":muyun-platform-web"),
     ":muyun-boot" to setOf(
         ":muyun-platform", ":muyun-iam", ":muyun-web-adapter", ":muyun-platform-web",
-        ":muyun-iam-web", ":muyun-dynamic-web", ":muyun-demo-web"
+        ":muyun-iam-web", ":muyun-dynamic-web"
     ),
 )
 

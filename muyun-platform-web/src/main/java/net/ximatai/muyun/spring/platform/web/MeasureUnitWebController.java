@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedEnabledSortableCrudWebSupport;
@@ -23,8 +25,8 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位",
-        webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位")
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units")
 public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
 

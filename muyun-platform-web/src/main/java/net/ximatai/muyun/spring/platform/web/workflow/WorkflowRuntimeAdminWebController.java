@@ -3,7 +3,8 @@ package net.ximatai.muyun.spring.platform.web.workflow;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.web.WebListResponse;
 import net.ximatai.muyun.spring.web.WebPageRequest;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.platform.web.PlatformMenu;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuGroups;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -40,9 +41,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/workflow/runtime/admin")
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class,
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class,
         alias = WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS,
-        title = "Workflow Admin", webScope = PlatformStaticModule.WebScope.CUSTOM)
+        title = "Workflow Admin")
 @PlatformMenu(parent = PlatformMenuGroups.OPS, title = "工作流运维", order = 20)
 public class WorkflowRuntimeAdminWebController {
     private final WorkflowAdminFacade adminFacade;

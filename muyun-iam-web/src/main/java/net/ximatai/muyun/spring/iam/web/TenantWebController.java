@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.web.SystemScope;
 import net.ximatai.muyun.spring.web.WebSupport;
 import net.ximatai.muyun.spring.platform.web.PlatformMenu;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuGroups;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.ModuleUiDefinition;
 import net.ximatai.muyun.spring.platform.web.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.web.IamApplication.class, alias = "iam.tenant", title = "租户管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.tenant", title = "租户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
 @RequestMapping("/iam.tenant")
 public class TenantWebController extends WebSupport<TenantService> implements

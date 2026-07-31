@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.spring.web.SystemScope;
 import net.ximatai.muyun.spring.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -26,7 +28,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.low_code_governance", title = "平台低代码治理", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.low_code_governance", title = "平台低代码治理")
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "低代码治理", order = 80)
 @RequestMapping({"/platform.low_code_governance", "/platform/low-code-governance"})
 public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConfigArchiveFacade>

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticReferenceDefinition;
+
 import net.ximatai.muyun.spring.ability.reference.ModuleFieldRef;
 import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;

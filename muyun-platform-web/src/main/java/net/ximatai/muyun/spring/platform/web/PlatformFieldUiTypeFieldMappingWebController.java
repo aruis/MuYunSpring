@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedSortableCrudWebSupport;
@@ -12,8 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = PlatformFieldUiTypeFieldMappingService.MODULE_ALIAS,
-        title = "平台字段 UI 类型字段映射", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = PlatformFieldUiTypeFieldMappingService.MODULE_ALIAS,
+        title = "平台字段 UI 类型字段映射")
 @RequestMapping("/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings")
 public class PlatformFieldUiTypeFieldMappingWebController
         extends NestedSortableCrudWebSupport<PlatformFieldUiTypeFieldMapping, PlatformFieldUiTypeFieldMappingService> {

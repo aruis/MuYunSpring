@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.web.code;
 
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.web.ReadOnlyWeb;
 import net.ximatai.muyun.spring.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
@@ -18,7 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = CodeSequenceStateService.MODULE_ALIAS, title = "编码序列状态", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = CodeSequenceStateService.MODULE_ALIAS, title = "编码序列状态")
 @RequestMapping({"/platform.code_sequence_state", "/platform/code/sequence-state"})
 public class CodeSequenceStateWebController extends WebSupport<CodeSequenceStateService> implements
         ReadOnlyWeb<CodeSequenceState, CodeSequenceStateService> {

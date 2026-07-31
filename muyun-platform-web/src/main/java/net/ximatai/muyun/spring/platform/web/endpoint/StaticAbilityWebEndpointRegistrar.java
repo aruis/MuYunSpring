@@ -4,11 +4,11 @@ import net.ximatai.muyun.spring.web.endpoint.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.ability.PlatformOperationDefinition;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContributionSupport;
 import net.ximatai.muyun.spring.platform.web.PlatformStaticWebProjection;
-import net.ximatai.muyun.spring.platform.web.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.platform.module.StaticServiceAbilityCompiler;
 import net.ximatai.muyun.spring.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.web.ScopedWeb;
 import net.ximatai.muyun.spring.platform.web.StaticAbilityOperationRuntime;

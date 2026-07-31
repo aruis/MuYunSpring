@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.web.code;
 
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.platform.web.PlatformMenu;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuGroups;
 import net.ximatai.muyun.spring.web.ReadOnlyWeb;
@@ -34,7 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = CodeRuleService.MODULE_ALIAS, title = "编码规则", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = CodeRuleService.MODULE_ALIAS, title = "编码规则")
 @PlatformMenu(parent = PlatformMenuGroups.BUSINESS_SUPPORT, order = 20)
 @RequestMapping({"/platform.code_rule", "/platform/code/rule"})
 public class CodeRuleWebController extends WebSupport<CodeRuleService> implements

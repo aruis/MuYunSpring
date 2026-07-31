@@ -1,7 +1,17 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticDeclarationPreflightTask;
+
+import net.ximatai.muyun.spring.platform.module.StaticModuleDefinitionRegistrar;
+
 import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
+import net.ximatai.muyun.spring.platform.application.PlatformApplication;
+import net.ximatai.muyun.spring.platform.application.PlatformStaticApplication;
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinition;
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinitionCatalog;
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinitionRegistrar;
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinitionScanner;
 import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;

@@ -104,22 +104,6 @@ class DemoBootstrapTaskTest {
     }
 
     @Test
-    void shouldDoNothingWhenDemoBootstrapIsDisabled() {
-        DemoBootstrapTask task = new DemoBootstrapTask(new DemoBootstrapProperties(),
-                tenantService, organizationService, departmentService, employeeService, userAccountService,
-                employeeAccountService, tenantRoleProvisioner);
-
-        task.run();
-
-        assertThat(tenantDao.list(Criteria.of())).isEmpty();
-        assertThat(organizationDao.list(Criteria.of())).isEmpty();
-        assertThat(departmentDao.list(Criteria.of())).isEmpty();
-        assertThat(employeeDao.list(Criteria.of())).isEmpty();
-        assertThat(userAccountDao.list(Criteria.of())).isEmpty();
-        assertThat(roleDao.list(Criteria.of())).isEmpty();
-    }
-
-    @Test
     void shouldGenerateDefaultRoleIdsWithinStandardIdLength() {
         assertThat(DefaultTenantRoleProvisioner.tenantAdminRoleId("acme"))
                 .hasSizeLessThanOrEqualTo(STANDARD_ID_MAX_LENGTH);
@@ -332,7 +316,6 @@ class DemoBootstrapTaskTest {
     @Test
     void shouldCreateDemoTenantOrganizationDepartmentAndEmployeeIdempotently() {
         DemoBootstrapProperties properties = new DemoBootstrapProperties();
-        properties.setEnabled(true);
         properties.setTenantTitle("演示租户");
         properties.setOrganizationTitle("戏码台");
         properties.setDepartmentTitle("综合管理部");
@@ -437,7 +420,6 @@ class DemoBootstrapTaskTest {
     @Test
     void shouldAllowExistingDemoAdminPasswordRotation() {
         DemoBootstrapProperties properties = new DemoBootstrapProperties();
-        properties.setEnabled(true);
         properties.setAdminInitialPassword("demo123");
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
@@ -460,7 +442,6 @@ class DemoBootstrapTaskTest {
     @Test
     void shouldReuseExistingDemoEmployeeBindingCreatedOutsideBootstrap() {
         DemoBootstrapProperties properties = new DemoBootstrapProperties();
-        properties.setEnabled(true);
         properties.setTenantTitle("演示租户");
         properties.setOrganizationTitle("戏码台");
         properties.setDepartmentTitle("综合管理部");
@@ -535,7 +516,6 @@ class DemoBootstrapTaskTest {
     @Test
     void shouldReplayTenantProvisioningWhenDemoTenantAlreadyExists() {
         DemoBootstrapProperties properties = new DemoBootstrapProperties();
-        properties.setEnabled(true);
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         TenantService replayingTenantService = spy(new TenantService(tenantDao));
         DemoBootstrapTask task = new DemoBootstrapTask(properties, replayingTenantService, organizationService,
@@ -558,7 +538,6 @@ class DemoBootstrapTaskTest {
     @Test
     void shouldFailFastWhenExistingDemoAdminUserDrifts() {
         DemoBootstrapProperties properties = new DemoBootstrapProperties();
-        properties.setEnabled(true);
         when(grantableActionResolver.resolve(any())).thenReturn(List.of());
         DemoBootstrapTask task = new DemoBootstrapTask(properties, tenantService, organizationService,
                 departmentService, employeeService, userAccountService, employeeAccountService, tenantRoleProvisioner);

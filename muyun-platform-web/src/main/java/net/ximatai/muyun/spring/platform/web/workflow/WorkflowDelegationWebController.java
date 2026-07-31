@@ -3,7 +3,8 @@ package net.ximatai.muyun.spring.platform.web.workflow;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.web.ScopedWeb;
 import net.ximatai.muyun.spring.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.web.WebQueryCondition;
@@ -29,9 +30,10 @@ import java.util.Set;
 
 @RestController
 @RequestMapping({"/platform.workflow_delegation", "/workflow/delegation"})
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class,
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class,
         alias = WorkflowDelegationService.MODULE_ALIAS,
-        title = "Workflow Delegation", webScope = PlatformStaticModule.WebScope.CUSTOM)
+        title = "Workflow Delegation")
 public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelegationService> {
     private static final Set<String> QUERY_ALLOWED_FIELDS = Set.of(
             "title", "enabled", "principalCanProcess", "moduleScopeType", "orgScopeType");

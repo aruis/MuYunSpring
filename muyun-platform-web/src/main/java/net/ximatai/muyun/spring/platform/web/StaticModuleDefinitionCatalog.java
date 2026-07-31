@@ -1,14 +1,15 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleRegistrationSource;
+import net.ximatai.muyun.spring.platform.module.StaticModuleRegistrationValidator;
+
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
-public class StaticModuleDefinitionCatalog {
+public class StaticModuleDefinitionCatalog implements StaticModuleRegistrationSource {
     private final List<StaticModuleDefinition> definitions;
     private final List<StaticModuleDefinitionScanner> scanners;
     private volatile List<StaticModuleDefinition> cachedDefinitions;
@@ -59,30 +60,14 @@ public class StaticModuleDefinitionCatalog {
 
     private List<StaticModuleDefinition> loadDefinitions() {
         if (scanners.isEmpty()) {
-            validateDefinitions(definitions);
+            StaticModuleRegistrationValidator.validate(definitions);
             return definitions;
         }
         ArrayList<StaticModuleDefinition> all = new ArrayList<>(definitions);
         for (StaticModuleDefinitionScanner scanner : scanners) {
             all.addAll(scanner.scan());
         }
-        validateDefinitions(all);
+        StaticModuleRegistrationValidator.validate(all);
         return List.copyOf(all);
-    }
-
-    private void validateDefinitions(List<StaticModuleDefinition> definitions) {
-        Set<String> modules = new HashSet<>();
-        for (StaticModuleDefinition definition : definitions) {
-            if (!modules.add(definition.moduleAlias())) {
-                throw new IllegalStateException("duplicate static module definition: " + definition.moduleAlias());
-            }
-            Set<String> actions = new HashSet<>();
-            for (StaticModuleActionDefinition action : definition.actions()) {
-                if (!actions.add(action.actionCode())) {
-                    throw new IllegalStateException("duplicate static module action definition: "
-                            + definition.moduleAlias() + "." + action.actionCode());
-                }
-            }
-        }
     }
 }

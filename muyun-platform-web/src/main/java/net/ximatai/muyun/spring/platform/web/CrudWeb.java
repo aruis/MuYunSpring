@@ -13,16 +13,13 @@ import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormSchema;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
-import net.ximatai.muyun.spring.platform.web.ModuleUiFormSchemaAdapter;
-import net.ximatai.muyun.spring.platform.web.RecordReadVisibility;
-import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
-import net.ximatai.muyun.spring.platform.web.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.platform.module.StaticModuleServiceDeclaration;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.ResolvableType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,7 +34,12 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
-        extends ScopedWeb<S>, RecordLabelWeb<T> {
+        extends ScopedWeb<S>, RecordLabelWeb<T>, StaticModuleServiceDeclaration {
+    @Override
+    default CrudAbility<?> staticModuleService() {
+        return service();
+    }
+
     default PageResult<T> queryRecords(WebQueryRequest request) {
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());

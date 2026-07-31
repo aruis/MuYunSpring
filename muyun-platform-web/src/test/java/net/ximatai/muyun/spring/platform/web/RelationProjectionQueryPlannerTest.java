@@ -1,5 +1,9 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
+
+import net.ximatai.muyun.spring.platform.module.StaticReferenceDefinition;
+
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.ability.reference.ReferencePath;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;

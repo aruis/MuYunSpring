@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.web;
 
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinition;
+import net.ximatai.muyun.spring.platform.application.StaticApplicationDefinitionRegistrar;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 
 import net.ximatai.muyun.database.core.orm.Criteria;

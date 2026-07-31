@@ -2,7 +2,8 @@ package net.ximatai.muyun.spring.platform.web.workflow;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebScope;
 import net.ximatai.muyun.spring.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -24,8 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = WorkflowVersionService.MODULE_ALIAS,
-        title = "平台工作流版本", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@PlatformStaticWebScope(PlatformStaticWebScope.Scope.CUSTOM)
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = WorkflowVersionService.MODULE_ALIAS,
+        title = "平台工作流版本")
 @RequestMapping("/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions")
 public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowVersion, WorkflowVersionService> {
 

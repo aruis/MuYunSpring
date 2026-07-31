@@ -27,7 +27,7 @@
 | TD-034 | 动态模块回收站尚未形成端到端交付链路 | `RECYCLE_BIN` 已能进入动态模块运行时能力和动作目录，但动态 Web 端点、动态记录运行态执行、页面宿主 mode 切换及恢复/清理交互尚未接入；若仅凭能力自动暴露入口，会产生不可用操作 | 进入动态模块软删治理或动态页面生命周期动作交付时，补齐动态回收站查询、恢复、清理、范围校验和宿主 mode 契约，再允许动态页面按能力自动展示入口 |
 | TD-035 | 动态复合租户唯一约束尚无持久化元数据事实源 | `EntityDefinition` 已能表达复合租户唯一约束，schema 映射与运行态预查也会使用同一事实；但配置管理侧尚未持久化该声明，现有 metadata compiler 只会从 `FieldDefinition.isUnique` 编译单字段唯一。因此不能将动态复合唯一配置视为已交付能力 | 出现真实动态模块需要复合租户唯一时，成套建设持久化定义、compiler、校验、schema 刷新、发布和配置 UI，再开放该配置入口 |
 | TD-036 | 动态引用加载与反向引用尚未进入配置持久化和页面交付 | 运行态已支持 `EntityReferenceLoadDefinition` 编译为与静态一致的 `ReferenceLoadPath`，并由共享 `ReferenceLoadReader` 执行多跳读取；`EntityReferencedByDefinition` 也能按动态 CRUD 链路装配反向集合。但二者尚无平台配置的持久化事实、metadata compiler 输入和动态页面 descriptor 表达，不能视为低代码可配置能力 | 出现真实动态模块需要配置多跳展示字段或反向集合视图时，成套建设配置定义、保存校验、compiler、运行态 refresh、页面 descriptor 与关联视图交付；引用加载输出字段保持只读虚拟字段，反向集合优先进入关联视图而非普通表单字段 |
-| TD-037 | 动态表单及配置资源的 HTTP URL 体系尚未定稿 | 当前 `@PlatformStaticModule.webScope = CUSTOM` 仅明确模块身份与嵌套资源路径可以不同，已覆盖模块、元数据、字段、UI 配置等现有父资源路径；这些 URL 仍是阶段性接口，不应据此固化前端路由、外部集成或自动生成规则 | 进入动态表单页面交付、配置管理 API 整理或外部开放 API 治理时，统一模块入口、父资源上下文、版本策略、兼容迁移和 endpoint descriptor，再收敛现有 `CUSTOM` 路径 |
+| TD-037 | 动态表单及配置资源的 HTTP URL 体系尚未定稿 | 当前 `@PlatformStaticWebScope(CUSTOM)` 仅明确模块身份与嵌套资源路径可以不同，已覆盖模块、元数据、字段、UI 配置等现有父资源路径；这些 URL 仍是阶段性接口，不应据此固化前端路由、外部集成或自动生成规则 | 进入动态表单页面交付、配置管理 API 整理或外部开放 API 治理时，统一模块入口、父资源上下文、版本策略、兼容迁移和 endpoint descriptor，再收敛现有 `CUSTOM` 路径 |
 
 ### 待决策
 

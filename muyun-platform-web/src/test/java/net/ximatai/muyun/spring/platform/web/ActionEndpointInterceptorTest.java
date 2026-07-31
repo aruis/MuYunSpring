@@ -20,8 +20,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.iam.web.RoleWebController;
 import net.ximatai.muyun.spring.iam.web.UserAccountWebController;
 import net.ximatai.muyun.spring.iam.web.IamActingRequestResolver;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContribution;
-import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.web.endpoint.RegisteredWebEndpoint;
 import net.ximatai.muyun.spring.web.endpoint.RegisteredWebEndpointCatalog;
 import net.ximatai.muyun.spring.web.endpoint.ResolvedWebEndpoint;
@@ -609,7 +608,7 @@ class ActionEndpointInterceptorTest {
         }
     }
 
-    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = "platform.workflow_admin", title = "Workflow Admin")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.workflow_admin", title = "Workflow Admin")
     private static final class StaticModuleActionController {
         @net.ximatai.muyun.spring.common.platform.CustomActionEndpoint("workflowAdminQuery")
         public void query() {

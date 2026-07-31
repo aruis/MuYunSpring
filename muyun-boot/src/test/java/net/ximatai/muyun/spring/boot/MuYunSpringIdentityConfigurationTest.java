@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionRegistrar;
+import net.ximatai.muyun.spring.platform.module.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.role.AccountRoleGrantDao;
