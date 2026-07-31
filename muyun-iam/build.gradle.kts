@@ -1,3 +1,7 @@
+plugins {
+    id("java-test-fixtures")
+}
+
 dependencies {
     api(project(":muyun-ability"))
     api(project(":muyun-platform"))
@@ -15,4 +19,6 @@ dependencies {
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    testFixturesImplementation(libs.spring.boot.starter.test)
 }

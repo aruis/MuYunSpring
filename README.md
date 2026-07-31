@@ -54,10 +54,18 @@ muyun-ability     平台能力接口、默认实现、生命周期和数据访�
 muyun-dynamic     动态元数据、动态记录运行态和动态运行态刷新
 muyun-platform    平台配置、页面交付、自动化、工作流和治理能力
 muyun-iam         租户、组织、用户、角色、权限和身份上下文
-muyun-boot        Spring Boot 启动与装配入口
+muyun-web-adapter 通用 HTTP 协议适配、请求生命周期和 Web 基础能力
+muyun-platform-web 平台能力的静态 Web 交付、端点投影和实时推送适配
+muyun-iam-web     IAM 领域的 Web 交付
+muyun-dynamic-web 动态记录和元数据的 Web 交付
+muyun-demo        演示业务模型与服务
+muyun-demo-web    演示业务的 Web 交付
+muyun-boot        Spring Boot 应用、装配、配置和本地启动入口
 muyun-web         Vue 前端工作台、平台 UI adapter、动态页面骨架和业务示例
 docs              架构原则、平台专题、前端路线和技术债记录
 ```
+
+领域模块不承载 HTTP 入口；`*-web` 模块依赖领域模块和 `muyun-web-adapter` 完成交付。`muyun-boot` 只负责组装这些模块并启动应用，不沉淀领域模型、Controller 或可复用测试构造。
 
 ## 技术栈
 
@@ -126,8 +134,12 @@ docker run --name muyun-spring-postgres \
 2. 启动后端：
 
 ```bash
-./gradlew :muyun-boot:bootRun --args='--muyun.runtime.mode=development --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring --spring.datasource.username=postgres --spring.datasource.password=muyun_dev'
+cp muyun-boot/src/main/resources/application-local.yml.example \
+  muyun-boot/src/main/resources/application-local.yml
+./gradlew :muyun-boot:bootRun --args='--spring.profiles.active=local'
 ```
+
+`application-local.yml` 只属于本机开发环境，已被 Git 忽略；可用同名环境变量覆盖样例中的数据库、初始管理员密码和 demo 开关。生产或共享环境不要启用 `local` profile。
 
 后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。分终端开发时，额外在另一个终端运行下列连续编译命令；它与开发态 DevTools 共同保证跨模块代码变化会重启本地后端：
 

@@ -21,5 +21,11 @@ include(
     "muyun-dynamic",
     "muyun-platform",
     "muyun-iam",
+    "muyun-web-adapter",
+    "muyun-platform-web",
+    "muyun-iam-web",
+    "muyun-dynamic-web",
+    "muyun-demo",
+    "muyun-demo-web",
     "muyun-boot"
 )

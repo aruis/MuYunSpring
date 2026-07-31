@@ -1,0 +1,17 @@
+# Copy to application-local.yml for local development. The real local override is ignored by Git.
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${MUYUN_DB_URL:jdbc:postgresql://127.0.0.1:54321/muyun_spring}
+    username: ${MUYUN_DB_USERNAME:postgres}
+    password: ${MUYUN_DB_PASSWORD:muyun_dev}
+
+muyun:
+  runtime:
+    mode: development
+  initial-admin:
+    initial-password: ${MUYUN_INITIAL_ADMIN_PASSWORD:admin123}
+  demo-bootstrap:
+    enabled: ${MUYUN_DEMO_BOOTSTRAP_ENABLED:true}

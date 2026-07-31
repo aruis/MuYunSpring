@@ -15,6 +15,11 @@ configurations.configureEach {
 dependencies {
     implementation(project(":muyun-platform"))
     implementation(project(":muyun-iam"))
+    implementation(project(":muyun-web-adapter"))
+    implementation(project(":muyun-platform-web"))
+    implementation(project(":muyun-iam-web"))
+    implementation(project(":muyun-dynamic-web"))
+    implementation(project(":muyun-demo-web"))
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.websocket)
     implementation(libs.spring.boot.jackson2)
@@ -29,6 +34,8 @@ dependencies {
     testImplementation(libs.spring.boot.starter.restclient.test)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(testFixtures(project(":muyun-iam")))
+    testImplementation(testFixtures(project(":muyun-platform")))
 }
 
 val localRuntimeProjectPaths = listOf(
@@ -37,6 +44,12 @@ val localRuntimeProjectPaths = listOf(
     ":muyun-dynamic",
     ":muyun-platform",
     ":muyun-iam",
+    ":muyun-web-adapter",
+    ":muyun-platform-web",
+    ":muyun-iam-web",
+    ":muyun-dynamic-web",
+    ":muyun-demo",
+    ":muyun-demo-web",
 )
 val localRuntimeOutputs = files(localRuntimeProjectPaths.map { projectPath ->
     rootProject.project(projectPath)

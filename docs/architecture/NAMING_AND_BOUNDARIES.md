@@ -10,6 +10,23 @@
 
 三者不能混用。一个 Gradle 子项目可以包含多个平台模块。
 
+## Gradle 分层
+
+Gradle 子项目表达稳定的构建、依赖和交付边界，而不是运行时 application/module alias。当前后端按以下职责分层：
+
+| 层次 | 子项目 | 职责 | 依赖约束 |
+| --- | --- | --- | --- |
+| 领域核心 | `muyun-common`、`muyun-ability`、`muyun-dynamic`、`muyun-platform`、`muyun-iam` | 领域模型、服务、能力契约和运行态 | 不依赖 `*-web` 或 `muyun-boot` |
+| 通用交付适配 | `muyun-web-adapter` | HTTP 协议、请求生命周期、通用 mutation/query/scope/realtime 契约 | 只依赖 `muyun-ability` 及其通用契约；不依赖 IAM、Dynamic、Platform 或任何 `*-web` 交付模块 |
+| 平台 Web 交付 | `muyun-platform-web` | 静态平台模块交付、端点投影与注册、平台实时推送适配 | 依赖领域核心和 `muyun-web-adapter` |
+| 领域 Web 交付 | `muyun-iam-web`、`muyun-dynamic-web` | 各领域 Controller、Web adapter 和对应测试 | 依赖各自领域模块；可复用平台 Web 交付能力 |
+| 演示 | `muyun-demo`、`muyun-demo-web` | 可运行的演示领域及其 Web 场景 | `muyun-demo` 不依赖 Web；`muyun-demo-web` 承接 Web 入口 |
+| 应用宿主 | `muyun-boot` | Spring Boot application、装配、配置和本地启动 | 只聚合运行模块，不承载领域或 Web 交付实现 |
+
+依赖方向始终从交付层指向领域层，再由 `muyun-boot` 统一装配；不得以生产依赖把领域模块或 `muyun-web-adapter` 反向依赖到某个 `*-web` 模块。跨模块测试复用应优先放在 Gradle `testFixtures`，不把测试构造提升为生产 API，也不把它们迁回 `muyun-boot`。
+
+构建任务 `verifyModuleBoundaries` 会校验生产 Project 依赖白名单（不只是禁止少数反向依赖），并禁止 `muyun-boot` 出现 `@RestController`、`@Controller`、`@Service` 或 `@Repository`。`verifyAll` 已包含该检查；新增模块依赖或在 Boot 放置业务实现时必须先通过它。
+
 ## Java 包根
 
 统一使用：

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot;
 
+import net.ximatai.muyun.spring.web.MuYunSpringJacksonConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleKind;

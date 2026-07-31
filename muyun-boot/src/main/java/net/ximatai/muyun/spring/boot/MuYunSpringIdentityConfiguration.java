@@ -1,40 +1,34 @@
 package net.ximatai.muyun.spring.boot;
 
-import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
-import net.ximatai.muyun.spring.boot.iam.BuiltInRolePermissionTemplateService;
-import net.ximatai.muyun.spring.boot.iam.RoleGrantableActionResolver;
-import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
-import net.ximatai.muyun.spring.boot.platform.DefaultTenantMenuProvisioner;
-import net.ximatai.muyun.spring.boot.platform.DefaultTenantApplicationProvisioner;
-import net.ximatai.muyun.spring.boot.platform.DefaultOrganizationRoleProvisioner;
-import net.ximatai.muyun.spring.boot.platform.DefaultTenantRoleProvisioner;
-import net.ximatai.muyun.spring.boot.platform.DemoBootstrapTask;
-import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
-import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
-import net.ximatai.muyun.spring.boot.platform.TenantApplicationReconciliationTask;
-import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
-import net.ximatai.muyun.spring.boot.platform.StaticReferenceCompiler;
-import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinition;
-import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionCatalog;
-import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionRegistrar;
-import net.ximatai.muyun.spring.boot.platform.StaticApplicationDefinitionScanner;
-import net.ximatai.muyun.spring.boot.platform.StaticDeclarationPreflightTask;
-import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
-import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
-import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
-import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.iam.role.StaticModuleActionRegistry;
+import net.ximatai.muyun.spring.iam.role.BuiltInRolePermissionTemplateService;
+import net.ximatai.muyun.spring.iam.role.RoleGrantableActionResolver;
+import net.ximatai.muyun.spring.platform.menu.DefaultTenantMenuProvisioner;
+import net.ximatai.muyun.spring.iam.tenant.DefaultTenantApplicationProvisioner;
+import net.ximatai.muyun.spring.iam.role.DefaultOrganizationRoleProvisioner;
+import net.ximatai.muyun.spring.iam.role.DefaultTenantRoleProvisioner;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
+import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
+import net.ximatai.muyun.spring.iam.tenant.TenantApplicationReconciliationTask;
+import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinition;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionRegistrar;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionScanner;
+import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinition;
+import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionCatalog;
+import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionRegistrar;
+import net.ximatai.muyun.spring.platform.web.StaticApplicationDefinitionScanner;
+import net.ximatai.muyun.spring.platform.web.StaticDeclarationPreflightTask;
+import net.ximatai.muyun.spring.iam.web.security.BearerTokenCurrentUserProvider;
+import net.ximatai.muyun.spring.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
-import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
-import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
@@ -54,7 +48,6 @@ import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -68,7 +61,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Configuration
-@EnableConfigurationProperties({MuYunSpringInitialAdminProperties.class, MuYunSpringDemoBootstrapProperties.class})
+@EnableConfigurationProperties(MuYunSpringInitialAdminProperties.class)
 public class MuYunSpringIdentityConfiguration {
     @Bean
     @Primary
@@ -154,21 +147,6 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
-    public StaticModuleDefinition employeeAccountStaticModuleDefinition() {
-        return StaticModuleDefinition.builder("iam", EmployeeAccountService.MODULE_ALIAS, "职员账号绑定")
-                .entry(ModuleEntryType.MODULE, null, null)
-                .capabilities(java.util.Set.of(EntityCapability.CRUD))
-                .entities(List.of(new StaticEntityDefinitionCompiler().compile(
-                        "employee_account",
-                        "职员账号绑定",
-                        EmployeeAccount.class
-                )))
-                .references(StaticReferenceCompiler.compile(EmployeeAccount.class))
-                .modelClass(EmployeeAccount.class)
-                .build();
-    }
-
-    @Bean
     @ConditionalOnMissingBean(StaticModuleDefinitionRegistrar.class)
     public StaticModuleDefinitionRegistrar staticModuleDefinitionRegistrar(PlatformModuleService moduleService,
                                                                           PlatformModuleActionService actionService,
@@ -237,22 +215,6 @@ public class MuYunSpringIdentityConfiguration {
             RoleService roleService,
             BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
         return new DefaultOrganizationRoleProvisioner(roleService, rolePermissionTemplateService);
-    }
-
-    @Bean
-    @ConditionalOnBean({TenantService.class, OrganizationService.class, DepartmentService.class, EmployeeService.class,
-            UserAccountService.class, EmployeeAccountService.class, DefaultTenantRoleProvisioner.class})
-    @ConditionalOnMissingBean(DemoBootstrapTask.class)
-    public DemoBootstrapTask demoBootstrapTask(MuYunSpringDemoBootstrapProperties properties,
-                                               TenantService tenantService,
-                                               OrganizationService organizationService,
-                                               DepartmentService departmentService,
-                                               EmployeeService employeeService,
-                                               UserAccountService userAccountService,
-                                               EmployeeAccountService employeeAccountService,
-                                               DefaultTenantRoleProvisioner tenantRoleProvisioner) {
-        return new DemoBootstrapTask(properties, tenantService, organizationService, departmentService, employeeService,
-                userAccountService, employeeAccountService, tenantRoleProvisioner);
     }
 
     @Bean

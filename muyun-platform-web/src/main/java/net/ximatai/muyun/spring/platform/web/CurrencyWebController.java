@@ -1,0 +1,54 @@
+package net.ximatai.muyun.spring.platform.web;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import jakarta.servlet.http.HttpServletRequest;
+import net.ximatai.muyun.spring.web.NestedEnabledSortableCrudWebSupport;
+import net.ximatai.muyun.spring.web.WebListResponse;
+import net.ximatai.muyun.spring.web.WebOutputSupport;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.platform.currency.Currency;
+import net.ximatai.muyun.spring.platform.currency.CurrencyService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.function.Supplier;
+
+@RestController
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.web.PlatformApplication.class, alias = CurrencyService.MODULE_ALIAS, title = "平台币种", webScope = PlatformStaticModule.WebScope.CUSTOM)
+@RequestMapping({"/platform.currency", "/platform.currencies"})
+public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<Currency, CurrencyService> {
+
+    @Override
+    public <T> T webScope(Supplier<T> action) {
+        return action.get();
+    }
+
+    @Override
+    protected void appendScope(Criteria criteria, HttpServletRequest request) {
+    }
+
+    @Override
+    protected void bindScope(Currency record, HttpServletRequest request) {
+    }
+
+    @Override
+    protected boolean inScope(Currency record, HttpServletRequest request) {
+        return true;
+    }
+
+    @Override
+    protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
+        return "currency not found: " + id;
+    }
+
+    @GetMapping("/options")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public WebListResponse<Currency> options(@RequestParam(defaultValue = "true") boolean enabledOnly) {
+        return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
+                service().listVisibleCurrencies(enabledOnly), FieldOutputContext.LIST)));
+    }
+}

@@ -8,20 +8,20 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
-import net.ximatai.muyun.spring.boot.platform.PlatformStaticWebProjection;
-import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
-import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
-import net.ximatai.muyun.spring.boot.platform.StaticServiceAbilityCompiler;
-import net.ximatai.muyun.spring.boot.web.ScopedWeb;
-import net.ximatai.muyun.spring.boot.web.WebPageRequest;
-import net.ximatai.muyun.spring.boot.web.WebPageResponse;
-import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
-import net.ximatai.muyun.spring.boot.web.WebSort;
-import net.ximatai.muyun.spring.boot.web.endpoint.RegisteredWebEndpointCatalog;
-import net.ximatai.muyun.spring.boot.web.endpoint.ResolvedWebEndpoint;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticActionContribution;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.PlatformStaticWebProjection;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.platform.web.StaticServiceAbilityCompiler;
+import net.ximatai.muyun.spring.web.ScopedWeb;
+import net.ximatai.muyun.spring.web.WebPageRequest;
+import net.ximatai.muyun.spring.web.WebPageResponse;
+import net.ximatai.muyun.spring.web.WebQueryCondition;
+import net.ximatai.muyun.spring.web.WebQueryRequest;
+import net.ximatai.muyun.spring.web.WebSort;
+import net.ximatai.muyun.spring.web.endpoint.RegisteredWebEndpointCatalog;
+import net.ximatai.muyun.spring.web.endpoint.ResolvedWebEndpoint;
 import net.ximatai.muyun.spring.ability.deletion.DeletionRecoveryAbility;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.deletion.DeletionEntry;
@@ -30,7 +30,9 @@ import net.ximatai.muyun.spring.platform.deletion.RecycleBinItem;
 import net.ximatai.muyun.spring.platform.deletion.RestoreEntryResult;
 import net.ximatai.muyun.spring.platform.deletion.RestoreReport;
 import net.ximatai.muyun.spring.platform.deletion.StaticDeletionRecoveryResourceResolver;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
@@ -153,6 +155,16 @@ class MuYunSpringApplicationContextIT {
 
     @Test
     void shouldLoadApplicationContextWithRealDatabase() {
+        assertThat(staticModuleDefinitionCatalog.find(EmployeeAccountService.MODULE_ALIAS))
+                .get()
+                .satisfies(definition -> {
+                    assertThat(definition.entryType()).isEqualTo(ModuleEntryType.MODULE);
+                    assertThat(definition.entities()).isNotEmpty();
+                    assertThat(definition.actions()).isNotEmpty();
+                });
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals(EmployeeAccountService.MODULE_ALIAS)))
+                .isEmpty();
         assertThat(registeredWebEndpointCatalog.endpoints().stream()
                 .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
                 .extracting(endpoint -> endpoint.definition().endpointId())
