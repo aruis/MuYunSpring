@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MenuSchemeService.MODULE_ALIAS, title = "平台菜单方案",
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MenuSchemeService.MODULE_ALIAS, title = "平台菜单方案",
         route = "/config/menus")
 @PlatformMenu(parent = PlatformMenuGroups.SETTINGS, title = "菜单方案", order = 10)
 @RequestMapping("/platform.menu_scheme")

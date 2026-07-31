@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @PlatformMenu(parent = PlatformMenuGroups.BUSINESS_SUPPORT, title = "字典管理", order = 10)
 @RequestMapping({"/platform.dictionary_category", "/platform.application/{applicationAlias}/dictionary-categories"})
 public class DictionaryCategoryWebController

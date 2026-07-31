@@ -59,7 +59,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.user", title = "用户管理")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 60)
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements

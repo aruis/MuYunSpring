@@ -786,7 +786,7 @@ class StaticModuleDefinitionScannerTest {
 
             assertThatThrownBy(scanner::scan)
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("alias must match web scope");
+                    .hasMessageContaining("module-alias web scope");
         }
     }
 
@@ -952,30 +952,164 @@ class StaticModuleDefinitionScannerTest {
 
             assertThatThrownBy(scanner::scan)
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("alias must match web scope");
+                    .hasMessageContaining("module-alias web scope");
+        }
+    }
+
+    @Test
+    void shouldRejectNonScopedStaticModuleWithNonCanonicalWebScope() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(NonScopedBadAliasWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("module-alias web scope");
+        }
+    }
+
+    @Test
+    void shouldRejectAdditionalWebScopeWithoutExplicitCustomDeclaration() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(CanonicalAndLegacyScopeWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("module-alias web scope");
+        }
+    }
+
+    @Test
+    void shouldRejectModuleApplicationClassWithoutStaticApplicationDeclaration() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(UndeclaredApplicationWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("application must declare @PlatformStaticApplication")
+                    .hasMessageContaining(String.class.getName());
+        }
+    }
+
+    @Test
+    void shouldRejectModuleAliasOutsideDeclaredApplication() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(WrongApplicationOwnerWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("alias must belong to application")
+                    .hasMessageContaining("iam.outside is not under platform");
+        }
+    }
+
+    @Test
+    void shouldAllowExplicitCustomWebScope() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(CustomScopeWeb.class);
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("demo.nested");
+        }
+    }
+
+    @Test
+    void shouldRejectCustomWebScopeWithoutClassLevelMapping() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(CustomScopeWithoutMappingWeb.class);
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("custom static module web scope requires @RequestMapping");
+        }
+    }
+
+    @Test
+    void shouldRejectStaticModuleAliasDifferentFromServiceAlias() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(ServiceAliasMismatchWeb.class,
+                    () -> new ServiceAliasMismatchWeb(new MultiSegmentModuleService()));
+            context.refresh();
+
+            assertThatThrownBy(() -> new StaticModuleDefinitionScanner(context).scan())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("alias must match service module alias")
+                    .hasMessageContaining("demo.service_alias != platform.workflow.definition");
         }
     }
 
     @RestController
-    @PlatformStaticModule(application = "iam", alias = "iam.bad", title = "Bad")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.bad", title = "Bad")
     @RequestMapping("/iam.good")
     static class BadAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = "platform", alias = "platform.field_type", title = "Bad")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.iam.IamApplication.class, alias = "iam.non_scoped_bad", title = "Non scoped bad")
+    @RequestMapping("/iam.other")
+    static class NonScopedBadAliasWeb {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class,
+            alias = "demo.canonical_and_legacy", title = "Canonical and legacy")
+    @RequestMapping({"/demo.canonical_and_legacy", "/demo/canonical-and-legacy"})
+    static class CanonicalAndLegacyScopeWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = "platform.field_type", title = "Bad")
     @RequestMapping("/platform.fieldtype")
     static class MissingSeparatorAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
     }
 
     @RestController
-    @PlatformStaticModule(application = "sales", alias = "sales.contract", title = "合同",
+    @PlatformStaticModule(application = String.class, alias = "demo.invalid", title = "Invalid")
+    static class UndeclaredApplicationWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class,
+            alias = "iam.outside", title = "Wrong owner")
+    static class WrongApplicationOwnerWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.nested", title = "Nested",
+            webScope = PlatformStaticModule.WebScope.CUSTOM)
+    @RequestMapping("/demo.parent/{parentId}/nested")
+    static class CustomScopeWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.no_mapping", title = "No mapping",
+            webScope = PlatformStaticModule.WebScope.CUSTOM)
+    static class CustomScopeWithoutMappingWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.service_alias", title = "Service alias")
+    @RequestMapping("/demo.service_alias")
+    static class ServiceAliasMismatchWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<MultiSegmentModuleService> {
+        ServiceAliasMismatchWeb(MultiSegmentModuleService service) {
+            this.service = service;
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.SalesApplication.class, alias = "sales.contract", title = "合同",
             capabilities = EntityCapability.APPROVAL)
     static class WorkflowEnabledWeb {
     }
 
     @RestController
-    @PlatformStaticModule(application = "platform", alias = "platform.dictionary_category", title = "字典管理")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = "platform.dictionary_category", title = "字典管理")
     static class ConflictingDictionaryCategoryWeb {
         @CustomActionEndpoint("item_query")
         public void itemQuery() {
@@ -983,7 +1117,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "sales", alias = "sales.order_line", title = "订单明细")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.SalesApplication.class, alias = "sales.order_line", title = "订单明细")
     static class StaticMeasureOrderWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<StaticMeasureOrderService> {
         StaticMeasureOrderWeb(StaticMeasureOrderService service) {
             this.service = service;
@@ -991,7 +1125,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.service_ability", title = "Service Ability")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.service_ability", title = "Service Ability")
     @RequestMapping("/demo.service_ability")
     static class ServiceDeclaredAbilityWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
         ServiceDeclaredAbilityWeb(Object service) {
@@ -1000,7 +1134,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.redeclared", title = "Redeclared",
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.redeclared", title = "Redeclared",
             capabilities = EntityCapability.ENABLE)
     @RequestMapping("/demo.redeclared")
     static class RedeclaredServiceAbilityWeb {
@@ -1020,7 +1154,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "demo", alias = "demo.read_only", title = "Read only")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.StaticTestApplications.DemoApplication.class, alias = "demo.read_only", title = "Read only")
     @RequestMapping("/demo.read_only")
     static final class DisabledCrudWeb implements CrudWeb<StandardEntity, ReadOnlyOperationService> {
         private final ReadOnlyOperationService service;
@@ -1048,7 +1182,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "platform", alias = "platform.workflow.definition", title = "流程定义")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = "platform.workflow.definition", title = "流程定义")
     @RequestMapping("/platform.workflow.definition")
     static class MultiSegmentModuleWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<MultiSegmentModuleService> {
         MultiSegmentModuleWeb(MultiSegmentModuleService service) {

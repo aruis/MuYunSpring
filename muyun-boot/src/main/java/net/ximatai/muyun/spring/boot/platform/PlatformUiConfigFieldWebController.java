@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = PlatformUiConfigFieldService.MODULE_ALIAS,
-        title = "平台 UI 字段配置")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = PlatformUiConfigFieldService.MODULE_ALIAS,
+        title = "平台 UI 字段配置", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.ui-config/{uiConfigId}/fields")
 public class PlatformUiConfigFieldWebController
         extends NestedEnabledSortableCrudWebSupport<PlatformUiConfigField, PlatformUiConfigFieldService> {

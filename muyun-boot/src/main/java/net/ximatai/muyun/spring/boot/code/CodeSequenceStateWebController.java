@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = CodeSequenceStateService.MODULE_ALIAS, title = "编码序列状态")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = CodeSequenceStateService.MODULE_ALIAS, title = "编码序列状态", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.code_sequence_state", "/platform/code/sequence-state"})
 public class CodeSequenceStateWebController extends WebSupport<CodeSequenceStateService> implements
         ReadOnlyWeb<CodeSequenceState, CodeSequenceStateService> {

@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MetadataFieldService.MODULE_ALIAS, title = "平台元数据字段")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MetadataFieldService.MODULE_ALIAS, title = "平台元数据字段",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.metadata/{metadataId}/fields")
 public class MetadataFieldWebController
         extends NestedEnabledSortableCrudWebSupport<MetadataField, MetadataFieldService> {

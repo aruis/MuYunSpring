@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ExchangeRateTypeService.MODULE_ALIAS,
-        title = "平台汇率类型")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ExchangeRateTypeService.MODULE_ALIAS,
+        title = "平台汇率类型", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.exchange_rate_type", "/platform.exchange-rate-types"})
 public class ExchangeRateTypeWebController
         extends NestedEnabledSortableCrudWebSupport<ExchangeRateType, ExchangeRateTypeService> {

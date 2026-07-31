@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.demo.school.hobby;
 
+import net.ximatai.muyun.spring.boot.demo.school.configuration.EducationApplication;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
@@ -10,8 +11,8 @@ import org.springframework.context.annotation.Profile;
 /** 爱好分类树的标准 Web 交付入口；树、启停与引用候选均由 Service Ability 统一提供。 */
 @RestController
 @Profile("school-demo")
-@PlatformStaticModule(application = "education", alias = "education.hobby", title = "爱好")
-@RequestMapping("/education.hobby")
+@PlatformStaticModule(application = EducationApplication.class, alias = HobbyService.MODULE_ALIAS, title = "爱好")
+@RequestMapping("/" + HobbyService.MODULE_ALIAS)
 public class HobbyWebController extends WebSupport<HobbyService>
         implements CrudWeb<Hobby, HobbyService> {
 }

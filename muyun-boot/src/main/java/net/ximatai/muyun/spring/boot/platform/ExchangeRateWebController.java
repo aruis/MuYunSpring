@@ -19,7 +19,7 @@ import java.time.LocalDate;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ExchangeRateService.MODULE_ALIAS, title = "平台汇率")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ExchangeRateService.MODULE_ALIAS, title = "平台汇率", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.exchange_rate", "/platform.exchange-rates"})
 public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSupport<ExchangeRate, ExchangeRateService> {
 

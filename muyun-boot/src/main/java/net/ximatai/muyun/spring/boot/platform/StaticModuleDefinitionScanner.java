@@ -54,10 +54,12 @@ public class StaticModuleDefinitionScanner {
     }
 
     private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
-        validateScopeAlias(beanClass, module);
+        ApplicationDeclaration application = application(module);
+        validateModuleAlias(module, application);
+        validateScopeAlias(bean, beanClass, module);
         List<RelationProjectionJoinDefinition> projectionJoins = projectionJoins(bean);
         java.util.Set<EntityCapability> capabilities = capabilities(bean, module);
-        return StaticModuleDefinition.builder(module.application(), module.alias(), module.title())
+        return StaticModuleDefinition.builder(application.alias(), module.alias(), module.title())
                 .parentModuleAlias(module.parent().isBlank() ? null : module.parent())
                 .entry(entryType(module), module.route(), module.externalUrl())
                 .capabilities(capabilities)
@@ -195,7 +197,7 @@ public class StaticModuleDefinitionScanner {
     }
 
     private String entityAlias(PlatformStaticModule module) {
-        String moduleName = module.alias().substring(module.application().length() + 1);
+        String moduleName = module.alias().substring(application(module).alias().length() + 1);
         int lastSeparator = moduleName.lastIndexOf('.');
         if (lastSeparator < 0) {
             return moduleName;
@@ -210,31 +212,57 @@ public class StaticModuleDefinitionScanner {
         return scopedWeb.service();
     }
 
-    private void validateScopeAlias(Class<?> beanClass, PlatformStaticModule module) {
-        if (!ScopedWeb.class.isAssignableFrom(beanClass)) {
-            return;
+    private ApplicationDeclaration application(PlatformStaticModule module) {
+        PlatformStaticApplication application = AnnotationUtils.findAnnotation(
+                module.application(), PlatformStaticApplication.class);
+        if (application == null) {
+            throw new IllegalStateException("@PlatformStaticModule application must declare @PlatformStaticApplication: "
+                    + module.application().getName());
         }
-        org.springframework.web.bind.annotation.RequestMapping mapping =
-                AnnotationUtils.findAnnotation(beanClass, org.springframework.web.bind.annotation.RequestMapping.class);
-        String path = mapping == null ? null : firstText(mapping.value());
-        if (path == null && mapping != null) {
-            path = firstText(mapping.path());
-        }
-        if (path == null) {
-            return;
-        }
-        String scopeName = path.replaceFirst("^/", "");
-        if (scopeName.contains("/")) {
-            return;
-        }
-        if (!module.alias().equals(scopeName) && !normalizeScope(module.alias()).equals(normalizeScope(scopeName))) {
-            throw new IllegalStateException("@PlatformStaticModule alias must match web scope: "
-                    + module.alias() + " != " + scopeName);
+        return new ApplicationDeclaration(application.alias());
+    }
+
+    private void validateModuleAlias(PlatformStaticModule module, ApplicationDeclaration application) {
+        if (!module.alias().startsWith(application.alias() + ".")) {
+            throw new IllegalStateException("@PlatformStaticModule alias must belong to application: "
+                    + module.alias() + " is not under " + application.alias());
         }
     }
 
-    private String normalizeScope(String value) {
-        return value == null ? "" : value.replace("-", "_").toLowerCase(java.util.Locale.ROOT);
+    private record ApplicationDeclaration(String alias) {
+    }
+
+    private void validateScopeAlias(Object bean, Class<?> beanClass, PlatformStaticModule module) {
+        Object service = service(bean);
+        if (service instanceof CrudAbility<?> ability
+                && ability.getModuleAlias() != null
+                && !ability.getModuleAlias().isBlank()
+                && !module.alias().equals(ability.getModuleAlias())) {
+            throw new IllegalStateException("@PlatformStaticModule alias must match service module alias: "
+                    + module.alias() + " != " + ability.getModuleAlias());
+        }
+        org.springframework.web.bind.annotation.RequestMapping mapping =
+                AnnotationUtils.findAnnotation(beanClass, org.springframework.web.bind.annotation.RequestMapping.class);
+        List<String> paths = mapping == null ? List.of() : java.util.stream.Stream
+                .concat(java.util.Arrays.stream(mapping.value()), java.util.Arrays.stream(mapping.path()))
+                .filter(path -> path != null && !path.isBlank())
+                .distinct()
+                .toList();
+        if (module.webScope() == PlatformStaticModule.WebScope.CUSTOM) {
+            if (paths.isEmpty()) {
+                throw new IllegalStateException("custom static module web scope requires @RequestMapping: "
+                        + module.alias());
+            }
+            return;
+        }
+        if (paths.isEmpty()) {
+            return;
+        }
+        String expectedPath = "/" + module.alias();
+        if (!paths.equals(List.of(expectedPath))) {
+            throw new IllegalStateException("@PlatformStaticModule module-alias web scope requires @RequestMapping: "
+                    + expectedPath + ", actual " + paths);
+        }
     }
 
     private List<StaticModuleActionDefinition> actions(Object bean,

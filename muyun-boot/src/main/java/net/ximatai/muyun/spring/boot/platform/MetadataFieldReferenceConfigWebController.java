@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MetadataFieldReferenceConfigService.MODULE_ALIAS,
-        title = "平台字段引用配置")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MetadataFieldReferenceConfigService.MODULE_ALIAS,
+        title = "平台字段引用配置", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs")
 public class MetadataFieldReferenceConfigWebController
         extends NestedCrudWebSupport<MetadataFieldReferenceConfig, MetadataFieldReferenceConfigService> {

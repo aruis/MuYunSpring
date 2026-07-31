@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MetadataViewService.MODULE_ALIAS, title = "平台元数据视图")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MetadataViewService.MODULE_ALIAS, title = "平台元数据视图",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/views")
 public class PlatformMetadataViewWebController
         extends NestedEnabledSortableCrudWebSupport<MetadataView, MetadataViewService> {

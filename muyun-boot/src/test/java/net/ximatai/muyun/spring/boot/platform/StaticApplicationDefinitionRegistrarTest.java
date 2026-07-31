@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
@@ -12,13 +11,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class StaticApplicationDefinitionRegistrarTest {
     @Test
     void shouldScanAndRegisterPlatformManagedApplicationBeforeModules() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EducationConfiguration.class)) {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EducationApplication.class)) {
             StaticApplicationDefinitionCatalog catalog = new StaticApplicationDefinitionCatalog(
                     List.of(), List.of(new StaticApplicationDefinitionScanner(context)));
             ApplicationService service = mock(ApplicationService.class);
@@ -44,6 +44,19 @@ class StaticApplicationDefinitionRegistrarTest {
     }
 
     @Test
+    void shouldSelfRegisterAnnotatedStaticApplicationClass() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(PlatformApplication.class)) {
+            List<StaticApplicationDefinition> definitions = new StaticApplicationDefinitionScanner(context).scan();
+
+            assertThat(definitions).singleElement().satisfies(definition -> {
+                assertThat(definition.alias()).isEqualTo("platform");
+                assertThat(definition.title()).isEqualTo("平台能力");
+                assertThat(definition.sortOrder()).isEqualTo(10);
+            });
+        }
+    }
+
+    @Test
     void shouldRejectManualApplicationWithSameAlias() {
         ApplicationService service = mock(ApplicationService.class);
         Application manual = new Application();
@@ -60,7 +73,7 @@ class StaticApplicationDefinitionRegistrarTest {
 
     @Test
     void shouldDisableStalePlatformManagedApplicationWhenScanningDeclarations() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EducationConfiguration.class)) {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EducationApplication.class)) {
             StaticApplicationDefinitionCatalog catalog = new StaticApplicationDefinitionCatalog(
                     List.of(), List.of(new StaticApplicationDefinitionScanner(context)));
             ApplicationService service = mock(ApplicationService.class);
@@ -76,8 +89,26 @@ class StaticApplicationDefinitionRegistrarTest {
         }
     }
 
-    @Configuration(proxyBeanMethods = false)
+    @Test
+    void shouldRejectUndeclaredModuleApplicationBeforeApplicationReconciliationWrites() {
+        ApplicationService applicationService = mock(ApplicationService.class);
+        StaticApplicationDefinitionCatalog applicationCatalog = new StaticApplicationDefinitionCatalog(List.of(
+                StaticApplicationDefinition.of("platform", "平台能力", 10)));
+        StaticModuleDefinitionCatalog moduleCatalog = new StaticModuleDefinitionCatalog(List.of(
+                StaticModuleDefinition.builder("iam", "iam.user", "用户管理").build()));
+        PlatformBootstrapRunner runner = new PlatformBootstrapRunner(List.of(
+                new StaticApplicationDefinitionRegistrar(applicationService, applicationCatalog, true),
+                new StaticDeclarationPreflightTask(applicationCatalog, moduleCatalog)));
+
+        assertThatThrownBy(() -> runner.run(null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("iam.user -> iam");
+        verify(applicationService, never()).disable(org.mockito.ArgumentMatchers.anyString());
+        verify(applicationService, never()).insert(org.mockito.ArgumentMatchers.any());
+        verify(applicationService, never()).update(org.mockito.ArgumentMatchers.any());
+    }
+
     @PlatformStaticApplication(alias = "education", title = "教学管理")
-    static class EducationConfiguration {
+    static class EducationApplication {
     }
 }

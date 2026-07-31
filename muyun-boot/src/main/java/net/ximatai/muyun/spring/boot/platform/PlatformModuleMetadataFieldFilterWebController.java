@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ModuleMetadataFieldFilterService.MODULE_ALIAS,
-        title = "平台模块字段引用过滤")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ModuleMetadataFieldFilterService.MODULE_ALIAS,
+        title = "平台模块字段引用过滤", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters")
 public class PlatformModuleMetadataFieldFilterWebController
         extends NestedSortableCrudWebSupport<ModuleMetadataFieldFilter, ModuleMetadataFieldFilterService> {

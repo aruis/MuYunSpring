@@ -13,8 +13,8 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = TenantCurrencySettingService.MODULE_ALIAS,
-        title = "平台租户币种设置")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = TenantCurrencySettingService.MODULE_ALIAS,
+        title = "平台租户币种设置", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.tenant_currency_setting", "/platform.tenant-currency-settings"})
 public class TenantCurrencySettingWebController
         extends NestedCrudWebSupport<TenantCurrencySetting, TenantCurrencySettingService> {

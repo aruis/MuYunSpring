@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = CodeRecycleEntryService.MODULE_ALIAS, title = "编码回收")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = CodeRecycleEntryService.MODULE_ALIAS, title = "编码回收", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping({"/platform.code_recycle_entry", "/platform/code/recycle-entry"})
 public class CodeRecycleEntryWebController extends WebSupport<CodeRecycleEntryService> implements
         ReadOnlyWeb<CodeRecycleEntry, CodeRecycleEntryService> {

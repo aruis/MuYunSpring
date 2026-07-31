@@ -24,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = WorkflowVersionService.MODULE_ALIAS,
-        title = "平台工作流版本")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = WorkflowVersionService.MODULE_ALIAS,
+        title = "平台工作流版本", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions")
 public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowVersion, WorkflowVersionService> {
 

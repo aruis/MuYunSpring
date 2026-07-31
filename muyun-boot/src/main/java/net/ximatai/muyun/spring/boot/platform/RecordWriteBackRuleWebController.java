@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = RecordWriteBackRuleService.MODULE_ALIAS,
-        title = "平台回写规则")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = RecordWriteBackRuleService.MODULE_ALIAS,
+        title = "平台回写规则", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/write-back-rules")
 public class RecordWriteBackRuleWebController
         extends ModuleScopedRuleTreeWebSupport<RecordWriteBackRule, RecordWriteBackRuleService> {

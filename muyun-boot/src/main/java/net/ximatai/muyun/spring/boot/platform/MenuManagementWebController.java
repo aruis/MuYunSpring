@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MenuService.MODULE_ALIAS, title = "平台菜单")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MenuService.MODULE_ALIAS, title = "平台菜单",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.menu-scheme/{schemeId}/menus")
 public class MenuManagementWebController extends NestedEnabledTreeCrudWebSupport<Menu, MenuService> {
 

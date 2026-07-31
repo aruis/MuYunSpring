@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = ModuleMetadataFieldAffectService.MODULE_ALIAS,
-        title = "平台模块字段引用回填")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = ModuleMetadataFieldAffectService.MODULE_ALIAS,
+        title = "平台模块字段引用回填", webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects")
 public class PlatformModuleMetadataFieldAffectWebController
         extends NestedSortableCrudWebSupport<ModuleMetadataFieldAffect, ModuleMetadataFieldAffectService> {

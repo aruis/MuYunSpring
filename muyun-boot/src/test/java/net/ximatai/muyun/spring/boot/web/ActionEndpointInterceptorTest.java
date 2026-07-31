@@ -606,7 +606,7 @@ class ActionEndpointInterceptorTest {
         }
     }
 
-    @PlatformStaticModule(application = "platform", alias = "platform.workflow_admin", title = "Workflow Admin")
+    @PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = "platform.workflow_admin", title = "Workflow Admin")
     private static final class StaticModuleActionController {
         @net.ximatai.muyun.spring.common.platform.CustomActionEndpoint("workflowAdminQuery")
         public void query() {

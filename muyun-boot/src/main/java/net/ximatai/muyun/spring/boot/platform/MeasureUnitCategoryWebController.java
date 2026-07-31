@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Objects;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MeasureUnitCategoryService.MODULE_ALIAS, title = "平台计量单位分类")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.boot.platform.PlatformApplication.class, alias = MeasureUnitCategoryService.MODULE_ALIAS, title = "平台计量单位分类",
+        webScope = PlatformStaticModule.WebScope.CUSTOM)
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories")
 public class MeasureUnitCategoryWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitCategory, MeasureUnitCategoryService> {
