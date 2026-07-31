@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.iam;
 
 import net.ximatai.muyun.spring.iam.role.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.iam.role.BuiltInRolePermissionTemplateService;
@@ -6,82 +6,56 @@ import net.ximatai.muyun.spring.platform.menu.DefaultTenantMenuProvisioner;
 import net.ximatai.muyun.spring.iam.tenant.DefaultTenantApplicationProvisioner;
 import net.ximatai.muyun.spring.iam.role.DefaultOrganizationRoleProvisioner;
 import net.ximatai.muyun.spring.iam.role.DefaultTenantRoleProvisioner;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
-import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationReconciliationTask;
-import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
-import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
-import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
-import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 
-import java.util.List;
-
-@Configuration
+/**
+ * IAM 宿主装配：提供租户有效性、系统菜单访问和租户初始化所需的默认协作对象。
+ * 初始数据执行与启动任务编排由 {@code boot.bootstrap} 负责，避免身份配置越界。
+ */
+@Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(MuYunSpringInitialAdminProperties.class)
-@Import({MuYunSpringStaticDeclarationConfiguration.class, MuYunSpringIdentityWebConfiguration.class})
 public class MuYunSpringIdentityConfiguration {
     @Bean
     @Primary
     @ConditionalOnMissingBean(value = ActiveTenantVerifier.class,
             ignored = {TenantService.class, TenantActiveScopedAbility.class})
+    /** 将租户服务作为默认有效性校验入口；应用自定义校验器时自动让位。 */
     public ActiveTenantVerifier activeTenantVerifier(TenantService tenantService) {
         return tenantService;
     }
 
     @Bean
     @ConditionalOnMissingBean(SystemMenuSchemeAccessPolicy.class)
+    /** 默认拒绝租户用户回退到系统菜单方案，避免菜单越权。 */
     public SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy() {
         return SystemMenuSchemeAccessPolicy.DENY_ALL;
     }
 
     @Bean
     @ConditionalOnMissingBean(StaticModuleActionRegistry.class)
+    /** 汇集静态模块动作，为角色授权与初始角色模板提供稳定目录。 */
     public StaticModuleActionRegistry staticModuleActionRegistry() {
         return new StaticModuleActionRegistry();
     }
 
     @Bean
-    @ConditionalOnMissingBean(InitialDataExecutor.class)
-    public InitialDataExecutor initialDataExecutor(List<InitialDataAbility<?>> abilities,
-                                                   List<InitialDataDeclarationProvider> providers) {
-        return new InitialDataExecutor(abilities, providers);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(PlatformBootstrapRunner.class)
-    public PlatformBootstrapRunner platformBootstrapRunner(List<PlatformBootstrapTask> tasks) {
-        return new PlatformBootstrapRunner(tasks);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(InitialDataBootstrapTask.class)
-    public InitialDataBootstrapTask initialDataBootstrapTask(InitialDataExecutor initialDataExecutor) {
-        return new InitialDataBootstrapTask(initialDataExecutor);
-    }
-
-    @Bean
     @ConditionalOnBean({TenantService.class, TenantApplicationService.class})
     @ConditionalOnMissingBean(TenantApplicationReconciliationTask.class)
+    /** 在租户与应用均可用时注册对账任务，补齐租户应用开通状态。 */
     public TenantApplicationReconciliationTask tenantApplicationReconciliationTask(
             TenantService tenantService,
             TenantApplicationService tenantApplicationService) {
@@ -91,6 +65,7 @@ public class MuYunSpringIdentityConfiguration {
     @Bean
     @ConditionalOnBean({MenuSchemeService.class, MenuService.class})
     @ConditionalOnMissingBean(DefaultTenantMenuProvisioner.class)
+    /** 租户创建时复制默认菜单方案；具体菜单事实仍由平台菜单领域维护。 */
     public DefaultTenantMenuProvisioner defaultTenantMenuProvisioner(MenuSchemeService menuSchemeService,
                                                                     MenuService menuService) {
         return new DefaultTenantMenuProvisioner(menuSchemeService, menuService);
@@ -99,6 +74,7 @@ public class MuYunSpringIdentityConfiguration {
     @Bean
     @ConditionalOnBean(TenantApplicationService.class)
     @ConditionalOnMissingBean(DefaultTenantApplicationProvisioner.class)
+    /** 为新租户开通平台已交付的应用，不让租户流程了解静态应用细节。 */
     public DefaultTenantApplicationProvisioner defaultTenantApplicationProvisioner(
             TenantApplicationService tenantApplicationService) {
         return new DefaultTenantApplicationProvisioner(tenantApplicationService);
@@ -107,6 +83,7 @@ public class MuYunSpringIdentityConfiguration {
     @Bean
     @ConditionalOnBean({RoleService.class, BuiltInRolePermissionTemplateService.class})
     @ConditionalOnMissingBean(DefaultTenantRoleProvisioner.class)
+    /** 基于内置权限模板准备租户管理员角色。 */
     public DefaultTenantRoleProvisioner defaultTenantRoleProvisioner(
             RoleService roleService,
             BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
@@ -116,31 +93,11 @@ public class MuYunSpringIdentityConfiguration {
     @Bean
     @ConditionalOnBean({RoleService.class, BuiltInRolePermissionTemplateService.class})
     @ConditionalOnMissingBean(DefaultOrganizationRoleProvisioner.class)
+    /** 基于同一模板准备组织级角色，保持组织和租户角色语义一致。 */
     public DefaultOrganizationRoleProvisioner defaultOrganizationRoleProvisioner(
             RoleService roleService,
             BuiltInRolePermissionTemplateService rolePermissionTemplateService) {
         return new DefaultOrganizationRoleProvisioner(roleService, rolePermissionTemplateService);
     }
 
-    @Bean
-    @ConditionalOnMissingBean(PlatformMenuInitialDataDeclarationProvider.class)
-    public PlatformMenuInitialDataDeclarationProvider platformMenuInitialDataDeclarationProvider(
-            MenuService menuService,
-            ApplicationContext applicationContext) {
-        return new PlatformMenuInitialDataDeclarationProvider(menuService, applicationContext);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(PlatformDictionaryInitialDataDeclarationProvider.class)
-    public PlatformDictionaryInitialDataDeclarationProvider platformDictionaryInitialDataDeclarationProvider(
-            DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations) {
-        return new PlatformDictionaryInitialDataDeclarationProvider(dictionaryInitialDataDeclarations);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(DictionaryInitialDataDeclarations.class)
-    public DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations(DictionaryCategoryService categoryService,
-                                                                               DictionaryItemService itemService) {
-        return new DictionaryInitialDataDeclarations(categoryService, itemService);
-    }
 }

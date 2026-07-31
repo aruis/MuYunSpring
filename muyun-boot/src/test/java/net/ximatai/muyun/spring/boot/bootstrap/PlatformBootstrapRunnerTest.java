@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.bootstrap;
 
 import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import org.junit.jupiter.api.Test;

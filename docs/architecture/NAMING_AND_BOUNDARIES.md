@@ -29,6 +29,8 @@ Gradle 子项目表达稳定的构建、依赖和交付边界，而不是运行�
 
 构建任务 `verifyModuleBoundaries` 会校验生产 Project 依赖白名单（不只是禁止少数反向依赖），并禁止 `muyun-boot` 出现 `@RestController`、`@Controller`、`@Service` 或 `@Repository`。`verifyAll` 已包含该检查；新增模块依赖或在 Boot 放置业务实现时必须先通过它。
 
+`muyun-boot` 的 Java 根包只保留 `MuYunSpringApplication`。宿主装配按 `configuration.database`、`configuration.runtime`、`configuration.platform`、`configuration.iam`、`configuration.dynamic` 分域；启动任务编排位于 `bootstrap`。这些包只负责 Spring 组合，不承载领域实现或 HTTP 交付。
+
 ## Java 包根
 
 统一使用：
