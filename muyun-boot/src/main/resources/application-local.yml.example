@@ -13,5 +13,3 @@ muyun:
     mode: development
   initial-admin:
     initial-password: ${MUYUN_INITIAL_ADMIN_PASSWORD:admin123}
-  demo-bootstrap:
-    enabled: ${MUYUN_DEMO_BOOTSTRAP_ENABLED:true}

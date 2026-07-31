@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.child.ChildAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
  * {@link ReferencerAbility} 将班级、学生引用纳入统一的写入完整性校验与引用依赖缓存失效链路。
  */
 @Service
+@Profile("school-demo")
 public class ClassMemberService extends AbstractAbilityService<ClassMember> implements
         SoftDeleteAbility<ClassMember>,
         SortAbility<ClassMember>,

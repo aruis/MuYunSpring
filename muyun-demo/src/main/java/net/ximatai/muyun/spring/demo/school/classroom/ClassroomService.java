@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
  * {@link ReferenceAbility} 让班级成为可选引用目标，排序、回收站和缓存则复用平台默认能力。
  */
 @Service
+@Profile("school-demo")
 public class ClassroomService extends AbstractAbilityService<Classroom> implements
         RecycleBinAbility<Classroom>,
         SortAbility<Classroom>,

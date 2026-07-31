@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
  * {@link ReferenceAbility} 将启用的分类节点交付为学生多选引用的统一候选项。
  */
 @Service
+@Profile("school-demo")
 public class HobbyService extends AbstractAbilityService<Hobby> implements
         SoftDeleteAbility<Hobby>,
         EnableAbility<Hobby>,

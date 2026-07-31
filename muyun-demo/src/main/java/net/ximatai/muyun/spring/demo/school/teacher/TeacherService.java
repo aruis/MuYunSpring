@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
  * 启停、软删和缓存使用平台默认能力，避免为主数据重复编排生命周期。
  */
 @Service
+@Profile("school-demo")
 public class TeacherService extends AbstractAbilityService<Teacher> implements
         SoftDeleteAbility<Teacher>,
         EnableAbility<Teacher>,

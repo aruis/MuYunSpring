@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.RecycleBinAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
  * 启停、回收站和缓存均由能力组合提供，业务代码不重复实现 CRUD 流程。
  */
 @Service
+@Profile("school-demo")
 public class StudentService extends AbstractAbilityService<Student> implements
         RecycleBinAbility<Student>,
         EnableAbility<Student>,
