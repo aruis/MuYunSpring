@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.platform;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;

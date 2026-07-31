@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.iam;
 
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.web.CurrentUserWebFilter;

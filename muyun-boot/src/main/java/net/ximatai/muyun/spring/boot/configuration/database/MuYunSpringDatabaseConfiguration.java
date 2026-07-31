@@ -1,4 +1,6 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.database;
+
+import net.ximatai.muyun.spring.boot.configuration.runtime.MuYunSpringRuntimeConfiguration;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
@@ -27,17 +29,23 @@ import org.springframework.context.annotation.Import;
 import java.math.BigInteger;
 import java.sql.Types;
 
+/**
+ * 数据库适配装配：把 MuYunDatabase 的实体解析、Schema 治理及 PostgreSQL 专属实现
+ * 接入 Spring，不把这些基础设施细节泄漏到领域 Service。
+ */
 @Configuration(proxyBeanMethods = false)
 @Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
 public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnMissingBean
+    /** 提供静态模型与动态模型共用的实体元数据解析器。 */
     EntityMetaResolver entityMetaResolver() {
         return PlatformEntityManagers.entityMetaResolver();
     }
 
     @Bean
     @ConditionalOnMissingBean
+    /** 将数据库操作、实体元数据和字段转换组合为统一实体管理器。 */
     SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
                                             EntityMetaResolver entityMetaResolver,
                                             DatabaseValueConverter databaseValueConverter) {
@@ -47,6 +55,7 @@ public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnBean(IDatabaseOperations.class)
     @ConditionalOnMissingBean
+    /** 按运行模式提供静态 Schema 的默认治理策略。 */
     StaticSchemaService staticSchemaService(IDatabaseOperations<?> operations,
                                             PlatformRuntimeModeProvider runtimeModeProvider) {
         return new StaticSchemaService(operations, new StaticEntityTableMapper(),
@@ -54,6 +63,7 @@ public class MuYunSpringDatabaseConfiguration {
     }
 
     @Bean
+    /** 统一 BigInteger 写入参数，避免 PostgreSQL/JDBC 的隐式窄化。 */
     JdbiConfigurer bigIntegerJdbiConfigurer() {
         return jdbi -> jdbi.registerArgument(new AbstractArgumentFactory<BigInteger>(Types.BIGINT) {
             @Override
@@ -66,6 +76,7 @@ public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnBean(Jdbi.class)
     @ConditionalOnMissingBean(CodeSequenceAllocator.class)
+    /** 在 PostgreSQL 环境启用编码规则的序列分配器。 */
     CodeSequenceAllocator codeSequenceAllocator(Jdbi jdbi) {
         return new PostgresCodeSequenceAllocator(jdbi);
     }
@@ -73,6 +84,7 @@ public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnBean(Jdbi.class)
     @ConditionalOnMissingBean(CodeRecycleConsumer.class)
+    /** 在 PostgreSQL 环境启用编码回收池消费实现。 */
     CodeRecycleConsumer codeRecycleConsumer(Jdbi jdbi) {
         return new PostgresCodeRecycleConsumer(jdbi);
     }

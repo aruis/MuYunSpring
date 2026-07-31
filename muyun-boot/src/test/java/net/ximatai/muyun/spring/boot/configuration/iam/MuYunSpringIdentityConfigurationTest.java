@@ -1,4 +1,6 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.iam;
+
+import net.ximatai.muyun.spring.boot.bootstrap.MuYunSpringBootstrapConfiguration;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
@@ -40,12 +42,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class MuYunSpringIdentityConfigurationTest {
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+    private final ApplicationContextRunner identityContextRunner = new ApplicationContextRunner()
             .withUserConfiguration(MuYunSpringIdentityConfiguration.class, MenuInitialDataAbilityConfiguration.class);
+    private final ApplicationContextRunner bootstrapContextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(MuYunSpringBootstrapConfiguration.class,
+                    MenuInitialDataAbilityConfiguration.class);
 
     @Test
     void shouldCollectMenuServicesAsInitialDataAbilities() {
-        contextRunner.run(context -> {
+        bootstrapContextRunner.run(context -> {
             Map<String, InitialDataAbility> abilities = context.getBeansOfType(InitialDataAbility.class);
             Map<String, PlatformBootstrapTask> bootstrapTasks = context.getBeansOfType(PlatformBootstrapTask.class);
 
@@ -64,7 +69,7 @@ class MuYunSpringIdentityConfigurationTest {
 
     @Test
     void shouldUseTenantServiceAsActiveTenantVerifierWithoutExtraPrimaryAdapter() {
-        contextRunner.run(context -> {
+        identityContextRunner.run(context -> {
             Map<String, ActiveTenantVerifier> verifiers = context.getBeansOfType(ActiveTenantVerifier.class);
 
             assertThat(verifiers).containsKey("tenantService");
@@ -78,7 +83,7 @@ class MuYunSpringIdentityConfigurationTest {
         ActiveTenantVerifier customVerifier = tenantId -> {
         };
 
-        contextRunner.withBean("customActiveTenantVerifier", ActiveTenantVerifier.class, () -> customVerifier,
+        identityContextRunner.withBean("customActiveTenantVerifier", ActiveTenantVerifier.class, () -> customVerifier,
                         beanDefinition -> beanDefinition.setPrimary(true))
                 .run(context -> {
                     Map<String, ActiveTenantVerifier> verifiers = context.getBeansOfType(ActiveTenantVerifier.class);
@@ -91,7 +96,7 @@ class MuYunSpringIdentityConfigurationTest {
 
     @Test
     void shouldNotFallbackTenantUsersToSystemMenuSchemeByDefault() {
-        contextRunner.run(context -> {
+        identityContextRunner.run(context -> {
             SystemMenuSchemeAccessPolicy policy = context.getBean(SystemMenuSchemeAccessPolicy.class);
 
             assertThat(policy.canUseSystemMenuScheme(CurrentUser.tenantUser(

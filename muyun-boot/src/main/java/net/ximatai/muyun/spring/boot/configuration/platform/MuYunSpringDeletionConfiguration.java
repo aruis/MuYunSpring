@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.platform;
 
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.ability.deletion.DeletionLifecycleListener;
@@ -10,10 +10,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Installs the platform deletion journal without coupling Ability to platform persistence. */
+/**
+ * 删除链路装配：把平台删除日志和事务执行器安装到 Ability 运行时，
+ * 使领域 Service 无需感知日志持久化或 Spring 事务 API。
+ */
 @Configuration(proxyBeanMethods = false)
 public class MuYunSpringDeletionConfiguration {
     @Bean
+    /** 注入删除生命周期监听器；应用未提供时使用显式空实现。 */
     DeletionLifecycleListenerRegistration deletionLifecycleListenerRegistration(
             ObjectProvider<DeletionLifecycleListener> listenerProvider) {
         return new DeletionLifecycleListenerRegistration(
@@ -21,6 +25,7 @@ public class MuYunSpringDeletionConfiguration {
     }
 
     @Bean
+    /** 有事务管理器时让删除前后动作共享事务；无事务宿主保持可用。 */
     DeletionTransactionRegistration deletionTransactionRegistration(
             ObjectProvider<PlatformTransactionManager> transactionManager) {
         PlatformTransactionManager manager = transactionManager.getIfAvailable();

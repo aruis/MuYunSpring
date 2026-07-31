@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.runtime;
 
 import net.ximatai.muyun.spring.ability.event.ModuleExtension;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;

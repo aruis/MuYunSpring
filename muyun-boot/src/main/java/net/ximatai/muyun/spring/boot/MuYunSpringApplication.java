@@ -10,6 +10,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+/** 标准 MuYunSpring 宿主入口：扫描平台交付模块并启用基础 Repository、自动配置和调度。 */
 @SpringBootConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration
 @ComponentScan(
@@ -26,6 +27,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 @EnableScheduling
 public class MuYunSpringApplication {
+    /** 启动不含演示业务依赖的标准平台宿主。 */
     public static void main(String[] args) {
         SpringApplication.run(MuYunSpringApplication.class, args);
     }

@@ -1,5 +1,6 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.dynamic;
 
+import net.ximatai.muyun.spring.boot.configuration.platform.MuYunSpringReferenceConfiguration;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;

@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.boot;
+package net.ximatai.muyun.spring.boot.configuration.runtime;
 
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeMode;
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
