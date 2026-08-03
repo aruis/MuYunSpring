@@ -60,7 +60,7 @@ MuYunSpring 应保持“能力层平台化、静态链路优雅、动态链路�
 
 1. SQL 投影只返回 `RecordReadProjection.outputFields + id + 必需内部字段`，不默认投影主表全部字段。
 2. 字段输出保护必须经过 SQL Map 输出后处理器；输出脱敏字段可走 SQL 投影，加密和签名等存储保护字段继续回退实体查询。
-3. `postReadTransforms` 只允许已被 SQL 输出路径支持的转换；当前支持 `fieldProtection` 和 `optionTitle`，不认识的转换继续回退实体查询。
+3. `postReadTransforms` 只允许已被 SQL 输出路径支持的转换；当前支持 `fieldProtection` 和 `optionLoad`，不认识的转换继续回退实体查询。
 4. 关联定义通过 `cardinality` 约束列表 SQL join 默认只允许 `ONE_TO_ONE` 和 `MANY_TO_ONE`。
 5. relation 字段默认只可展示；是否可过滤、可排序必须由投影定义或查询字段契约显式声明。
 6. 为用户到职员的 `bound_employee` 补真实链路测试，覆盖租户过滤、软删中间表、软删职员、未绑定账号、分页和条件查询。

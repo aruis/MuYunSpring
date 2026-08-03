@@ -15,18 +15,24 @@ public final class OptionFieldResolver {
     }
 
     public static List<OptionFieldDefinition> resolve(Class<?> modelClass) {
+        List<OptionFieldDefinition> definitions = new ArrayList<>();
+        for (Field field : fields(modelClass)) {
+            resolve(field).ifPresent(definitions::add);
+        }
+        return List.copyOf(definitions);
+    }
+
+    static List<Field> fields(Class<?> modelClass) {
         if (modelClass == null) {
             return List.of();
         }
-        List<OptionFieldDefinition> definitions = new ArrayList<>();
+        List<Field> fields = new ArrayList<>();
         Class<?> current = modelClass;
         while (current != null && current != Object.class) {
-            for (Field field : current.getDeclaredFields()) {
-                resolve(field).ifPresent(definitions::add);
-            }
+            java.util.Collections.addAll(fields, current.getDeclaredFields());
             current = current.getSuperclass();
         }
-        return List.copyOf(definitions);
+        return List.copyOf(fields);
     }
 
     public static Optional<OptionFieldDefinition> resolve(Field field) {
@@ -34,26 +40,29 @@ public final class OptionFieldResolver {
             return Optional.empty();
         }
         OptionField annotation = field.getAnnotation(OptionField.class);
+        DictionaryField dictionaryField = field.getAnnotation(DictionaryField.class);
+        if (annotation != null && dictionaryField != null) {
+            throw new IllegalArgumentException("field cannot declare both OptionField and DictionaryField: "
+                    + qualifiedFieldName(field));
+        }
+        if (dictionaryField != null) {
+            return DictionaryFieldResolver.resolve(field).map(DictionaryFieldDefinition::optionDefinition);
+        }
         if (annotation == null) {
             return Optional.empty();
         }
-        validateSelectionMode(field, annotation);
         OptionBinding binding = resolveBinding(field, annotation);
-        return Optional.of(new OptionFieldDefinition(
-                field.getName(),
-                binding,
-                annotation.selectionMode(),
-                annotation.titleOutput(),
-                resolveTitleOutputField(field.getDeclaringClass(), field.getName(), annotation)));
+        return Optional.of(definition(field, binding, annotation.selectionMode()));
+    }
+
+    static OptionFieldDefinition definition(Field field,
+                                             OptionBinding binding,
+                                             OptionSelectionMode selectionMode) {
+        validateSelectionMode(field, selectionMode);
+        return new OptionFieldDefinition(field.getName(), binding, selectionMode);
     }
 
     private static OptionBinding resolveBinding(Field field, OptionField annotation) {
-        if (annotation.type() == OptionSourceType.DICTIONARY) {
-            rejectEnumType(annotation);
-            OptionBinding binding = new OptionBinding(OptionBinding.DICTIONARY_SOURCE, annotation.source());
-            binding.dictionarySource();
-            return binding;
-        }
         if (annotation.type() == OptionSourceType.ENUM) {
             rejectEnumSource(annotation);
             return enumBinding(resolveEnumType(field, annotation));
@@ -61,21 +70,15 @@ public final class OptionFieldResolver {
         throw new IllegalArgumentException("unsupported option source type: " + annotation.type());
     }
 
-    private static void validateSelectionMode(Field field, OptionField annotation) {
+    private static void validateSelectionMode(Field field, OptionSelectionMode selectionMode) {
         boolean multipleValueType = isMultipleValueType(field);
-        if (multipleValueType && annotation.selectionMode() != OptionSelectionMode.MULTIPLE) {
+        if (multipleValueType && selectionMode != OptionSelectionMode.MULTIPLE) {
             throw new IllegalArgumentException("multiple option field requires MULTIPLE selection mode: "
                     + qualifiedFieldName(field));
         }
-        if (!multipleValueType && annotation.selectionMode() == OptionSelectionMode.MULTIPLE) {
+        if (!multipleValueType && selectionMode == OptionSelectionMode.MULTIPLE) {
             throw new IllegalArgumentException("MULTIPLE selection mode requires collection or array field: "
                     + qualifiedFieldName(field));
-        }
-    }
-
-    private static void rejectEnumType(OptionField annotation) {
-        if (annotation.enumType() != CodeTitleEnum.class) {
-            throw new IllegalArgumentException("dictionary option field must not declare enumType");
         }
     }
 
@@ -149,32 +152,4 @@ public final class OptionFieldResolver {
         return field.getDeclaringClass().getName() + "." + field.getName();
     }
 
-    private static String resolveTitleOutputField(Class<?> declaringClass, String fieldName, OptionField annotation) {
-        if (annotation.titleOutput() == OptionTitleOutput.NONE) {
-            return "";
-        }
-        String outputField = annotation.titleOutput() == OptionTitleOutput.CUSTOM
-                ? annotation.titleOutputField()
-                : autoTitleOutputField(fieldName);
-        requireField(declaringClass, outputField, "option title output field");
-        return outputField;
-    }
-
-    private static String autoTitleOutputField(String fieldName) {
-        return fieldName + "Title";
-    }
-
-    private static void requireField(Class<?> declaringClass, String fieldName, String label) {
-        Class<?> current = declaringClass;
-        while (current != null && current != Object.class) {
-            try {
-                current.getDeclaredField(fieldName);
-                return;
-            } catch (NoSuchFieldException ignored) {
-                current = current.getSuperclass();
-            }
-        }
-        throw new IllegalArgumentException(label + " does not exist: "
-                + declaringClass.getName() + "." + fieldName);
-    }
 }

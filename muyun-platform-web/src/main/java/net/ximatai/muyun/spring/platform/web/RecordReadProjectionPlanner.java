@@ -5,8 +5,7 @@ import net.ximatai.muyun.spring.ability.FieldReadPolicy;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
-import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
@@ -222,11 +221,11 @@ public final class RecordReadProjectionPlanner {
         }
         Class<?> modelClass = modelClass(recordService);
         if (modelClass != null) {
-            OptionFieldResolver.resolve(modelClass).stream()
-                    .filter(OptionFieldDefinition::hasTitleOutput)
-                    .map(OptionFieldDefinition::fieldName)
-                    .filter(outputFieldNames::contains)
-                    .map(RecordReadPostTransform::optionTitle)
+            OptionLoadResolver.resolve(modelClass).stream()
+                    .filter(definition -> outputFieldNames.contains(definition.outputField())
+                            || (definition.optionItemField().equals("title")
+                            && outputFieldNames.contains(definition.sourceField())))
+                    .map(definition -> RecordReadPostTransform.optionLoad(definition.outputField()))
                     .map(RecordReadPostTransform::serialize)
                     .forEach(transforms::add);
         }

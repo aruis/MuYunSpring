@@ -28,8 +28,34 @@ public record FieldDefinition(
         FieldMeasureUnitDefinition measureUnit,
         FieldMoneyDefinition money,
         FieldStorageForm storageForm,
-        FieldValueShape valueShape
+        FieldValueShape valueShape,
+        FieldOptionLoadDefinition optionLoad
 ) {
+    public FieldDefinition(String fieldName,
+                           String columnName,
+                           FieldType type,
+                           String name,
+                           boolean isRequired,
+                           boolean isUnique,
+                           boolean isIndexed,
+                           boolean isSortable,
+                           boolean isTitle,
+                           Integer length,
+                           Integer precision,
+                           Integer scale,
+                           FieldDictionaryBinding dictionaryBinding,
+                           FieldQueryDefinition queryDefinition,
+                           String defaultUiTypeAlias,
+                           FieldBehaviorDefinition behavior,
+                           FieldProtectionDefinition protection,
+                           FieldMeasureUnitDefinition measureUnit,
+                           FieldMoneyDefinition money,
+                           FieldStorageForm storageForm,
+                           FieldValueShape valueShape) {
+        this(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
+                measureUnit, money, storageForm, valueShape, null);
+    }
     public FieldDefinition(String fieldName, String columnName, FieldType type, String name) {
         this(fieldName, columnName, type, name, false, false, false, false, false,
                 null, null, null, null, null, null, null, null, null, null);
@@ -331,5 +357,18 @@ public record FieldDefinition(
 
     public FieldDefinition jsonSet() {
         return valueShape(FieldValueShape.JSON_SET);
+    }
+
+    /**
+     * Loads a stable OptionItem property from a dictionary-bound source field into this virtual field.
+     */
+    public FieldDefinition optionLoad(String sourceField) {
+        return optionLoad(sourceField, "title");
+    }
+
+    public FieldDefinition optionLoad(String sourceField, String optionItemField) {
+        return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
+                measureUnit, money, storageForm, valueShape, new FieldOptionLoadDefinition(sourceField, optionItemField));
     }
 }

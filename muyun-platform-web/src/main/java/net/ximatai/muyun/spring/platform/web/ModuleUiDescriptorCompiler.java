@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
@@ -158,9 +159,18 @@ public final class ModuleUiDescriptorCompiler {
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(
                         OptionFieldDefinition::fieldName,
                         definition -> new ResolvedOptionFieldDescriptor(definition.binding(), definition.selectionMode(),
-                                definition.hasTitleOutput() ? definition.titleOutputField() : null),
+                                optionTitleField(modelClass, definition.fieldName())),
                         (left, right) -> left
                 ));
+    }
+
+    private static String optionTitleField(Class<?> modelClass, String sourceField) {
+        return OptionLoadResolver.resolve(modelClass).stream()
+                .filter(definition -> definition.sourceField().equals(sourceField))
+                .filter(definition -> definition.optionItemField().equals("title"))
+                .map(definition -> definition.outputField())
+                .findFirst()
+                .orElse(null);
     }
 
     private static String staticRecordLabelField(StaticModuleDefinition definition) {
@@ -347,6 +357,7 @@ public final class ModuleUiDescriptorCompiler {
                 .map(StaticModuleReadProjectionDefinition::outputField)
                 .forEach(field -> fields.put(field, Boolean.TRUE));
         referenceOutputFields(definition).forEach(field -> fields.put(field, Boolean.TRUE));
+        OptionLoadResolver.resolve(definition.modelClass()).forEach(load -> fields.put(load.outputField(), Boolean.TRUE));
         return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
     }
 

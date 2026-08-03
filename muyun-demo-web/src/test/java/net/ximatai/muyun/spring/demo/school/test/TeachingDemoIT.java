@@ -171,7 +171,7 @@ public class TeachingDemoIT {
             String teacherId = teachers.insert(teacher("T-" + serial(), "数学老师", "mathematics"));
             Teacher output = recordOutput.record(teachers, teachers.select(teacherId), FieldOutputContext.VIEW);
             assertThat(output.getSubjectCode()).isEqualTo("mathematics");
-            assertThat(output.getSubjectCodeTitle()).isEqualTo("数学");
+            assertThat(output.getSubjectTitle()).isEqualTo("数学");
 
             assertThatThrownBy(() -> teachers.insert(teacher("T-" + serial(), "无效学科", "physics")))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -236,12 +236,12 @@ public class TeachingDemoIT {
             classroom.setMembers(null);
             Classroom selected = classrooms.select(classroomId);
 
-            assertThat(selected.getHomeroomTeacherIdTitle()).isEqualTo("王老师");
+            assertThat(selected.getHomeroomTeacherTitle()).isEqualTo("王老师");
             assertThat(selected.getMembers()).singleElement().satisfies(loaded -> {
                 assertThat(loaded.getClassroomId()).isEqualTo(classroomId);
                 assertThat(loaded.getSortOrder()).isEqualTo(100);
             });
-            assertThat(members.select(member.getId()).getStudentIdTitle()).isEqualTo("陈同学");
+            assertThat(members.select(member.getId()).getStudentTitle()).isEqualTo("陈同学");
             assertThat(members.select(member.getId()).getHomeroomTeacherAssistantTitle()).isEqualTo("李同学");
             assertThat(students.select(studentId).getClassMemberships())
                     .extracting(ClassMember::getId)

@@ -42,6 +42,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final FieldSigner fieldSigner;
     private final PlatformTimeService timeService;
     private final DatabaseValueConverter valueConverter;
+    private final DynamicOptionLoadPopulator optionLoadPopulator;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(builder(operations));
@@ -62,6 +63,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         this.fieldSigner = Objects.requireNonNull(builder.fieldSigner, "fieldSigner must not be null");
         this.timeService = Objects.requireNonNull(builder.timeService, "timeService must not be null");
         this.valueConverter = Objects.requireNonNull(builder.valueConverter, "valueConverter must not be null");
+        this.optionLoadPopulator = Objects.requireNonNull(builder.optionLoadPopulator, "optionLoadPopulator must not be null");
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
         rebuildInboundReferenceIndex();
     }
@@ -81,6 +83,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         private FieldSigner fieldSigner = FieldSigner.UNAVAILABLE;
         private PlatformTimeService timeService = new PlatformTimeService();
         private DatabaseValueConverter valueConverter = DatabaseValueConverter.DEFAULT;
+        private DynamicOptionLoadPopulator optionLoadPopulator = DynamicOptionLoadPopulator.NONE;
 
         private Builder(IDatabaseOperations<?> operations) {
             this.operations = Objects.requireNonNull(operations, "operations must not be null");
@@ -131,6 +134,11 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
         public Builder valueConverter(DatabaseValueConverter valueConverter) {
             this.valueConverter = valueConverter == null ? DatabaseValueConverter.DEFAULT : valueConverter;
+            return this;
+        }
+
+        public Builder optionLoadPopulator(DynamicOptionLoadPopulator optionLoadPopulator) {
+            this.optionLoadPopulator = optionLoadPopulator == null ? DynamicOptionLoadPopulator.NONE : optionLoadPopulator;
             return this;
         }
 
@@ -215,7 +223,8 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 fieldValueValidator,
                 fieldCryptoProvider,
                 fieldSigner,
-                timeService
+                timeService,
+                optionLoadPopulator
         );
     }
 

@@ -37,7 +37,7 @@ public class Classroom extends StandardSortableEntity {
 
     /** 直接投影班主任姓名，避免业务代码手工填充展示字段。 */
     @ReferenceLoad(source = "homeroomTeacherId", field = "title")
-    private transient String homeroomTeacherIdTitle;
+    private transient String homeroomTeacherTitle;
 
     /** 班级是成员聚合根；保存班级时平台自动维护成员的 {@code classroomId}。 */
     @Children

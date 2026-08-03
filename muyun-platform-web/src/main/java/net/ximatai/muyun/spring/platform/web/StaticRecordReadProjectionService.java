@@ -21,7 +21,7 @@ import net.ximatai.muyun.spring.ability.reference.ModuleReadProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.web.WebPageResponse;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
@@ -345,16 +345,15 @@ public class StaticRecordReadProjectionService {
                 .map(ViewFieldRef::fieldName)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (modelClass != null) {
-            Set<String> optionTitleSources = projection.postReadTransforms().stream()
+            Set<String> optionLoadFields = projection.postReadTransforms().stream()
                     .map(RecordReadPostTransform::parse)
                     .flatMap(Optional::stream)
-                    .filter(RecordReadPostTransform::isOptionTitle)
+                    .filter(RecordReadPostTransform::isOptionLoad)
                     .map(RecordReadPostTransform::fieldName)
                     .collect(java.util.stream.Collectors.toSet());
-            OptionFieldResolver.resolve(modelClass).stream()
-                    .filter(definition -> optionTitleSources.contains(definition.fieldName()))
-                    .filter(definition -> definition.hasTitleOutput())
-                    .map(definition -> definition.titleOutputField())
+            OptionLoadResolver.resolve(modelClass).stream()
+                    .filter(definition -> optionLoadFields.contains(definition.outputField()))
+                    .map(definition -> definition.outputField())
                     .forEach(fields::add);
         }
         return List.copyOf(fields);
@@ -380,6 +379,12 @@ public class StaticRecordReadProjectionService {
                 : StaticReferenceResolver.loadPaths(modelClass)) {
             if (output.contains(path.outputField()) && !output.contains(path.sourceField())) {
                 internal.add(path.sourceField());
+            }
+        }
+        for (net.ximatai.muyun.spring.common.option.OptionLoadDefinition load
+                : OptionLoadResolver.resolve(modelClass)) {
+            if (output.contains(load.outputField()) && !output.contains(load.sourceField())) {
+                internal.add(load.sourceField());
             }
         }
         List<String> normalizedInternal = internal.stream().distinct().toList();

@@ -46,7 +46,7 @@ public class ClassMember extends StandardEntity implements SortCapable {
 
     /** 从学生引用直接读取标题，作为单跳 {@code @ReferenceLoad} 的最小示例。 */
     @ReferenceLoad(source = "studentId", field = "title")
-    private transient String studentIdTitle;
+    private transient String studentTitle;
 
     /**
      * 班主任可跨班复用同一位学生助理：成员从班级取班主任，再从教师取学生助理，

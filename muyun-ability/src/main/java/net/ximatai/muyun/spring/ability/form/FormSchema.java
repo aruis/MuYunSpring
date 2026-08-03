@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability.form;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 
 import java.util.List;
@@ -29,21 +30,25 @@ public record FormSchema(String scopeName,
             throw new IllegalArgumentException("form descriptor must not be null");
         }
         Map<String, OptionFieldDefinition> optionFields = optionFields(modelClass);
+        Map<String, String> optionTitleFields = optionTitleFields(modelClass);
         return new FormSchema(
                 descriptor.scopeName(),
                 descriptor.title(),
                 descriptor.fields().stream()
-                        .map(field -> Field.from(mergeOptionField(field, optionFields)))
+                        .map(field -> Field.from(mergeOptionField(field, optionFields, optionTitleFields)))
                         .toList()
         );
     }
 
-    private static FormField mergeOptionField(FormField field, Map<String, OptionFieldDefinition> optionFields) {
+    private static FormField mergeOptionField(FormField field,
+                                              Map<String, OptionFieldDefinition> optionFields,
+                                              Map<String, String> optionTitleFields) {
         if (field.optionBinding() != null || optionFields.isEmpty()) {
             return field;
         }
         OptionFieldDefinition definition = optionFields.get(field.fieldName());
-        return definition == null ? field : field.withOptionField(definition);
+        return definition == null ? field : field.withOptionField(definition)
+                .withOptionTitleField(optionTitleFields.get(field.fieldName()));
     }
 
     private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {
@@ -56,6 +61,14 @@ public record FormSchema(String scopeName,
                         Function.identity(),
                         (first, ignored) -> first
                 ));
+    }
+
+    private static Map<String, String> optionTitleFields(Class<?> modelClass) {
+        if (modelClass == null) return Map.of();
+        return OptionLoadResolver.resolve(modelClass).stream()
+                .filter(definition -> "title".equals(definition.optionItemField()))
+                .collect(Collectors.toMap(definition -> definition.sourceField(), definition -> definition.outputField(),
+                        (first, ignored) -> first));
     }
 
     public record Field(String name,

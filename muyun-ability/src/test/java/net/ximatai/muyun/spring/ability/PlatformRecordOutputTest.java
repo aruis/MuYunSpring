@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.output.DefaultPlatformRecordOutput;
-import net.ximatai.muyun.spring.ability.output.OptionTitleRecordOutputTransformer;
+import net.ximatai.muyun.spring.ability.output.OptionLoadRecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.RecordOutputContext;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,7 +18,7 @@ class PlatformRecordOutputTest {
     @Test
     void shouldPopulateStaticOptionTitlesWithoutServiceSpecificOutputAbility() {
         PlatformRecordOutput output = new DefaultPlatformRecordOutput(List.of(
-                new OptionTitleRecordOutputTransformer((modelClass, entity) -> {
+                new OptionLoadRecordOutputTransformer((modelClass, entity) -> {
                     OptionRecord record = (OptionRecord) entity;
                     if ("1".equals(record.getKind())) {
                         record.setKindTitle("标准");
@@ -38,7 +38,7 @@ class PlatformRecordOutputTest {
     @Test
     void shouldApplyRecordTransformersInOrderForLists() {
         PlatformRecordOutput output = new DefaultPlatformRecordOutput(List.of(
-                new OptionTitleRecordOutputTransformer((modelClass, entity) ->
+                new OptionLoadRecordOutputTransformer((modelClass, entity) ->
                         ((OptionRecord) entity).setKindTitle("标准")),
                 new RecordOutputTransformer() {
                     @Override
@@ -70,9 +70,10 @@ class PlatformRecordOutputTest {
     }
 
     private static final class OptionRecord extends StandardEntity {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "demo.kind")
+        @DictionaryField(source = "demo.kind")
         private String kind;
 
+        @OptionLoad(source = "kind")
         private String kindTitle;
 
         public String getKind() {

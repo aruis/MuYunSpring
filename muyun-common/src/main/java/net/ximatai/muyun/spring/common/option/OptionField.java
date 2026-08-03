@@ -17,8 +17,4 @@ public @interface OptionField {
     Class<? extends CodeTitleEnum> enumType() default CodeTitleEnum.class;
 
     OptionSelectionMode selectionMode() default OptionSelectionMode.SINGLE;
-
-    OptionTitleOutput titleOutput() default OptionTitleOutput.AUTO;
-
-    String titleOutputField() default "";
 }

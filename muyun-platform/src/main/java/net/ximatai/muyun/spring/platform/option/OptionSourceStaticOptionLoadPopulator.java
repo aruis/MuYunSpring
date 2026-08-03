@@ -1,10 +1,10 @@
 package net.ximatai.muyun.spring.platform.option;
 
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
-import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionItem;
+import net.ximatai.muyun.spring.common.option.OptionLoadDefinition;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
@@ -12,16 +12,17 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
-public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldTitlePopulator {
+public class OptionSourceStaticOptionLoadPopulator implements StaticOptionLoadPopulator {
     private final OptionSourceRegistry optionSourceRegistry;
 
-    public OptionSourceStaticFieldTitlePopulator(OptionSourceRegistry optionSourceRegistry) {
+    public OptionSourceStaticOptionLoadPopulator(OptionSourceRegistry optionSourceRegistry) {
         this.optionSourceRegistry = optionSourceRegistry;
     }
 
@@ -38,57 +39,64 @@ public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldT
         if (modelClass == null || entities == null || entities.isEmpty()) {
             return;
         }
-        for (OptionFieldDefinition definition : titleOutputDefinitions(modelClass)) {
-            Map<String, String> titles = optionTitles(definition);
+        for (OptionLoadDefinition definition : OptionLoadResolver.resolve(modelClass)) {
+            Map<String, OptionItem> options = optionItems(definition);
             for (Object entity : entities) {
-                populateTitle(modelClass, entity, definition, titles);
+                populate(modelClass, entity, definition, options);
             }
         }
     }
 
-    private List<OptionFieldDefinition> titleOutputDefinitions(Class<?> modelClass) {
-        return OptionFieldResolver.resolve(modelClass).stream()
-                .filter(OptionFieldDefinition::hasTitleOutput)
-                .toList();
+    private Map<String, OptionItem> optionItems(OptionLoadDefinition definition) {
+        return optionSourceRegistry.source(definition.sourceDefinition().binding()).options(OptionQuery.all()).stream()
+                .collect(Collectors.toMap(OptionItem::code, item -> item, (left, right) -> left));
     }
 
-    private Map<String, String> optionTitles(OptionFieldDefinition definition) {
-        return optionSourceRegistry.source(definition.binding()).options(OptionQuery.all()).stream()
-                .collect(Collectors.toMap(OptionItem::code, OptionItem::title, (left, right) -> left));
-    }
-
-    private void populateTitle(Class<?> modelClass,
-                               Object entity,
-                               OptionFieldDefinition definition,
-                               Map<String, String> titles) {
+    private void populate(Class<?> modelClass,
+                          Object entity,
+                          OptionLoadDefinition definition,
+                          Map<String, OptionItem> options) {
         if (entity == null) {
             return;
         }
-        Object value = readField(modelClass, entity, definition.fieldName());
-        Object titleValue = definition.selectionMode() == OptionSelectionMode.MULTIPLE
-                ? multipleTitles(value, titles)
-                : singleTitle(value, titles);
-        writeField(modelClass, entity, definition.titleOutputField(), titleValue);
+        Object sourceValue = readField(modelClass, entity, definition.sourceField());
+        Object loaded = definition.sourceDefinition().selectionMode() == OptionSelectionMode.MULTIPLE
+                ? multipleValues(sourceValue, definition.optionItemField(), options)
+                : singleValue(sourceValue, definition.optionItemField(), options);
+        writeField(modelClass, entity, definition.outputField(), loaded);
     }
 
-    private String singleTitle(Object value, Map<String, String> titles) {
+    private Object singleValue(Object value, String itemField, Map<String, OptionItem> options) {
         String code = code(value);
-        return code == null ? null : titles.get(code);
+        OptionItem item = code == null ? null : options.get(code);
+        return item == null ? null : optionItemValue(item, itemField);
     }
 
-    private List<String> multipleTitles(Object value, Map<String, String> titles) {
+    private List<Object> multipleValues(Object value, String itemField, Map<String, OptionItem> options) {
         if (value == null) {
             return null;
         }
-        List<String> resolved = new ArrayList<>();
+        List<Object> resolved = new ArrayList<>();
         for (Object item : toValues(value)) {
-            String code = code(item);
-            String title = code == null ? null : titles.get(code);
-            if (title != null) {
-                resolved.add(title);
+            Object loaded = singleValue(item, itemField, options);
+            if (loaded != null) {
+                resolved.add(loaded);
             }
         }
         return resolved;
+    }
+
+    private Object optionItemValue(OptionItem item, String fieldName) {
+        for (RecordComponent component : OptionItem.class.getRecordComponents()) {
+            if (component.getName().equals(fieldName)) {
+                try {
+                    return component.getAccessor().invoke(item);
+                } catch (ReflectiveOperationException ex) {
+                    throw new IllegalStateException("cannot read option item field: " + fieldName, ex);
+                }
+            }
+        }
+        throw new IllegalArgumentException("unknown option item field: " + fieldName);
     }
 
     private String code(Object value) {
@@ -134,7 +142,7 @@ public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldT
             field.setAccessible(true);
             field.set(entity, value);
         } catch (IllegalAccessException ex) {
-            throw new IllegalStateException("cannot write option title field: " + fieldName, ex);
+            throw new IllegalStateException("cannot write option load field: " + fieldName, ex);
         }
     }
 

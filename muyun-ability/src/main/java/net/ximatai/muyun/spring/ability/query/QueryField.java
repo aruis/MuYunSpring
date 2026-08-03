@@ -83,8 +83,12 @@ public record QueryField(String fieldName,
             throw new IllegalArgumentException("option field definition must not be null");
         }
         return new QueryField(fieldName, title, valueType, operators, defaultOperator, sortable, quickSearch,
-                definition.binding(), definition.selectionMode(),
-                definition.hasTitleOutput() ? definition.titleOutputField() : null);
+                definition.binding(), definition.selectionMode(), null);
+    }
+
+    public QueryField withOptionTitleField(String optionTitleField) {
+        return new QueryField(fieldName, title, valueType, operators, defaultOperator, sortable, quickSearch,
+                optionBinding, selectionMode, optionTitleField);
     }
 
     private static QueryOperator fallbackDefaultOperator(QueryValueType valueType, Set<QueryOperator> operators) {

@@ -2,8 +2,9 @@ package net.ximatai.muyun.spring.ability.option;
 
 import java.util.List;
 
-public interface StaticOptionFieldTitlePopulator {
-    StaticOptionFieldTitlePopulator NONE = (modelClass, entity) -> {
+/** Populates static {@code @OptionLoad} projections after a record is read. */
+public interface StaticOptionLoadPopulator {
+    StaticOptionLoadPopulator NONE = (modelClass, entity) -> {
     };
 
     void populate(Class<?> modelClass, Object entity);

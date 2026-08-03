@@ -83,6 +83,7 @@ public class DynamicEntityService implements
     private final FieldSigner fieldSigner;
     private final FieldProtectionPlan<DynamicRecord> fieldProtectionPlan;
     private final PlatformTimeService timeService;
+    private final DynamicOptionLoadPopulator optionLoadPopulator;
 
     DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE, null, unsupportedRelationResolver(),
@@ -120,6 +121,22 @@ public class DynamicEntityService implements
                                 FieldCryptoProvider fieldCryptoProvider,
                                 FieldSigner fieldSigner,
                                 PlatformTimeService timeService) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, referenceServiceResolver, cacheNamespacePrefix,
+                fieldValueValidator, fieldCryptoProvider, fieldSigner, timeService, DynamicOptionLoadPopulator.NONE);
+    }
+
+    DynamicEntityService(DynamicRecordDao dao,
+                         String moduleAlias,
+                         DynamicRecordLifecycle lifecycle,
+                         ModuleDefinition module,
+                         Function<String, DynamicEntityService> relationServiceResolver,
+                         Function<ReferenceTarget, DynamicEntityService> referenceServiceResolver,
+                         String cacheNamespacePrefix,
+                         DynamicFieldValueValidator fieldValueValidator,
+                         FieldCryptoProvider fieldCryptoProvider,
+                         FieldSigner fieldSigner,
+                         PlatformTimeService timeService,
+                         DynamicOptionLoadPopulator optionLoadPopulator) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
@@ -132,6 +149,7 @@ public class DynamicEntityService implements
         this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
         this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
         this.timeService = timeService == null ? new PlatformTimeService() : timeService;
+        this.optionLoadPopulator = optionLoadPopulator == null ? DynamicOptionLoadPopulator.NONE : optionLoadPopulator;
         this.fieldProtectionPlan = new FieldProtectionPlan<DynamicRecord>(dao.getEntity().fields().stream()
                 .filter(field -> field.protection().enabled())
                 .map(field -> (ProtectedFieldAccessor<DynamicRecord>) new DynamicProtectedFieldAccessor(field))
@@ -653,6 +671,7 @@ public class DynamicEntityService implements
     private void applyReadPipeline(DynamicRecord record) {
         restoreProtectedFieldsFromStorage(record);
         populateReferenceReadFields(record == null ? List.of() : List.of(record));
+        optionLoadPopulator.populate(dao.getEntity(), record == null ? List.of() : List.of(record));
         refreshReferenceDependencies(record);
     }
 
@@ -662,6 +681,7 @@ public class DynamicEntityService implements
         }
         records.forEach(this::restoreProtectedFieldsFromStorage);
         populateReferenceReadFields(records);
+        optionLoadPopulator.populate(dao.getEntity(), records);
         records.forEach(this::refreshReferenceDependencies);
     }
 

@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.ability.form;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,9 +65,10 @@ class FormSchemaTest {
     }
 
     private static class EmployeeOptionRecord {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        @DictionaryField(source = "iam.gender")
         private String gender;
 
+        @OptionLoad(source = "gender")
         private String genderTitle;
     }
 }

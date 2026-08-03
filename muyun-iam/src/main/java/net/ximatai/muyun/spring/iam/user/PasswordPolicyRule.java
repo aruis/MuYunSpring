@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
 @Getter
@@ -26,7 +27,8 @@ public class PasswordPolicyRule extends StandardEnabledSortableEntity {
             comment = "Policy scope type", defaultVal = @Default(varchar = "global"))
     private PasswordPolicyScopeType scopeType = PasswordPolicyScopeType.GLOBAL;
 
-    private String scopeTypeTitle;
+    @OptionLoad(source = "scopeType")
+    private transient String scopeTypeTitle;
 
     @Column(name = "scope_id", type = ColumnType.VARCHAR, length = 64, comment = "Policy scope id")
     private String scopeId;

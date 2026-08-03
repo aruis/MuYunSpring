@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.SortDirection;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 
 import java.util.Arrays;
@@ -32,13 +33,14 @@ public record QuerySchema(String scopeName,
 
     public static QuerySchema from(QueryDescriptor descriptor, Class<?> modelClass) {
         Map<String, OptionFieldDefinition> optionFields = optionFields(modelClass);
+        Map<String, String> optionTitleFields = optionTitleFields(modelClass);
         List<Field> fields = descriptor.fields().stream()
-                .map(field -> Field.from(mergeOptionField(field, optionFields)))
+                .map(field -> Field.from(mergeOptionField(field, optionFields, optionTitleFields)))
                 .toList();
         return new QuerySchema(
                 descriptor.scopeName(),
                 null,
-                QuickSearch.from(descriptor, optionFields),
+                QuickSearch.from(descriptor, optionFields, optionTitleFields),
                 fields,
                 descriptor.externalCriteriaKeys().stream()
                         .map(ExternalCriteria::pageContextObject)
@@ -49,12 +51,15 @@ public record QuerySchema(String scopeName,
         );
     }
 
-    private static QueryField mergeOptionField(QueryField field, Map<String, OptionFieldDefinition> optionFields) {
+    private static QueryField mergeOptionField(QueryField field,
+                                               Map<String, OptionFieldDefinition> optionFields,
+                                               Map<String, String> optionTitleFields) {
         if (field.optionBinding() != null || optionFields.isEmpty()) {
             return field;
         }
         OptionFieldDefinition definition = optionFields.get(field.fieldName());
-        return definition == null ? field : field.withOptionField(definition);
+        return definition == null ? field : field.withOptionField(definition)
+                .withOptionTitleField(optionTitleFields.get(field.fieldName()));
     }
 
     private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {
@@ -69,6 +74,14 @@ public record QuerySchema(String scopeName,
                 ));
     }
 
+    private static Map<String, String> optionTitleFields(Class<?> modelClass) {
+        if (modelClass == null) return Map.of();
+        return OptionLoadResolver.resolve(modelClass).stream()
+                .filter(definition -> "title".equals(definition.optionItemField()))
+                .collect(Collectors.toUnmodifiableMap(definition -> definition.sourceField(),
+                        definition -> definition.outputField(), (first, ignored) -> first));
+    }
+
     public record QuickSearch(boolean enabled,
                               List<String> fields,
                               List<Field> fieldSchemas) {
@@ -78,12 +91,14 @@ public record QuerySchema(String scopeName,
         }
 
         static QuickSearch from(QueryDescriptor descriptor) {
-            return from(descriptor, Map.of());
+            return from(descriptor, Map.of(), Map.of());
         }
 
-        static QuickSearch from(QueryDescriptor descriptor, Map<String, OptionFieldDefinition> optionFields) {
+        static QuickSearch from(QueryDescriptor descriptor,
+                                Map<String, OptionFieldDefinition> optionFields,
+                                Map<String, String> optionTitleFields) {
             List<Field> fieldSchemas = descriptor.quickSearchFields().stream()
-                    .map(field -> Field.from(mergeOptionField(field, optionFields)))
+                    .map(field -> Field.from(mergeOptionField(field, optionFields, optionTitleFields)))
                     .toList();
             List<String> fields = fieldSchemas.stream().map(Field::name).toList();
             return new QuickSearch(!fields.isEmpty(), fields, fieldSchemas);

@@ -127,6 +127,7 @@ public class ModuleDefinitionValidator {
         for (FieldDefinition field : fields) {
             validateMeasureUnit(entity, field, fields);
             validateMoney(entity, field, fields);
+            validateOptionLoad(entity, field);
         }
         validateTenantUniqueConstraints(entity, fields);
         validateSortPartition(entity, fields);
@@ -409,6 +410,41 @@ public class ModuleDefinitionValidator {
         if (field.valueShape() != FieldValueShape.JSON_SET) {
             throw new ModuleDefinitionException("collection query operators require JSON_SET value shape: "
                     + field.code());
+        }
+    }
+
+    private void validateOptionLoad(EntityDefinition entity, FieldDefinition output) {
+        FieldOptionLoadDefinition load = output.optionLoad();
+        if (load == null) {
+            return;
+        }
+        if (output.isPhysical()) {
+            throw new ModuleDefinitionException("option load requires virtual output field: "
+                    + entity.alias() + "." + output.fieldName());
+        }
+        FieldDefinition source = requireField(entity, load.sourceField(), "option load source field");
+        if (source.dictionaryBinding() == null) {
+            throw new ModuleDefinitionException("option load source requires dictionary binding: "
+                    + entity.alias() + "." + load.sourceField());
+        }
+        if (!Set.of("code", "title", "enabled", "sortOrder", "parentCode").contains(load.optionItemField())) {
+            throw new ModuleDefinitionException("unknown option item field: " + load.optionItemField());
+        }
+        if (source.dictionaryBinding().selectionMode() == OptionSelectionMode.MULTIPLE) {
+            if (output.type() != FieldType.JSON || output.valueShape() != FieldValueShape.JSON_SET) {
+                throw new ModuleDefinitionException("multiple option load requires JSON_SET output field: "
+                        + entity.alias() + "." + output.fieldName());
+            }
+            return;
+        }
+        FieldType expected = switch (load.optionItemField()) {
+            case "enabled" -> FieldType.BOOLEAN;
+            case "sortOrder" -> FieldType.INTEGER;
+            default -> FieldType.STRING;
+        };
+        if (output.type() != expected && !(expected == FieldType.STRING && output.type() == FieldType.TEXT)) {
+            throw new ModuleDefinitionException("option load output type does not match option item field: "
+                    + entity.alias() + "." + output.fieldName());
         }
     }
 

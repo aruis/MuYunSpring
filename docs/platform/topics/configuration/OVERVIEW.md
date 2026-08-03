@@ -57,14 +57,14 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 
 ## 静态选项字段
 
-静态模型通过 `@OptionField` 声明字段的选项来源，和动态字段编译后的 option binding 复用同一套前端 schema、保存校验和 title 输出语义。注解只定义抽象契约，具体选项来源由业务层 provider 实现，避免 common 层依赖平台字典业务。
+静态模型通过 `@OptionField` 或其字典专用声明 `@DictionaryField` 声明字段的选项来源，和动态字段编译后的 option binding 复用同一套前端 schema、保存校验和 title 输出语义。`@DictionaryField` 只改善字典绑定与 baseline 的声明体验，运行时仍编译为同一个 dictionary `OptionBinding`；两者不能标注在同一个字段。通用 `@OptionField` 保持来源无关，避免 common 层依赖字典持久化或启动机制。
 
 当前稳定来源包括：
 
-1. `DICTIONARY`：`source` 使用 `applicationAlias.categoryAlias`，业务字段保存字典项目 `code`。租户上下文读取字典选项时，租户字典优先；租户下不存在对应类目时，允许回退读取平台全局字典。
+1. `DICTIONARY`：静态字段使用 `@DictionaryField(source = "applicationAlias.categoryAlias")`；字段需要交付最小字典值域时在同一注解声明 `title` 和 `initialItems`。业务字段保存字典项目 `code`。租户上下文读取字典选项时，租户字典优先；租户下不存在对应类目时，允许回退读取平台全局字典。
 2. `ENUM`：字段类型或 `enumType` 必须实现 `CodeTitleEnum`，业务字段保存 enum code。集合或数组字段必须显式声明 `selectionMode = MULTIPLE`。
 
-静态查询 schema 会在 `QueryAbility.querySchema()` 中按模型同名字段自动合并 `@OptionField` 元数据；静态页面字段选项应在模块 UI descriptor 编译链中合并，不再以 service `FormAbility.formSchema()` 作为目标来源。业务 service 的 `QueryDescriptor` 只声明查询语义；模块 UI 声明只表达页面意图。默认 title 输出字段为 `fieldName + "Title"`，也可通过 `titleOutputField` 定制；关闭 title 输出时 schema 或 descriptor 不暴露 `optionTitleField`。
+静态查询 schema 会在 `QueryAbility.querySchema()` 中按模型同名字段自动合并 `@OptionField` 或 `@DictionaryField` 元数据；静态页面字段选项应在模块 UI descriptor 编译链中合并，不再以 service `FormAbility.formSchema()` 作为目标来源。业务 service 的 `QueryDescriptor` 只声明查询语义；模块 UI 声明只表达页面意图。读模型字段通过 `@OptionLoad(source = "...")` 声明从已绑定选项中提取的 `OptionItem` 属性，默认读取 `title`；`field` 可显式选择 `code`、`enabled`、`sortOrder` 或 `parentCode`。动态元数据在输出虚拟字段上使用同构声明：`FieldDefinition.string("subjectTitle", "学科").virtual().optionLoad("subjectCode")`。因此选项值字段只声明候选与校验，投影字段自行声明读取来源；当存在 `field = "title"` 的投影时，schema 或 descriptor 暴露对应的 `optionTitleField`。
 
 ## 计量单位边界
 

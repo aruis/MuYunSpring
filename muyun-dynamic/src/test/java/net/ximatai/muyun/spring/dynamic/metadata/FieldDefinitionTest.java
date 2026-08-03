@@ -222,6 +222,33 @@ class FieldDefinitionTest {
     }
 
     @Test
+    void shouldValidateDictionaryOptionLoadOnVirtualOutputField() {
+        ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+        EntityDefinition entity = new EntityDefinition("teacher", "edu_teacher", "Teacher", java.util.List.of(
+                FieldDefinition.string("subjectCode", "Subject")
+                        .column("subject_code").dictionary("education", "teaching_subject"),
+                FieldDefinition.string("subjectTitle", "Subject Title")
+                        .column("subject_title").virtual().optionLoad("subjectCode")
+        ));
+
+        validator.validateEntity(entity);
+
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition("teacher", "edu_teacher", "Teacher",
+                java.util.List.of(FieldDefinition.string("subjectCode", "Subject").column("subject_code"),
+                        FieldDefinition.string("subjectTitle", "Subject Title").column("subject_title")
+                                .virtual().optionLoad("subjectCode")))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("option load source requires dictionary binding");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition("teacher", "edu_teacher", "Teacher",
+                java.util.List.of(FieldDefinition.string("subjectCode", "Subject")
+                                .column("subject_code").dictionary("education", "teaching_subject"),
+                        FieldDefinition.string("subjectTitle", "Subject Title").column("subject_title")
+                                .optionLoad("subjectCode")))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("option load requires virtual output field");
+    }
+
+    @Test
     void shouldValidateZonedTimestampCompanionFieldContract() {
         ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
 

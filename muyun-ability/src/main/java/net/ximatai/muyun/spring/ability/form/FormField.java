@@ -68,8 +68,12 @@ public record FormField(String fieldName,
             throw new IllegalArgumentException("option field definition must not be null");
         }
         return new FormField(fieldName, title, valueType, null, required, readOnly,
-                definition.binding(), definition.selectionMode(),
-                definition.hasTitleOutput() ? definition.titleOutputField() : null);
+                definition.binding(), definition.selectionMode(), null);
+    }
+
+    public FormField withOptionTitleField(String optionTitleField) {
+        return new FormField(fieldName, title, valueType, controlType, required, readOnly,
+                optionBinding, selectionMode, optionTitleField);
     }
 
     private static FormControlType defaultControlType(FormValueType valueType,

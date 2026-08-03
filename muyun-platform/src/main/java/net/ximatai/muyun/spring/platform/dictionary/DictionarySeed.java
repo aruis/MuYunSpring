@@ -1,6 +1,10 @@
 package net.ximatai.muyun.spring.platform.dictionary;
 
 import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 
 public record DictionarySeed(
@@ -27,6 +31,33 @@ public record DictionarySeed(
                                             DictionaryItemSeed... items) {
         return new DictionarySeed(id, applicationAlias, alias, title, sortOrder,
                 items == null ? List.of() : Arrays.asList(items));
+    }
+
+    /** Creates a seed whose internal category ID is safely derived from its stable dictionary identity. */
+    public static DictionarySeed dictionaryFor(String applicationAlias,
+                                              String alias,
+                                              String title,
+                                              int sortOrder,
+                                              DictionaryItemSeed... items) {
+        String source = requireText(applicationAlias, "applicationAlias") + "."
+                + requireText(alias, "dictionaryCategoryAlias");
+        return dictionary(internalId("dict.", source, 24), applicationAlias, alias, title, sortOrder, items);
+    }
+
+    static String itemId(String applicationAlias, String alias, String code) {
+        String source = requireText(applicationAlias, "applicationAlias") + "."
+                + requireText(alias, "dictionaryCategoryAlias") + "."
+                + requireText(code, "dictionaryItemCode");
+        return internalId("dict.item.", source, 22);
+    }
+
+    private static String internalId(String prefix, String source, int digestLength) {
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
+            return prefix + HexFormat.of().formatHex(bytes).substring(0, digestLength);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 must be available", exception);
+        }
     }
 
     private static String requireText(String value, String name) {

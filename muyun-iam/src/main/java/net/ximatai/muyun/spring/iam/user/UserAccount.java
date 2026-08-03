@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEnabledS
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
 import java.time.Instant;
@@ -46,7 +47,8 @@ public class UserAccount extends StandardDataScopedEnabledSortableEntity {
     @Column(name = "password_status", type = ColumnType.VARCHAR, length = 32, comment = "Password status")
     private PasswordStatus passwordStatus;
 
-    private String passwordStatusTitle;
+    @OptionLoad(source = "passwordStatus")
+    private transient String passwordStatusTitle;
 
     @Column(name = "password_changed_at", type = ColumnType.TIMESTAMP, comment = "Password changed at")
     private Instant passwordChangedAt;

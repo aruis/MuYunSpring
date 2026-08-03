@@ -5,7 +5,7 @@ import java.util.Optional;
 public record RecordReadPostTransform(String transformType,
                                       String fieldName) {
     public static final String FIELD_PROTECTION = "fieldProtection";
-    public static final String OPTION_TITLE = "optionTitle";
+    public static final String OPTION_LOAD = "optionLoad";
     private static final String SEPARATOR = ":";
 
     public RecordReadPostTransform {
@@ -23,8 +23,8 @@ public record RecordReadPostTransform(String transformType,
         return new RecordReadPostTransform(FIELD_PROTECTION, fieldName);
     }
 
-    public static RecordReadPostTransform optionTitle(String fieldName) {
-        return new RecordReadPostTransform(OPTION_TITLE, fieldName);
+    public static RecordReadPostTransform optionLoad(String fieldName) {
+        return new RecordReadPostTransform(OPTION_LOAD, fieldName);
     }
 
     public static Optional<RecordReadPostTransform> parse(String value) {
@@ -46,8 +46,8 @@ public record RecordReadPostTransform(String transformType,
         return FIELD_PROTECTION.equals(transformType);
     }
 
-    public boolean isOptionTitle() {
-        return OPTION_TITLE.equals(transformType);
+    public boolean isOptionLoad() {
+        return OPTION_LOAD.equals(transformType);
     }
 
     public String serialize() {

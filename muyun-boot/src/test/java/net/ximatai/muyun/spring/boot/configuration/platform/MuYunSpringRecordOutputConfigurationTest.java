@@ -2,15 +2,15 @@ package net.ximatai.muyun.spring.boot.configuration.platform;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
 import net.ximatai.muyun.spring.ability.output.RecordOutputContext;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.web.WebOutputSupport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -45,7 +45,7 @@ class MuYunSpringRecordOutputConfigurationTest {
     @Configuration(proxyBeanMethods = false)
     static class TestOptionTitleConfiguration {
         @Bean
-        StaticOptionFieldTitlePopulator staticOptionFieldTitlePopulator() {
+        StaticOptionLoadPopulator staticOptionLoadPopulator() {
             return (modelClass, entity) -> {
                 OptionRecord record = (OptionRecord) entity;
                 if ("standard".equals(record.getKind())) {
@@ -89,9 +89,10 @@ class MuYunSpringRecordOutputConfigurationTest {
     }
 
     private static final class OptionRecord extends StandardEntity {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "test.kind")
+        @DictionaryField(source = "test.kind")
         private String kind;
 
+        @OptionLoad(source = "kind")
         private String kindTitle;
 
         public String getKind() {

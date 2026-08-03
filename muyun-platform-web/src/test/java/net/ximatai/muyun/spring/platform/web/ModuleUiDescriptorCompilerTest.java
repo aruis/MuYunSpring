@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.platform.web;
 
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
@@ -274,9 +274,10 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     private static class OptionEmployee {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        @DictionaryField(source = "iam.gender")
         private String gender;
 
+        @OptionLoad(source = "gender")
         private String genderTitle;
     }
 

@@ -7,8 +7,8 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.model.standard.StandardTitledEntity;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
@@ -32,11 +32,20 @@ public class Teacher extends StandardTitledEntity implements EnabledCapable {
     private String teacherNo;
 
     /** 教学学科由平台字典供给候选项，教师模型只保存稳定 code。 */
-    @OptionField(type = OptionSourceType.DICTIONARY, source = "education.teaching_subject")
+    @DictionaryField(
+            source = "education.teaching_subject",
+            title = "教学学科",
+            initialItems = {
+                    @DictionaryField.InitialItem(code = "mathematics", title = "数学", sortOrder = 10),
+                    @DictionaryField.InitialItem(code = "chinese", title = "语文", sortOrder = 20),
+                    @DictionaryField.InitialItem(code = "english", title = "英语", sortOrder = 30)
+            }
+    )
     @Column(name = "subject_code", type = ColumnType.VARCHAR, length = 64, nullable = false)
     private String subjectCode;
 
-    private transient String subjectCodeTitle;
+    @OptionLoad(source = "subjectCode")
+    private transient String subjectTitle;
 
     @Column(name = "enabled", type = ColumnType.BOOLEAN, nullable = false,
             defaultVal = @net.ximatai.muyun.database.core.annotation.Default(bool = TrueOrFalse.TRUE))

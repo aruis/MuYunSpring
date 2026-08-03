@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldOptionLoadDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldTemporalSemantics;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -27,6 +28,7 @@ public record DynamicFieldDescriptor(
         Integer scale,
         OptionBinding optionBinding,
         OptionSelectionMode selectionMode,
+        FieldOptionLoadDefinition optionLoad,
         DynamicReferenceDescriptor reference,
         List<DynamicFieldCompanionDescriptor> companions,
         DynamicFieldQueryDescriptor query,
@@ -63,6 +65,7 @@ public record DynamicFieldDescriptor(
                 field.scale(),
                 field.optionBinding(),
                 field.dictionaryBinding() == null ? null : field.dictionaryBinding().selectionMode(),
+                field.optionLoad(),
                 null,
                 companions(field),
                 DynamicFieldQueryDescriptor.from(field.queryDefinition()),
@@ -95,6 +98,7 @@ public record DynamicFieldDescriptor(
                 descriptor.scale(),
                 descriptor.optionBinding(),
                 descriptor.selectionMode(),
+                descriptor.optionLoad(),
                 reference,
                 descriptor.companions(),
                 descriptor.query(),

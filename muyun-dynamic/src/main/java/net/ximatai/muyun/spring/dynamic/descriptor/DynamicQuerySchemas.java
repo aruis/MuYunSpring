@@ -19,7 +19,7 @@ public final class DynamicQuerySchemas {
                 : new LinkedHashSet<>(quickSearchFields);
         List<QuerySchema.Field> fields = descriptor.fields().stream()
                 .filter(DynamicQuerySchemas::queryable)
-                .map(field -> field(field, quickSearchFieldSet.contains(field.fieldName())))
+                .map(field -> field(field, quickSearchFieldSet.contains(field.fieldName()), descriptor.fields()))
                 .toList();
         List<QuerySchema.Field> quickSearchFieldSchemas = descriptor.fields().stream()
                 .filter(field -> quickSearchFieldSet.contains(field.fieldName()))
@@ -39,7 +39,9 @@ public final class DynamicQuerySchemas {
         );
     }
 
-    private static QuerySchema.Field field(DynamicFieldDescriptor field, boolean quickSearch) {
+    private static QuerySchema.Field field(DynamicFieldDescriptor field,
+                                           boolean quickSearch,
+                                           List<DynamicFieldDescriptor> fields) {
         boolean queryable = queryable(field);
         return new QuerySchema.Field(
                 field.fieldName(),
@@ -51,7 +53,7 @@ public final class DynamicQuerySchemas {
                 field.sortable(),
                 field.optionBinding(),
                 field.selectionMode(),
-                null
+                optionTitleField(field, fields)
         );
     }
 
@@ -68,6 +70,19 @@ public final class DynamicQuerySchemas {
                 field.selectionMode(),
                 null
         );
+    }
+
+    private static String optionTitleField(DynamicFieldDescriptor source, List<DynamicFieldDescriptor> fields) {
+        if (source.optionBinding() == null) {
+            return null;
+        }
+        return fields.stream()
+                .filter(field -> field.optionLoad() != null)
+                .filter(field -> source.fieldName().equals(field.optionLoad().sourceField()))
+                .filter(field -> "title".equals(field.optionLoad().optionItemField()))
+                .map(DynamicFieldDescriptor::fieldName)
+                .findFirst()
+                .orElse(null);
     }
 
     private static boolean queryable(DynamicFieldDescriptor field) {

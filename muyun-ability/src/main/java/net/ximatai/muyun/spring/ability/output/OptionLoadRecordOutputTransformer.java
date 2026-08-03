@@ -1,24 +1,25 @@
 package net.ximatai.muyun.spring.ability.output;
 
 import net.ximatai.muyun.spring.ability.CrudAbility;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 
 import java.util.List;
 import java.util.Objects;
 
-public class OptionTitleRecordOutputTransformer implements RecordOutputTransformer {
-    private final StaticOptionFieldTitlePopulator titlePopulator;
+/** Applies declared option projections to static read records. */
+public class OptionLoadRecordOutputTransformer implements RecordOutputTransformer {
+    private final StaticOptionLoadPopulator loadPopulator;
 
-    public OptionTitleRecordOutputTransformer(StaticOptionFieldTitlePopulator titlePopulator) {
-        this.titlePopulator = titlePopulator == null ? StaticOptionFieldTitlePopulator.NONE : titlePopulator;
+    public OptionLoadRecordOutputTransformer(StaticOptionLoadPopulator loadPopulator) {
+        this.loadPopulator = loadPopulator == null ? StaticOptionLoadPopulator.NONE : loadPopulator;
     }
 
     @Override
     public boolean supports(CrudAbility<?> service, RecordOutputContext context) {
         Class<?> modelClass = service == null ? null : service.modelClass();
-        return modelClass != null && !OptionFieldResolver.resolve(modelClass).isEmpty();
+        return modelClass != null && !OptionLoadResolver.resolve(modelClass).isEmpty();
     }
 
     @Override
@@ -26,7 +27,7 @@ public class OptionTitleRecordOutputTransformer implements RecordOutputTransform
                                                         T record,
                                                         RecordOutputContext context) {
         if (record != null) {
-            titlePopulator.populate(modelClass(service, record), record);
+            loadPopulator.populate(modelClass(service, record), record);
         }
         return record;
     }
@@ -38,7 +39,7 @@ public class OptionTitleRecordOutputTransformer implements RecordOutputTransform
         if (records == null || records.isEmpty()) {
             return records;
         }
-        titlePopulator.populateAll(modelClass(service, records.getFirst()), records);
+        loadPopulator.populateAll(modelClass(service, records.getFirst()), records);
         return records;
     }
 
