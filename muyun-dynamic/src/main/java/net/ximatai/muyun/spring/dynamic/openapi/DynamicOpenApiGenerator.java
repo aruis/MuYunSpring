@@ -370,7 +370,8 @@ public class DynamicOpenApiGenerator {
                 effectivePermissionCode,
                 DEFAULT_ERRORS,
                 successStatus,
-                responseMediaType
+                responseMediaType,
+                PlatformAction.QUERY.code().equals(actionCode) ? Map.of() : null
         );
     }
 

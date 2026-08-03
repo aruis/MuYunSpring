@@ -87,7 +87,8 @@ public class StaticModuleOpenApiGenerator {
                 definition.operationCode(), requestSchema, responseSchema, actionCode,
                 PlatformPermissionCode.action(definition.moduleAlias(),
                         PlatformAction.permissionActionCodeOf(actionCode)), DEFAULT_ERRORS,
-                definition.action() == PlatformAction.CREATE ? 201 : 200);
+                definition.action() == PlatformAction.CREATE ? 201 : 200, null,
+                definition.action() == PlatformAction.QUERY ? Map.of() : null);
     }
 
     private String requestSchema(PlatformAction action, String mainSchemaName) {

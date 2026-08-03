@@ -128,6 +128,8 @@ class StaticModuleOpenApiGeneratorTest {
                 .singleElement().extracting(operation -> operation.successStatus()).isEqualTo(201);
         assertThat(document.operations()).filteredOn(operation -> PlatformAction.DELETE.code().equals(operation.actionCode()))
                 .singleElement().extracting(operation -> operation.requestSchema()).isEqualTo("RecordActionWebRequest");
+        assertThat(document.operations()).filteredOn(operation -> PlatformAction.QUERY.code().equals(operation.actionCode()))
+                .singleElement().extracting(operation -> operation.requestExample()).isEqualTo(Map.of());
         @SuppressWarnings("unchecked")
         var paths = (java.util.Map<String, Object>) OpenApi31Projector.project(document).get("paths");
         @SuppressWarnings("unchecked")

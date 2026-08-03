@@ -20,9 +20,10 @@ public interface PlatformApiDocument {
     record Operation(String method, String path, String operationId, String summary,
                      String requestSchema, String responseSchema, String actionCode,
                      String permissionCode, List<String> errorCodes, int successStatus,
-                     String responseMediaType) {
+                     String responseMediaType, Map<String, Object> requestExample) {
         public Operation {
             errorCodes = errorCodes == null ? List.of() : List.copyOf(errorCodes);
+            requestExample = requestExample == null ? null : Map.copyOf(requestExample);
             if (successStatus < 100 || successStatus > 599) {
                 throw new IllegalArgumentException("OpenAPI success status must be an HTTP status: " + successStatus);
             }
@@ -40,6 +41,14 @@ public interface PlatformApiDocument {
                          String permissionCode, List<String> errorCodes, int successStatus) {
             this(method, path, operationId, summary, requestSchema, responseSchema, actionCode, permissionCode,
                     errorCodes, successStatus, null);
+        }
+
+        public Operation(String method, String path, String operationId, String summary,
+                         String requestSchema, String responseSchema, String actionCode,
+                         String permissionCode, List<String> errorCodes, int successStatus,
+                         String responseMediaType) {
+            this(method, path, operationId, summary, requestSchema, responseSchema, actionCode, permissionCode,
+                    errorCodes, successStatus, responseMediaType, null);
         }
     }
 

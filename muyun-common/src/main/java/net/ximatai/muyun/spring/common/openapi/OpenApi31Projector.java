@@ -52,8 +52,10 @@ public final class OpenApi31Projector {
             value.put("parameters", parameters);
         }
         if (operation.requestSchema() != null) {
-            value.put("requestBody", Map.of("required", true, "content", Map.of(JSON,
-                    Map.of("schema", schemaReference(operation.requestSchema(), document.schemas().keySet())))));
+            Map<String, Object> media = new LinkedHashMap<>();
+            media.put("schema", schemaReference(operation.requestSchema(), document.schemas().keySet()));
+            if (operation.requestExample() != null) media.put("example", operation.requestExample());
+            value.put("requestBody", Map.of("required", true, "content", Map.of(JSON, Map.copyOf(media))));
         }
         value.put("responses", responses(operation, document));
         putExtension(value, "x-muyun-action-code", operation.actionCode());
