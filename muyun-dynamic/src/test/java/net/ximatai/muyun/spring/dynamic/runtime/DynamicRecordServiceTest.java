@@ -346,7 +346,8 @@ class DynamicRecordServiceTest {
         assertThat(document.basePath()).isEqualTo("/" + MODULE);
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
-                .contains("/" + MODULE + "/query", "/" + MODULE + "/insert", "/" + MODULE + "/openapi");
+                .contains("/" + MODULE + "/query", "/" + MODULE + "/insert")
+                .doesNotContain("/" + MODULE + "/openapi");
         assertThat(document.schemas()).containsKey("ContractRecord");
     }
 

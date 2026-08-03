@@ -119,7 +119,7 @@ public class TeachingDemoIT {
         var document = openApiGenerator.generate(TeacherService.MODULE_ALIAS);
 
         assertThat(document.operations()).extracting(operation -> operation.path())
-                .contains("/education.teacher/openapi");
+                .doesNotContain("/education.teacher/openapi");
     }
 
     @Test

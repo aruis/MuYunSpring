@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createOpenApiAuthenticatedFetch,
+  createModuleOpenApiPageDescriptor,
   isOpenApiCatalogPath,
+  isModuleOpenApiPage,
   loadModuleOpenApi,
   moduleAliasFromOpenApiPath,
   openApiBackendBaseUrl,
@@ -19,6 +21,14 @@ test('recognizes the API catalog route independently from a module document rout
   assert.equal(isOpenApiCatalogPath('/openapi'), true);
   assert.equal(isOpenApiCatalogPath('/openapi/'), true);
   assert.equal(isOpenApiCatalogPath('/openapi/education.teacher'), false);
+});
+
+test('creates a stable workbench tab descriptor for a module document', () => {
+  const descriptor = createModuleOpenApiPageDescriptor('education.teacher', '教师');
+
+  assert.equal(descriptor.title, '教师.OpenAPI');
+  assert.equal(descriptor.target.route, '/openapi/education.teacher');
+  assert.equal(isModuleOpenApiPage(descriptor), true);
 });
 
 test('loads a module document from its canonical backend OpenAPI endpoint', async () => {

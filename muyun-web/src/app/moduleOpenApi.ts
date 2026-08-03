@@ -1,4 +1,5 @@
 import type { HttpClient } from '@muyun/web-core';
+import type { PageDescriptor } from '@muyun/web-contracts';
 import { effectiveAuthToken } from './authSession';
 
 export interface ModuleOpenApiDocument {
@@ -14,6 +15,28 @@ const OPEN_API_PATH = /^\/openapi\/([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)\/?$/;
 /** Returns the module alias only for the dedicated, authenticated OpenAPI viewer path. */
 export function moduleAliasFromOpenApiPath(pathname: string): string | undefined {
   return OPEN_API_PATH.exec(pathname)?.[1];
+}
+
+/** Creates the workbench page contract for one module's authenticated API document. */
+export function createModuleOpenApiPageDescriptor(moduleAlias: string, moduleTitle?: string): PageDescriptor {
+  return {
+    pageType: 'platform-route',
+    openMode: 'workbench-route',
+    hostType: 'platform-route-host',
+    title: `${moduleTitle ?? moduleAlias}.OpenAPI`,
+    target: { route: `/openapi/${encodeURIComponent(moduleAlias)}`, moduleAlias },
+    tabPolicy: { identity: 'by-target', closable: true, cacheable: true },
+  };
+}
+
+/** Recognizes the app-owned OpenAPI tab without teaching the shared route resolver about this feature. */
+export function isModuleOpenApiPage(descriptor?: PageDescriptor): boolean {
+  if (descriptor?.pageType !== 'platform-route') {
+    return false;
+  }
+
+  const moduleAlias = moduleAliasFromOpenApiPath(descriptor.target.route ?? '');
+  return moduleAlias !== undefined && descriptor.target.moduleAlias === moduleAlias;
 }
 
 export function isOpenApiCatalogPath(pathname: string): boolean {

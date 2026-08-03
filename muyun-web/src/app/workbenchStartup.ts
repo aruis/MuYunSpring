@@ -18,6 +18,11 @@ import {
   type PageDescriptorResolveOptions,
 } from '@muyun/platform-workbench';
 import { createWorkspaceViewDescriptor, resolveWorkspaceView } from './workspaceViews';
+import {
+  createModuleOpenApiPageDescriptor,
+  isModuleOpenApiPage,
+  moduleAliasFromOpenApiPath,
+} from './moduleOpenApi';
 
 export interface WorkbenchStartupClients {
   sessionClient: SessionClient;
@@ -74,6 +79,13 @@ export function activeTabUrlOf(state: WorkbenchStartupState): string | undefined
   const descriptor =
     activeTab?.pageDescriptor ??
     (activeTab?.target ? resolvePageDescriptor(activeTab.target, { title: activeTab.title }) : undefined);
+  if (
+    descriptor?.pageType === 'platform-route' &&
+    isModuleOpenApiPage(descriptor) &&
+    descriptor.target.route
+  ) {
+    return descriptor.target.route;
+  }
   return descriptor ? pageDescriptorToUrl(descriptor) : undefined;
 }
 
@@ -86,7 +98,10 @@ export function restoreWorkbenchStartupStateFromUrl(
     return state;
   }
 
-  const descriptor = tryPageDescriptorFromUrl(url, options);
+  const openApiModuleAlias = moduleAliasFromOpenApiPath(url.split(/[?#]/, 1)[0] ?? '');
+  const descriptor = openApiModuleAlias
+    ? createModuleOpenApiPageDescriptor(openApiModuleAlias)
+    : tryPageDescriptorFromUrl(url, options);
   if (!descriptor) {
     return state;
   }
