@@ -59,9 +59,10 @@ class FormSchemaTest {
 
         FormSchema schema = FormSchema.from(descriptor, EmployeeOptionRecord.class);
 
-        assertThat(schema.fields()).singleElement()
-                .extracting(FormSchema.Field::optionBinding)
-                .isEqualTo(OptionBinding.dictionary("crm", "gender"));
+        assertThat(schema.fields()).singleElement().satisfies(field -> {
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
     }
 
     private static class EmployeeOptionRecord {

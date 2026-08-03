@@ -104,6 +104,33 @@ class DynamicRecordRuntimeTest {
     }
 
     @Test
+    void shouldPopulateOptionLoadOnSingleRecordSelectIncludingCacheHit() {
+        CacheRegistry.clearAll();
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "teacher-1",
+                "subject_code", "mathematics",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicRecordRuntime runtime = DynamicRecordRuntime.builder(operations)
+                .optionLoadPopulator((entity, records) -> records.forEach(record ->
+                        record.putVirtualValue("subjectTitle", "数学")))
+                .build()
+                .register(new ModuleDefinition("education.teacher", "Teacher", List.of(new EntityDefinition(
+                        "teacher", "education_teacher", "Teacher", List.of(
+                        FieldDefinition.string("subjectCode", "Subject").column("subject_code")
+                                .dictionary("education", "teaching_subject"),
+                        FieldDefinition.string("subjectTitle", "Subject Title").column("subject_title")
+                                .virtual().optionLoad("subjectCode")
+                )))));
+        DynamicEntityService service = runtime.entityService("education.teacher", "teacher");
+
+        assertThat(service.select("teacher-1").getValue("subjectTitle")).isEqualTo("数学");
+        assertThat(service.select("teacher-1").getValue("subjectTitle")).isEqualTo("数学");
+    }
+
+    @Test
     void shouldClearRuntimeCacheByNamespacePrefix() {
         CacheRegistry.clearAll();
         IDatabaseOperations<Object> operations = operations();

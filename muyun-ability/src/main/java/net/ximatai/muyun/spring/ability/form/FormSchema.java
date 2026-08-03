@@ -43,12 +43,11 @@ public record FormSchema(String scopeName,
     private static FormField mergeOptionField(FormField field,
                                               Map<String, OptionFieldDefinition> optionFields,
                                               Map<String, String> optionTitleFields) {
-        if (field.optionBinding() != null || optionFields.isEmpty()) {
-            return field;
-        }
         OptionFieldDefinition definition = optionFields.get(field.fieldName());
-        return definition == null ? field : field.withOptionField(definition)
-                .withOptionTitleField(optionTitleFields.get(field.fieldName()));
+        FormField resolved = field.optionBinding() != null || definition == null
+                ? field
+                : field.withOptionField(definition);
+        return resolved.withOptionTitleField(optionTitleFields.get(field.fieldName()));
     }
 
     private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {

@@ -318,6 +318,7 @@ public class DynamicEntityService implements
     @Override
     public void afterSelect(DynamicRecord record) {
         lifecycle.afterSelect(record);
+        optionLoadPopulator.populate(dao.getEntity(), record == null ? List.of() : List.of(record));
     }
 
     @Override

@@ -54,12 +54,11 @@ public record QuerySchema(String scopeName,
     private static QueryField mergeOptionField(QueryField field,
                                                Map<String, OptionFieldDefinition> optionFields,
                                                Map<String, String> optionTitleFields) {
-        if (field.optionBinding() != null || optionFields.isEmpty()) {
-            return field;
-        }
         OptionFieldDefinition definition = optionFields.get(field.fieldName());
-        return definition == null ? field : field.withOptionField(definition)
-                .withOptionTitleField(optionTitleFields.get(field.fieldName()));
+        QueryField resolved = field.optionBinding() != null || definition == null
+                ? field
+                : field.withOptionField(definition);
+        return resolved.withOptionTitleField(optionTitleFields.get(field.fieldName()));
     }
 
     private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {

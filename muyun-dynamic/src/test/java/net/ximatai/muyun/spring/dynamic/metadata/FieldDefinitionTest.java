@@ -78,6 +78,17 @@ class FieldDefinitionTest {
     }
 
     @Test
+    void shouldPreserveOptionLoadAcrossFluentMethods() {
+        FieldDefinition field = FieldDefinition.string("subjectTitle", "Subject Title")
+                .virtual()
+                .optionLoad("subjectCode")
+                .defaultUiType("text")
+                .column("subject_title");
+
+        assertThat(field.optionLoad()).isEqualTo(new FieldOptionLoadDefinition("subjectCode"));
+    }
+
+    @Test
     void shouldExposeJsonSetValueShapeAndPreserveAcrossFluentMethods() {
         FieldDefinition field = FieldDefinition.of("tags", FieldType.JSON, "Tags")
                 .jsonSet()
