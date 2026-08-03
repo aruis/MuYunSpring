@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.web.BusinessMutation;
 import net.ximatai.muyun.spring.web.BusinessMutationResultSupport;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.web.MutationTenantScopeResolver;
@@ -60,6 +61,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.role", title = "角色管理")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 70)
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements

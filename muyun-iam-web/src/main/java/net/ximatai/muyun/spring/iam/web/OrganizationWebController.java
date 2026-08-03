@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.iam.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.TreeScope;
 import net.ximatai.muyun.spring.web.ScopedTreeWebProjectionPolicy;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.organization", title = "机构管理", route = "/iam/organizations")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20)
 @RequestMapping("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements

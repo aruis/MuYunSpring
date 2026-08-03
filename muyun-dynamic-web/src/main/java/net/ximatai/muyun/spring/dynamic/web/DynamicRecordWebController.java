@@ -69,8 +69,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
-import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
+import net.ximatai.muyun.spring.common.openapi.OpenApi31Projector;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
@@ -1148,16 +1148,18 @@ public class DynamicRecordWebController implements
     }
 
     @GetMapping("/describe")
+    @ActionEndpoint(PlatformAction.VIEW)
     public DynamicModuleDescriptor describeModule(@PathVariable String moduleAlias) {
         return tenantScope(moduleAlias, () -> permissionScopedDescriptor(moduleAlias));
     }
 
     @GetMapping("/openapi")
-    public DynamicOpenApiDocument openApi(@PathVariable String moduleAlias) {
-        return tenantScope(moduleAlias, () -> openApiGenerator.generate(
+    @ActionEndpoint(PlatformAction.VIEW)
+    public Map<String, Object> openApi(@PathVariable String moduleAlias) {
+        return tenantScope(moduleAlias, () -> OpenApi31Projector.project(openApiGenerator.generate(
                 permissionScopedDescriptor(moduleAlias),
                 action -> recordService.actionAuthorizationAvailability(
-                        moduleAlias, action.code(), Set.of()).available()));
+                        moduleAlias, action.code(), Set.of()).available())));
     }
 
     @GetMapping("/navigation/{sessionId}/{recordId}")

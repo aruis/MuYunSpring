@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = PlatformFieldTypeService.MODULE_ALIAS, title = "平台字段类型")
+@StaticModuleOpenApi
 @RequestMapping("/platform.field_type")
 public class PlatformFieldTypeWebController extends WebSupport<PlatformFieldTypeService> implements
         CrudWeb<PlatformFieldType, PlatformFieldTypeService>,

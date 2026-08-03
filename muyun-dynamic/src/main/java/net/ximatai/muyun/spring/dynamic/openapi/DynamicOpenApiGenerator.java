@@ -20,6 +20,7 @@ import java.util.function.Predicate;
 public class DynamicOpenApiGenerator {
     private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
+    private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final List<String> DEFAULT_ERRORS = List.of(
             PlatformErrorCodes.VALIDATION_FAILED,
             "DYNAMIC_ACTION_FAILED",
@@ -66,7 +67,7 @@ public class DynamicOpenApiGenerator {
         operations.add(getOperation(descriptor.moduleAlias(), basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
                 "Describe " + descriptor.title(), null, "DynamicModuleDescriptor", null));
         operations.add(getOperation(descriptor.moduleAlias(), basePath + "/openapi", operationId(descriptor, "openApi"),
-                "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
+                "OpenAPI " + descriptor.title(), null, "OpenApi31Document", null));
         if (standardActionVisible.test(PlatformAction.QUERY)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/query", operationId(descriptor, "query"),
                     "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));
@@ -140,29 +141,28 @@ public class DynamicOpenApiGenerator {
         }
         boolean exchangeSupported = mainEntity.capabilities().contains(EntityCapability.EXCHANGE.name());
         if (exchangeSupported && standardActionVisible.test(PlatformAction.IMPORT)) {
-            operations.add(operation(descriptor.moduleAlias(), basePath + "/exchange/template",
+            operations.add(binaryOperation(descriptor.moduleAlias(), basePath + "/exchange/template",
                     operationId(descriptor, "exchangeTemplate"),
                     "Download exchange template " + mainEntity.title(), "DynamicExchangeTemplateRequest",
-                    "binary", PlatformAction.IMPORT.code()));
+                    PlatformAction.IMPORT.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/import/parse", operationId(descriptor, "importParse"),
                     "Parse import workbook " + mainEntity.title(), "DynamicImportParseRequest",
                     "DynamicImportParseResult", PlatformAction.IMPORT.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/import/execute", operationId(descriptor, "importExecute"),
                     "Execute import workbook " + mainEntity.title(), "DynamicImportExecuteMultipartRequest",
                     "DynamicImportUploadResult", PlatformAction.IMPORT.code()));
-            operations.add(operation(descriptor.moduleAlias(), basePath + "/import/error-file/{token}",
+            operations.add(binaryOperation(descriptor.moduleAlias(), basePath + "/import/error-file/{token}",
                     operationId(descriptor, "importErrorFile"),
                     "Download import error workbook " + mainEntity.title(), null,
-                    "binary", PlatformAction.IMPORT.code()));
+                    PlatformAction.IMPORT.code()));
         }
         if (exchangeSupported && standardActionVisible.test(PlatformAction.EXPORT)) {
-            operations.add(operation(descriptor.moduleAlias(), basePath + "/export/data",
+            operations.add(binaryOperation(descriptor.moduleAlias(), basePath + "/export/data",
                     operationId(descriptor, "exportData"),
-                    "Export data " + mainEntity.title(), "WebQueryRequest", "binary", PlatformAction.EXPORT.code()));
-            operations.add(operation(descriptor.moduleAlias(), basePath + "/export/selected",
+                    "Export data " + mainEntity.title(), "WebQueryRequest", PlatformAction.EXPORT.code()));
+            operations.add(binaryOperation(descriptor.moduleAlias(), basePath + "/export/selected",
                     operationId(descriptor, "exportSelected"),
-                    "Export selected data " + mainEntity.title(), "DynamicSelectedExportRequest",
-                    "binary", PlatformAction.EXPORT.code()));
+                    "Export selected data " + mainEntity.title(), "DynamicSelectedExportRequest", PlatformAction.EXPORT.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
                 && standardActionVisible.test(PlatformAction.ENABLE)) {
@@ -284,6 +284,16 @@ public class DynamicOpenApiGenerator {
         return operation(METHOD_POST, moduleAlias, path, operationId, summary, requestSchema, responseSchema, actionCode);
     }
 
+    private DynamicOpenApiDocument.Operation binaryOperation(String moduleAlias,
+                                                             String path,
+                                                             String operationId,
+                                                             String summary,
+                                                             String requestSchema,
+                                                             String actionCode) {
+        return operationWithPermissionCode(METHOD_POST, moduleAlias, path, operationId, summary, requestSchema,
+                "BinaryFile", actionCode, null, XLSX_CONTENT_TYPE);
+    }
+
     private DynamicOpenApiDocument.Operation getOperation(String moduleAlias,
                                                           String path,
                                                           String operationId,
@@ -327,19 +337,41 @@ public class DynamicOpenApiGenerator {
                                                                          String responseSchema,
                                                                          String actionCode,
                                                                          String permissionCode) {
+        return operationWithPermissionCode(method, moduleAlias, path, operationId, summary, requestSchema,
+                responseSchema, actionCode, permissionCode, null);
+    }
+
+    private DynamicOpenApiDocument.Operation operationWithPermissionCode(String method,
+                                                                         String moduleAlias,
+                                                                         String path,
+                                                                         String operationId,
+                                                                         String summary,
+                                                                         String requestSchema,
+                                                                         String responseSchema,
+                                                                         String actionCode,
+                                                                         String permissionCode,
+                                                                         String responseMediaType) {
         String effectivePermissionCode = permissionCode == null && actionCode != null
                 ? PlatformPermissionCode.action(moduleAlias, PlatformAction.permissionActionCodeOf(actionCode))
                 : permissionCode;
+        String effectiveRequestSchema = PlatformAction.DELETE.code().equals(actionCode)
+                && path.endsWith("/delete/{id}") && requestSchema == null
+                ? "RecordActionWebRequest"
+                : requestSchema;
+        int successStatus = PlatformAction.CREATE.code().equals(actionCode) && path.endsWith("/insert") ? 201 : 200;
         return new DynamicOpenApiDocument.Operation(
                 method,
                 path,
                 operationId,
                 summary,
-                requestSchema,
+                effectiveRequestSchema,
                 responseSchema,
                 actionCode,
                 effectivePermissionCode,
-                DEFAULT_ERRORS
+                DEFAULT_ERRORS,
+                successStatus,
+                responseMediaType,
+                PlatformAction.QUERY.code().equals(actionCode) ? Map.of() : null
         );
     }
 

@@ -41,9 +41,10 @@ public class ActionEndpointWebConfiguration {
             RequestMappingHandlerMapping handlerMapping,
             RegisteredWebEndpointCatalog endpointCatalog,
             ObjectProvider<RecycleBinFacade> recycleBinFacade,
-            ObjectProvider<ObjectMapper> objectMapper) {
+            ObjectProvider<ObjectMapper> objectMapper,
+            ObjectProvider<StaticModuleOpenApiEndpoint> staticModuleOpenApiEndpoint) {
         return new StaticAbilityWebEndpointRegistrar(applicationContext, handlerMapping, endpointCatalog,
-                recycleBinFacade, objectMapper.getIfAvailable(ObjectMapper::new));
+                recycleBinFacade, objectMapper.getIfAvailable(ObjectMapper::new), staticModuleOpenApiEndpoint);
     }
 
     @Bean

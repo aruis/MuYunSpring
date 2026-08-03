@@ -28,6 +28,7 @@
 | TD-035 | 动态复合租户唯一约束尚无持久化元数据事实源 | `EntityDefinition` 已能表达复合租户唯一约束，schema 映射与运行态预查也会使用同一事实；但配置管理侧尚未持久化该声明，现有 metadata compiler 只会从 `FieldDefinition.isUnique` 编译单字段唯一。因此不能将动态复合唯一配置视为已交付能力 | 出现真实动态模块需要复合租户唯一时，成套建设持久化定义、compiler、校验、schema 刷新、发布和配置 UI，再开放该配置入口 |
 | TD-036 | 动态引用加载与反向引用尚未进入配置持久化和页面交付 | 运行态已支持 `EntityReferenceLoadDefinition` 编译为与静态一致的 `ReferenceLoadPath`，并由共享 `ReferenceLoadReader` 执行多跳读取；`EntityReferencedByDefinition` 也能按动态 CRUD 链路装配反向集合。但二者尚无平台配置的持久化事实、metadata compiler 输入和动态页面 descriptor 表达，不能视为低代码可配置能力 | 出现真实动态模块需要配置多跳展示字段或反向集合视图时，成套建设配置定义、保存校验、compiler、运行态 refresh、页面 descriptor 与关联视图交付；引用加载输出字段保持只读虚拟字段，反向集合优先进入关联视图而非普通表单字段 |
 | TD-037 | 动态表单及配置资源的 HTTP URL 体系尚未定稿 | 当前 `@PlatformStaticWebScope(CUSTOM)` 仅明确模块身份与嵌套资源路径可以不同，已覆盖模块、元数据、字段、UI 配置等现有父资源路径；这些 URL 仍是阶段性接口，不应据此固化前端路由、外部集成或自动生成规则 | 进入动态表单页面交付、配置管理 API 整理或外部开放 API 治理时，统一模块入口、父资源上下文、版本策略、兼容迁移和 endpoint descriptor，再收敛现有 `CUSTOM` 路径 |
+| TD-038 | 动态选项投影尚未进入配置持久化与发布链路 | `FieldDefinition.optionLoad` 已能表达字典选项字段到只读虚拟字段的属性投影，并已接入运行态读取、descriptor 与页面 schema；但配置管理侧尚无对应的字段事实、保存校验和 metadata compiler 输入，因此不能视为动态表单可配置能力 | 出现真实动态模块需要在配置界面声明字典标题或其他稳定 `OptionItem` 属性投影时，成套建设配置定义、来源/输出字段校验、compiler、运行态 refresh、发布快照与页面交付；保持输出字段只读、虚拟，且不参与查询、排序或写入 |
 
 ### 待决策
 

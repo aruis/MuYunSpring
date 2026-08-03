@@ -32,6 +32,7 @@ import {
 } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import { createModuleManagementState, moduleTitleOf } from './moduleManagementState';
+import { loadOpenApiCatalog } from '../app/moduleOpenApi';
 
 defineOptions({ name: 'ModuleManagementView' });
 
@@ -54,6 +55,7 @@ const applicationReloadKey = ref(0);
 const moduleSearchKeyword = ref('');
 const moduleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const treeClients = new Map<string, StaticModuleTreeClient<PlatformModule>>();
+const openApiModuleAliases = ref(new Set<string>());
 
 const {
   moduleReloadKey,
@@ -120,7 +122,7 @@ const moduleActions = computed<RecordActionItem[]>(() => {
       },
     ];
   }
-  return [
+  const actions: RecordActionItem[] = [
     {
       key: 'edit',
       actionCode: 'update',
@@ -137,6 +139,11 @@ const moduleActions = computed<RecordActionItem[]>(() => {
       loading: saving.value,
     },
   ];
+  const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
+  if (moduleAlias && openApiModuleAliases.value.has(moduleAlias)) {
+    actions.unshift({ key: 'openapi', title: '查看 OpenAPI' });
+  }
+  return actions;
 });
 
 watch(selectedApplicationAlias, () => {
@@ -144,7 +151,10 @@ watch(selectedApplicationAlias, () => {
   resetForApplication();
 });
 
-onMounted(loadModuleFormDefinition);
+onMounted(() => {
+  void loadModuleFormDefinition();
+  void loadOpenApiModules();
+});
 
 function loadApplications(records: CrudRecordListBase[]) {
   applications.value = records as Application[];
@@ -172,6 +182,16 @@ async function loadModuleFormDefinition() {
   try {
     const runtimeContext = await moduleContext.runtime.ready;
     moduleFormFieldDefinitions.value = resolveRecordFormFields(runtimeContext.uiDescriptor);
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'module-management', phase: 'load' });
+  }
+}
+
+async function loadOpenApiModules() {
+  try {
+    openApiModuleAliases.value = new Set(
+      (await loadOpenApiCatalog(moduleContext.http)).map((item) => item.moduleAlias),
+    );
   } catch (cause) {
     presentPlatformError(cause, { source: 'module-management', phase: 'load' });
   }
@@ -239,11 +259,18 @@ function handleModuleTreeAction(action: UiRecordInlineAction, record: PlatformMo
 }
 
 function handleModuleAction(action: RecordActionItem) {
+  if (action.key === 'openapi') openModuleOpenApi();
   if (action.key === 'edit') startEdit();
   if (action.key === 'create-child') startCreateChild();
   if (action.key === 'delete') void removeSelected();
   if (action.key === 'cancel') cancelEdit();
   if (action.key === 'save') void save();
+}
+
+function openModuleOpenApi() {
+  const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
+  if (!moduleAlias) return;
+  window.location.assign(`/openapi/${encodeURIComponent(moduleAlias)}`);
 }
 
 function updateDraftField(

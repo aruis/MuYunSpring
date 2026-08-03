@@ -18,6 +18,8 @@ import net.ximatai.muyun.spring.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.web.endpoint.RegisteredWebEndpointCatalog;
 import net.ximatai.muyun.spring.platform.web.endpoint.StaticAbilityWebEndpointRegistrar;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -57,6 +59,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigPublishService;
@@ -153,6 +156,27 @@ class PlatformConfigurationWebControllerTest {
                 .andExpect(jsonPath("$.records[0].children[0].record.id").value("platform.sales.order"));
 
         verify(service).rootModules("platform");
+    }
+
+    @Test
+    void shouldHideUndescribableModulesFromOpenApiCatalog() {
+        PlatformModuleService service = mock(PlatformModuleService.class);
+        PlatformModule allowed = module("crm.customer", "crm", null);
+        allowed.setModuleKind(ModuleKind.DYNAMIC);
+        PlatformModule denied = module("crm.contract", "crm", null);
+        denied.setModuleKind(ModuleKind.DYNAMIC);
+        when(service.listVisibleModules()).thenReturn(List.of(allowed, denied));
+        ActionExecutionPolicyService authorizationService = mock(ActionExecutionPolicyService.class);
+        doThrow(new PlatformAccessDeniedException("action permission denied"))
+                .when(authorizationService)
+                .authorize(argThat(context -> context != null && "crm.contract".equals(context.moduleAlias())));
+        PlatformModuleWebController controller = new PlatformModuleWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        controller.configureOpenApiAuthorization(new ActionEndpointContextResolver(), authorizationService);
+
+        List<OpenApiModuleCatalogItem> catalog = controller.openApiCatalog();
+
+        assertThat(catalog).extracting(OpenApiModuleCatalogItem::moduleAlias).containsExactly("crm.customer");
     }
 
     @Test

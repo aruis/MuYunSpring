@@ -6,6 +6,7 @@ FRONTEND_DIR="$ROOT_DIR/muyun-web"
 BACKEND_PORT="${MUYUN_BACKEND_PORT:-8080}"
 FRONTEND_PORT="${MUYUN_FRONTEND_PORT:-5173}"
 FORCE_RESTART=false
+RUN_MODE="demo"
 
 PROCESS_PIDS=()
 PROCESS_NAMES=()
@@ -13,7 +14,7 @@ CLEANING_UP=false
 
 usage() {
   cat <<USAGE
-Usage: $0 [-f|--force]
+Usage: $0 [--demo|--platform] [-f|--force]
 
 Starts the local development stack:
   - PostgreSQL via docker compose
@@ -21,6 +22,9 @@ Starts the local development stack:
   - Vite frontend on http://127.0.0.1:${FRONTEND_PORT}/
 
 Options:
+  -d, --demo   Run the complete school demo (default).
+  -p, --platform
+               Run the platform without optional demo modules.
   -f, --force  Stop existing processes listening on backend/frontend ports before startup.
 
 Environment:
@@ -159,7 +163,9 @@ force_stop_existing_processes() {
   force_stop_port "$BACKEND_PORT" "backend"
   force_stop_port "$FRONTEND_PORT" "frontend"
   force_stop_project_processes "continuous compiler" "demoClasses" "--continuous"
+  force_stop_project_processes "continuous compiler" ":muyun-boot:classes" "--continuous"
   force_stop_project_processes "boot runner" ":muyun-boot:demoBootRun"
+  force_stop_project_processes "boot runner" ":muyun-boot:bootRun"
   force_stop_project_processes "frontend dev server" "node_modules/.bin/vite" "--port $FRONTEND_PORT"
 }
 
@@ -190,14 +196,35 @@ ensure_frontend_dependencies() {
   npm ci --prefix "$FRONTEND_DIR"
 }
 
+wait_for_postgres() {
+  local attempts=30
+  echo "Waiting for PostgreSQL to accept connections..."
+  while ((attempts > 0)); do
+    if docker compose exec -T postgres pg_isready -U postgres -d muyun_spring >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempts=$((attempts - 1))
+  done
+  echo "PostgreSQL did not become ready within 30 seconds." >&2
+  docker compose logs --tail=50 postgres >&2 || true
+  exit 1
+}
+
 start_backend() {
   cd "$ROOT_DIR"
-  exec ./gradlew :muyun-boot:demoBootRun --args="$(backend_args)"
+  if [[ "$RUN_MODE" == "demo" ]]; then
+    exec ./gradlew :muyun-boot:demoBootRun --args="$(backend_args)"
+  fi
+  exec ./gradlew :muyun-boot:bootRun --args="$(backend_args)"
 }
 
 watch_backend_classes() {
   cd "$ROOT_DIR"
-  exec ./gradlew demoClasses --continuous
+  if [[ "$RUN_MODE" == "demo" ]]; then
+    exec ./gradlew demoClasses --continuous
+  fi
+  exec ./gradlew :muyun-boot:classes --continuous
 }
 
 start_frontend() {
@@ -225,6 +252,12 @@ wait_for_children() {
 
 while (($# > 0)); do
   case "$1" in
+    -d|--demo)
+      RUN_MODE="demo"
+      ;;
+    -p|--platform)
+      RUN_MODE="platform"
+      ;;
     -f|--force)
       FORCE_RESTART=true
       ;;
@@ -246,9 +279,10 @@ cd "$ROOT_DIR"
 force_stop_existing_processes
 echo "Starting PostgreSQL..."
 docker compose up -d
+wait_for_postgres
 ensure_frontend_dependencies
 
-echo "Starting backend, continuous compilation and frontend..."
+echo "Starting $RUN_MODE backend, continuous compilation and frontend..."
 start_process backend-compiler watch_backend_classes
 start_process backend start_backend
 start_process frontend start_frontend

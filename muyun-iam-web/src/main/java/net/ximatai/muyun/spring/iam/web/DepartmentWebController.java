@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
 import net.ximatai.muyun.spring.platform.web.ModuleUiDefinition;
 import net.ximatai.muyun.spring.platform.web.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.MutationTenantScopeResolver;
 import net.ximatai.muyun.spring.web.TreeScope;
@@ -26,6 +27,7 @@ import java.util.Optional;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.department", title = "部门管理", route = "/iam/departments")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "部门管理", order = 30)
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements

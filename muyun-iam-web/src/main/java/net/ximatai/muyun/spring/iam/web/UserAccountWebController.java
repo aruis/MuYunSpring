@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.web.BusinessMutationChange;
 import net.ximatai.muyun.spring.web.BusinessMutationRecordIdSource;
 import net.ximatai.muyun.spring.web.BusinessMutationResult;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.MutationTenantScopeExecutor;
 import net.ximatai.muyun.spring.web.MutationTenantScopeResolver;
@@ -60,6 +61,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.user", title = "用户管理")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 60)
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements

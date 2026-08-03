@@ -12,6 +12,8 @@ import net.ximatai.muyun.spring.platform.module.StaticServiceAbilityCompiler;
 import net.ximatai.muyun.spring.web.RecordWebProjectionPolicy;
 import net.ximatai.muyun.spring.web.ScopedWeb;
 import net.ximatai.muyun.spring.platform.web.StaticAbilityOperationRuntime;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApiEndpoint;
 import net.ximatai.muyun.spring.platform.web.StandardWebEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -41,6 +43,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
     private final RequestMappingHandlerMapping handlerMapping;
     private final RegisteredWebEndpointCatalog endpointCatalog;
     private final ObjectProvider<RecycleBinFacade> recycleBinFacade;
+    private final ObjectProvider<StaticModuleOpenApiEndpoint> staticModuleOpenApiEndpoint;
     private final PlatformWebOperationDispatcher dispatcher;
     private final StaticWebEndpointProjectionCompiler projectionCompiler = new StaticWebEndpointProjectionCompiler();
 
@@ -56,10 +59,20 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
                                              RegisteredWebEndpointCatalog endpointCatalog,
                                              ObjectProvider<RecycleBinFacade> recycleBinFacade,
                                              ObjectMapper objectMapper) {
+        this(applicationContext, handlerMapping, endpointCatalog, recycleBinFacade, objectMapper, null);
+    }
+
+    public StaticAbilityWebEndpointRegistrar(ApplicationContext applicationContext,
+                                             RequestMappingHandlerMapping handlerMapping,
+                                             RegisteredWebEndpointCatalog endpointCatalog,
+                                             ObjectProvider<RecycleBinFacade> recycleBinFacade,
+                                             ObjectMapper objectMapper,
+                                             ObjectProvider<StaticModuleOpenApiEndpoint> staticModuleOpenApiEndpoint) {
         this.applicationContext = applicationContext;
         this.handlerMapping = handlerMapping;
         this.endpointCatalog = endpointCatalog;
         this.recycleBinFacade = recycleBinFacade;
+        this.staticModuleOpenApiEndpoint = staticModuleOpenApiEndpoint;
         this.dispatcher = new PlatformWebOperationDispatcher(endpointCatalog, objectMapper,
                 new StaticAbilityOperationRuntime(recycleBinFacade));
     }
@@ -117,6 +130,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
             compiledProjectionBeans.add(beanName);
         }
         requireAnchoredStandardProjections(compiledProjectionBeans);
+        registerStaticModuleOpenApiEndpoints();
         registerExplicitControllerEndpoints();
     }
 
@@ -263,6 +277,57 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
                         definition, mapping, handler.getBean(), handler.getMethod()));
             }
         });
+    }
+
+    private void registerStaticModuleOpenApiEndpoints() {
+        if (staticModuleOpenApiEndpoint == null) {
+            return;
+        }
+        StaticModuleOpenApiEndpoint endpoint = staticModuleOpenApiEndpoint.getIfAvailable();
+        if (endpoint == null) {
+            return;
+        }
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(StaticModuleOpenApi.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            Class<?> beanClass = AopUtils.getTargetClass(bean);
+            PlatformStaticModule module = AnnotationUtils.findAnnotation(beanClass, PlatformStaticModule.class);
+            if (module == null) {
+                throw new IllegalStateException("@StaticModuleOpenApi requires @PlatformStaticModule: "
+                        + beanClass.getName());
+            }
+            for (String basePath : basePaths(beanClass, module.alias())) {
+                registerStaticModuleOpenApiEndpoint(endpoint, module.alias(), basePath + "/openapi");
+            }
+        }
+    }
+
+    private void registerStaticModuleOpenApiEndpoint(StaticModuleOpenApiEndpoint endpoint,
+                                                     String moduleAlias,
+                                                     String path) {
+        endpoint.register(moduleAlias, path);
+        RequestMappingInfo mapping = RequestMappingInfo.paths(path)
+                .methods(RequestMethod.GET)
+                .options(handlerMapping.getBuilderConfiguration())
+                .build();
+        ExistingMapping existing = findExistingMapping(path, RequestMethod.GET);
+        if (existing != null) {
+            throw new IllegalStateException("static module OpenAPI mapping already exists at GET " + path
+                    + ": " + existing.handler());
+        }
+        HandlerMethod handlerMethod = new HandlerMethod(endpoint,
+                org.springframework.util.ReflectionUtils.findMethod(StaticModuleOpenApiEndpoint.class,
+                        "openApi", jakarta.servlet.http.HttpServletRequest.class));
+        try {
+            handlerMapping.registerMapping(mapping, endpoint, handlerMethod.getMethod());
+        } catch (RuntimeException failure) {
+            throw new IllegalStateException("failed to register static module OpenAPI endpoint at GET " + path,
+                    failure);
+        }
+        String endpointId = moduleAlias + ".openApi.get."
+                + Integer.toUnsignedString(path.hashCode(), 36);
+        ResolvedWebEndpoint definition = new ResolvedWebEndpoint(endpointId, moduleAlias, "openApi", "openApi",
+                PlatformAction.VIEW, RequestMethod.GET, path, ResolvedWebEndpoint.Source.STATIC_EXPLICIT);
+        endpointCatalog.register(new RegisteredWebEndpoint(definition, mapping, endpoint, handlerMethod.getMethod()));
     }
 
     private String explicitModuleAlias(Class<?> beanClass) {

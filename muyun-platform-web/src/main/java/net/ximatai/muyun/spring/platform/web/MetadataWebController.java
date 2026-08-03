@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = MetadataService.MODULE_ALIAS, title = "平台元数据")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "元数据管理", order = 30)
 @RequestMapping("/platform.metadata")
 public class MetadataWebController extends WebSupport<MetadataService> implements

@@ -196,10 +196,10 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(get("/{moduleAlias}/openapi", MODULE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleAlias").value(MODULE))
-                .andExpect(jsonPath("$.basePath").value("/" + MODULE))
-                .andExpect(jsonPath("$.operations[0].path").value("/" + MODULE + "/describe"))
-                .andExpect(jsonPath("$.schemas.ContractRecord.type").value("object"));
+                .andExpect(jsonPath("$.openapi").value("3.1.1"))
+                .andExpect(jsonPath("$.x-muyun-module-alias").value(MODULE))
+                .andExpect(jsonPath("$.paths['/sales.contract/describe'].get.operationId").isNotEmpty())
+                .andExpect(jsonPath("$.components.schemas.ContractRecord.type").value("object"));
     }
 
     @Test
@@ -314,9 +314,18 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(get("/{moduleAlias}/openapi", MODULE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/submit/{recordId}')]").isEmpty())
-                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/delete/{id}')]").isEmpty())
-                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/view/{id}')]").isNotEmpty());
+                .andExpect(jsonPath("$.paths['/sales.contract/submit/{recordId}']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/sales.contract/delete/{id}']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/sales.contract/view/{id}'].get").exists());
+    }
+
+    @Test
+    void shouldDeclareViewPermissionForDynamicDescriptionAndOpenApi() throws Exception {
+        Method describe = DynamicRecordWebController.class.getDeclaredMethod("describeModule", String.class);
+        Method openApi = DynamicRecordWebController.class.getDeclaredMethod("openApi", String.class);
+
+        assertThat(describe.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.VIEW);
+        assertThat(openApi.getAnnotation(ActionEndpoint.class).value()).isEqualTo(PlatformAction.VIEW);
     }
 
     @Test

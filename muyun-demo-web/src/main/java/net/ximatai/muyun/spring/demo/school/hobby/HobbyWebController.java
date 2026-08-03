@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.demo.school.hobby;
 
 import net.ximatai.muyun.spring.demo.school.configuration.EducationApplication;
 import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.WebSupport;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Profile;
 @RestController
 @Profile("school-demo")
 @PlatformStaticModule(application = EducationApplication.class, alias = HobbyService.MODULE_ALIAS, title = "爱好")
+@StaticModuleOpenApi
 @RequestMapping("/" + HobbyService.MODULE_ALIAS)
 public class HobbyWebController extends WebSupport<HobbyService>
         implements CrudWeb<Hobby, HobbyService> {

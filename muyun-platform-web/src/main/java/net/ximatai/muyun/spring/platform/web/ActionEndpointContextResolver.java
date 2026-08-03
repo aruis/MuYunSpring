@@ -98,13 +98,35 @@ public class ActionEndpointContextResolver {
     }
 
     public ActionExecutionContext resolve(HttpServletRequest request, ResolvedWebEndpoint endpoint) {
-        ActionExecutionPolicy policy = registeredPolicy(
-                endpoint.moduleAlias(), endpoint.executionPolicy().actionCode())
-                .orElse(endpoint.executionPolicy());
+        ActionExecutionPolicy policy = resolvedPolicy(endpoint.moduleAlias(), endpoint.executionPolicy());
         return ActionExecutionContext.ofPolicy(
                 endpoint.moduleAlias(),
                 policy,
                 recordIds(request),
+                CurrentUserContext.currentUser()
+        );
+    }
+
+    /**
+     * Resolves a module-scoped action outside an HTTP handler while preserving the same persisted
+     * policy override used by the action interceptor.  API catalogs use this to decide whether a
+     * module may be described to the current caller.
+     */
+    public ActionExecutionContext resolveModuleAction(String moduleAlias, net.ximatai.muyun.spring.common.platform.PlatformAction action) {
+        return ActionExecutionContext.ofPolicy(
+                moduleAlias,
+                resolvedPolicy(moduleAlias, action.executionPolicy()),
+                Set.of(),
+                CurrentUserContext.currentUser()
+        );
+    }
+
+    /** Resolves a compiled endpoint for projections such as OpenAPI. */
+    public ActionExecutionContext resolve(ResolvedWebEndpoint endpoint) {
+        return ActionExecutionContext.ofPolicy(
+                endpoint.moduleAlias(),
+                resolvedPolicy(endpoint.moduleAlias(), endpoint.executionPolicy()),
+                Set.of(),
                 CurrentUserContext.currentUser()
         );
     }
@@ -160,6 +182,10 @@ public class ActionEndpointContextResolver {
             return Optional.empty();
         }
         return Optional.of(toPolicy(action));
+    }
+
+    private ActionExecutionPolicy resolvedPolicy(String moduleAlias, ActionExecutionPolicy fallback) {
+        return registeredPolicy(moduleAlias, fallback.actionCode()).orElse(fallback);
     }
 
     private ActionExecutionPolicy toPolicy(PlatformModuleAction action) {
