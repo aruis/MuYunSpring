@@ -66,8 +66,6 @@ public class DynamicOpenApiGenerator {
         List<DynamicOpenApiDocument.Operation> operations = new ArrayList<>();
         operations.add(getOperation(descriptor.moduleAlias(), basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
                 "Describe " + descriptor.title(), null, "DynamicModuleDescriptor", null));
-        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/openapi", operationId(descriptor, "openApi"),
-                "OpenAPI " + descriptor.title(), null, "OpenApi31Document", null));
         if (standardActionVisible.test(PlatformAction.QUERY)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/query", operationId(descriptor, "query"),
                     "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));

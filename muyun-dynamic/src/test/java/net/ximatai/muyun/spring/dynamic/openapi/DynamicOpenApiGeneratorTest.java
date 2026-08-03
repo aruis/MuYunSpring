@@ -43,7 +43,6 @@ class DynamicOpenApiGeneratorTest {
                 .extracting(DynamicOpenApiDocument.Operation::path)
                 .contains(
                         "/sales.contract/describe",
-                        "/sales.contract/openapi",
                         "/sales.contract/query",
                         "/sales.contract/query/summary",
                         "/sales.contract/view/{id}",
@@ -282,18 +281,11 @@ class DynamicOpenApiGeneratorTest {
 
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
-                .contains("/sales.contract/openapi", "/sales.contract/query",
+                .contains("/sales.contract/query",
                         "/sales.contract/import/parse", "/sales.contract/exchange/template",
                         "/sales.contract/export/data", "/sales.contract/export/selected")
-                .doesNotContain("/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}",
+                .doesNotContain("/sales.contract/openapi", "/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}",
                         "/sales.contract/import", "/sales.contract/exchange", "/sales.contract/export");
-        assertThat(document.operations().stream()
-                .filter(operation -> operation.path().equals("/sales.contract/openapi")))
-                .singleElement()
-                .satisfies(operation -> {
-                    assertThat(operation.method()).isEqualTo("GET");
-                    assertThat(operation.actionCode()).isNull();
-                });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/view/{id}/associations/{viewCode}/query")))
                 .singleElement()
@@ -583,20 +575,18 @@ class DynamicOpenApiGeneratorTest {
     }
 
     @Test
-    void shouldExposeDescribeAndOpenApiDocumentSchemas() {
+    void shouldExposeDescribeDocumentSchemasWithoutTheDocumentDeliveryContract() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
 
         assertThat(document.schemas().get("DynamicModuleDescriptor").properties())
                 .containsKeys("moduleAlias", "title", "mainEntityAlias", "actions", "entities",
                         "relations", "references", "associationViews");
-        assertThat(document.schemas().get("OpenApi31Document").properties())
-                .containsKeys("openapi", "info", "paths", "components");
+        assertThat(document.schemas()).doesNotContainKey("OpenApi31Document");
         assertThat(document.schemas().get("BinaryFile"))
                 .extracting(DynamicOpenApiDocument.Schema::type, DynamicOpenApiDocument.Schema::format)
                 .containsExactly("string", "binary");
-        assertThat(document.operations()).filteredOn(operation -> operation.path().endsWith("/openapi"))
-                .singleElement().extracting(DynamicOpenApiDocument.Operation::responseSchema)
-                .isEqualTo("OpenApi31Document");
+        assertThat(document.operations()).extracting(DynamicOpenApiDocument.Operation::path)
+                .doesNotContain("/sales.contract/openapi");
     }
 
     @Test

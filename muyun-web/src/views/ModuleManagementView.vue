@@ -32,7 +32,8 @@ import {
 } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import { createModuleManagementState, moduleTitleOf } from './moduleManagementState';
-import { loadOpenApiCatalog } from '../app/moduleOpenApi';
+import { createModuleOpenApiPageDescriptor, loadOpenApiCatalog } from '../app/moduleOpenApi';
+import { useWorkbenchNavigation } from '../app/workbenchNavigation';
 
 defineOptions({ name: 'ModuleManagementView' });
 
@@ -56,6 +57,7 @@ const moduleSearchKeyword = ref('');
 const moduleFormFieldDefinitions = ref(resolveRecordFormFields(undefined));
 const treeClients = new Map<string, StaticModuleTreeClient<PlatformModule>>();
 const openApiModuleAliases = ref(new Set<string>());
+const workbenchNavigation = useWorkbenchNavigation();
 
 const {
   moduleReloadKey,
@@ -270,7 +272,7 @@ function handleModuleAction(action: RecordActionItem) {
 function openModuleOpenApi() {
   const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
   if (!moduleAlias) return;
-  window.location.assign(`/openapi/${encodeURIComponent(moduleAlias)}`);
+  workbenchNavigation?.openPage(createModuleOpenApiPageDescriptor(moduleAlias, selectedModule.value?.title));
 }
 
 function updateDraftField(

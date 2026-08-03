@@ -670,6 +670,22 @@ test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no men
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
 });
 
+test('restoreWorkbenchStartupStateFromUrl restores a module OpenAPI document as a direct tab', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+    activeTabKey: undefined,
+  };
+
+  const restored = restoreWorkbenchStartupStateFromUrl(state, '/openapi/education.teacher');
+
+  assert.equal(restored.tabs?.length, 1);
+  assert.equal(restored.tabs?.[0]?.title, 'education.teacher.OpenAPI');
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.moduleAlias, 'education.teacher');
+  assert.equal(activeTabUrlOf(restored), '/openapi/education.teacher');
+});
+
 test('restoreWorkbenchStartupStateFromUrl restores a declared workspace view ahead of its menu route', () => {
   const state = {
     session: { currentUser },

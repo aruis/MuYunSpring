@@ -57,10 +57,6 @@ public class StaticModuleOpenApiGenerator {
                 .filter(endpoint -> authorized(endpoint.definition()))
                 .map(endpoint -> operation(endpoint, schemaFactory.mainSchemaName(module)))
                 .toList();
-        PlatformApiDocument.Operation openApi = new PlatformApiDocument.Operation("GET", basePath + "/openapi",
-                module.moduleAlias().replace('.', '_') + "_openApi", "OpenAPI " + module.title(),
-                null, "OpenApi31Document", null, null, DEFAULT_ERRORS);
-        operations = java.util.stream.Stream.concat(operations.stream(), java.util.stream.Stream.of(openApi)).toList();
         return new StaticOpenApiDocument(module.moduleAlias(), module.title(), basePath, operations,
                 schemaFactory.schemas(module), errors());
     }

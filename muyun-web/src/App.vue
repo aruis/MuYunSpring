@@ -40,7 +40,11 @@ import { connectAppRealtime } from './app/realtime';
 import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
 import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
-import { isOpenApiCatalogPath, moduleAliasFromOpenApiPath } from './app/moduleOpenApi';
+import {
+  createModuleOpenApiPageDescriptor,
+  isModuleOpenApiPage,
+  isOpenApiCatalogPath,
+} from './app/moduleOpenApi';
 import ModuleOpenApiView from './views/ModuleOpenApiView.vue';
 import OpenApiCatalogView from './views/OpenApiCatalogView.vue';
 import {
@@ -70,7 +74,6 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const securityNotification = ref<WebUserNotification>();
 const securityLogoutCountdown = ref(0);
-const openApiModuleAlias = ref(moduleAliasFromOpenApiPath(window.location.pathname));
 const openApiCatalogOpen = ref(isOpenApiCatalogPath(window.location.pathname));
 const realtimeStatus = ref<WorkbenchRealtimeStatus>('unavailable');
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
@@ -126,7 +129,7 @@ async function loadWorkbench() {
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
     reconnectRealtime();
-    if (!openApiModuleAlias.value && !openApiCatalogOpen.value) {
+    if (!openApiCatalogOpen.value) {
       syncBrowserUrl(state);
     }
   } catch (cause) {
@@ -472,20 +475,21 @@ function currentBrowserPath() {
 }
 
 function updateSpecialRoute() {
-  openApiModuleAlias.value = moduleAliasFromOpenApiPath(window.location.pathname);
   openApiCatalogOpen.value = isOpenApiCatalogPath(window.location.pathname);
 }
 
 function returnToWorkbench() {
-  openApiModuleAlias.value = undefined;
   openApiCatalogOpen.value = false;
-  window.history.replaceState(window.history.state, '', '/');
+  if (startup.value) syncBrowserUrl(startup.value);
 }
 
-function openModuleOpenApi(moduleAlias: string) {
+function openModuleOpenApi(moduleAlias: string, moduleTitle?: string) {
   openApiCatalogOpen.value = false;
-  openApiModuleAlias.value = moduleAlias;
-  window.history.pushState(window.history.state, '', `/openapi/${encodeURIComponent(moduleAlias)}`);
+  handleOpenPage(createModuleOpenApiPageDescriptor(moduleAlias, moduleTitle));
+}
+
+function resolveModuleOpenApiTitle(tabKey: string, moduleAlias: string, moduleTitle: string) {
+  handleReplacePage(tabKey, createModuleOpenApiPageDescriptor(moduleAlias, moduleTitle));
 }
 
 function syncBrowserUrl(state: WorkbenchStartupState) {
@@ -513,11 +517,6 @@ function requiresLogin(cause: unknown) {
     :error="error"
     @authenticated="handleAuthenticated"
   />
-  <ModuleOpenApiView
-    v-else-if="openApiModuleAlias"
-    :module-alias="openApiModuleAlias"
-    @back="returnToWorkbench"
-  />
   <OpenApiCatalogView v-else-if="openApiCatalogOpen" @open="openModuleOpenApi" @back="returnToWorkbench" />
   <Workbench
     v-else
@@ -531,9 +530,16 @@ function requiresLogin(cause: unknown) {
     @close-tab="handleCloseTab"
     @user-command="handleUserCommand"
   >
-    <template #default="{ pageDescriptor }">
+    <template #default="{ activeTab, pageDescriptor }">
+      <ModuleOpenApiView
+        v-if="isModuleOpenApiPage(pageDescriptor)"
+        :module-alias="pageDescriptor?.target.moduleAlias ?? ''"
+        @title-resolved="
+          resolveModuleOpenApiTitle(activeTab.key, pageDescriptor?.target.moduleAlias ?? '', $event)
+        "
+      />
       <StaticBusinessRouteOutlet
-        v-if="isStaticBusinessRoutePage(pageDescriptor)"
+        v-else-if="isStaticBusinessRoutePage(pageDescriptor)"
         :descriptor="pageDescriptor"
       />
       <WorkbenchOutlet v-else :descriptor="pageDescriptor" />

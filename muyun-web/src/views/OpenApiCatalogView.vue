@@ -4,7 +4,7 @@ import { presentPlatformError } from '@muyun/platform-components';
 import { createBackendHttpClient } from '../app/backendHttp';
 import { loadOpenApiCatalog, type OpenApiModuleCatalogItem } from '../app/moduleOpenApi';
 
-const emit = defineEmits<{ open: [moduleAlias: string]; back: [] }>();
+const emit = defineEmits<{ open: [moduleAlias: string, title: string]; back: [] }>();
 const modules = ref<OpenApiModuleCatalogItem[]>([]);
 const loading = ref(false);
 const error = ref<string>();
@@ -44,7 +44,7 @@ async function load() {
         v-for="module in modules"
         :key="module.moduleAlias"
         type="button"
-        @click="emit('open', module.moduleAlias)"
+        @click="emit('open', module.moduleAlias, module.title)"
       >
         <span class="module-kind">{{ module.moduleKind === 'dynamic' ? '动态' : '静态' }}</span>
         <strong>{{ module.title }}</strong>

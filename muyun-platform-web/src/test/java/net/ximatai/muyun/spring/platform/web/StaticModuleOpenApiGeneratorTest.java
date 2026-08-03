@@ -60,8 +60,8 @@ class StaticModuleOpenApiGeneratorTest {
         assertThat(document.basePath()).isEqualTo("/education.teacher");
         assertThat(document.operations())
                 .extracting(operation -> operation.path())
-                .containsExactly("/education.teacher/query", "/education.teacher/enable/{id}",
-                        "/education.teacher/openapi");
+                .containsExactly("/education.teacher/query", "/education.teacher/enable/{id}")
+                .doesNotContain("/education.teacher/openapi");
         assertThat(document.operations().getFirst().permissionCode()).isEqualTo(
                 PlatformPermissionCode.action("education.teacher",
                         PlatformAction.permissionActionCodeOf(PlatformAction.QUERY.code())));

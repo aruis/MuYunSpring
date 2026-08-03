@@ -30,7 +30,6 @@ final class StaticModuleOpenApiSchemaFactory {
             schemas.put(entitySchemaName + "PageResponse", pageResponseSchema(entitySchemaName));
         }
         schemas.put("PlatformWebError", platformWebErrorSchema());
-        schemas.put("OpenApi31Document", openApi31DocumentSchema());
         return Map.copyOf(schemas);
     }
 
@@ -160,16 +159,6 @@ final class StaticModuleOpenApiSchemaFactory {
                 "targets", arrayProperty("object"),
                 "details", objectProperty(null),
                 "messageArgs", objectProperty(null)
-        ), null);
-    }
-
-    PlatformApiDocument.Schema openApi31DocumentSchema() {
-        return new PlatformApiDocument.Schema("OpenApi31Document", "object", null, List.of("openapi", "info", "paths"), Map.of(
-                "openapi", new PlatformApiDocument.Property("string", null, true, false, false,
-                        null, "OpenAPI specification version", null, null, null, null, List.of()),
-                "info", objectProperty(null),
-                "paths", objectProperty(null),
-                "components", objectProperty(null)
         ), null);
     }
 

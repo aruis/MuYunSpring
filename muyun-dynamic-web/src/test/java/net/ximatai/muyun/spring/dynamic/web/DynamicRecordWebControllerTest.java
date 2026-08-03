@@ -199,6 +199,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.openapi").value("3.1.1"))
                 .andExpect(jsonPath("$.x-muyun-module-alias").value(MODULE))
                 .andExpect(jsonPath("$.paths['/sales.contract/describe'].get.operationId").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/sales.contract/openapi']").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.ContractRecord.type").value("object"));
     }
 

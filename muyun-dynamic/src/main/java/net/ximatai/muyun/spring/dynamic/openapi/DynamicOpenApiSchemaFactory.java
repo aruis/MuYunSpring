@@ -81,7 +81,6 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("PlatformModuleTaskCheckDefinition", moduleTaskCheckDefinitionSchema());
         schemas.put("DynamicViewDescriptor", viewDescriptorSchema());
         schemas.put("DynamicViewFieldDescriptor", viewFieldDescriptorSchema());
-        schemas.put("OpenApi31Document", openApi31DocumentSchema());
         schemas.put("BinaryFile", new DynamicOpenApiDocument.Schema("BinaryFile", "string", "binary",
                 List.of(), Map.of(), null));
         schemas.put("DynamicActionDescriptorList", arraySchema("DynamicActionDescriptorList", "DynamicActionDescriptor"));
@@ -497,16 +496,6 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("required", booleanProperty(false));
         return new DynamicOpenApiDocument.Schema("DynamicViewFieldDescriptor", "object", null,
                 List.of("fieldName", "title", "visible", "controlType"), properties, null);
-    }
-
-    private DynamicOpenApiDocument.Schema openApi31DocumentSchema() {
-        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
-        properties.put("openapi", stringProperty(false));
-        properties.put("info", objectProperty("object"));
-        properties.put("paths", objectProperty("object"));
-        properties.put("components", objectProperty("object"));
-        return new DynamicOpenApiDocument.Schema("OpenApi31Document", "object", null,
-                List.of("openapi", "info", "paths"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema queryRequestSchema(String name,
