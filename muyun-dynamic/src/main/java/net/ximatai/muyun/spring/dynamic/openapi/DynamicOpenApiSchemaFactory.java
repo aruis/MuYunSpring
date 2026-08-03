@@ -25,6 +25,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
         schemas.put("WebQueryCriteria", queryCriteriaSchema());
         schemas.put("WebPageRequest", pageRequestSchema("WebPageRequest"));
+        schemas.put("RecordActionWebRequest", recordActionWebRequestSchema());
         schemas.put("WebSort", sortSchema("WebSort"));
         schemas.put("DynamicSummaryItem", summaryItemSchema());
         schemas.put("DynamicSummaryItemList", summaryItemListSchema());
@@ -615,6 +616,13 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("pageSize", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema recordActionWebRequestSchema() {
+        return new DynamicOpenApiDocument.Schema("RecordActionWebRequest", "object", null, List.of("version"), Map.of(
+                "version", new DynamicOpenApiDocument.Property("integer", "int32", true, false,
+                        false, null, null, null, null, null, List.of())
+        ), null);
     }
 
     private DynamicOpenApiDocument.Schema sortSchema(String name) {

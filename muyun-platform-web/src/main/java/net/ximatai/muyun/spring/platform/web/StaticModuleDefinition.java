@@ -33,6 +33,7 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
     private final List<StaticModuleReadProjectionDefinition> readProjections;
     private final Class<?> modelClass;
     private final List<RelationProjectionJoinDefinition> projectionJoins;
+    private final boolean openApiAvailable;
 
     private StaticModuleDefinition(String applicationAlias,
                                    String moduleAlias,
@@ -48,7 +49,8 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
                                    List<StaticReferenceDefinition> references,
                                    List<StaticModuleReadProjectionDefinition> readProjections,
                                    Class<?> modelClass,
-                                   List<RelationProjectionJoinDefinition> projectionJoins) {
+                                   List<RelationProjectionJoinDefinition> projectionJoins,
+                                   boolean openApiAvailable) {
         applicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         moduleAlias = PlatformNameRules.requireModuleAliasInApplication(moduleAlias, applicationAlias);
         title = title == null || title.isBlank() ? moduleAlias : title.trim();
@@ -94,6 +96,7 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
         this.readProjections = readProjections;
         this.modelClass = modelClass;
         this.projectionJoins = projectionJoins;
+        this.openApiAvailable = openApiAvailable;
     }
 
     public String applicationAlias() { return applicationAlias; }
@@ -111,6 +114,7 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
     public List<StaticModuleReadProjectionDefinition> readProjections() { return readProjections; }
     public Class<?> modelClass() { return modelClass; }
     public List<RelationProjectionJoinDefinition> projectionJoins() { return projectionJoins; }
+    public boolean openApiAvailable() { return openApiAvailable; }
 
     public String getApplicationAlias() { return applicationAlias; }
     public String getModuleAlias() { return moduleAlias; }
@@ -127,6 +131,7 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
     public List<StaticModuleReadProjectionDefinition> getReadProjections() { return readProjections; }
     public Class<?> getModelClass() { return modelClass; }
     public List<RelationProjectionJoinDefinition> getProjectionJoins() { return projectionJoins; }
+    public boolean isOpenApiAvailable() { return openApiAvailable; }
 
     @Override
     public boolean equals(Object other) {
@@ -146,14 +151,15 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
                 && Objects.equals(references, that.references)
                 && Objects.equals(readProjections, that.readProjections)
                 && Objects.equals(modelClass, that.modelClass)
-                && Objects.equals(projectionJoins, that.projectionJoins);
+                && Objects.equals(projectionJoins, that.projectionJoins)
+                && openApiAvailable == that.openApiAvailable;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute,
                 entryExternalUrl, capabilities, actions, entities, uiDefinition, references, readProjections,
-                modelClass, projectionJoins);
+                modelClass, projectionJoins, openApiAvailable);
     }
 
     @Override
@@ -172,7 +178,8 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
                 + ", references=" + references
                 + ", readProjections=" + readProjections
                 + ", modelClass=" + modelClass
-                + ", projectionJoins=" + projectionJoins + "]";
+                + ", projectionJoins=" + projectionJoins
+                + ", openApiAvailable=" + openApiAvailable + "]";
     }
 
     public boolean supports(EntityCapability capability) {
@@ -194,7 +201,8 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
                 .references(references)
                 .readProjections(readProjections)
                 .modelClass(modelClass)
-                .projectionJoins(projectionJoins);
+                .projectionJoins(projectionJoins)
+                .openApiAvailable(openApiAvailable);
     }
 
     public static final class Builder {
@@ -213,6 +221,7 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
         private List<StaticModuleReadProjectionDefinition> readProjections = List.of();
         private Class<?> modelClass;
         private List<RelationProjectionJoinDefinition> projectionJoins = List.of();
+        private boolean openApiAvailable;
 
         private Builder(String applicationAlias, String moduleAlias, String title) {
             this.applicationAlias = applicationAlias;
@@ -272,10 +281,15 @@ public final class StaticModuleDefinition implements StaticModuleRegistration {
             return this;
         }
 
+        public Builder openApiAvailable(boolean value) {
+            this.openApiAvailable = value;
+            return this;
+        }
+
         public StaticModuleDefinition build() {
             return new StaticModuleDefinition(applicationAlias, moduleAlias, title, parentModuleAlias, entryType,
                     entryRoute, entryExternalUrl, capabilities, actions, entities, uiDefinition, references,
-                    readProjections, modelClass, projectionJoins);
+                    readProjections, modelClass, projectionJoins, openApiAvailable);
         }
     }
 

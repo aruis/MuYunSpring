@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.demo.school.student;
 
 import net.ximatai.muyun.spring.demo.school.configuration.EducationApplication;
 import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.WebSupport;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Profile;
 @RestController
 @Profile("school-demo")
 @PlatformStaticModule(application = EducationApplication.class, alias = StudentService.MODULE_ALIAS, title = "学生")
+@StaticModuleOpenApi
 @RequestMapping("/" + StudentService.MODULE_ALIAS)
 public class StudentWebController extends WebSupport<StudentService>
         implements CrudWeb<Student, StudentService> {

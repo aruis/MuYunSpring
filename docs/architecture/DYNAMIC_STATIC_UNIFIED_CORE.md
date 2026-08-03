@@ -83,6 +83,8 @@ DynamicRecordService
 
 Web 层通过标准投射描述组合模块基础路径、动作相对路径、HTTP method 和输入绑定，并把启用的 Operation 注册为真实 Spring MVC mapping。所有编译端点进入同一个平台 Dispatcher，不为每种 Ability 生成 Handler 类。端点在 Spring MVC 接受后写入真实端点目录，目录保留实际 `RequestMappingInfo`、Operation 语义和执行目标；模块运行态、Action 权限和后续 OpenAPI 应消费这条统一链路。动态元数据后续也应编译到相同 Operation 和端点目录，不能再维护一套独立硬编码路径。
 
+静态模块在 Web Controller 上以 `@StaticModuleOpenApi` 声明 `GET /{moduleAlias}/openapi`；平台启动时据此注册精确映射，`CrudWeb` 与非 CRUD 静态模块均可按需接入，且不把文档交付误建模为 CRUD 类型能力。该入口与动态模块统一输出 OpenAPI 3.1.1：平台以来源无关的 `PlatformApiDocument` 作为内部编译模型，再投影为标准 `openapi`、`paths`、`components.schemas` 和 Bearer 安全方案。模块文档和 descriptor 的描述权限统一为模块 `VIEW`；API 目录和静态文档路径都会按同一动作策略（包括平台配置覆盖）过滤。静态 Schema 从已编译的 `EntityDefinition` 产生，动态 Schema 从运行态 descriptor 产生；动作码、权限码、引用、候选来源和时间语义通过 `x-muyun-*` 扩展保留，不用私有格式替代标准 OpenAPI。
+
 标准 Ability 端点、Web 投影差异和独立业务 HTTP 接口遵守三条边界：
 
 - 标准启停、排序、树和回收站端点由 Ability 自动装配；`@PlatformStaticActionContribution` 子资源也进入同一编译链，其资源前缀动作和权限继承关系写入 resolved endpoint。

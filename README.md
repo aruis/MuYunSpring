@@ -100,10 +100,10 @@ docs              架构原则、平台专题、前端路线和技术债记录
 一键启动本地开发栈：
 
 ```bash
-./scripts/dev-local.sh
+./scripts/dev-local.sh --demo
 ```
 
-该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。脚本以 `school-demo` 运行完整学校演示环境，并准备对应的租户、机构、角色和学校业务数据。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。纯平台开发请直接运行标准 `bootRun`，不加载 Demo。
+该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。`--demo` 以 `school-demo` 运行完整学校演示环境，并准备对应的租户、机构、角色和学校业务数据；这是脚本的默认模式。纯平台开发使用 `./scripts/dev-local.sh --platform`，不加载 Demo。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。
 
 也可以按下面步骤分开启动。
 

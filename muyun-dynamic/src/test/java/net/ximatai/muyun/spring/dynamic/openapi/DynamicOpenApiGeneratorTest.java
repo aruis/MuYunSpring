@@ -33,6 +33,12 @@ class DynamicOpenApiGeneratorTest {
 
         assertThat(document.moduleAlias()).isEqualTo("sales.contract");
         assertThat(document.basePath()).isEqualTo("/sales.contract");
+        assertThat(document.schemas()).containsKey("RecordActionWebRequest");
+        assertThat(document.operations()).filteredOn(operation -> "/sales.contract/insert".equals(operation.path()))
+                .singleElement().extracting(DynamicOpenApiDocument.Operation::successStatus).isEqualTo(201);
+        assertThat(document.operations()).filteredOn(operation -> "/sales.contract/delete/{id}".equals(operation.path()))
+                .singleElement().extracting(DynamicOpenApiDocument.Operation::requestSchema)
+                .isEqualTo("RecordActionWebRequest");
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
                 .contains(

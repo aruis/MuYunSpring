@@ -177,9 +177,15 @@ class MuYunSpringApplicationContextIT {
                         "platform.application.recycleBin.restore");
         assertThat(registeredWebEndpointCatalog.endpoints().stream()
                 .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
-                .filteredOn(endpoint -> !endpoint.definition().abilityCode().equals("controller"))
+                .filteredOn(endpoint -> !endpoint.definition().abilityCode().equals("controller")
+                        && !endpoint.definition().abilityCode().equals("openApi"))
                 .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
                         .isEqualTo(ResolvedWebEndpoint.Source.STATIC_ABILITY));
+        assertThat(registeredWebEndpointCatalog.endpoints().stream()
+                .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
+                .filteredOn(endpoint -> endpoint.definition().abilityCode().equals("openApi"))
+                .allSatisfy(endpoint -> assertThat(endpoint.definition().source())
+                        .isEqualTo(ResolvedWebEndpoint.Source.STATIC_EXPLICIT));
         assertThat(registeredWebEndpointCatalog.endpoints().stream()
                 .filter(endpoint -> endpoint.definition().moduleAlias().equals("platform.application")))
                 .filteredOn(endpoint -> endpoint.definition().abilityCode().equals("controller"))

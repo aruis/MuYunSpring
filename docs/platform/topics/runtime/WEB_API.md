@@ -16,8 +16,8 @@
 
 | 方法 | URL | 功能 |
 | --- | --- | --- |
-| `GET` | `/{moduleAlias}/describe` | 返回动态模块 descriptor，包含主实体、字段、能力、关系、引用、视图、关联视图和动作目录。 |
-| `GET` | `/{moduleAlias}/openapi` | 返回由 descriptor 生成的动态 OpenAPI 基础文档模型。 |
+| `GET` | `/{moduleAlias}/describe` | 返回动态模块 descriptor，包含主实体、字段、能力、关系、引用、视图、关联视图和动作目录；需要模块 `VIEW` 权限。 |
+| `GET` | `/{moduleAlias}/openapi` | 返回由 descriptor 生成的 OpenAPI 3.1.1 文档；需要模块 `VIEW` 权限。 |
 
 ## 查询与记录
 

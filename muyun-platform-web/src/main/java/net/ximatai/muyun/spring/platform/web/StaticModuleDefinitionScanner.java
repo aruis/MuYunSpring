@@ -83,6 +83,7 @@ public class StaticModuleDefinitionScanner implements StaticModuleRegistrationSo
                 .readProjections(readProjections(bean))
                 .modelClass(modelClass(bean))
                 .projectionJoins(projectionJoins)
+                .openApiAvailable(AnnotationUtils.findAnnotation(beanClass, StaticModuleOpenApi.class) != null)
                 .build();
     }
 

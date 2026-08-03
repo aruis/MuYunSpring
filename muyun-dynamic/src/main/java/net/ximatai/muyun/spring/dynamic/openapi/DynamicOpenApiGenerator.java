@@ -330,16 +330,22 @@ public class DynamicOpenApiGenerator {
         String effectivePermissionCode = permissionCode == null && actionCode != null
                 ? PlatformPermissionCode.action(moduleAlias, PlatformAction.permissionActionCodeOf(actionCode))
                 : permissionCode;
+        String effectiveRequestSchema = PlatformAction.DELETE.code().equals(actionCode)
+                && path.endsWith("/delete/{id}") && requestSchema == null
+                ? "RecordActionWebRequest"
+                : requestSchema;
+        int successStatus = PlatformAction.CREATE.code().equals(actionCode) && path.endsWith("/insert") ? 201 : 200;
         return new DynamicOpenApiDocument.Operation(
                 method,
                 path,
                 operationId,
                 summary,
-                requestSchema,
+                effectiveRequestSchema,
                 responseSchema,
                 actionCode,
                 effectivePermissionCode,
-                DEFAULT_ERRORS
+                DEFAULT_ERRORS,
+                successStatus
         );
     }
 

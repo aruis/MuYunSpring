@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.application.ApplicationService;
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApiGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +84,9 @@ public class TeachingDemoIT {
     @Autowired
     private ApplicationService applicationService;
 
+    @Autowired
+    private StaticModuleOpenApiGenerator openApiGenerator;
+
     @DynamicPropertySource
     static void applicationProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
@@ -108,6 +112,14 @@ public class TeachingDemoIT {
                         "education.teacher.enable.disable", "education.classroom.sort.sort",
                         "education.classroom.recycleBin.restore", "education.hobby.tree.tree",
                         "education.hobby.tree.sort");
+    }
+
+    @Test
+    void shouldDescribeTeacherModuleThroughAcceptedStaticEndpointCatalog() {
+        var document = openApiGenerator.generate(TeacherService.MODULE_ALIAS);
+
+        assertThat(document.operations()).extracting(operation -> operation.path())
+                .contains("/education.teacher/openapi");
     }
 
     @Test

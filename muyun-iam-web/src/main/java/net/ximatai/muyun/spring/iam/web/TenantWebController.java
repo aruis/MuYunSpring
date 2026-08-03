@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.iam.web;
 
+import net.ximatai.muyun.spring.platform.web.StaticModuleOpenApi;
 import net.ximatai.muyun.spring.platform.web.CrudWeb;
 import net.ximatai.muyun.spring.web.SystemScope;
 import net.ximatai.muyun.spring.web.WebSupport;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.tenant", title = "租户管理")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
 @RequestMapping("/iam.tenant")
 public class TenantWebController extends WebSupport<TenantService> implements

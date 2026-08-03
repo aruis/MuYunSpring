@@ -16,11 +16,15 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +40,7 @@ import java.util.List;
 
 @RestController
 @PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
+@StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "模块管理", order = 20)
 @RequestMapping("/platform.module")
 public class PlatformModuleWebController extends WebSupport<PlatformModuleService> implements
@@ -43,6 +48,9 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         SystemScope<PlatformModuleService> {
 
     private PlatformDynamicRuntimeRefreshService runtimeRefreshService;
+    private StaticModuleDefinitionCatalog staticModuleCatalog;
+    private ActionEndpointContextResolver actionContextResolver;
+    private ActionExecutionPolicyService actionExecutionPolicyService;
 
     @Autowired
     public PlatformModuleWebController(PlatformDynamicRuntimeRefreshService runtimeRefreshService) {
@@ -50,6 +58,29 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
     }
 
     public PlatformModuleWebController() {
+    }
+
+    @Autowired
+    void configureStaticModuleCatalog(StaticModuleDefinitionCatalog value) {
+        this.staticModuleCatalog = value;
+    }
+
+    @Autowired
+    void configureOpenApiAuthorization(ActionEndpointContextResolver contextResolver,
+                                       ActionExecutionPolicyService policyService) {
+        this.actionContextResolver = contextResolver;
+        this.actionExecutionPolicyService = policyService;
+    }
+
+    @GetMapping("/openapi/catalog")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public List<OpenApiModuleCatalogItem> openApiCatalog() {
+        return webScope(() -> service().listVisibleModules().stream()
+                .filter(this::openApiAvailable)
+                .filter(this::openApiDescribable)
+                .map(module -> new OpenApiModuleCatalogItem(module.getAlias(), module.getTitle(),
+                        module.getModuleKind().getCode(), "/" + module.getAlias() + "/openapi"))
+                .toList());
     }
 
     @PostMapping("/sort/{id}")
@@ -144,6 +175,28 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         for (PlatformModule child : service().children(applicationAlias, parentId)) {
             rows.add(child);
             appendDescendants(applicationAlias, child.getId(), rows);
+        }
+    }
+
+    private boolean openApiAvailable(PlatformModule module) {
+        if (module.getModuleKind() == ModuleKind.DYNAMIC) {
+            return true;
+        }
+        return staticModuleCatalog != null && staticModuleCatalog.find(module.getAlias())
+                .map(StaticModuleDefinition::openApiAvailable)
+                .orElse(false);
+    }
+
+    private boolean openApiDescribable(PlatformModule module) {
+        if (actionContextResolver == null || actionExecutionPolicyService == null) {
+            return true;
+        }
+        try {
+            actionExecutionPolicyService.authorize(actionContextResolver.resolveModuleAction(
+                    module.getAlias(), PlatformAction.VIEW));
+            return true;
+        } catch (AuthenticationRequiredException | PlatformAccessDeniedException ignored) {
+            return false;
         }
     }
 

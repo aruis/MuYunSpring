@@ -40,6 +40,9 @@ import { connectAppRealtime } from './app/realtime';
 import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
 import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
+import { isOpenApiCatalogPath, moduleAliasFromOpenApiPath } from './app/moduleOpenApi';
+import ModuleOpenApiView from './views/ModuleOpenApiView.vue';
+import OpenApiCatalogView from './views/OpenApiCatalogView.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
@@ -67,6 +70,8 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const securityNotification = ref<WebUserNotification>();
 const securityLogoutCountdown = ref(0);
+const openApiModuleAlias = ref(moduleAliasFromOpenApiPath(window.location.pathname));
+const openApiCatalogOpen = ref(isOpenApiCatalogPath(window.location.pathname));
 const realtimeStatus = ref<WorkbenchRealtimeStatus>('unavailable');
 const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
 let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
@@ -93,6 +98,7 @@ configureAuthenticationRecovery((error, token) => {
 });
 
 onMounted(async () => {
+  window.addEventListener('popstate', updateSpecialRoute);
   if (!usesMockStartup() && !effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN)) {
     loginRequired.value = true;
     loading.value = false;
@@ -103,6 +109,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearSecurityLogoutTimer();
+  window.removeEventListener('popstate', updateSpecialRoute);
 });
 
 async function loadWorkbench() {
@@ -119,7 +126,9 @@ async function loadWorkbench() {
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
     reconnectRealtime();
-    syncBrowserUrl(state);
+    if (!openApiModuleAlias.value && !openApiCatalogOpen.value) {
+      syncBrowserUrl(state);
+    }
   } catch (cause) {
     if (isPasswordChangeRequiredError(cause)) {
       openChangeOwnPasswordDialog();
@@ -462,6 +471,23 @@ function currentBrowserPath() {
   return `${window.location.pathname}${window.location.search}`;
 }
 
+function updateSpecialRoute() {
+  openApiModuleAlias.value = moduleAliasFromOpenApiPath(window.location.pathname);
+  openApiCatalogOpen.value = isOpenApiCatalogPath(window.location.pathname);
+}
+
+function returnToWorkbench() {
+  openApiModuleAlias.value = undefined;
+  openApiCatalogOpen.value = false;
+  window.history.replaceState(window.history.state, '', '/');
+}
+
+function openModuleOpenApi(moduleAlias: string) {
+  openApiCatalogOpen.value = false;
+  openApiModuleAlias.value = moduleAlias;
+  window.history.pushState(window.history.state, '', `/openapi/${encodeURIComponent(moduleAlias)}`);
+}
+
 function syncBrowserUrl(state: WorkbenchStartupState) {
   const url = activeTabUrlOf(state) ?? '/';
   if (url === currentBrowserPath()) {
@@ -487,6 +513,12 @@ function requiresLogin(cause: unknown) {
     :error="error"
     @authenticated="handleAuthenticated"
   />
+  <ModuleOpenApiView
+    v-else-if="openApiModuleAlias"
+    :module-alias="openApiModuleAlias"
+    @back="returnToWorkbench"
+  />
+  <OpenApiCatalogView v-else-if="openApiCatalogOpen" @open="openModuleOpenApi" @back="returnToWorkbench" />
   <Workbench
     v-else
     v-model:active-tab-key="activeTabKey"

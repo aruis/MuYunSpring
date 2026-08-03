@@ -74,6 +74,10 @@ val demoRuntimeOutputs = files(demoRuntimeProjectPaths.map { projectPath ->
         .named("main")
         .map { sourceSet -> sourceSet.output }
 })
+val bootMainOutput = extensions
+    .getByType<SourceSetContainer>()
+    .named("main")
+    .map { sourceSet -> sourceSet.output }
 val standardRuntimeBuildDirectories = standardRuntimeProjectPaths.map { projectPath ->
     rootProject.project(projectPath).layout.buildDirectory
 }
@@ -97,7 +101,7 @@ tasks.register<BootRun>("demoBootRun") {
     mainClass.set("net.ximatai.muyun.spring.boot.MuYunSpringApplication")
     systemProperty("spring.profiles.include", "school-demo")
     // DevTools needs mutable project outputs for every assembled module, including the optional demo.
-    classpath = demoRuntimeOutputs + demoRuntimeClasspath.filter { entry ->
+    classpath = bootMainOutput.get() + demoRuntimeOutputs + demoRuntimeClasspath.filter { entry ->
         demoRuntimeBuildDirectories.none { buildDirectory ->
             entry.toPath().startsWith(buildDirectory.get().asFile.toPath())
         }
