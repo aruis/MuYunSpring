@@ -47,7 +47,10 @@ public record FormSchema(String scopeName,
         FormField resolved = field.optionBinding() != null || definition == null
                 ? field
                 : field.withOptionField(definition);
-        return resolved.withOptionTitleField(optionTitleFields.get(field.fieldName()));
+        String optionTitleField = optionTitleFields.get(field.fieldName());
+        return optionTitleField == null || resolved.optionTitleField() != null
+                ? resolved
+                : resolved.withOptionTitleField(optionTitleField);
     }
 
     private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {
