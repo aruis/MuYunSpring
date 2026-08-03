@@ -85,6 +85,7 @@ class DynamicQuerySchemasTest {
                 null,
                 null,
                 null,
+                null,
                 List.of(),
                 new DynamicFieldQueryDescriptor(queryable, defaultOperator, operators),
                 null,

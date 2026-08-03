@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.SortPartitionBy;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
 @Getter
@@ -30,14 +31,16 @@ public class Role extends StandardEnabledSortableEntity {
             comment = "Role assignment type", defaultVal = @Default(varchar = "employment"))
     private RoleAssignmentType assignmentType = RoleAssignmentType.EMPLOYMENT;
 
-    private String assignmentTypeTitle;
+    @OptionLoad(source = "assignmentType")
+    private transient String assignmentTypeTitle;
 
     @OptionField(type = OptionSourceType.ENUM)
     @Column(name = "role_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role kind",
             defaultVal = @Default(varchar = "standard"))
     private RoleKind roleKind = RoleKind.STANDARD;
 
-    private String roleKindTitle;
+    @OptionLoad(source = "roleKind")
+    private transient String roleKindTitle;
 
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;
@@ -47,7 +50,8 @@ public class Role extends StandardEnabledSortableEntity {
             comment = "Role owner scope type", defaultVal = @Default(varchar = "tenant"))
     private RoleOwnerScopeType ownerScopeType = RoleOwnerScopeType.TENANT;
 
-    private String ownerScopeTypeTitle;
+    @OptionLoad(source = "ownerScopeType")
+    private transient String ownerScopeTypeTitle;
 
     @Column(name = "owner_scope_id", type = ColumnType.VARCHAR, length = 64, comment = "Role owner scope id")
     private String ownerScopeId;
@@ -61,7 +65,8 @@ public class Role extends StandardEnabledSortableEntity {
             comment = "Role share policy", defaultVal = @Default(varchar = "private"))
     private RoleSharePolicy sharePolicy = RoleSharePolicy.PRIVATE;
 
-    private String sharePolicyTitle;
+    @OptionLoad(source = "sharePolicy")
+    private transient String sharePolicyTitle;
 
     @Column(name = "built_in", type = ColumnType.BOOLEAN, comment = "Built-in role flag",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))

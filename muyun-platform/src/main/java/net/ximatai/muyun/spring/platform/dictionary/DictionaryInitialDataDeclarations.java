@@ -105,7 +105,9 @@ public class DictionaryInitialDataDeclarations {
     }
 
     private String itemId(DictionarySeed seed, DictionaryItemSeed item) {
-        return item.id() == null ? seed.id() + "." + item.code() : item.id();
+        return item.id() == null
+                ? DictionarySeed.itemId(seed.applicationAlias(), seed.alias(), item.code())
+                : item.id();
     }
 
     private DictionaryCategory dictionaryCategory(String applicationAlias, String alias) {

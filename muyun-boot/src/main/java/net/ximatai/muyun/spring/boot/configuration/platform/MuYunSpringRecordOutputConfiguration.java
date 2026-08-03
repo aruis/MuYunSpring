@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.boot.configuration.platform;
 
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
 import net.ximatai.muyun.spring.ability.output.DefaultPlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.FieldProtectionRecordOutputTransformer;
-import net.ximatai.muyun.spring.ability.output.OptionTitleRecordOutputTransformer;
+import net.ximatai.muyun.spring.ability.output.OptionLoadRecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.RecordOutputTransformer;
 import net.ximatai.muyun.spring.web.WebOutputSupport;
@@ -24,11 +24,11 @@ import java.util.List;
 public class MuYunSpringRecordOutputConfiguration {
     @Bean
     @Order(0)
-    /** 先补齐选项标题，使后续输出转换器可基于完整语义处理记录。 */
-    RecordOutputTransformer optionTitleRecordOutputTransformer(
-            ObjectProvider<StaticOptionFieldTitlePopulator> titlePopulatorProvider) {
-        return new OptionTitleRecordOutputTransformer(
-                titlePopulatorProvider.getIfAvailable(() -> StaticOptionFieldTitlePopulator.NONE)
+    /** 先补齐声明的选项投影，使后续输出转换器可基于完整语义处理记录。 */
+    RecordOutputTransformer optionLoadRecordOutputTransformer(
+            ObjectProvider<StaticOptionLoadPopulator> loadPopulatorProvider) {
+        return new OptionLoadRecordOutputTransformer(
+                loadPopulatorProvider.getIfAvailable(() -> StaticOptionLoadPopulator.NONE)
         );
     }
 

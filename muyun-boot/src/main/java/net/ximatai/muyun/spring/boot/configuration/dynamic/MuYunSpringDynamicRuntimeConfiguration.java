@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
 import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
@@ -28,6 +29,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicOptionLoadPopulator;
+import net.ximatai.muyun.spring.dynamic.runtime.OptionSourceDynamicOptionLoadPopulator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
@@ -138,7 +141,9 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               ObjectProvider<FieldCryptoProvider> fieldCryptoProvider,
                                               ObjectProvider<FieldSigner> fieldSigner,
                                               PlatformTimeService platformTimeService,
-                                              DatabaseValueConverter databaseValueConverter) {
+                                              DatabaseValueConverter databaseValueConverter,
+                                              ObjectProvider<OptionSourceRegistry> optionSourceRegistry) {
+        OptionSourceRegistry registry = optionSourceRegistry.getIfAvailable();
         return DynamicRecordRuntime.builder(operations)
                 .registry(new DynamicModuleRegistry())
                 .fieldValueValidator(fieldValueValidator)
@@ -150,6 +155,9 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                         fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE))
                 .timeService(platformTimeService)
                 .valueConverter(databaseValueConverter)
+                .optionLoadPopulator(registry == null
+                        ? DynamicOptionLoadPopulator.NONE
+                        : new OptionSourceDynamicOptionLoadPopulator(registry))
                 .build();
     }
 

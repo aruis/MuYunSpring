@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.ability.query;
 
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import org.junit.jupiter.api.Test;
 
@@ -189,15 +189,17 @@ class QuerySchemaTest {
 
         QuerySchema schema = QuerySchema.from(descriptor, EmployeeOptionRecord.class);
 
-        assertThat(schema.fields()).singleElement()
-                .extracting(QuerySchema.Field::optionBinding)
-                .isEqualTo(OptionBinding.dictionary("crm", "gender"));
+        assertThat(schema.fields()).singleElement().satisfies(field -> {
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
     }
 
     private static class EmployeeOptionRecord {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        @DictionaryField(source = "iam.gender")
         private String gender;
 
+        @OptionLoad(source = "gender")
         private String genderTitle;
     }
 

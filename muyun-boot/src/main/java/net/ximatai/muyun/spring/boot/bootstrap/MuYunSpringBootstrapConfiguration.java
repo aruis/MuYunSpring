@@ -5,13 +5,15 @@ import net.ximatai.muyun.spring.boot.configuration.platform.MuYunSpringStaticDec
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
-import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinition;
+import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -59,11 +61,16 @@ public class MuYunSpringBootstrapConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(PlatformDictionaryInitialDataDeclarationProvider.class)
-    /** 将平台字典声明转换为初始数据来源，不让字典模块感知 Boot 生命周期。 */
-    PlatformDictionaryInitialDataDeclarationProvider platformDictionaryInitialDataDeclarationProvider(
-            DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations) {
-        return new PlatformDictionaryInitialDataDeclarationProvider(dictionaryInitialDataDeclarations);
+    @ConditionalOnMissingBean(DictionaryFieldInitialDataDeclarationProvider.class)
+    /** 将静态字段声明的字典 baseline 转换为初始数据，不让领域模型感知启动或持久化。 */
+    DictionaryFieldInitialDataDeclarationProvider dictionaryFieldInitialDataDeclarationProvider(
+            DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations,
+            StaticModuleDefinitionCatalog staticModuleDefinitions) {
+        List<Class<?>> modelClasses = staticModuleDefinitions.definitions().stream()
+                .map(StaticModuleDefinition::modelClass)
+                .filter(modelClass -> modelClass != null && modelClass != Object.class)
+                .toList();
+        return new DictionaryFieldInitialDataDeclarationProvider(dictionaryInitialDataDeclarations, modelClasses);
     }
 
     @Bean

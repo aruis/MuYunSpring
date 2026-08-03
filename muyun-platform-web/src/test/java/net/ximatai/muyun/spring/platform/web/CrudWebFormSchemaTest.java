@@ -20,8 +20,8 @@ import net.ximatai.muyun.spring.platform.web.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.platform.web.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.platform.web.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -241,10 +241,11 @@ class CrudWebFormSchemaTest {
         @Column(name = "title", comment = "名称")
         private String title;
 
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "demo.status")
+        @DictionaryField(source = "demo.status")
         @Column(name = "status", comment = "状态")
         private String status;
 
+        @OptionLoad(source = "status")
         private String statusTitle;
 
         public String getTitle() {

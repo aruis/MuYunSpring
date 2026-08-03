@@ -143,7 +143,7 @@ class RelationProjectionReadServiceTest {
                         ViewFieldRef.main("passwordStatus"),
                         ViewFieldRef.relation("bound_employee", "employeeNo")),
                 List.of("id"),
-                List.of("optionTitle:passwordStatus")
+                List.of("optionLoad:passwordStatusTitle")
         );
 
         ProjectionQueryDescriptor descriptor = service.describeListQuery(userRelationDefinition(), projection);

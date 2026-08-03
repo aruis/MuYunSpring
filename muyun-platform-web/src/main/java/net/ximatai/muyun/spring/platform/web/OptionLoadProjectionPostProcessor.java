@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.platform.web;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
-import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionLoadDefinition;
+import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
@@ -14,11 +14,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
-final class OptionTitleProjectionPostProcessor {
-    private OptionTitleProjectionPostProcessor() {
+final class OptionLoadProjectionPostProcessor {
+    private OptionLoadProjectionPostProcessor() {
     }
 
     static List<Map<String, Object>> apply(Class<?> modelClass,
@@ -37,16 +36,15 @@ final class OptionTitleProjectionPostProcessor {
                 || optionSourceRegistry == null) {
             return records;
         }
-        Set<String> optionTitleFields = graph.parsedTransforms().stream()
-                .filter(RecordReadPostTransform::isOptionTitle)
+        java.util.Set<String> optionLoadFields = graph.parsedTransforms().stream()
+                .filter(RecordReadPostTransform::isOptionLoad)
                 .map(RecordReadPostTransform::fieldName)
                 .collect(Collectors.toUnmodifiableSet());
-        if (optionTitleFields.isEmpty()) {
+        if (optionLoadFields.isEmpty()) {
             return records;
         }
-        List<OptionFieldDefinition> definitions = OptionFieldResolver.resolve(modelClass).stream()
-                .filter(OptionFieldDefinition::hasTitleOutput)
-                .filter(definition -> optionTitleFields.contains(definition.fieldName()))
+        List<OptionLoadDefinition> definitions = OptionLoadResolver.resolve(modelClass).stream()
+                .filter(definition -> optionLoadFields.contains(definition.outputField()))
                 .toList();
         if (definitions.isEmpty()) {
             return records;
@@ -54,11 +52,11 @@ final class OptionTitleProjectionPostProcessor {
         List<Map<String, Object>> projected = new ArrayList<>(records.size());
         for (Map<String, Object> record : records) {
             LinkedHashMap<String, Object> output = new LinkedHashMap<>(record);
-            for (OptionFieldDefinition definition : definitions) {
-                if (!output.containsKey(definition.fieldName()) || output.containsKey(definition.titleOutputField())) {
+            for (OptionLoadDefinition definition : definitions) {
+                if (!output.containsKey(definition.sourceField()) || output.containsKey(definition.outputField())) {
                     continue;
                 }
-                output.put(definition.titleOutputField(), titleValue(definition, output.get(definition.fieldName()),
+                output.put(definition.outputField(), loadedValue(definition, output.get(definition.sourceField()),
                         optionSourceRegistry));
             }
             projected.add(Collections.unmodifiableMap(output));
@@ -66,34 +64,46 @@ final class OptionTitleProjectionPostProcessor {
         return List.copyOf(projected);
     }
 
-    private static Object titleValue(OptionFieldDefinition definition,
+    private static Object loadedValue(OptionLoadDefinition definition,
                                      Object value,
                                      OptionSourceRegistry optionSourceRegistry) {
-        Map<String, String> titles = optionSourceRegistry.source(definition.binding()).options(OptionQuery.all()).stream()
-                .collect(Collectors.toMap(OptionItem::code, OptionItem::title, (left, right) -> left));
-        return definition.selectionMode() == OptionSelectionMode.MULTIPLE
-                ? multipleTitles(value, titles)
-                : singleTitle(value, titles);
+        Map<String, OptionItem> options = optionSourceRegistry.source(definition.sourceDefinition().binding())
+                .options(OptionQuery.all()).stream()
+                .collect(Collectors.toMap(OptionItem::code, item -> item, (left, right) -> left));
+        return definition.sourceDefinition().selectionMode() == OptionSelectionMode.MULTIPLE
+                ? multipleValues(value, definition.optionItemField(), options)
+                : singleValue(value, definition.optionItemField(), options);
     }
 
-    private static String singleTitle(Object value, Map<String, String> titles) {
+    private static Object singleValue(Object value, String itemField, Map<String, OptionItem> options) {
         String code = code(value);
-        return code == null ? null : titles.get(code);
+        OptionItem item = code == null ? null : options.get(code);
+        return item == null ? null : optionItemValue(item, itemField);
     }
 
-    private static List<String> multipleTitles(Object value, Map<String, String> titles) {
+    private static List<Object> multipleValues(Object value, String itemField, Map<String, OptionItem> options) {
         if (value == null) {
             return null;
         }
-        List<String> resolved = new ArrayList<>();
+        List<Object> resolved = new ArrayList<>();
         for (Object item : toValues(value)) {
-            String code = code(item);
-            String title = code == null ? null : titles.get(code);
-            if (title != null) {
-                resolved.add(title);
+            Object loaded = singleValue(item, itemField, options);
+            if (loaded != null) {
+                resolved.add(loaded);
             }
         }
         return resolved;
+    }
+
+    private static Object optionItemValue(OptionItem item, String fieldName) {
+        return switch (fieldName) {
+            case "code" -> item.code();
+            case "title" -> item.title();
+            case "enabled" -> item.enabled();
+            case "sortOrder" -> item.sortOrder();
+            case "parentCode" -> item.parentCode();
+            default -> throw new IllegalArgumentException("unknown option item field: " + fieldName);
+        };
     }
 
     private static String code(Object value) {

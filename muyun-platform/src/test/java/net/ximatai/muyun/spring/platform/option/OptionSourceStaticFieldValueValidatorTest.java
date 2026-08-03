@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.option;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionItem;
@@ -77,14 +78,14 @@ class OptionSourceStaticFieldValueValidatorTest {
     }
 
     private static class Employee {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        @DictionaryField(source = "iam.gender")
         private String gender;
 
         private String genderTitle;
     }
 
     private static class EmployeeTags {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender",
+        @DictionaryField(source = "iam.gender",
                 selectionMode = OptionSelectionMode.MULTIPLE)
         private List<String> tags;
 

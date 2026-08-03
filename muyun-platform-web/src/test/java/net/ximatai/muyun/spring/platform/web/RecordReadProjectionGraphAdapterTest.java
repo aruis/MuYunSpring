@@ -67,7 +67,7 @@ class RecordReadProjectionGraphAdapterTest {
                 List.of("id"),
                 List.of(
                         RecordReadPostTransform.fieldProtection("username").serialize(),
-                        RecordReadPostTransform.optionTitle("passwordStatus").serialize()
+                        RecordReadPostTransform.optionLoad("passwordStatusTitle").serialize()
                 )
         );
 

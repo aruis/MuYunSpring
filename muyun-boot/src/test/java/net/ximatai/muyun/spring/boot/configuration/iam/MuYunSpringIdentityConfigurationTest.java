@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.platform.runtime.PlatformBootstrapTask;
-import net.ximatai.muyun.spring.platform.dictionary.PlatformDictionaryInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.web.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.module.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -60,7 +60,7 @@ class MuYunSpringIdentityConfigurationTest {
             assertThat(context).hasSingleBean(InitialDataExecutor.class);
             assertThat(context).hasSingleBean(PlatformMenuInitialDataDeclarationProvider.class);
             assertThat(context).hasSingleBean(DictionaryInitialDataDeclarations.class);
-            assertThat(context).hasSingleBean(PlatformDictionaryInitialDataDeclarationProvider.class);
+            assertThat(context).hasSingleBean(DictionaryFieldInitialDataDeclarationProvider.class);
             assertThat(bootstrapTasks.values())
                     .anyMatch(StaticModuleDefinitionRegistrar.class::isInstance)
                     .anyMatch(InitialDataBootstrapTask.class::isInstance);

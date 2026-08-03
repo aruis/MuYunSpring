@@ -12,8 +12,8 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 import net.ximatai.muyun.spring.common.model.constraint.TenantUniqueConstraint;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
-import net.ximatai.muyun.spring.common.option.OptionField;
-import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 
@@ -43,11 +43,20 @@ public class Employee extends StandardEnabledSortableEntity {
             comment = "Employee number")
     private String employeeNo;
 
-    @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+    @DictionaryField(
+            source = "iam.gender",
+            title = "性别",
+            sortOrder = 10,
+            initialItems = {
+                    @DictionaryField.InitialItem(code = "1", title = "男", sortOrder = 10),
+                    @DictionaryField.InitialItem(code = "2", title = "女", sortOrder = 20)
+            }
+    )
     @Column(name = "gender", type = ColumnType.VARCHAR, length = 64, comment = "Gender")
     private String gender;
 
-    private String genderTitle;
+    @OptionLoad(source = "gender")
+    private transient String genderTitle;
 
     @Column(name = "mobile", type = ColumnType.VARCHAR, length = 32, comment = "Mobile")
     private String mobile;

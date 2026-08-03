@@ -2,9 +2,11 @@ package net.ximatai.muyun.spring.platform.option;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
+import net.ximatai.muyun.spring.common.option.DictionaryField;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionItem;
+import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSource;
@@ -18,15 +20,15 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class OptionSourceStaticFieldTitlePopulatorTest {
-    private final OptionSourceStaticFieldTitlePopulator populator =
-            new OptionSourceStaticFieldTitlePopulator(new OptionSourceRegistry(List.of(
+class OptionSourceStaticOptionLoadPopulatorTest {
+    private final OptionSourceStaticOptionLoadPopulator populator =
+            new OptionSourceStaticOptionLoadPopulator(new OptionSourceRegistry(List.of(
                     new GenderSourceProvider(),
                     new CodeTitleEnumOptionSourceProvider()
             )));
 
     @Test
-    void shouldPopulateAutoTitleOutputField() {
+    void shouldPopulateDictionaryTitleLoad() {
         Employee employee = new Employee();
         employee.gender = "1";
 
@@ -36,17 +38,18 @@ class OptionSourceStaticFieldTitlePopulatorTest {
     }
 
     @Test
-    void shouldUseAllOptionsForTitleOutput() {
+    void shouldUseDisabledDictionaryItemForLoad() {
         Employee employee = new Employee();
         employee.gender = "0";
 
         populator.populate(Employee.class, employee);
 
         assertThat(employee.genderTitle).isEqualTo("停用");
+        assertThat(employee.genderEnabled).isFalse();
     }
 
     @Test
-    void shouldPopulateMultipleTitleOutputField() {
+    void shouldPopulateMultipleOptionLoad() {
         EmployeeTags employee = new EmployeeTags();
         employee.tags = List.of("1", "0", "missing");
 
@@ -57,8 +60,8 @@ class OptionSourceStaticFieldTitlePopulatorTest {
 
     @Test
     void shouldExposeConfigurationErrorWhenOptionSourceIsMissing() {
-        OptionSourceStaticFieldTitlePopulator missingSourcePopulator =
-                new OptionSourceStaticFieldTitlePopulator(new OptionSourceRegistry(List.of(new MissingSourceProvider())));
+        OptionSourceStaticOptionLoadPopulator missingSourcePopulator =
+                new OptionSourceStaticOptionLoadPopulator(new OptionSourceRegistry(List.of(new MissingSourceProvider())));
         Employee employee = new Employee();
         employee.gender = "1";
         employee.genderTitle = "old";
@@ -71,7 +74,7 @@ class OptionSourceStaticFieldTitlePopulatorTest {
     }
 
     @Test
-    void shouldPopulateCodeTitleEnumTitleOutputField() {
+    void shouldPopulateStaticEnumOptionLoad() {
         RoleDraft draft = new RoleDraft();
         draft.kind = TestRoleKind.STANDARD;
 
@@ -81,7 +84,7 @@ class OptionSourceStaticFieldTitlePopulatorTest {
     }
 
     @Test
-    void shouldPopulateCodeTitleEnumCollectionTitleOutputField() {
+    void shouldPopulateStaticEnumCollectionOptionLoad() {
         RoleKindsDraft draft = new RoleKindsDraft();
         draft.kinds = List.of(TestRoleKind.STANDARD, TestRoleKind.SYSTEM);
 
@@ -91,17 +94,22 @@ class OptionSourceStaticFieldTitlePopulatorTest {
     }
 
     private static class Employee {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        @DictionaryField(source = "iam.gender")
         private String gender;
 
+        @OptionLoad(source = "gender")
         private String genderTitle;
+
+        @OptionLoad(source = "gender", field = "enabled")
+        private Boolean genderEnabled;
     }
 
     private static class EmployeeTags {
-        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender",
+        @DictionaryField(source = "iam.gender",
                 selectionMode = OptionSelectionMode.MULTIPLE)
         private List<String> tags;
 
+        @OptionLoad(source = "tags")
         private List<String> tagsTitle;
     }
 
@@ -109,6 +117,7 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         @OptionField(type = OptionSourceType.ENUM)
         private TestRoleKind kind;
 
+        @OptionLoad(source = "kind")
         private String kindTitle;
     }
 
@@ -116,6 +125,7 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         @OptionField(type = OptionSourceType.ENUM, selectionMode = OptionSelectionMode.MULTIPLE)
         private List<TestRoleKind> kinds;
 
+        @OptionLoad(source = "kinds")
         private List<String> kindsTitle;
     }
 

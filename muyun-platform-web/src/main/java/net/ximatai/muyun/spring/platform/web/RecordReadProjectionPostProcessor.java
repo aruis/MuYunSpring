@@ -23,7 +23,7 @@ final class RecordReadProjectionPostProcessor {
         }
         return graph.transforms().stream()
                 .allMatch(transform -> transform.parsed()
-                        && (transform.transform().isFieldProtection() || transform.transform().isOptionTitle()));
+                        && (transform.transform().isFieldProtection() || transform.transform().isOptionLoad()));
     }
 
     static boolean hasStorageProtectedOutput(List<StaticModuleDefinition> definitions,
@@ -51,6 +51,6 @@ final class RecordReadProjectionPostProcessor {
                                                        List<Map<String, Object>> records,
                                                        OptionSourceRegistry optionSourceRegistry) {
         ProjectionGraph graph = projection == null ? null : RecordReadProjectionGraphAdapter.adapt(projection);
-        return OptionTitleProjectionPostProcessor.apply(modelClass, graph, records, optionSourceRegistry);
+        return OptionLoadProjectionPostProcessor.apply(modelClass, graph, records, optionSourceRegistry);
     }
 }

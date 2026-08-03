@@ -160,10 +160,10 @@ class RecordReadProjectionPlannerTest {
         assertThat(transform.serialize()).isEqualTo("fieldProtection:mobile");
         assertThat(RecordReadPostTransform.parse(" fieldProtection:mobile "))
                 .hasValue(transform);
-        assertThat(RecordReadPostTransform.optionTitle("passwordStatus").serialize())
-                .isEqualTo("optionTitle:passwordStatus");
-        assertThat(RecordReadPostTransform.parse("optionTitle:passwordStatus"))
-                .hasValue(RecordReadPostTransform.optionTitle("passwordStatus"));
+        assertThat(RecordReadPostTransform.optionLoad("passwordStatusTitle").serialize())
+                .isEqualTo("optionLoad:passwordStatusTitle");
+        assertThat(RecordReadPostTransform.parse("optionLoad:passwordStatusTitle"))
+                .hasValue(RecordReadPostTransform.optionLoad("passwordStatusTitle"));
         assertThat(RecordReadPostTransform.parse("fieldProtection"))
                 .isEmpty();
         assertThat(RecordReadPostTransform.parse("fieldProtection:mobile:extra"))
@@ -206,7 +206,7 @@ class RecordReadProjectionPlannerTest {
                 recordService
         );
 
-        assertThat(projection.postReadTransforms()).containsExactly("optionTitle:passwordStatus");
+        assertThat(projection.postReadTransforms()).containsExactly("optionLoad:passwordStatusTitle");
     }
 
     @Test

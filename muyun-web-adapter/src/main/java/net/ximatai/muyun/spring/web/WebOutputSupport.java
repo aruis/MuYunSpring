@@ -4,9 +4,9 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.output.DefaultPlatformRecordOutput;
 import net.ximatai.muyun.spring.ability.output.FieldProtectionRecordOutputTransformer;
-import net.ximatai.muyun.spring.ability.output.OptionTitleRecordOutputTransformer;
+import net.ximatai.muyun.spring.ability.output.OptionLoadRecordOutputTransformer;
 import net.ximatai.muyun.spring.ability.output.PlatformRecordOutput;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 
@@ -46,7 +46,7 @@ public final class WebOutputSupport {
 
     private static PlatformRecordOutput defaultOutput() {
         return new DefaultPlatformRecordOutput(List.of(
-                new OptionTitleRecordOutputTransformer(StaticOptionFieldTitlePopulator.NONE),
+                new OptionLoadRecordOutputTransformer(StaticOptionLoadPopulator.NONE),
                 new FieldProtectionRecordOutputTransformer()
         ));
     }
