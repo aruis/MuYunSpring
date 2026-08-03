@@ -55,6 +55,27 @@ class ModuleActionContributionRegistrarTest {
     }
 
     @Test
+    void shouldKeepPermissionGovernanceOverrideWhenContributionIsRegisteredAgain() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        action.setAccessModeOverride(EntityActionAccessMode.ANONYMOUS_ALLOWED);
+        action.setActionAuthOverride(false);
+        action.setDataAuthOverride(false);
+        action.setDefaultGrantPolicyOverride(ActionDefaultGrantPolicy.ANY_LOGIN_USER);
+        actionService.update(action);
+
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-2", "sync"));
+
+        PlatformModuleAction reloaded = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(reloaded.effectiveAccessMode()).isEqualTo(EntityActionAccessMode.ANONYMOUS_ALLOWED);
+        assertThat(reloaded.effectiveActionAuth()).isFalse();
+        assertThat(reloaded.effectiveDefaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.ANY_LOGIN_USER);
+        assertThat(reloaded.getSourceVersionId()).isEqualTo("ver-2");
+    }
+
+    @Test
     void shouldRejectActionCodeConflictWithDifferentSource() {
         moduleService.insert(module("sales.contract"));
         PlatformModuleAction existing = new PlatformModuleAction();

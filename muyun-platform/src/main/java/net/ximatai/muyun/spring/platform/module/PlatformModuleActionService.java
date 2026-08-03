@@ -9,17 +9,23 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorDefinition;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.Objects;
 import java.util.Optional;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
@@ -38,25 +44,40 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
 
     private final PlatformModuleService moduleService;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
+    private final DynamicActionExecutorRegistry actionExecutorRegistry;
 
     public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
                                        PlatformModuleService moduleService) {
-        this(actionDao, moduleService, Optional.empty());
+        this(actionDao, moduleService, Optional.empty(), Optional.empty());
+    }
+
+    public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
+                                       PlatformModuleService moduleService,
+                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+        this(actionDao, moduleService, runtimeRefreshCoordinator, Optional.empty());
     }
 
     @Autowired
     public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
                                        PlatformModuleService moduleService,
-                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                       Optional<DynamicActionExecutorRegistry> actionExecutorRegistry) {
         super(MODULE_ALIAS, PlatformModuleAction.class, actionDao);
         this.moduleService = moduleService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+        this.actionExecutorRegistry = actionExecutorRegistry.orElse(null);
     }
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModuleAction.class, java.util.List.of("id", "moduleAlias", "actionCode", "entityAlias", "permissionActionCode", "title", "category", "actionLevel", "accessMode", "actionAuth", "dataAuth", "defaultGrantPolicy", "executorType", "executorKey", "sourceType", "sourceId", "bindingType", "bindingId", "bindingAlias", "systemManaged", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModuleAction.class, java.util.List.of("id", "moduleAlias", "actionCode", "entityAlias", "permissionActionCode", "title", "category", "actionLevel", "accessMode", "actionAuth", "dataAuth", "defaultGrantPolicy", "permissionActionCodeOverride", "accessModeOverride", "actionAuthOverride", "dataAuthOverride", "defaultGrantPolicyOverride", "executorType", "executorKey", "sourceType", "sourceId", "bindingType", "bindingId", "bindingAlias", "systemManaged", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    @Override
+    public Set<String> editablePlatformManagedFields() {
+        return Set.of("permissionActionCodeOverride", "accessModeOverride", "actionAuthOverride",
+                "dataAuthOverride", "defaultGrantPolicyOverride");
     }
 
     @Override
@@ -111,6 +132,23 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
     }
 
+    /** Restores the permission policy declared by the action contributor or static module. */
+    public void clearPermissionGovernanceOverrides(String moduleAlias, String actionId) {
+        String validModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        PlatformModuleAction action = select(actionId);
+        if (action == null || !validModuleAlias.equals(action.getModuleAlias())) {
+            throw new PlatformException("module action does not belong to module: " + validModuleAlias + "." + actionId);
+        }
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+            action.setPermissionActionCodeOverride(null);
+            action.setAccessModeOverride(null);
+            action.setActionAuthOverride(null);
+            action.setDataAuthOverride(null);
+            action.setDefaultGrantPolicyOverride(null);
+            update(action);
+        });
+    }
+
     public List<PlatformModuleAction> listBySource(ModuleActionSourceType sourceType, String sourceId) {
         if (sourceType == null || sourceId == null || sourceId.isBlank()) {
             return List.of();
@@ -125,7 +163,8 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
 
     private void normalizeAndValidate(PlatformModuleAction action) {
         String moduleAlias = PlatformNameRules.requireModuleAlias(action.getModuleAlias());
-        if (moduleService.resolveVisibleModule(moduleAlias) == null) {
+        PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
+        if (module == null) {
             throw new PlatformException("Module action requires existing module: " + moduleAlias);
         }
         action.setModuleAlias(moduleAlias);
@@ -142,6 +181,13 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         action.setPermissionActionCode(action.getPermissionActionCode() == null
                 ? action.getActionCode()
                 : PlatformNameRules.requireActionCode(action.getPermissionActionCode(), "permissionActionCode"));
+        if (action.getPermissionActionCodeOverride() != null && action.getPermissionActionCodeOverride().isBlank()) {
+            action.setPermissionActionCodeOverride(null);
+        }
+        if (action.getPermissionActionCodeOverride() != null) {
+            action.setPermissionActionCodeOverride(PlatformNameRules.requireActionCode(
+                    action.getPermissionActionCodeOverride(), "permissionActionCodeOverride"));
+        }
         if (action.getTitle() == null || action.getTitle().isBlank()) {
             action.setTitle(action.getActionCode());
         }
@@ -190,11 +236,40 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         if (action.getSystemManaged() == null) {
             action.setSystemManaged(false);
         }
+        validateManualActionBinding(action, module);
         action.setTenantId(null);
         rejectDuplicate(action, Criteria.of()
                         .eq("moduleAlias", action.getModuleAlias())
                         .eq("actionCode", action.getActionCode())
                         .isNull(StandardEntitySchema.TENANT_ID_FIELD),
                 "module action must be unique in module: " + action.getModuleAlias() + "." + action.getActionCode());
+    }
+
+    private void validateManualActionBinding(PlatformModuleAction action, PlatformModule module) {
+        if (Boolean.TRUE.equals(action.getSystemManaged()) || actionExecutorRegistry == null) {
+            return;
+        }
+        if (module.getModuleKind() != ModuleKind.DYNAMIC) {
+            throw new PlatformException("Manual module actions require a dynamic module: " + action.getModuleAlias());
+        }
+        if (action.getCategory() != EntityActionCategory.CUSTOM
+                || action.getExecutorType() != EntityActionExecutorType.SERVICE) {
+            throw new PlatformException("Manual module actions must bind a custom service executor: "
+                    + action.getModuleAlias() + "." + action.getActionCode());
+        }
+        DynamicActionExecutorDefinition definition;
+        try {
+            definition = actionExecutorRegistry.definition(action.getExecutorKey());
+        } catch (IllegalArgumentException exception) {
+            throw new PlatformException("Manual module action requires a deployed executor: "
+                    + action.getModuleAlias() + "." + action.getActionCode(), exception);
+        }
+        if (!definition.bindable() || !definition.supports(action.getCategory(), action.getActionLevel())) {
+            throw new PlatformException("Executor cannot be bound to module action: "
+                    + action.getModuleAlias() + "." + action.getActionCode());
+        }
+        action.setBindingType(ModuleActionBindingType.DYNAMIC_ACTION_EXECUTOR);
+        action.setBindingId(definition.executorKey());
+        action.setBindingAlias(definition.executorKey());
     }
 }

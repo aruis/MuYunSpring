@@ -57,6 +57,24 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean dataAuth = Boolean.FALSE;
 
+    @Column(name = "permission_action_code_override", type = ColumnType.VARCHAR, length = 64,
+            comment = "Governance override for permission action code")
+    private String permissionActionCodeOverride;
+
+    @Column(name = "access_mode_override", type = ColumnType.VARCHAR, length = 32,
+            comment = "Governance override for action access mode")
+    private EntityActionAccessMode accessModeOverride;
+
+    @Column(name = "action_auth_override", comment = "Governance override for action permission")
+    private Boolean actionAuthOverride;
+
+    @Column(name = "data_auth_override", comment = "Governance override for data permission")
+    private Boolean dataAuthOverride;
+
+    @Column(name = "default_grant_policy_override", type = ColumnType.VARCHAR, length = 32,
+            comment = "Governance override for default action grant policy")
+    private ActionDefaultGrantPolicy defaultGrantPolicyOverride;
+
     @Column(name = "default_grant_policy", type = ColumnType.VARCHAR, length = 32,
             comment = "Default action grant policy")
     private ActionDefaultGrantPolicy defaultGrantPolicy;
@@ -95,4 +113,26 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "system_managed", comment = "Whether action is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean systemManaged = Boolean.FALSE;
+
+    public String effectivePermissionActionCode() {
+        return permissionActionCodeOverride == null || permissionActionCodeOverride.isBlank()
+                ? permissionActionCode
+                : permissionActionCodeOverride;
+    }
+
+    public EntityActionAccessMode effectiveAccessMode() {
+        return accessModeOverride == null ? accessMode : accessModeOverride;
+    }
+
+    public boolean effectiveActionAuth() {
+        return actionAuthOverride == null ? Boolean.TRUE.equals(actionAuth) : actionAuthOverride;
+    }
+
+    public boolean effectiveDataAuth() {
+        return dataAuthOverride == null ? Boolean.TRUE.equals(dataAuth) : dataAuthOverride;
+    }
+
+    public ActionDefaultGrantPolicy effectiveDefaultGrantPolicy() {
+        return defaultGrantPolicyOverride == null ? defaultGrantPolicy : defaultGrantPolicyOverride;
+    }
 }

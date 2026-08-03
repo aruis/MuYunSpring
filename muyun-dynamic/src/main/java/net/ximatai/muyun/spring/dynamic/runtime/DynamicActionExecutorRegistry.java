@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.function.Supplier;
 
 public final class DynamicActionExecutorRegistry {
@@ -42,6 +43,18 @@ public final class DynamicActionExecutorRegistry {
 
     public boolean contains(String executorKey) {
         return executorKey != null && executorMap().containsKey(executorKey);
+    }
+
+    public DynamicActionExecutorDefinition definition(String executorKey) {
+        return require(executorKey).definition();
+    }
+
+    public List<DynamicActionExecutorDefinition> definitions() {
+        return executorMap().values().stream()
+                .map(DynamicActionExecutor::definition)
+                .sorted(java.util.Comparator.comparing(DynamicActionExecutorDefinition::title)
+                        .thenComparing(DynamicActionExecutorDefinition::executorKey))
+                .toList();
     }
 
     public static DynamicActionExecutorRegistry empty() {

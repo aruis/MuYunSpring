@@ -190,7 +190,7 @@ public class ActionEndpointContextResolver {
 
     private ActionExecutionPolicy toPolicy(PlatformModuleAction action) {
         String actionCode = PlatformNameRules.requireActionCode(action.getActionCode(), "actionCode");
-        String permissionActionCode = action.getPermissionActionCode();
+        String permissionActionCode = action.effectivePermissionActionCode();
         String inheritActionCode = permissionActionCode == null || permissionActionCode.isBlank()
                 || permissionActionCode.equals(actionCode)
                 ? null
@@ -198,12 +198,12 @@ public class ActionEndpointContextResolver {
         return new ActionExecutionPolicy(
                 actionCode,
                 toPlatformLevel(action.getActionLevel()),
-                action.getAccessMode() == null
+                action.effectiveAccessMode() == null
                         ? ActionAccessMode.AUTH_REQUIRED
-                        : ActionAccessMode.valueOf(action.getAccessMode().name()),
-                action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()),
-                Boolean.TRUE.equals(action.getDataAuth()),
-                action.getDefaultGrantPolicy(),
+                        : ActionAccessMode.valueOf(action.effectiveAccessMode().name()),
+                action.effectiveActionAuth(),
+                action.effectiveDataAuth(),
+                action.effectiveDefaultGrantPolicy(),
                 inheritActionCode
         );
     }

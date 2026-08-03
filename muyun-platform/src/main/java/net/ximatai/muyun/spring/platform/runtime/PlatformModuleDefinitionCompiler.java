@@ -639,10 +639,10 @@ public class PlatformModuleDefinitionCompiler {
                 Boolean.TRUE.equals(action.getEnabled()),
                 action.getActionLevel(),
                 action.getCategory(),
-                action.getAccessMode(),
-                action.getActionAuth(),
-                action.getDataAuth(),
-                action.getDefaultGrantPolicy(),
+                action.effectiveAccessMode(),
+                action.effectiveActionAuth(),
+                action.effectiveDataAuth(),
+                action.effectiveDefaultGrantPolicy(),
                 inheritedActionCode(action),
                 action.getAvailableExpression(),
                 action.getUnavailableMessage(),
@@ -652,7 +652,7 @@ public class PlatformModuleDefinitionCompiler {
     }
 
     private String inheritedActionCode(PlatformModuleAction action) {
-        String permissionActionCode = action.getPermissionActionCode();
+        String permissionActionCode = action.effectivePermissionActionCode();
         if (permissionActionCode == null || permissionActionCode.isBlank()
                 || permissionActionCode.equals(action.getActionCode())) {
             return null;

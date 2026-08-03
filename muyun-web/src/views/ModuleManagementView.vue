@@ -34,6 +34,8 @@ import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muy
 import { createModuleManagementState, moduleTitleOf } from './moduleManagementState';
 import { createModuleOpenApiPageDescriptor, loadOpenApiCatalog } from '../app/moduleOpenApi';
 import { useWorkbenchNavigation } from '../app/workbenchNavigation';
+import { createWorkspaceViewDescriptor } from '../app/workspaceViews';
+import { moduleActionManagementWorkspaceView } from './moduleActionManagementWorkspaceView';
 
 defineOptions({ name: 'ModuleManagementView' });
 
@@ -142,6 +144,9 @@ const moduleActions = computed<RecordActionItem[]>(() => {
     },
   ];
   const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
+  if (moduleAlias) {
+    actions.unshift({ key: 'actions', title: '动作' });
+  }
   if (moduleAlias && openApiModuleAliases.value.has(moduleAlias)) {
     actions.unshift({ key: 'openapi', title: '查看 OpenAPI' });
   }
@@ -261,12 +266,25 @@ function handleModuleTreeAction(action: UiRecordInlineAction, record: PlatformMo
 }
 
 function handleModuleAction(action: RecordActionItem) {
+  if (action.key === 'actions') openModuleActions();
   if (action.key === 'openapi') openModuleOpenApi();
   if (action.key === 'edit') startEdit();
   if (action.key === 'create-child') startCreateChild();
   if (action.key === 'delete') void removeSelected();
   if (action.key === 'cancel') cancelEdit();
   if (action.key === 'save') void save();
+}
+
+function openModuleActions() {
+  const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
+  if (!moduleAlias) return;
+  workbenchNavigation?.openPage(
+    createWorkspaceViewDescriptor(moduleActionManagementWorkspaceView, {
+      moduleAlias,
+      moduleTitle: selectedModule.value?.title,
+      moduleKind: selectedModule.value?.moduleKind,
+    }),
+  );
 }
 
 function openModuleOpenApi() {

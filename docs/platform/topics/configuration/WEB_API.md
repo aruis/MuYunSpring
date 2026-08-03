@@ -9,6 +9,7 @@
 | 应用 | `ApplicationService` | `/platform.application` |
 | 模块 | `PlatformModuleService` | `/platform.module` |
 | 模块动作 | `PlatformModuleActionService` | `/platform.module/{moduleAlias}/actions` |
+| 可绑定二开执行器目录 | `DynamicActionExecutorRegistry` | `/platform.module/action-executors` |
 | 元数据 | `MetadataService` | `/platform.metadata` |
 | 元数据字段 | `MetadataFieldService` | `/platform.metadata/{metadataId}/fields` |
 | 字段类型 | `PlatformFieldTypeService` | `/platform.field_type` |
@@ -63,6 +64,7 @@
 | 模块 | `POST` | `/platform.module/delete/{id}` | 删除模块 |
 | 模块 | `POST` | `/platform.module/enable/{id}`、`/disable/{id}` | 启用或停用模块 |
 | 模块 | `POST` | `/platform.module/sort/{id}` | 在应用内调整模块树位置 |
+| 模块动作 | `GET` | `/platform.module/action-executors` | 查询已部署且显式允许配置绑定的二开执行器；不返回平台内部执行器 |
 | 租户应用配置 | `POST` | `/iam.tenant/{tenantId}/applications/query`、`/view/{id}`、`/insert`、`/update/{id}`、`/delete/{id}`、`/configure` | 租户的应用子资源；`configure` 接收勾选应用集合，在事务内按差异新增或删除子记录；租户侧不维护启停状态 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}` | 获取指定应用下的模块树 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}/{parentId}` | 获取指定父模块下的子树或扁平列表 |
@@ -362,6 +364,7 @@
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/delete/{id}` | 删除模块动作 |
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/enable/{id}`、`/disable/{id}` | 启用或停用模块动作 |
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/sort/{id}` | 在模块内调整动作顺序 |
+| 模块动作 | `DELETE` | `/platform.module/{moduleAlias}/actions/{id}/permission-governance` | 清除托管动作的权限治理覆盖，恢复代码声明默认策略 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/query` | 查询模块绑定的元数据关系 |
 | 元数据关系 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/view/{id}` | 查看模块元数据关系 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/insert` | 新增模块元数据关系 |
