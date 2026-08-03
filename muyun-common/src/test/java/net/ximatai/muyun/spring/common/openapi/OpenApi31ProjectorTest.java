@@ -26,6 +26,9 @@ class OpenApi31ProjectorTest {
         assertThat(parsed.getOpenAPI().getOpenapi()).isEqualTo(OpenApi31Projector.VERSION);
         assertThat(parsed.getOpenAPI().getPaths()).containsKey("/crm.customer/view/{id}");
         assertThat(parsed.getOpenAPI().getComponents().getSecuritySchemes()).containsKey("bearerAuth");
+        assertThat(parsed.getOpenAPI().getPaths().get("/crm.customer/export").getPost().getResponses()
+                .get("200").getContent())
+                .containsKey("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         assertThat(projected).containsEntry("x-muyun-module-alias", "crm.customer");
         assertThat(projected).containsEntry("x-muyun-module-base-path", "/crm.customer");
     }
@@ -48,16 +51,25 @@ class OpenApi31ProjectorTest {
 
         @Override
         public List<Operation> operations() {
-            return List.of(new Operation("GET", "/crm.customer/view/{id}", "crm_customer_view",
-                    "View customer", null, "Customer", "view", "crm.customer:view",
-                    List.of("RESOURCE_NOT_FOUND")));
+            return List.of(
+                    new Operation("GET", "/crm.customer/view/{id}", "crm_customer_view",
+                            "View customer", null, "Customer", "view", "crm.customer:view",
+                            List.of("RESOURCE_NOT_FOUND")),
+                    new Operation("POST", "/crm.customer/export", "crm_customer_export",
+                            "Export customers", null, "BinaryFile", "export", "crm.customer:export",
+                            List.of(), 200,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            );
         }
 
         @Override
         public Map<String, Schema> schemas() {
-            return Map.of("Customer", new Schema("Customer", "object", null, List.of("name"),
-                    Map.of("name", new Property("string", null, true, false, false,
-                            null, null, null, null, null, null, List.of())), null));
+            return Map.of(
+                    "Customer", new Schema("Customer", "object", null, List.of("name"),
+                            Map.of("name", new Property("string", null, true, false, false,
+                                    null, null, null, null, null, null, List.of())), null),
+                    "BinaryFile", new Schema("BinaryFile", "string", "binary", List.of(), Map.of(), null)
+            );
         }
 
         @Override

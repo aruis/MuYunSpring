@@ -84,7 +84,9 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.method()).isEqualTo("POST");
                     assertThat(operation.operationId()).isEqualTo("salesContractImportErrorFile");
-                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                    assertThat(operation.responseSchema()).isEqualTo("BinaryFile");
+                    assertThat(operation.responseMediaType())
+                            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/exchange/template")))
@@ -92,7 +94,7 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code());
                     assertThat(operation.requestSchema()).isEqualTo("DynamicExchangeTemplateRequest");
-                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                    assertThat(operation.responseSchema()).isEqualTo("BinaryFile");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/export/selected")))
@@ -100,7 +102,7 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.EXPORT.code());
                     assertThat(operation.requestSchema()).isEqualTo("DynamicSelectedExportRequest");
-                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                    assertThat(operation.responseSchema()).isEqualTo("BinaryFile");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/query/summary")))
@@ -587,28 +589,21 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("DynamicModuleDescriptor").properties())
                 .containsKeys("moduleAlias", "title", "mainEntityAlias", "actions", "entities",
                         "relations", "references", "associationViews");
-        assertThat(document.schemas().get("DynamicOpenApiDocument").properties())
-                .containsKeys("moduleAlias", "title", "basePath", "operations", "schemas", "errors");
-        assertThat(document.schemas().get("DynamicOpenApiDocument").properties().get("operations").itemType())
-                .isEqualTo("DynamicOpenApiOperation");
-        assertThat(document.schemas().get("DynamicOpenApiOperation").properties())
-                .containsKeys("method", "path", "operationId", "summary", "requestSchema",
-                        "responseSchema", "actionCode", "errorCodes");
-        assertThat(document.schemas().get("DynamicOpenApiProperty").properties())
-                .containsKeys("type", "format", "required", "nullable", "multiple",
-                        "optionSourceType", "optionSource", "referenceModuleAlias",
-                        "referenceEntityAlias", "itemType", "temporalSemantics", "companionFields");
-        assertThat(document.schemas().get("DynamicOpenApiSchema").properties())
-                .containsKey("valueShapeByResultType");
-        assertThat(document.schemas().get("DynamicOpenApiErrorResponse").required())
-                .containsExactly("code", "status", "schemaName");
+        assertThat(document.schemas().get("OpenApi31Document").properties())
+                .containsKeys("openapi", "info", "paths", "components");
+        assertThat(document.schemas().get("BinaryFile"))
+                .extracting(DynamicOpenApiDocument.Schema::type, DynamicOpenApiDocument.Schema::format)
+                .containsExactly("string", "binary");
+        assertThat(document.operations()).filteredOn(operation -> operation.path().endsWith("/openapi"))
+                .singleElement().extracting(DynamicOpenApiDocument.Operation::responseSchema)
+                .isEqualTo("OpenApi31Document");
     }
 
     @Test
     void shouldDefineEveryReferencedSchema() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
         Set<String> primitives = Set.of("string", "object", "array", "integer", "number", "boolean",
-                "binary", "scalar", "null");
+                "scalar", "null");
 
         for (DynamicOpenApiDocument.Operation operation : document.operations()) {
             assertResolvableSchema(operation.requestSchema(), document.schemas(), primitives);

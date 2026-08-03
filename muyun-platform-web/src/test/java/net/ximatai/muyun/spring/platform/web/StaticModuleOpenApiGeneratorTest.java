@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -119,6 +120,10 @@ class StaticModuleOpenApiGeneratorTest {
         assertThat(document.schemas().get("WebPageRequest").properties()).containsKeys("pageNum", "pageSize");
         assertThat(document.schemas().get("TeacherPageResponse").properties())
                 .containsKeys("records", "total", "pageNum", "pageSize", "pages", "totalKnown", "navigation");
+        assertThat(document.schemas().get("Teacher").properties())
+                .containsKeys("id", "tenantId", "version", "deleted", "createdAt", "updatedAt");
+        assertThat(document.schemas().get("Teacher").properties().get("version").optionSource())
+                .contains("Optimistic lock");
         assertThat(document.operations()).filteredOn(operation -> PlatformAction.CREATE.code().equals(operation.actionCode()))
                 .singleElement().extracting(operation -> operation.successStatus()).isEqualTo(201);
         assertThat(document.operations()).filteredOn(operation -> PlatformAction.DELETE.code().equals(operation.actionCode()))
@@ -137,6 +142,7 @@ class StaticModuleOpenApiGeneratorTest {
                         StaticModuleDefinition.builder("education", "education.teacher", "教师").build())),
                 new RegisteredWebEndpointCatalog());
         StaticModuleOpenApiEndpoint endpoint = new StaticModuleOpenApiEndpoint(generator);
+        endpoint.register("education.teacher", "/education.teacher/openapi");
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/education.teacher/openapi");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
@@ -159,8 +165,22 @@ class StaticModuleOpenApiGeneratorTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> endpoint.openApi(request))
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("must end with /openapi");
+                    .hasMessageContaining("unknown static module OpenAPI mapping");
         }
+    }
+
+    @Test
+    void shouldResolveCustomOpenApiPathFromRegisteredModuleMapping() {
+        generator = new StaticModuleOpenApiGenerator(
+                new StaticModuleDefinitionCatalog(List.of(
+                        StaticModuleDefinition.builder("iam", "iam.organization", "组织").build())),
+                new RegisteredWebEndpointCatalog());
+        StaticModuleOpenApiEndpoint endpoint = new StaticModuleOpenApiEndpoint(generator);
+        endpoint.register("iam.organization", "/organizations/openapi");
+
+        Map<String, Object> document = endpoint.openApi(new MockHttpServletRequest("GET", "/organizations/openapi"));
+
+        assertThat(document).containsEntry("x-muyun-module-alias", "iam.organization");
     }
 
     private void register(RegisteredWebEndpointCatalog catalog, ResolvedWebEndpoint definition) {

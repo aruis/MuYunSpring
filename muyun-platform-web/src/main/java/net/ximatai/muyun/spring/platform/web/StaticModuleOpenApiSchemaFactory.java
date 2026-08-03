@@ -30,6 +30,7 @@ final class StaticModuleOpenApiSchemaFactory {
             schemas.put(entitySchemaName + "PageResponse", pageResponseSchema(entitySchemaName));
         }
         schemas.put("PlatformWebError", platformWebErrorSchema());
+        schemas.put("OpenApi31Document", openApi31DocumentSchema());
         return Map.copyOf(schemas);
     }
 
@@ -44,7 +45,26 @@ final class StaticModuleOpenApiSchemaFactory {
             properties.put(field.fieldName(), property(field));
             if (field.isRequired()) required.add(field.fieldName());
         }
+        properties.put("id", new PlatformApiDocument.Property("string", null, false, true, false,
+                null, "Platform record identifier", null, null, null, null, List.of()));
+        properties.put("tenantId", new PlatformApiDocument.Property("string", null, false, true, false,
+                null, "Platform tenant identifier", null, null, null, null, List.of()));
+        properties.put("version", new PlatformApiDocument.Property("integer", "int32", false, true, false,
+                null, "Optimistic lock version; required when updating an existing record", null, null, null, null, List.of()));
+        properties.put("deleted", new PlatformApiDocument.Property("boolean", null, false, true, false,
+                null, "Soft delete flag", null, null, null, null, List.of()));
+        properties.put("deletedAt", temporalProperty());
+        properties.put("deletedBy", stringProperty());
+        properties.put("createdBy", stringProperty());
+        properties.put("createdAt", temporalProperty());
+        properties.put("updatedBy", stringProperty());
+        properties.put("updatedAt", temporalProperty());
         return new PlatformApiDocument.Schema(schemaName(entity), "object", null, required, properties, null);
+    }
+
+    private PlatformApiDocument.Property temporalProperty() {
+        return new PlatformApiDocument.Property("string", "date-time", false, true, false,
+                null, null, null, null, null, null, List.of());
     }
 
     private PlatformApiDocument.Property property(FieldDefinition field) {
@@ -140,6 +160,16 @@ final class StaticModuleOpenApiSchemaFactory {
                 "targets", arrayProperty("object"),
                 "details", objectProperty(null),
                 "messageArgs", objectProperty(null)
+        ), null);
+    }
+
+    PlatformApiDocument.Schema openApi31DocumentSchema() {
+        return new PlatformApiDocument.Schema("OpenApi31Document", "object", null, List.of("openapi", "info", "paths"), Map.of(
+                "openapi", new PlatformApiDocument.Property("string", null, true, false, false,
+                        null, "OpenAPI specification version", null, null, null, null, List.of()),
+                "info", objectProperty(null),
+                "paths", objectProperty(null),
+                "components", objectProperty(null)
         ), null);
     }
 

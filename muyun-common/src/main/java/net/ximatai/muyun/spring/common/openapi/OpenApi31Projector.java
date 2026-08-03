@@ -81,7 +81,7 @@ public final class OpenApi31Projector {
         Map<String, Object> success = new LinkedHashMap<>();
         success.put("description", "Success");
         if (operation.responseSchema() != null) {
-            success.put("content", Map.of(JSON, Map.of("schema",
+            success.put("content", Map.of(responseMediaType(operation), Map.of("schema",
                     schemaReference(operation.responseSchema(), document.schemas().keySet()))));
         }
         responses.put(String.valueOf(operation.successStatus()), success);
@@ -93,6 +93,12 @@ public final class OpenApi31Projector {
             }
         }
         return copyMap(responses);
+    }
+
+    private static String responseMediaType(PlatformApiDocument.Operation operation) {
+        return operation.responseMediaType() == null || operation.responseMediaType().isBlank()
+                ? JSON
+                : operation.responseMediaType();
     }
 
     private static Map<String, Object> components(PlatformApiDocument document) {

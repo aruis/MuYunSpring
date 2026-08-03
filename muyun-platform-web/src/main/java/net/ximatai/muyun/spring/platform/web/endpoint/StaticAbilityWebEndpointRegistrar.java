@@ -304,6 +304,7 @@ public class StaticAbilityWebEndpointRegistrar implements SmartInitializingSingl
     private void registerStaticModuleOpenApiEndpoint(StaticModuleOpenApiEndpoint endpoint,
                                                      String moduleAlias,
                                                      String path) {
+        endpoint.register(moduleAlias, path);
         RequestMappingInfo mapping = RequestMappingInfo.paths(path)
                 .methods(RequestMethod.GET)
                 .options(handlerMapping.getBuilderConfiguration())
