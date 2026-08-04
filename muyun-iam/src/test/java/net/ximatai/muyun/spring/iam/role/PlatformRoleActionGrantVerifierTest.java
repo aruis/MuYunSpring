@@ -105,7 +105,6 @@ class PlatformRoleActionGrantVerifierTest {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         PlatformModuleAction action = moduleAction("exportData", "create", true);
-        action.setPermissionActionCodeOverride("export");
         action.setDataAuth(Boolean.TRUE);
         action.setDataAuthOverride(false);
         when(moduleService.resolveVisibleModule("sales.contract"))
@@ -113,7 +112,7 @@ class PlatformRoleActionGrantVerifierTest {
         when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of(action));
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(moduleService, moduleActionService);
 
-        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "exportData")).isEqualTo("export");
+        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "exportData")).isEqualTo("create");
         assertThat(verifier.requiresDataScope("sales.contract", "exportData")).isFalse();
     }
 

@@ -190,7 +190,7 @@ public class ActionEndpointContextResolver {
 
     private ActionExecutionPolicy toPolicy(PlatformModuleAction action) {
         String actionCode = PlatformNameRules.requireActionCode(action.getActionCode(), "actionCode");
-        String permissionActionCode = action.effectivePermissionActionCode();
+        String permissionActionCode = action.getPermissionActionCode();
         String inheritActionCode = permissionActionCode == null || permissionActionCode.isBlank()
                 || permissionActionCode.equals(actionCode)
                 ? null

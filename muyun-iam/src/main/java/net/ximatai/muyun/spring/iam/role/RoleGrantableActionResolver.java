@@ -76,7 +76,7 @@ public class RoleGrantableActionResolver {
         return new GrantableAction(
                 moduleAlias,
                 action.getActionCode(),
-                action.effectivePermissionActionCode(),
+                action.getPermissionActionCode(),
                 usesPlatformDefaultTitle ? platformAction.orElseThrow().title() : action.getTitle(),
                 usesPlatformDefaultTitle ? platformAction.orElseThrow().titleKey() : null,
                 action.effectiveActionAuth(),

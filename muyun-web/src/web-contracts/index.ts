@@ -848,7 +848,6 @@ export interface PlatformModuleAction extends StandardEnabledSortableEntity {
   dataAuth?: boolean;
   defaultGrantPolicy?: 'NONE' | 'ANY_LOGIN_USER' | 'OWNER' | 'ASSIGNEE' | 'MEMBER';
   /** Governance-only overrides. Code declarations remain the default action fact. */
-  permissionActionCodeOverride?: string;
   accessModeOverride?: 'AUTH_REQUIRED' | 'LOGIN_REQUIRED' | 'ANONYMOUS_ALLOWED';
   actionAuthOverride?: boolean;
   dataAuthOverride?: boolean;

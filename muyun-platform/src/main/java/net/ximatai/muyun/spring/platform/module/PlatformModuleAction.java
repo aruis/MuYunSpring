@@ -57,10 +57,6 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean dataAuth = Boolean.FALSE;
 
-    @Column(name = "permission_action_code_override", type = ColumnType.VARCHAR, length = 64,
-            comment = "Governance override for permission action code")
-    private String permissionActionCodeOverride;
-
     @Column(name = "access_mode_override", type = ColumnType.VARCHAR, length = 32,
             comment = "Governance override for action access mode")
     private EntityActionAccessMode accessModeOverride;
@@ -113,12 +109,6 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "system_managed", comment = "Whether action is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean systemManaged = Boolean.FALSE;
-
-    public String effectivePermissionActionCode() {
-        return permissionActionCodeOverride == null || permissionActionCodeOverride.isBlank()
-                ? permissionActionCode
-                : permissionActionCodeOverride;
-    }
 
     public EntityActionAccessMode effectiveAccessMode() {
         return accessModeOverride == null ? accessMode : accessModeOverride;

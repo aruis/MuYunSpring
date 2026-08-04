@@ -652,7 +652,7 @@ public class PlatformModuleDefinitionCompiler {
     }
 
     private String inheritedActionCode(PlatformModuleAction action) {
-        String permissionActionCode = action.effectivePermissionActionCode();
+        String permissionActionCode = action.getPermissionActionCode();
         if (permissionActionCode == null || permissionActionCode.isBlank()
                 || permissionActionCode.equals(action.getActionCode())) {
             return null;

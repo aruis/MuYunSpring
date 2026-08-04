@@ -102,6 +102,8 @@ class StaticModuleDefinitionRegistrarTest {
                     assertThat(action.getModuleAlias()).isEqualTo("iam.user");
                     assertThat(action.getPermissionActionCode()).isEqualTo("menu");
                     assertThat(action.getDataAuth()).isFalse();
+                    assertThat(action.getSourceType()).isEqualTo(ModuleActionSourceType.STATIC_MODULE);
+                    assertThat(action.getSourceId()).isEqualTo("iam.user");
                     assertThat(action.getSystemManaged()).isTrue();
                     assertThat(action.getEnabled()).isTrue();
                 });

@@ -71,14 +71,13 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModuleAction.class, java.util.List.of("id", "moduleAlias", "actionCode", "entityAlias", "permissionActionCode", "title", "category", "actionLevel", "accessMode", "actionAuth", "dataAuth", "defaultGrantPolicy", "permissionActionCodeOverride", "accessModeOverride", "actionAuthOverride", "dataAuthOverride", "defaultGrantPolicyOverride", "executorType", "executorKey", "sourceType", "sourceId", "bindingType", "bindingId", "bindingAlias", "systemManaged", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModuleAction.class, java.util.List.of("id", "moduleAlias", "actionCode", "entityAlias", "permissionActionCode", "title", "category", "actionLevel", "accessMode", "actionAuth", "dataAuth", "defaultGrantPolicy", "accessModeOverride", "actionAuthOverride", "dataAuthOverride", "defaultGrantPolicyOverride", "executorType", "executorKey", "sourceType", "sourceId", "bindingType", "bindingId", "bindingAlias", "systemManaged", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override
     public Set<String> editablePlatformManagedFields() {
-        return Set.of("permissionActionCodeOverride", "accessModeOverride", "actionAuthOverride",
-                "dataAuthOverride", "defaultGrantPolicyOverride");
+        return Set.of("accessModeOverride", "actionAuthOverride", "dataAuthOverride", "defaultGrantPolicyOverride");
     }
 
     @Override
@@ -144,7 +143,6 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
             throw new OptimisticLockException("record version conflict: " + actionId);
         }
         PlatformManagedMutationContext.runAsPlatformManaged(() -> {
-            action.setPermissionActionCodeOverride(null);
             action.setAccessModeOverride(null);
             action.setActionAuthOverride(null);
             action.setDataAuthOverride(null);
@@ -186,13 +184,6 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         action.setPermissionActionCode(action.getPermissionActionCode() == null
                 ? action.getActionCode()
                 : PlatformNameRules.requireActionCode(action.getPermissionActionCode(), "permissionActionCode"));
-        if (action.getPermissionActionCodeOverride() != null && action.getPermissionActionCodeOverride().isBlank()) {
-            action.setPermissionActionCodeOverride(null);
-        }
-        if (action.getPermissionActionCodeOverride() != null) {
-            action.setPermissionActionCodeOverride(PlatformNameRules.requireActionCode(
-                    action.getPermissionActionCodeOverride(), "permissionActionCodeOverride"));
-        }
         if (action.getTitle() == null || action.getTitle().isBlank()) {
             action.setTitle(action.getActionCode());
         }

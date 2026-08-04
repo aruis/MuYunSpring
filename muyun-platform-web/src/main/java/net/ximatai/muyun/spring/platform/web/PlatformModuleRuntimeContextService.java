@@ -366,9 +366,9 @@ public class PlatformModuleRuntimeContextService {
     }
 
     private ActionExecutionPolicy policy(PlatformModuleAction action) {
-        String permissionActionCode = action.effectivePermissionActionCode() == null || action.effectivePermissionActionCode().isBlank()
+        String permissionActionCode = action.getPermissionActionCode() == null || action.getPermissionActionCode().isBlank()
                 ? action.getActionCode()
-                : action.effectivePermissionActionCode();
+                : action.getPermissionActionCode();
         return new ActionExecutionPolicy(
                 action.getActionCode(),
                 toPlatformLevel(action.getActionLevel()),

@@ -129,6 +129,8 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
             action.setDefaultGrantPolicy(actionDefinition.defaultGrantPolicy());
             action.setExecutorType(actionDefinition.executorType());
             action.setExecutorKey(actionDefinition.executorKey());
+            action.setSourceType(ModuleActionSourceType.STATIC_MODULE);
+            action.setSourceId(definition.moduleAlias());
             action.setSystemManaged(Boolean.TRUE);
             action.setEnabled(Boolean.TRUE);
             action.setSortOrder(order++);

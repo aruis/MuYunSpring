@@ -96,7 +96,7 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
     }
 
     private String permissionActionCode(PlatformModuleAction action) {
-        String permissionActionCode = action.effectivePermissionActionCode();
+        String permissionActionCode = action.getPermissionActionCode();
         return permissionActionCode == null || permissionActionCode.isBlank()
                 ? Objects.requireNonNull(action.getActionCode(), "actionCode must not be null")
                 : permissionActionCode;

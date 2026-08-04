@@ -16,12 +16,15 @@ withDefaults(
     explorerSearchKeyword?: string;
     explorerSearchPlaceholder?: string;
     explorerSearchable?: boolean;
+    /** Uses the workspace-height detail scroll pattern for long management forms. */
+    scrollableContent?: boolean;
   }>(),
   {
     mutedMessage: undefined,
     explorerSearchKeyword: '',
     explorerSearchPlaceholder: '搜索名称、编码或 ID',
     explorerSearchable: true,
+    scrollableContent: false,
   },
 );
 
@@ -32,7 +35,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <ManagementWorkspace class="static-management-page">
+  <ManagementWorkspace
+    class="static-management-page"
+    :class="{ 'static-management-page--scrollable': scrollableContent }"
+  >
     <ManagementExplorerColumn>
       <RecordExplorerPanel
         class="static-management-sidebar"
@@ -54,7 +60,11 @@ const emit = defineEmits<{
       </RecordExplorerPanel>
     </ManagementExplorerColumn>
 
-    <RecordDetailPanel class="static-management-card" :title="detailTitle">
+    <RecordDetailPanel
+      class="static-management-card"
+      :title="detailTitle"
+      :scrollable-content="scrollableContent"
+    >
       <template #status>
         <slot name="detail-status" />
       </template>
@@ -78,6 +88,17 @@ const emit = defineEmits<{
 .static-management-sidebar,
 .static-management-card {
   min-width: 0;
+}
+
+.static-management-page--scrollable {
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.static-management-page--scrollable .static-management-card {
+  min-height: 0;
 }
 
 .static-management-sidebar {
