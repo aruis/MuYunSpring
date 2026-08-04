@@ -1470,7 +1470,7 @@ class IamWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("Internal server error"));
+                .andExpect(jsonPath("$.message").value("系统暂时不可用，请稍后重试"));
     }
 
     @Test

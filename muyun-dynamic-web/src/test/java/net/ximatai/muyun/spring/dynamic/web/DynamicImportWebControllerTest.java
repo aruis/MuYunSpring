@@ -104,6 +104,28 @@ class DynamicImportWebControllerTest {
     }
 
     @Test
+    void shouldReturnPlatformErrorWhenParseFilePartIsMissing() throws Exception {
+        mvc.perform(multipart("/{moduleAlias}/import/parse", MODULE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("缺少必要请求部分"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("file"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnPlatformErrorWhenExecuteCommandPartIsMissing() throws Exception {
+        mvc.perform(multipart("/{moduleAlias}/import/execute", MODULE)
+                        .file(new MockMultipartFile("file", "order.xlsx",
+                                DynamicImportWebController.XLSX_CONTENT_TYPE, new byte[]{1, 2, 3})))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("缺少必要请求部分"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("command"));
+    }
+
+    @Test
     void shouldRejectParseWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 

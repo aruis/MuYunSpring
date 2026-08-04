@@ -113,8 +113,6 @@ class LoginWebControllerTest {
     @Test
     void shouldReturnBadRequestWhenLoginRequestIsMalformed() throws Exception {
         UserSessionService userSessionService = mock(UserSessionService.class);
-        when(userSessionService.login(isNull(), anyString(), anyString(), nullable(String.class), nullable(String.class)))
-                .thenThrow(new IllegalArgumentException("tenantId must not be null"));
         LoginWebController controller = new LoginWebController(userSessionService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new PlatformWebExceptionHandler())
@@ -123,13 +121,14 @@ class LoginWebControllerTest {
         mvc.perform(post("/iam.auth/login")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"username":"alice","password":"secret1"}
+                                {"tenantId":"tenant-a","password":"secret1"}
                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("tenantId must not be null"));
+                .andExpect(jsonPath("$.message").value("登录请求缺少用户名"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("username"));
     }
 
     @Test

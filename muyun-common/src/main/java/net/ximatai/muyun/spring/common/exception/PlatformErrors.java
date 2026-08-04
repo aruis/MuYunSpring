@@ -50,6 +50,10 @@ public final class PlatformErrors {
         return new PlatformException(code, 400, message, ErrorScope.empty(), List.of(), Map.of());
     }
 
+    public static PlatformException badRequest(String code, String message, List<ErrorTarget> targets) {
+        return new PlatformException(code, 400, message, ErrorScope.empty(), targets, Map.of());
+    }
+
     public static PlatformException notFound(String message, ErrorScope scope) {
         return new PlatformException(PlatformErrorCodes.RESOURCE_NOT_FOUND, 404, message, scope, List.of(), Map.of());
     }

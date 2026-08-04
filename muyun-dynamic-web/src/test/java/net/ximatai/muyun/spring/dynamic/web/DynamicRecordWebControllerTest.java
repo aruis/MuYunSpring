@@ -3279,7 +3279,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_VERSION))
                 .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.message").value("record version conflict: contract-1"));
+                .andExpect(jsonPath("$.message").value("数据已被更新，请刷新后重试"));
     }
 
     @Test

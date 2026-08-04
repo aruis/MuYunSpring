@@ -15,12 +15,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -117,9 +121,9 @@ class PlatformWebExceptionHandlerTest {
         mvc.perform(get("/demo/optimistic-lock"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_VERSION))
-                .andExpect(jsonPath("$.message").value("record version conflict"))
+                .andExpect(jsonPath("$.message").value("数据已被更新，请刷新后重试"))
                 .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.CONFLICT_VERSION))
-                .andExpect(jsonPath("$.actionMessage.text").value("record version conflict"))
+                .andExpect(jsonPath("$.actionMessage.text").value("数据已被更新，请刷新后重试"))
                 .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
     }
 
@@ -150,13 +154,59 @@ class PlatformWebExceptionHandlerTest {
     }
 
     @Test
+    void shouldHideMalformedRequestBodyDetailsBehindStableEnvelope() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(post("/demo/body").contentType(MediaType.APPLICATION_JSON).content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message").value("请求体格式错误"))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void shouldLocateMalformedRequestParameterWithoutExposingFrameworkMessage() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/number").param("value", "not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message").value("请求参数格式错误"))
+                .andExpect(jsonPath("$.targets[0].kind").value("field"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("value"));
+    }
+
+    @Test
+    void shouldLocateMissingRequiredRequestParameter() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/required"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("缺少必要请求参数"))
+                .andExpect(jsonPath("$.targets[0].fieldName").value("value"));
+    }
+
+    @Test
+    void shouldReturnStableEnvelopeForUnsupportedMediaType() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(post("/demo/body").contentType(MediaType.TEXT_PLAIN).content("plain"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.message").value("不支持的请求媒体类型"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
     void shouldHideUnexpectedExceptionMessage() throws Exception {
         MockMvc mvc = mvc(new DemoController());
 
         mvc.perform(get("/demo/unexpected"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.INTERNAL_ERROR))
-                .andExpect(jsonPath("$.message").value("Internal server error"))
+                .andExpect(jsonPath("$.message").value("系统暂时不可用，请稍后重试"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 
@@ -214,9 +264,26 @@ class PlatformWebExceptionHandlerTest {
             throw new IllegalArgumentException("name must not be blank");
         }
 
+        @PostMapping(value = "/demo/body", consumes = MediaType.APPLICATION_JSON_VALUE)
+        String body(@RequestBody DemoRequest request) {
+            return request.name();
+        }
+
+        @GetMapping("/demo/number")
+        Integer number(@RequestParam Integer value) {
+            return value;
+        }
+
+        @GetMapping("/demo/required")
+        String required(@RequestParam String value) {
+            return value;
+        }
+
         @GetMapping("/demo/unexpected")
         String unexpected() {
             throw new IllegalStateException("database password leaked");
         }
+
+        private record DemoRequest(String name) { }
     }
 }
