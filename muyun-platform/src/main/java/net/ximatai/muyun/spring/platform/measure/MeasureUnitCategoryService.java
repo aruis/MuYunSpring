@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -32,7 +33,8 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
         SortAbility<MeasureUnitCategory>,
         ReferenceAbility<MeasureUnitCategory>,
         CacheAbility<MeasureUnitCategory>,
-        QueryAbility<MeasureUnitCategory> {
+        QueryAbility<MeasureUnitCategory>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "platform.measure_unit_category";
     public static final String SHARED_APPLICATION_ALIAS = "platform";
 
@@ -45,6 +47,21 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
         return QueryDescriptors.fromModel(MODULE_ALIAS, MeasureUnitCategory.class, java.util.List.of("id", "tenantId", "applicationAlias", "alias", "dimension", "baseUnitCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "measureUnitCategory";
+    }
+
+    @Override
+    public String resourceName() {
+        return "计量单位类目";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

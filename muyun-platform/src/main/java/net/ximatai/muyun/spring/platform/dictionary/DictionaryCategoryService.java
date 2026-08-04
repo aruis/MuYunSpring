@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,7 +20,8 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
         SoftDeleteAbility<DictionaryCategory>,
         EnableAbility<DictionaryCategory>,
         TreeAbility<DictionaryCategory>,
-        QueryAbility<DictionaryCategory> {
+        QueryAbility<DictionaryCategory>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "platform.dictionary_category";
 
     public DictionaryCategoryService(BaseDao<DictionaryCategory, String> categoryDao) {
@@ -31,6 +33,21 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
         return QueryDescriptors.fromModel(MODULE_ALIAS, DictionaryCategory.class, java.util.List.of("id", "applicationAlias", "alias", "categoryKind", "parentId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "dictionaryCategory";
+    }
+
+    @Override
+    public String resourceName() {
+        return "字典类目";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

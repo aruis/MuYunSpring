@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.stereotype.Service;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
@@ -20,7 +21,8 @@ public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDe
         SoftDeleteAbility<WorkflowDefinition>,
         EnableAbility<WorkflowDefinition>,
         SortAbility<WorkflowDefinition>,
-        QueryAbility<WorkflowDefinition> {
+        QueryAbility<WorkflowDefinition>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "platform.workflow.definition";
 
     public WorkflowDefinitionService(BaseDao<WorkflowDefinition, String> workflowDefinitionDao) {
@@ -31,6 +33,21 @@ public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDe
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, WorkflowDefinition.class, java.util.List.of("id", "applicationAlias", "moduleAlias", "alias", "approvalEnabled", "actionCode", "definitionStatus", "currentVersionNo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "workflowDefinition";
+    }
+
+    @Override
+    public String resourceName() {
+        return "工作流定义";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

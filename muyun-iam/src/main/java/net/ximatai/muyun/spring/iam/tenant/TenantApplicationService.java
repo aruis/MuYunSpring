@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.deletion.DeletionTrigger;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.common.exception.ApplicationNotOpenedException;
 import net.ximatai.muyun.spring.common.platform.TenantApplicationCatalog;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,8 @@ import java.util.Set;
 public class TenantApplicationService extends AbstractAbilityService<TenantApplication> implements
         GlobalScopedAbility<TenantApplication>,
         RecycleBinAbility<TenantApplication>,
-        ChildAbility<TenantApplication> {
+        ChildAbility<TenantApplication>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "iam.tenant_application";
     public static final String IAM_APPLICATION_ALIAS = "iam";
 
@@ -56,6 +58,21 @@ public class TenantApplicationService extends AbstractAbilityService<TenantAppli
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         return !list(Criteria.of().eq("tenantId", validTenantId).eq("applicationAlias", validApplicationAlias),
                 PageRequest.of(1, 1)).isEmpty();
+    }
+
+    @Override
+    public String resourceKey() {
+        return "tenantApplication";
+    }
+
+    @Override
+    public String resourceName() {
+        return "租户应用开通记录";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     /** Returns whether a recorded entitlement is currently executable for the tenant. */
