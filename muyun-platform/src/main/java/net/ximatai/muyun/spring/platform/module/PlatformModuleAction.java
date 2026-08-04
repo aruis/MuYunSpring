@@ -90,7 +90,7 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "source_type", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source type")
     private ModuleActionSourceType sourceType;
 
-    @Column(name = "source_id", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source id")
+    @Column(name = "source_id", type = ColumnType.VARCHAR, length = 128, comment = "Action contribution source id")
     private String sourceId;
 
     @Column(name = "source_version_id", type = ColumnType.VARCHAR, length = 64,

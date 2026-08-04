@@ -80,6 +80,10 @@ public final class DynamicActionExecutorRegistry {
             return;
         }
         String key = requireKey(executor.executorKey());
+        DynamicActionExecutorDefinition definition = executor.definition();
+        if (definition == null || !key.equals(requireKey(definition.executorKey()))) {
+            throw new IllegalArgumentException("dynamic action executor definition key must match executor key: " + key);
+        }
         DynamicActionExecutor previous = registered.putIfAbsent(key, executor);
         if (previous != null) {
             throw new IllegalArgumentException("duplicate dynamic action executor key: " + key);

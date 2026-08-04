@@ -120,6 +120,27 @@ class StaticModuleDefinitionRegistrarTest {
     }
 
     @Test
+    void shouldKeepLongStaticModuleAliasAsActionSource() {
+        String moduleAlias = "sales." + "contract_".repeat(8);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        when(moduleService.select(moduleAlias)).thenReturn(null);
+        when(actionService.findByModuleAliasAndActionCode(moduleAlias, "query")).thenReturn(null);
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                moduleService,
+                actionService,
+                List.of(definition("sales", moduleAlias, "合同", List.of(
+                        StaticModuleActionDefinition.platformAction(PlatformAction.QUERY))))
+        );
+
+        registrar.registerAll();
+
+        ArgumentCaptor<PlatformModuleAction> actionCaptor = ArgumentCaptor.forClass(PlatformModuleAction.class);
+        verify(actionService).insert(actionCaptor.capture());
+        assertThat(actionCaptor.getValue().getSourceId()).isEqualTo(moduleAlias).hasSizeGreaterThan(64);
+    }
+
+    @Test
     void shouldRegisterStaticModuleEntryOnPlatformModule() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);

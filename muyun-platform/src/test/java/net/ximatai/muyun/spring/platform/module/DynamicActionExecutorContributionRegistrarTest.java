@@ -10,6 +10,7 @@ import org.springframework.context.ApplicationContext;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,31 @@ class DynamicActionExecutorContributionRegistrarTest {
         assertThatThrownBy(registrar::run)
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("requires a dynamic module");
+    }
+
+    @Test
+    void shouldDisableContributedActionsWhenExecutorIsNoLongerDeployed() {
+        TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
+        PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
+        PlatformModule module = new PlatformModule();
+        module.setAlias("sales.contract");
+        module.setApplicationAlias("sales");
+        module.setTitle("合同");
+        module.setModuleKind(ModuleKind.DYNAMIC);
+        moduleService.insert(module);
+        PlatformModuleActionService actionService = new PlatformModuleActionService(new TestMemoryDao<>(), moduleService);
+        ApplicationContext applicationContext = mock(ApplicationContext.class);
+        when(applicationContext.getBeansOfType(DynamicActionExecutor.class))
+                .thenReturn(Map.of("testExecutor", new TestExecutor()), Map.of());
+        DynamicActionExecutorContributionRegistrar registrar = new DynamicActionExecutorContributionRegistrar(
+                applicationContext, new ModuleActionContributionRegistrar(actionService), moduleService);
+
+        registrar.run();
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "sync").getEnabled()).isTrue();
+
+        registrar.run();
+
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "sync").getEnabled()).isFalse();
     }
 
     @PlatformDynamicActionContribution(moduleAlias = "sales.contract", actionCode = "sync", title = "同步")

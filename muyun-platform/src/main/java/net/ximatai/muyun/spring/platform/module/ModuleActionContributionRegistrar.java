@@ -89,6 +89,27 @@ public class ModuleActionContributionRegistrar {
         }
     }
 
+    /** Disables code-owned actions whose deployed executor no longer exists. */
+    public void disableMissingDynamicActionExecutorActions(Set<String> executorKeys) {
+        Set<String> availableKeys = executorKeys == null ? Set.of() : Set.copyOf(executorKeys);
+        try (TenantContext.Scope ignored = TenantContext.system("reconcile contributed module actions")) {
+            PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                for (PlatformModuleAction action : actionService
+                        .listSystemManagedActionsBySourceType(ModuleActionSourceType.CODE_EXTENSION)) {
+                    String executorKey = action.getBindingType() == ModuleActionBindingType.DYNAMIC_ACTION_EXECUTOR
+                            ? action.getBindingId()
+                            : action.getExecutorKey();
+                    if ((executorKey != null && availableKeys.contains(executorKey))
+                            || Boolean.FALSE.equals(action.getEnabled())) {
+                        continue;
+                    }
+                    action.setEnabled(Boolean.FALSE);
+                    actionService.update(action);
+                }
+            });
+        }
+    }
+
     private void validateContribution(ModuleActionContribution contribution) {
         if (contribution.sourceType() == null || contribution.sourceId() == null || contribution.sourceId().isBlank()) {
             throw new PlatformException("module action contribution source must not be blank: "

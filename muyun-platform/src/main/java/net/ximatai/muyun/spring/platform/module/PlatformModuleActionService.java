@@ -164,6 +164,18 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
     }
 
+    public List<PlatformModuleAction> listSystemManagedActionsBySourceType(ModuleActionSourceType sourceType) {
+        if (sourceType == null) {
+            return List.of();
+        }
+        try (TenantContext.Scope ignored = TenantContext.system("select global contributed module actions")) {
+            return list(Criteria.of()
+                    .eq("sourceType", sourceType)
+                    .eq("systemManaged", Boolean.TRUE)
+                    .isNull(StandardEntitySchema.TENANT_ID_FIELD), ALL, Sort.asc("sortOrder"));
+        }
+    }
+
     private void normalizeAndValidate(PlatformModuleAction action) {
         String moduleAlias = PlatformNameRules.requireModuleAlias(action.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);

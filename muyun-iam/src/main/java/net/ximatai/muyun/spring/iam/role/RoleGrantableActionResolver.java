@@ -46,8 +46,9 @@ public class RoleGrantableActionResolver {
             if (module == null) {
                 continue;
             }
-            List<GrantableAction> registeredActions = registeredModuleActions(moduleAlias);
-            if (!registeredActions.isEmpty()) {
+            List<PlatformModuleAction> persistedActions = persistedModuleActions(moduleAlias);
+            List<GrantableAction> registeredActions = grantableActions(moduleAlias, persistedActions);
+            if (!persistedActions.isEmpty()) {
                 for (GrantableAction action : registeredActions) {
                     put(actions, action);
                 }
@@ -60,9 +61,14 @@ public class RoleGrantableActionResolver {
         return List.copyOf(actions.values());
     }
 
-    private List<GrantableAction> registeredModuleActions(String moduleAlias) {
+    private List<PlatformModuleAction> persistedModuleActions(String moduleAlias) {
         return moduleActionService.listByModuleAliases(List.of(moduleAlias)).stream()
                 .filter(action -> Boolean.TRUE.equals(action.getEnabled()))
+                .toList();
+    }
+
+    private List<GrantableAction> grantableActions(String moduleAlias, List<PlatformModuleAction> actions) {
+        return actions.stream()
                 .filter(PlatformModuleAction::effectiveActionAuth)
                 .map(action -> toGrantableAction(moduleAlias, action))
                 .toList();

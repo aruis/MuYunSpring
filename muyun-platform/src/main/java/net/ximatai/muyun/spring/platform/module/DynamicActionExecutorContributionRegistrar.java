@@ -33,7 +33,12 @@ public class DynamicActionExecutorContributionRegistrar implements PlatformBoots
 
     @Override
     public void run() {
-        applicationContext.getBeansOfType(DynamicActionExecutor.class).values().forEach(this::register);
+        List<DynamicActionExecutor> executors = List.copyOf(
+                applicationContext.getBeansOfType(DynamicActionExecutor.class).values());
+        executors.forEach(this::register);
+        contributionRegistrar.disableMissingDynamicActionExecutorActions(executors.stream()
+                .map(DynamicActionExecutor::executorKey)
+                .collect(java.util.stream.Collectors.toSet()));
     }
 
     @Override
