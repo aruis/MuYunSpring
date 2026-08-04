@@ -63,7 +63,7 @@ public class RoleGrantableActionResolver {
     private List<GrantableAction> registeredModuleActions(String moduleAlias) {
         return moduleActionService.listByModuleAliases(List.of(moduleAlias)).stream()
                 .filter(action -> Boolean.TRUE.equals(action.getEnabled()))
-                .filter(action -> action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()))
+                .filter(PlatformModuleAction::effectiveActionAuth)
                 .map(action -> toGrantableAction(moduleAlias, action))
                 .toList();
     }
@@ -76,11 +76,11 @@ public class RoleGrantableActionResolver {
         return new GrantableAction(
                 moduleAlias,
                 action.getActionCode(),
-                action.getPermissionActionCode(),
+                action.effectivePermissionActionCode(),
                 usesPlatformDefaultTitle ? platformAction.orElseThrow().title() : action.getTitle(),
                 usesPlatformDefaultTitle ? platformAction.orElseThrow().titleKey() : null,
-                action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()),
-                Boolean.TRUE.equals(action.getDataAuth())
+                action.effectiveActionAuth(),
+                action.effectiveDataAuth()
         );
     }
 

@@ -146,6 +146,7 @@ async function clearPermissionGovernance() {
     await baseContext.http.request<void>({
       path: `/platform.module/${encodeURIComponent(props.moduleAlias)}/actions/${encodeURIComponent(selected.value.id)}/permission-governance`,
       method: 'DELETE',
+      body: { version: selected.value.version },
     });
     management.cancelEdit();
     reloadKey.value += 1;
@@ -163,7 +164,7 @@ function hasPermissionGovernanceOverride(action: PlatformModuleAction) {
     action.actionAuthOverride,
     action.dataAuthOverride,
     action.defaultGrantPolicyOverride,
-  ].some((value) => value !== undefined);
+  ].some((value) => value != null);
 }
 
 function updateDraft(field: keyof PlatformModuleAction, value: unknown) {

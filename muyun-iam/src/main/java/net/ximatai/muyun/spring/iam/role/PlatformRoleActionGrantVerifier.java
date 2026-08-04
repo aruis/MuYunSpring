@@ -72,8 +72,7 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
         if (!registeredActions.isEmpty()) {
             return registeredActions.stream()
                     .filter(action -> actionCode.equals(action.getActionCode()))
-                    .map(PlatformModuleAction::getDataAuth)
-                    .filter(Objects::nonNull)
+                    .map(PlatformModuleAction::effectiveDataAuth)
                     .findFirst()
                     .orElseThrow(() -> new PlatformException("role action requires configured module action: "
                             + moduleAlias + "." + actionCode));
@@ -92,12 +91,12 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
     private List<PlatformModuleAction> registeredModuleActions(String moduleAlias) {
         return moduleActionService.listByModuleAliases(List.of(moduleAlias)).stream()
                 .filter(action -> Boolean.TRUE.equals(action.getEnabled()))
-                .filter(action -> action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()))
+                .filter(PlatformModuleAction::effectiveActionAuth)
                 .toList();
     }
 
     private String permissionActionCode(PlatformModuleAction action) {
-        String permissionActionCode = action.getPermissionActionCode();
+        String permissionActionCode = action.effectivePermissionActionCode();
         return permissionActionCode == null || permissionActionCode.isBlank()
                 ? Objects.requireNonNull(action.getActionCode(), "actionCode must not be null")
                 : permissionActionCode;

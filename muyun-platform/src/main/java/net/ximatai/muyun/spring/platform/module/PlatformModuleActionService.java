@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -133,11 +134,14 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
     }
 
     /** Restores the permission policy declared by the action contributor or static module. */
-    public void clearPermissionGovernanceOverrides(String moduleAlias, String actionId) {
+    public void clearPermissionGovernanceOverrides(String moduleAlias, String actionId, Integer version) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         PlatformModuleAction action = select(actionId);
         if (action == null || !validModuleAlias.equals(action.getModuleAlias())) {
             throw new PlatformException("module action does not belong to module: " + validModuleAlias + "." + actionId);
+        }
+        if (version == null || !version.equals(action.getVersion())) {
+            throw new OptimisticLockException("record version conflict: " + actionId);
         }
         PlatformManagedMutationContext.runAsPlatformManaged(() -> {
             action.setPermissionActionCodeOverride(null);
@@ -145,6 +149,7 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
             action.setActionAuthOverride(null);
             action.setDataAuthOverride(null);
             action.setDefaultGrantPolicyOverride(null);
+            action.setVersion(version);
             update(action);
         });
     }

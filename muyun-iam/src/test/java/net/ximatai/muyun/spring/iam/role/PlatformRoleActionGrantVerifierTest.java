@@ -100,6 +100,39 @@ class PlatformRoleActionGrantVerifierTest {
         assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "exportData")).isEqualTo("create");
     }
 
+    @Test
+    void shouldUseEffectivePermissionGovernanceForRegisteredAction() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleAction action = moduleAction("exportData", "create", true);
+        action.setPermissionActionCodeOverride("export");
+        action.setDataAuth(Boolean.TRUE);
+        action.setDataAuthOverride(false);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of(action));
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(moduleService, moduleActionService);
+
+        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "exportData")).isEqualTo("export");
+        assertThat(verifier.requiresDataScope("sales.contract", "exportData")).isFalse();
+    }
+
+    @Test
+    void shouldRejectRegisteredActionWhenGovernanceDisablesActionAuth() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleAction action = moduleAction("submit", true);
+        action.setActionAuthOverride(false);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of(action));
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(moduleService, moduleActionService);
+
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("sales.contract", "submit"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("configured module action");
+    }
+
 
     @Test
     void shouldRejectStaticActionMissingFromRegisteredModuleActions() {

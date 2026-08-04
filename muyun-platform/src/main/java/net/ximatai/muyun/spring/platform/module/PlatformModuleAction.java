@@ -104,10 +104,10 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "binding_type", type = ColumnType.VARCHAR, length = 64, comment = "Action binding type")
     private ModuleActionBindingType bindingType;
 
-    @Column(name = "binding_id", type = ColumnType.VARCHAR, length = 64, comment = "Action binding id")
+    @Column(name = "binding_id", type = ColumnType.VARCHAR, length = 128, comment = "Action binding id")
     private String bindingId;
 
-    @Column(name = "binding_alias", type = ColumnType.VARCHAR, length = 64, comment = "Action binding alias")
+    @Column(name = "binding_alias", type = ColumnType.VARCHAR, length = 128, comment = "Action binding alias")
     private String bindingAlias;
 
     @Column(name = "system_managed", comment = "Whether action is managed by platform",

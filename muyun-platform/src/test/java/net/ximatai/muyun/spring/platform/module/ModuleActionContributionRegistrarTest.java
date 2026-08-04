@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.module;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -73,6 +74,20 @@ class ModuleActionContributionRegistrarTest {
         assertThat(reloaded.effectiveActionAuth()).isFalse();
         assertThat(reloaded.effectiveDefaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.ANY_LOGIN_USER);
         assertThat(reloaded.getSourceVersionId()).isEqualTo("ver-2");
+    }
+
+    @Test
+    void shouldRequireCurrentVersionWhenClearingPermissionGovernanceOverrides() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        Integer staleVersion = action.getVersion();
+        action.setActionAuthOverride(false);
+        actionService.update(action);
+
+        assertThatThrownBy(() -> actionService.clearPermissionGovernanceOverrides(
+                "sales.contract", action.getId(), staleVersion))
+                .isInstanceOf(OptimisticLockException.class);
     }
 
     @Test

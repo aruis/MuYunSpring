@@ -93,6 +93,9 @@ public final class DynamicActionExecutorRegistry {
         if (!executorKey.equals(executorKey.trim())) {
             throw new IllegalArgumentException("dynamic action executorKey must not contain leading or trailing spaces");
         }
+        if (executorKey.length() > 128) {
+            throw new IllegalArgumentException("dynamic action executorKey must not exceed 128 characters");
+        }
         return executorKey;
     }
 }
