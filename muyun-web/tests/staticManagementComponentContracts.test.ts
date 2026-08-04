@@ -325,7 +325,7 @@ test('management workspace fixes explorer and detail width contracts without los
   assert.match(workspaceSource, /min-width: 0/);
   assert.match(indexSource, /export \{ default as ManagementWorkspace \}/);
   assert.match(indexSource, /export \{ default as ManagementExplorerColumn \}/);
-  assert.match(staticLayoutSource, /<ManagementWorkspace class="static-management-page">/);
+  assert.match(staticLayoutSource, /<ManagementWorkspace\s+class="static-management-page"/);
   assert.match(staticLayoutSource, /<ManagementExplorerColumn>/);
   assert.match(positionViewSource, /<ManagementWorkspace[\s\S]*:explorer-count="canBrowseTenants \? 3 : 2"/);
   const employeeViewSource = [

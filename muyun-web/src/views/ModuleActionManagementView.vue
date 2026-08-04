@@ -590,28 +590,30 @@ function actionDetailDisplayValue(fieldName: string, value: unknown) {
       <p class="form-hint wide-field">
         手工动作只能绑定已部署的二开执行器；平台会通过通用动作接口承接权限、审计和运行态刷新。
       </p>
-      <label
-        ><span>动作编码</span
-        ><UiInput
+      <label>
+        <span>动作编码</span>
+        <UiInput
           :value="draft.actionCode"
           :disabled="formDisabled"
           @update:value="updateDraft('actionCode', $event)"
-      /></label>
-      <label
-        ><span>动作名称</span
-        ><UiInput :value="draft.title" :disabled="formDisabled" @update:value="updateDraft('title', $event)"
-      /></label>
-      <label
-        ><span>执行层级</span
-        ><UiSelect
+        />
+      </label>
+      <label>
+        <span>动作名称</span>
+        <UiInput :value="draft.title" :disabled="formDisabled" @update:value="updateDraft('title', $event)" />
+      </label>
+      <label>
+        <span>执行层级</span>
+        <UiSelect
           :value="draft.actionLevel"
           :disabled="formDisabled"
           :options="actionLevelOptions"
           @update:value="updateDraft('actionLevel', $event)"
-      /></label>
-      <label
-        ><span>访问方式</span
-        ><UiSelect
+        />
+      </label>
+      <label>
+        <span>访问方式</span>
+        <UiSelect
           :value="draft.accessMode"
           :disabled="formDisabled"
           :options="[
@@ -620,34 +622,36 @@ function actionDetailDisplayValue(fieldName: string, value: unknown) {
             { label: '匿名可用', value: 'ANONYMOUS_ALLOWED' },
           ]"
           @update:value="updateDraft('accessMode', $event)"
-      /></label>
-      <label
-        ><span>二开执行器</span
-        ><UiSelect
+        />
+      </label>
+      <label>
+        <span>二开执行器</span>
+        <UiSelect
           :value="draft.executorKey"
           :disabled="formDisabled"
           :options="executorOptions"
           @update:value="updateExecutor($event)"
-      /></label>
-      <label class="checkbox-field"
-        ><UiCheckbox
+        />
+      </label>
+      <label class="checkbox-field">
+        <UiCheckbox
           :checked="draft.actionAuth !== false"
           :disabled="formDisabled"
           @update:checked="updateDraft('actionAuth', $event)"
           >启用动作授权</UiCheckbox
-        ></label
-      >
-      <label class="checkbox-field"
-        ><UiCheckbox
+        >
+      </label>
+      <label class="checkbox-field">
+        <UiCheckbox
           :checked="draft.dataAuth === true"
           :disabled="formDisabled"
           @update:checked="updateDraft('dataAuth', $event)"
           >启用数据授权</UiCheckbox
-        ></label
-      >
-      <label
-        ><span>默认授予策略</span
-        ><UiSelect
+        >
+      </label>
+      <label>
+        <span>默认授予策略</span>
+        <UiSelect
           :value="draft.defaultGrantPolicy"
           :disabled="formDisabled"
           :options="[
@@ -658,21 +662,24 @@ function actionDetailDisplayValue(fieldName: string, value: unknown) {
             { label: '成员', value: 'MEMBER' },
           ]"
           @update:value="updateDraft('defaultGrantPolicy', $event)"
-      /></label>
-      <label class="wide-field"
-        ><span>可用条件表达式</span
-        ><UiTextArea
+        />
+      </label>
+      <label class="wide-field">
+        <span>可用条件表达式</span>
+        <UiTextArea
           :value="draft.availableExpression"
           :disabled="formDisabled"
           @update:value="updateDraft('availableExpression', $event)"
-      /></label>
-      <label class="wide-field"
-        ><span>不可用提示</span
-        ><UiTextArea
+        />
+      </label>
+      <label class="wide-field">
+        <span>不可用提示</span>
+        <UiTextArea
           :value="draft.unavailableMessage"
           :disabled="formDisabled"
           @update:value="updateDraft('unavailableMessage', $event)"
-      /></label>
+        />
+      </label>
     </form>
     <RecordMetaSection v-if="selected || mode !== 'view'" :record="draft" />
   </StaticManagementLayout>
