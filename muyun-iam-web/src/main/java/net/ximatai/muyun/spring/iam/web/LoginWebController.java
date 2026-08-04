@@ -2,6 +2,9 @@ package net.ximatai.muyun.spring.iam.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.ErrorTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.exception.PlatformErrors;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
@@ -23,6 +26,7 @@ public class LoginWebController {
 
     @PostMapping("/login")
     public LoginResult login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        validateLoginRequest(request);
         return userSessionService.login(request.tenantId(), request.username(), request.password(),
                 clientIp(httpRequest), httpRequest.getHeader("User-Agent"));
     }
@@ -63,6 +67,21 @@ public class LoginWebController {
             return forwardedFor.split(",", 2)[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private void validateLoginRequest(LoginRequest request) {
+        if (request == null || isBlank(request.username())) {
+            throw PlatformErrors.badRequest(PlatformErrorCodes.VALIDATION_FAILED, "登录请求缺少用户名",
+                    java.util.List.of(ErrorTarget.field("username")));
+        }
+        if (isBlank(request.password())) {
+            throw PlatformErrors.badRequest(PlatformErrorCodes.VALIDATION_FAILED, "登录请求缺少密码",
+                    java.util.List.of(ErrorTarget.field("password")));
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public record LoginRequest(String tenantId, String username, String password) {
