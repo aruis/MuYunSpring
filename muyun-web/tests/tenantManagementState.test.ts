@@ -62,14 +62,14 @@ test('tenant management state keeps existing alias stable while editing title', 
 });
 
 test('tenant management state toggles enable state and refreshes selected record', async () => {
-  const calls: string[] = [];
+  const calls: Array<{ action: string; id: string; request?: unknown }> = [];
   const context = createContext({
-    disable: async (id) => {
-      calls.push(`disable:${id}`);
+    disable: async (id, request) => {
+      calls.push({ action: 'disable', id, request });
       return 1;
     },
     view: async (id) => {
-      calls.push(`view:${id}`);
+      calls.push({ action: 'view', id });
       return { id, alias: id, title: '租户 A', enabled: false, version: 1 };
     },
   });
@@ -78,7 +78,10 @@ test('tenant management state toggles enable state and refreshes selected record
   state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true, version: 0 });
   await state.toggleEnabled();
 
-  assert.deepEqual(calls, ['disable:tenant_a', 'view:tenant_a']);
+  assert.deepEqual(calls, [
+    { action: 'disable', id: 'tenant_a', request: { version: 0 } },
+    { action: 'view', id: 'tenant_a' },
+  ]);
   assert.equal(state.selected.value?.enabled, false);
   assert.equal(state.reloadKey.value, 1);
 });
@@ -97,10 +100,10 @@ test('tenant management state cancels creation back to selected tenant', () => {
 });
 
 test('tenant management state respects delete confirmation result', async () => {
-  const calls: string[] = [];
+  const calls: Array<{ id: string; request: unknown }> = [];
   const context = createContext({
-    delete: async (id) => {
-      calls.push(`delete:${id}`);
+    delete: async (id, request) => {
+      calls.push({ id, request });
       return 1;
     },
   });
@@ -116,7 +119,7 @@ test('tenant management state respects delete confirmation result', async () => 
   confirmed = true;
   await state.removeSelected();
 
-  assert.deepEqual(calls, ['delete:tenant_a']);
+  assert.deepEqual(calls, [{ id: 'tenant_a', request: { version: 0 } }]);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'create');
 });
