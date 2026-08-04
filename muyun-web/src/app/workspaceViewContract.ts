@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import type { RouteQueryValue } from '@muyun/web-contracts';
+import type { PageLayoutMode, RouteQueryValue } from '@muyun/web-contracts';
 
 export type WorkspaceViewInput = object;
 export type WorkspaceViewPresentation = 'drawer' | 'tab';
@@ -16,6 +16,8 @@ export interface WorkspaceViewDefinition<TInput extends WorkspaceViewInput> {
   route: string;
   moduleAlias: string;
   component: Component;
+  /** Vertical layout contract used when the work view is opened in a tab. */
+  layout?: PageLayoutMode;
   /** Drawer capacity used when this view is opened as a drawer. */
   drawerProfile?: WorkspaceDrawerProfile;
   /** Title restored when a URL-addressable drawer returns to its ordinary route. */

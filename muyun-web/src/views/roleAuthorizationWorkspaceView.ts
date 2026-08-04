@@ -11,6 +11,7 @@ export const roleAuthorizationWorkspaceView = defineWorkspaceView<RoleAuthorizat
   route: '/iam/role-authorization',
   moduleAlias: 'iam.role',
   component: defineAsyncComponent(() => import('./RoleAuthorizationView.vue')),
+  layout: 'workspace',
   routeTitle: '角色授权',
   drawerProfile: 'wide-work',
   presentations: ['drawer', 'tab'],

@@ -72,6 +72,7 @@ export function createWorkspaceViewDescriptor<TInput extends WorkspaceViewInput>
     openMode: 'workbench-route',
     hostType: 'business-route-host',
     title,
+    layout: view.layout,
     target: { route: view.route, moduleAlias: view.moduleAlias, query: params },
     params,
     tabPolicy: { identity: 'by-params' },

@@ -195,7 +195,10 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
               v-show="tab.key === activeTabKey"
               class="tab-panel-host"
             >
-              <div class="tab-page">
+              <div
+                class="tab-page"
+                :class="{ 'tab-page--workspace': pageDescriptorOf(tab)?.layout === 'workspace' }"
+              >
                 <slot :active-tab="tab" :target="tab.target" :page-descriptor="pageDescriptorOf(tab)" />
               </div>
             </UiSidePanelHost>
@@ -435,6 +438,11 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
   padding: 14px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.tab-page--workspace {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 @media (max-width: 980px) {

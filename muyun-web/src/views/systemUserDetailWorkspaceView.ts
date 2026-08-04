@@ -11,6 +11,7 @@ export const systemUserDetailWorkspaceView = defineWorkspaceView<SystemUserDetai
   route: '/iam/system-users',
   moduleAlias: 'iam.system_user',
   component: defineAsyncComponent(() => import('./SystemUserDetailWorkspaceView.vue')),
+  layout: 'workspace',
   routeTitle: '系统账号管理',
   presentations: ['drawer', 'tab'],
   titleOf: () => '系统账号详情',

@@ -303,10 +303,27 @@ test('record explorer panel focuses and closes search from keyboard', () => {
   assert.match(inputSource, /keydown: \[event: KeyboardEvent\]/);
 });
 
-test('management workspace fixes explorer and detail width contracts without losing desktop overflow', () => {
+test('record explorer regions pass constrained height through to tree and list scroll owners', () => {
+  const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
+  const treeSource = readSource('src/platform-components/TreeRecordExplorer.vue');
+  const crudListSource = readSource('src/platform-components/CrudRecordListExplorer.vue');
+
+  assert.match(
+    panelSource,
+    /\.record-explorer-panel-content \{[\s\S]*display: flex;[\s\S]*flex-direction: column;[\s\S]*min-height: 0;/,
+  );
+  assert.match(panelSource, /\.record-explorer-panel-content :slotted\(\*\) \{[\s\S]*flex: 1 1 auto;/);
+  assert.match(treeSource, /\.tree-record-explorer \{[\s\S]*flex: 1 1 auto;/);
+  assert.match(treeSource, /\.ant-tree\) \{[\s\S]*overflow: auto;/);
+  assert.match(crudListSource, /\.crud-record-list-explorer \{[\s\S]*flex: 1 1 auto;/);
+  assert.match(crudListSource, /:deep\(\.record-list-explorer\) \{[\s\S]*flex: 1 1 auto;/);
+});
+
+test('management workspace consumes the page layout contract for constrained desktop work areas', () => {
   const workspaceSource = readSource('src/platform-components/ManagementWorkspace.vue');
   const explorerColumnSource = readSource('src/platform-components/ManagementExplorerColumn.vue');
   const staticLayoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
+  const detailPanelSource = readSource('src/platform-components/RecordDetailPanel.vue');
   const positionViewSource = readSource('src/views/PositionManagementView.vue');
   const indexSource = readSource('src/platform-components/index.ts');
 
@@ -316,17 +333,24 @@ test('management workspace fixes explorer and detail width contracts without los
   assert.match(workspaceSource, /management-workspace--2-explorer/);
   assert.match(workspaceSource, /management-workspace--3-explorer/);
   assert.match(workspaceSource, /align-items: start/);
+  assert.match(workspaceSource, /usePageLayout/);
+  assert.match(workspaceSource, /management-workspace--constrained/);
+  assert.match(workspaceSource, /height: 100%;[\s\S]*min-height: 0;[\s\S]*align-items: stretch;/);
   assert.match(explorerColumnSource, /defineOptions\(\{ name: 'ManagementExplorerColumn' \}\)/);
   assert.match(explorerColumnSource, /align-self: stretch/);
   assert.match(explorerColumnSource, /:slotted\(\*\)/);
   assert.match(workspaceSource, /min-height: 100%/);
   assert.doesNotMatch(workspaceSource, /100vh - 116px/);
-  assert.match(workspaceSource, /@media \(max-width: 719px\)/);
+  assert.match(workspaceSource, /@media \(max-width: 980px\)/);
   assert.match(workspaceSource, /min-width: 0/);
   assert.match(indexSource, /export \{ default as ManagementWorkspace \}/);
   assert.match(indexSource, /export \{ default as ManagementExplorerColumn \}/);
   assert.match(staticLayoutSource, /<ManagementWorkspace\s+class="static-management-page"/);
   assert.match(staticLayoutSource, /<ManagementExplorerColumn>/);
+  assert.doesNotMatch(staticLayoutSource, /scrollableContent\?: boolean/);
+  assert.match(detailPanelSource, /const pageLayout = usePageLayout\(\)/);
+  assert.match(detailPanelSource, /:scrollable-content="pageLayout === 'workspace'"/);
+  assert.doesNotMatch(detailPanelSource, /scrollableContent\?: boolean/);
   assert.match(positionViewSource, /<ManagementWorkspace[\s\S]*:explorer-count="canBrowseTenants \? 3 : 2"/);
   const employeeViewSource = [
     readSource('src/views/EmployeeManagementView.vue'),
@@ -340,6 +364,36 @@ test('management workspace fixes explorer and detail width contracts without los
   assert.doesNotMatch(employeeViewSource, /grid-template-columns: minmax\(260px, 320px\)/);
   assert.doesNotMatch(positionViewSource, /management-workspace-explorer/);
   assert.doesNotMatch(positionViewSource, /position-workspace-system/);
+});
+
+test('system user management fills the constrained work area and leaves scrolling to its list panel', () => {
+  const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+
+  assert.match(
+    systemUserSource,
+    /\.system-user-management-page \{[\s\S]*height: 100%;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/,
+  );
+  assert.match(
+    systemUserSource,
+    /@media \(max-width: 980px\) \{[\s\S]*\.system-user-management-page \{[\s\S]*height: auto;[\s\S]*overflow: visible;/,
+  );
+  assert.match(routesSource, /route: '\/iam\/system-users'[\s\S]*layout: 'workspace'/);
+});
+
+test('user management fills the constrained work area and leaves scrolling to its scope and list panels', () => {
+  const userSource = readSource('src/views/UserManagementView.vue');
+  const routesSource = readSource('src/app/businessRoutes.ts');
+
+  assert.match(
+    userSource,
+    /\.user-management-page \{[\s\S]*height: 100%;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/,
+  );
+  assert.match(
+    userSource,
+    /@media \(max-width: 980px\) \{[\s\S]*\.user-management-page \{[\s\S]*height: auto;[\s\S]*overflow: visible;/,
+  );
+  assert.match(routesSource, /route: '\/iam\/users'[\s\S]*layout: 'workspace'/);
 });
 
 test('record picker search supports clearing its keyword', () => {
@@ -1056,6 +1110,9 @@ test('role management keeps basic scope management separate from binding and aut
   assert.match(roleViewSource, /moduleAlias: 'iam\.organization'/);
   assert.match(roleViewSource, /moduleAlias: 'iam\.role'/);
   assert.match(roleViewSource, /role-management-page/);
+  assert.match(roleViewSource, /height: 100%;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/);
+  assert.match(roleViewSource, /@media \(max-width: 980px\)[\s\S]*height: auto;[\s\S]*overflow: visible;/);
+  assert.doesNotMatch(roleViewSource, /calc\(100vh|calc\(100dvh/);
   assert.match(roleViewSource, /<CrudRecordListExplorer/);
   assert.match(roleViewSource, /<TreeRecordExplorer/);
   assert.match(roleViewSource, /<RecordQueryListPanel/);
@@ -1214,6 +1271,7 @@ test('user management keeps account basics separate from employment binding and 
   assert.match(userViewSource, /moduleAlias: 'iam\.tenant'/);
   assert.match(userViewSource, /moduleAlias: 'iam\.user'/);
   assert.match(userViewSource, /user-management-page/);
+  assert.doesNotMatch(userViewSource, /calc\(100vh|calc\(100dvh/);
   assert.match(userViewSource, /<CrudRecordListExplorer/);
   assert.match(userViewSource, /<RecordQueryListPanel/);
   assert.match(userViewSource, /:expanded-row-keys="expandedUserKeys"/);
@@ -1336,8 +1394,7 @@ test('system user management is a separate root account entry', () => {
   assert.match(systemUserViewSource, /defineOptions\(\{ name: 'SystemUserManagementView' \}\)/);
   assert.match(systemUserViewSource, /moduleAlias: 'iam\.user'/);
   assert.match(systemUserViewSource, /system-user-management-page/);
-  assert.match(systemUserViewSource, /height: calc\(100vh - 116px\)/);
-  assert.match(systemUserViewSource, /overflow: hidden/);
+  assert.doesNotMatch(systemUserViewSource, /100vh|100dvh/);
   assert.match(systemUserViewSource, /<RecordQueryListPanel/);
   assert.match(systemUserViewSource, /:expanded-row-keys="expandedUserKeys"/);
   assert.match(systemUserViewSource, /@row-expand="handleUserRowExpand"/);
@@ -1414,6 +1471,16 @@ test('system user management is a separate root account entry', () => {
   assert.doesNotMatch(systemUserViewSource, /actionCode: 'delete'/);
   assert.doesNotMatch(systemUserViewSource, /forceLogout/);
   assert.doesNotMatch(userViewSource, /iam\.system_user/);
+});
+
+test('ordinary management pages do not infer their height from the workbench chrome', () => {
+  for (const viewPath of [
+    'src/views/DepartmentManagementView.vue',
+    'src/views/DictionaryManagementView.vue',
+    'src/views/MenuManagementView.vue',
+  ]) {
+    assert.doesNotMatch(readSource(viewPath), /calc\(100vh|calc\(100dvh/);
+  }
 });
 
 test('password management is a dedicated security settings page', () => {
@@ -1624,6 +1691,8 @@ test('workbench keeps cacheable tab pages mounted behind their stable tab keys',
   assert.match(workbenchSource, /:active-tab="tab"[\s\S]*:page-descriptor="pageDescriptorOf\(tab\)"/);
   assert.match(workbenchSource, /\.tab-panel-host \{[\s\S]*height: 100%;[\s\S]*min-height: 0;/);
   assert.match(workbenchSource, /\.tab-page \{[\s\S]*padding: 14px;[\s\S]*overflow: auto;/);
+  assert.match(workbenchSource, /tab-page--workspace/);
+  assert.match(workbenchSource, /\.tab-page--workspace \{\s*overflow-x: auto;\s*overflow-y: hidden;/);
 });
 
 test('module management keeps application-scoped tree maintenance separate from module child resources', () => {
@@ -1639,13 +1708,16 @@ test('module management keeps application-scoped tree maintenance separate from 
   assert.match(moduleManagementSource, /path: treePath/);
   assert.match(moduleManagementSource, /path: `\/platform\.module\/sort\/\$\{encodeURIComponent\(id\)\}`/);
   assert.match(moduleManagementSource, /<TreeRecordExplorer/);
-  assert.match(moduleManagementSource, /<RecordDetailPanel/);
+  assert.match(
+    moduleManagementSource,
+    /<ManagementWorkspace class="module-management-workspace" :explorer-count="2">/,
+  );
+  assert.match(moduleManagementSource, /<RecordDetailPanel class="module-detail-column" :title="cardTitle">/);
   assert.match(
     moduleManagementSource,
     /grid-template-columns: minmax\(220px, 260px\) minmax\(260px, 320px\) minmax\(560px, 1fr\)/,
   );
-  assert.match(moduleManagementSource, /height: 100%;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;/);
-  assert.match(moduleManagementSource, /scrollable-content/);
+  assert.doesNotMatch(moduleManagementSource, /scrollable-content/);
   assert.match(moduleManagementSource, /moduleFormFieldNames/);
   assert.doesNotMatch(moduleManagementSource, /runtime\/refresh/);
   assert.doesNotMatch(moduleManagementSource, /metadata-relations/);

@@ -586,14 +586,18 @@ function menuNodeTitle(menu: MenuRecord) {
 <style scoped>
 .menu-management-page {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
-  min-height: calc(100vh - 116px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .menu-management-grid {
   display: grid;
   grid-template-columns: minmax(240px, 280px) minmax(280px, 340px) minmax(440px, 1fr);
   gap: 12px;
+  height: 100%;
   min-height: 0;
 }
 
@@ -720,17 +724,19 @@ function menuNodeTitle(menu: MenuRecord) {
   border-top: 1px solid var(--muyun-border-subtle);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 980px) {
+  .menu-management-page {
+    height: auto;
+    overflow: visible;
+  }
+
   .menu-management-grid {
     grid-template-columns: 1fr;
+    height: auto;
   }
 }
 
 @media (max-width: 800px) {
-  .menu-management-grid {
-    grid-template-columns: 1fr;
-  }
-
   .static-record-form {
     grid-template-columns: 1fr;
   }

@@ -347,7 +347,6 @@ function actionDetailDisplayValue(fieldName: string, value: unknown) {
   <StaticManagementLayout
     explorer-title="模块动作"
     refresh-title="刷新动作"
-    scrollable-content
     :mode="mode"
     :detail-title="cardTitle"
     :explorer-search-keyword="searchKeyword"

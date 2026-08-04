@@ -4,6 +4,7 @@ import {
   CrudRecordListExplorer,
   type CrudRecordListBase,
   ModuleActionButton,
+  ManagementWorkspace,
   RecordActionBar,
   RecordDetailPanel,
   RecordExplorerPanel,
@@ -330,7 +331,7 @@ const moduleFormFieldFallback: Record<ModuleFormFieldName, RecordFormFieldFallba
 </script>
 
 <template>
-  <section class="module-management-workspace">
+  <ManagementWorkspace class="module-management-workspace" :explorer-count="2">
     <RecordExplorerPanel
       v-model:search-keyword="applicationSearchKeyword"
       class="application-column"
@@ -389,7 +390,7 @@ const moduleFormFieldFallback: Record<ModuleFormFieldName, RecordFormFieldFallba
       />
     </RecordExplorerPanel>
 
-    <RecordDetailPanel class="module-detail-column" :title="cardTitle" scrollable-content>
+    <RecordDetailPanel class="module-detail-column" :title="cardTitle">
       <template #status>
         <RecordStatusSwitch
           v-if="mode === 'view' && selectedModule"
@@ -422,17 +423,12 @@ const moduleFormFieldFallback: Record<ModuleFormFieldName, RecordFormFieldFallba
       </form>
       <RecordMetaSection v-if="selectedModule || mode !== 'view'" :record="draft" show-sort-order />
     </RecordDetailPanel>
-  </section>
+  </ManagementWorkspace>
 </template>
 
 <style scoped>
 .module-management-workspace {
-  display: grid;
   grid-template-columns: minmax(220px, 260px) minmax(260px, 320px) minmax(560px, 1fr);
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .application-column,
@@ -466,7 +462,7 @@ const moduleFormFieldFallback: Record<ModuleFormFieldName, RecordFormFieldFallba
   font-size: 13px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 980px) {
   .module-management-workspace {
     height: auto;
     overflow: visible;

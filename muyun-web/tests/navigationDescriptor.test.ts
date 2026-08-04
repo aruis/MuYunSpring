@@ -104,6 +104,91 @@ test('resolvePageDescriptor keeps path, routeName, and pageKey available for off
   assert.equal(pageKeyDescriptor.target.pageKey, 'customerList');
 });
 
+test('resolvePageDescriptor carries a static business route layout without putting it into the URL', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'module-management',
+      menuType: 'route',
+      openMode: 'tab',
+      route: '/config/modules',
+      moduleAlias: 'platform.module',
+    },
+    {
+      businessRoutePrefixes: ['/config/modules'],
+      businessRouteLayouts: { '/config/modules': 'workspace' },
+    },
+  );
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.layout, 'workspace');
+  assert.doesNotMatch(pageDescriptorToUrl(descriptor), /workspace/);
+  const restored = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor), {
+    businessRoutePrefixes: ['/config/modules'],
+    businessRouteLayouts: { '/config/modules': 'workspace' },
+  });
+  assert.equal(restored.layout, 'workspace');
+});
+
+test('every static business route explicitly classifies its page layout', async () => {
+  const { staticBusinessRoutes } = await import('../src/app/businessRoutes');
+
+  assert.ok(staticBusinessRoutes.every((route) => route.layout === 'flow' || route.layout === 'workspace'));
+});
+
+test('role management is a constrained workspace page', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'roles',
+      menuType: 'route',
+      openMode: 'tab',
+      route: '/iam/roles',
+      moduleAlias: 'iam.role',
+    },
+    {
+      businessRoutePrefixes: ['/iam/roles'],
+      businessRouteLayouts: { '/iam/roles': 'workspace' },
+    },
+  );
+
+  assert.equal(descriptor.layout, 'workspace');
+});
+
+test('system user management is a constrained workspace page', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'system-users',
+      menuType: 'route',
+      openMode: 'tab',
+      route: '/iam/system-users',
+      moduleAlias: 'iam.system_user',
+    },
+    {
+      businessRoutePrefixes: ['/iam/system-users'],
+      businessRouteLayouts: { '/iam/system-users': 'workspace' },
+    },
+  );
+
+  assert.equal(descriptor.layout, 'workspace');
+});
+
+test('user management is a constrained workspace page', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'users',
+      menuType: 'route',
+      openMode: 'tab',
+      route: '/iam/users',
+      moduleAlias: 'iam.user',
+    },
+    {
+      businessRoutePrefixes: ['/iam/users'],
+      businessRouteLayouts: { '/iam/users': 'workspace' },
+    },
+  );
+
+  assert.equal(descriptor.layout, 'workspace');
+});
+
 test('resolvePageDescriptor carries route menu module alias for business module context', () => {
   const target = getMenuNavigationTarget({
     id: 'organization',

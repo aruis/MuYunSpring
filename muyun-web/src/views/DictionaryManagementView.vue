@@ -647,7 +647,9 @@ const itemFormFieldFallback: Record<DictionaryItemFormFieldName, RecordFormField
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(280px, 360px) minmax(420px, 1fr);
   gap: 12px;
-  min-height: calc(100vh - 116px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dictionary-column {
@@ -770,9 +772,11 @@ h3 {
   border-top: 1px solid var(--muyun-border-subtle);
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 980px) {
   .dictionary-workspace {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 
   .item-form {

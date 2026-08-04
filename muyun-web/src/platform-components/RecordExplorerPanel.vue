@@ -222,9 +222,16 @@ async function focusSearchInput() {
 }
 
 .record-explorer-panel-content {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.record-explorer-panel-content :slotted(*) {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .record-explorer-panel-footer {
