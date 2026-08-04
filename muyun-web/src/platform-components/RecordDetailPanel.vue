@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import RecordDetailLayout from './RecordDetailLayout.vue';
+import { usePageLayout } from './pageLayoutContext';
 
 defineOptions({ name: 'RecordDetailPanel' });
 
@@ -7,14 +8,10 @@ withDefaults(
   defineProps<{
     title: string;
     subtitle?: string;
-    /** Keeps the panel header fixed while the detail content scrolls. */
-    scrollableContent?: boolean;
   }>(),
-  {
-    subtitle: undefined,
-    scrollableContent: false,
-  },
+  { subtitle: undefined },
 );
+const pageLayout = usePageLayout();
 </script>
 
 <template>
@@ -22,7 +19,7 @@ withDefaults(
     surface="workspace"
     :title="title"
     :subtitle="subtitle"
-    :scrollable-content="scrollableContent"
+    :scrollable-content="pageLayout === 'workspace'"
   >
     <template #status>
       <slot name="status" />

@@ -1,7 +1,7 @@
 import { createMenuClient, createSessionClient } from '@muyun/web-core';
 import type { WorkbenchStartupState } from '@muyun/web-contracts';
 import { createBackendHttpClient } from './backendHttp';
-import { businessModuleRoutes, businessRoutePrefixes } from './businessRoutes';
+import { businessModuleRoutes, businessRouteLayouts, businessRoutePrefixes } from './businessRoutes';
 import { loadWorkbenchStartupState } from './workbenchStartup';
 
 export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupState> {
@@ -24,6 +24,7 @@ export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupSt
     },
     {
       businessModuleRoutes,
+      businessRouteLayouts,
       businessRoutePrefixes,
     },
   );

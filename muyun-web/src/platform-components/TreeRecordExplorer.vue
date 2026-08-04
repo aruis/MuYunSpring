@@ -241,6 +241,7 @@ defineExpose({ openSearch, toggleSearch });
 <style scoped>
 .tree-record-explorer {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;

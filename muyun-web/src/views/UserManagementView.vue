@@ -1007,7 +1007,7 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
       />
     </RecordDetailDrawer>
 
-    <RecordDetailPanel v-else :title="userDetailTitle" :subtitle="userDetailSubtitle" scrollable-content>
+    <RecordDetailPanel v-else :title="userDetailTitle" :subtitle="userDetailSubtitle">
       <template #status>
         <RecordStatusSwitch
           v-if="userDetailMode === 'view' && selectedUser"
@@ -1056,7 +1056,8 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 12px;
-  height: calc(100vh - 116px);
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1106,13 +1107,17 @@ function tenantItemOf(record: CrudRecordListBase): RecordExplorerItemDescriptor 
   }
 }
 
+@media (max-width: 980px) {
+  .user-management-page {
+    height: auto;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 760px) {
   .user-management-page {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(180px, 0.65fr) minmax(360px, 1fr);
-    height: auto;
-    min-height: calc(100vh - 116px);
-    overflow: visible;
   }
 
   .user-list-panel {

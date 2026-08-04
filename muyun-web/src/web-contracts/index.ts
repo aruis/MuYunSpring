@@ -221,6 +221,14 @@ export type PageHostType =
 
 export type TabIdentityStrategy = 'by-menu' | 'by-target' | 'by-params';
 
+/**
+ * Declares which layer owns a page's vertical scroll boundary.
+ *
+ * Flow pages scroll in their workbench tab. Workspace pages consume the
+ * constrained desktop work area and manage their resource/detail panes.
+ */
+export type PageLayoutMode = 'flow' | 'workspace';
+
 export interface TabPolicy {
   identity: TabIdentityStrategy;
   closable?: boolean;
@@ -242,6 +250,8 @@ export interface PageDescriptorBase<
   openMode: TOpenMode;
   hostType: THostType;
   title?: string;
+  /** Defaults to flow when omitted, preserving ordinary route behaviour. */
+  layout?: PageLayoutMode;
   menuId?: string;
   target: TTarget;
   params?: Record<string, RouteQueryValue>;

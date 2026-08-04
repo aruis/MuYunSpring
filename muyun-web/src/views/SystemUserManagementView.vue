@@ -824,7 +824,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
       </template>
     </RecordModeDrawer>
 
-    <RecordDetailPanel v-else :title="detailTitle" :subtitle="detailSubtitle" scrollable-content>
+    <RecordDetailPanel v-else :title="detailTitle" :subtitle="detailSubtitle">
       <template #status>
         <RecordStatusSwitch
           v-if="detailMode === 'view' && selectedUser"
@@ -899,7 +899,7 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
 .system-user-management-page {
   position: relative;
   display: grid;
-  height: calc(100vh - 116px);
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -949,5 +949,12 @@ function systemUserTitle(record: Partial<UserAccount> | QueryListRecord | undefi
   place-items: center;
   gap: 12px;
   min-height: 180px;
+}
+
+@media (max-width: 980px) {
+  .system-user-management-page {
+    height: auto;
+    overflow: visible;
+  }
 }
 </style>

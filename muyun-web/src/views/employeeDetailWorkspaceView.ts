@@ -10,6 +10,7 @@ export const employeeDetailWorkspaceView = defineWorkspaceView<EmployeeDetailWor
   route: '/iam/employees',
   moduleAlias: 'iam.employee',
   component: defineAsyncComponent(() => import('./EmployeeDetailWorkspaceView.vue')),
+  layout: 'workspace',
   routeTitle: '职员管理',
   presentations: ['drawer', 'tab'],
   titleOf: () => '职员详情',

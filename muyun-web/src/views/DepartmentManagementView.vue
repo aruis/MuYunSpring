@@ -372,7 +372,9 @@ const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFie
   display: grid;
   grid-template-columns: minmax(220px, 240px) minmax(240px, 260px) minmax(340px, 1fr);
   gap: 12px;
-  min-height: calc(100vh - 116px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .organization-column,
@@ -401,12 +403,16 @@ const departmentFormFieldFallback: Record<DepartmentFormFieldName, RecordFormFie
 }
 
 @media (max-width: 1180px) {
-  .department-workspace {
-    grid-template-columns: 1fr;
-  }
-
   .department-form {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .department-workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 }
 </style>

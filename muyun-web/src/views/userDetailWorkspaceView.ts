@@ -10,6 +10,7 @@ export const userDetailWorkspaceView = defineWorkspaceView<UserDetailWorkspaceVi
   route: '/iam/users',
   moduleAlias: 'iam.user',
   component: defineAsyncComponent(() => import('./UserDetailWorkspaceView.vue')),
+  layout: 'workspace',
   routeTitle: '用户管理',
   presentations: ['drawer', 'tab'],
   titleOf: () => '用户详情',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { usePageLayout } from './pageLayoutContext';
 
 defineOptions({ name: 'ManagementWorkspace' });
 
@@ -14,10 +15,14 @@ const props = withDefaults(
 );
 
 const workspaceClass = computed(() => `management-workspace--${props.explorerCount}-explorer`);
+const pageLayout = usePageLayout();
 </script>
 
 <template>
-  <section class="management-workspace" :class="workspaceClass">
+  <section
+    class="management-workspace"
+    :class="[workspaceClass, { 'management-workspace--constrained': pageLayout === 'workspace' }]"
+  >
     <slot />
   </section>
 </template>
@@ -32,6 +37,12 @@ const workspaceClass = computed(() => `management-workspace--${props.explorerCou
   align-items: start;
   gap: var(--muyun-management-column-gap);
   min-height: 100%;
+}
+
+.management-workspace--constrained {
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .management-workspace--1-explorer {
@@ -70,7 +81,7 @@ const workspaceClass = computed(() => `management-workspace--${props.explorerCou
   );
 }
 
-@media (max-width: 719px) {
+@media (max-width: 980px) {
   .management-workspace,
   .management-workspace--1-explorer,
   .management-workspace--2-explorer,

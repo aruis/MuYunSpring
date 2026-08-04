@@ -1399,12 +1399,7 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
     />
   </ManagementWorkspace>
 
-  <RecordDetailPanel
-    v-else
-    :title="employeeDetailTitle"
-    :subtitle="employeeDetailSubtitle"
-    scrollable-content
-  >
+  <RecordDetailPanel v-else :title="employeeDetailTitle" :subtitle="employeeDetailSubtitle">
     <template #status>
       <RecordStatusSwitch
         v-if="employeeDetailMode === 'view' && selectedEmployee"

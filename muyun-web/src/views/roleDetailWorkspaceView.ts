@@ -16,6 +16,7 @@ export const roleDetailWorkspaceView = defineWorkspaceView<RoleDetailWorkspaceVi
   route: '/iam/roles',
   moduleAlias: 'iam.role',
   component: defineAsyncComponent(() => import('./RoleDetailWorkspaceView.vue')),
+  layout: 'workspace',
   routeTitle: '角色管理',
   presentations: ['drawer', 'tab'],
   titleOf: () => '角色详情',

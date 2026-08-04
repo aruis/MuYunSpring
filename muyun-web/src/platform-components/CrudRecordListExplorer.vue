@@ -252,8 +252,14 @@ async function handleRecycleBinAction(action: UiRecordInlineAction, record: Crud
 <style scoped>
 .crud-record-list-explorer {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.crud-record-list-explorer :deep(.record-list-explorer) {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 </style>

@@ -35,7 +35,12 @@ import { platformMessage } from './app/platformMessage';
 import { provideCurrentUserContext } from './app/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
-import { businessModuleRoutes, businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
+import {
+  businessModuleRoutes,
+  businessRouteLayouts,
+  businessRoutePrefixes,
+  isStaticBusinessRoutePage,
+} from './app/businessRoutes';
 import { connectAppRealtime } from './app/realtime';
 import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
@@ -76,7 +81,7 @@ const securityNotification = ref<WebUserNotification>();
 const securityLogoutCountdown = ref(0);
 const openApiCatalogOpen = ref(isOpenApiCatalogPath(window.location.pathname));
 const realtimeStatus = ref<WorkbenchRealtimeStatus>('unavailable');
-const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
+const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes, businessRouteLayouts };
 let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
 let securityLogoutTimer: number | undefined;
 

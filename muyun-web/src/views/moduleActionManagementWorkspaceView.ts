@@ -14,6 +14,7 @@ export const moduleActionManagementWorkspaceView =
     route: '/config/modules',
     moduleAlias: 'platform.module',
     component: defineAsyncComponent(() => import('./ModuleActionManagementView.vue')),
+    layout: 'workspace',
     routeTitle: '模块管理',
     presentations: ['tab'],
     titleOf: (input) => `动作：${input.moduleTitle ?? input.moduleAlias}`,

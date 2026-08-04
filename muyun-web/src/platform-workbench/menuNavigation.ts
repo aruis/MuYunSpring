@@ -5,6 +5,7 @@ import type {
   MenuTab,
   MenuTreeNode,
   PageDescriptor,
+  PageLayoutMode,
   RoutePageTarget,
   RouteQueryPrimitive,
   RouteQueryValue,
@@ -15,6 +16,8 @@ export interface PageDescriptorResolveOptions {
   platformRoutePrefixes?: string[];
   businessRoutePrefixes?: string[];
   businessModuleRoutes?: Record<string, string>;
+  /** Page layout contracts keyed by a static business route. */
+  businessRouteLayouts?: Record<string, PageLayoutMode>;
   businessRouteNames?: string[];
   businessPageKeys?: string[];
 }
@@ -23,6 +26,7 @@ export interface PageDescriptorUrlParseOptions {
   title?: string;
   platformRoutePrefixes?: string[];
   businessRoutePrefixes?: string[];
+  businessRouteLayouts?: Record<string, PageLayoutMode>;
 }
 
 const defaultBusinessRoutePrefixes: string[] = [];
@@ -94,6 +98,7 @@ export function resolvePageDescriptor(
         openMode: 'workbench-route',
         hostType: 'business-route-host',
         title: options.title,
+        layout: businessRouteLayoutsOf({ route: businessRoute }, options),
         menuId: target.menuId,
         target: {
           route: businessRoute,
@@ -139,7 +144,12 @@ export function resolvePageDescriptor(
     };
 
     return pageType === 'business-route'
-      ? { ...descriptorBase, pageType, hostType: 'business-route-host' }
+      ? {
+          ...descriptorBase,
+          pageType,
+          hostType: 'business-route-host',
+          layout: businessRouteLayoutsOf(routeTarget, options),
+        }
       : { ...descriptorBase, pageType, hostType: 'platform-route-host' };
   }
 
@@ -386,6 +396,7 @@ export function pageDescriptorFromUrl(
         ...descriptorBase,
         pageType: 'business-route',
         hostType: 'business-route-host',
+        layout: businessRouteLayoutsOf(routeTarget, options),
       };
     }
 
@@ -423,6 +434,7 @@ export function pageDescriptorFromUrl(
       ...descriptorBase,
       pageType: 'business-route',
       hostType: 'business-route-host',
+      layout: businessRouteLayoutsOf(descriptorBase.target, options),
     };
   }
 
@@ -466,6 +478,13 @@ function isBusinessRouteTarget(target: RoutePageTarget, options: PageDescriptorR
     (target.routeName ? options.businessRouteNames?.includes(target.routeName) === true : false) ||
     (target.pageKey ? options.businessPageKeys?.includes(target.pageKey) === true : false)
   );
+}
+
+function businessRouteLayoutsOf(
+  target: RoutePageTarget,
+  options: Pick<PageDescriptorResolveOptions, 'businessRouteLayouts'>,
+): PageLayoutMode | undefined {
+  return target.route ? options.businessRouteLayouts?.[target.route] : undefined;
 }
 
 function isBusinessRoutePath(path: string, options: PageDescriptorUrlParseOptions): boolean {

@@ -138,7 +138,7 @@ const workspaceContainerProps = computed(() =>
         onClose: dismissWorkspaceView,
       }
     : isWorkspaceView.value
-      ? { title: workspaceTitle.value, scrollableContent: true }
+      ? { title: workspaceTitle.value }
       : {},
 );
 const dataGrantDirty = computed(() => {
