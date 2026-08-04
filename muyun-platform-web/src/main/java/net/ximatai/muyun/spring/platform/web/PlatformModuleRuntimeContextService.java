@@ -372,11 +372,11 @@ public class PlatformModuleRuntimeContextService {
         return new ActionExecutionPolicy(
                 action.getActionCode(),
                 toPlatformLevel(action.getActionLevel()),
-                toAccessMode(action.getAccessMode()),
-                Boolean.TRUE.equals(action.getActionAuth()),
-                Boolean.TRUE.equals(action.getDataAuth()),
-                action.getDefaultGrantPolicy(),
-                inheritActionCode(action.getActionCode(), permissionActionCode, Boolean.TRUE.equals(action.getActionAuth()))
+                toAccessMode(action.effectiveAccessMode()),
+                action.effectiveActionAuth(),
+                action.effectiveDataAuth(),
+                action.effectiveDefaultGrantPolicy(),
+                inheritActionCode(action.getActionCode(), permissionActionCode, action.effectiveActionAuth())
         );
     }
 

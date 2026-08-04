@@ -9,6 +9,7 @@ export { default as UiSearchInput } from './components/UiSearchInput.vue';
 export { default as UiTextArea } from './components/UiTextArea.vue';
 export { default as UiSelect } from './components/UiSelect.vue';
 export { default as UiTreeSelect } from './components/UiTreeSelect.vue';
+export { default as UiTooltip } from './components/UiTooltip.vue';
 export { default as UiSwitch } from './components/UiSwitch.vue';
 export { default as UiMenu } from './components/UiMenu.vue';
 export { default as UiTabs } from './components/UiTabs.vue';

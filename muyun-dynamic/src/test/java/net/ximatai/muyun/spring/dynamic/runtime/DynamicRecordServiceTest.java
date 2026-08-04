@@ -1785,6 +1785,13 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldRejectDynamicActionExecutorWithMismatchedDefinitionKey() {
+        assertThatThrownBy(() -> new DynamicActionExecutorRegistry(List.of(new MismatchedDefinitionActionExecutor())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("definition key must match executor key: contractSubmit");
+    }
+
+    @Test
     void shouldNotLoadExistingRecordForActionWithoutCondition() {
         IDatabaseOperations<Object> operations = operations();
         DynamicRecordService service = actionService(operations);
@@ -3951,6 +3958,23 @@ class DynamicRecordServiceTest {
     }
 
     private record TestActionExecutor(String executorKey) implements DynamicActionExecutor {
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            return null;
+        }
+    }
+
+    private static final class MismatchedDefinitionActionExecutor implements DynamicActionExecutor {
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public DynamicActionExecutorDefinition definition() {
+            return DynamicActionExecutorDefinition.internal("anotherExecutor");
+        }
+
         @Override
         public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
             return null;

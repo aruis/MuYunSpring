@@ -57,6 +57,20 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean dataAuth = Boolean.FALSE;
 
+    @Column(name = "access_mode_override", type = ColumnType.VARCHAR, length = 32,
+            comment = "Governance override for action access mode")
+    private EntityActionAccessMode accessModeOverride;
+
+    @Column(name = "action_auth_override", comment = "Governance override for action permission")
+    private Boolean actionAuthOverride;
+
+    @Column(name = "data_auth_override", comment = "Governance override for data permission")
+    private Boolean dataAuthOverride;
+
+    @Column(name = "default_grant_policy_override", type = ColumnType.VARCHAR, length = 32,
+            comment = "Governance override for default action grant policy")
+    private ActionDefaultGrantPolicy defaultGrantPolicyOverride;
+
     @Column(name = "default_grant_policy", type = ColumnType.VARCHAR, length = 32,
             comment = "Default action grant policy")
     private ActionDefaultGrantPolicy defaultGrantPolicy;
@@ -76,7 +90,7 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "source_type", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source type")
     private ModuleActionSourceType sourceType;
 
-    @Column(name = "source_id", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source id")
+    @Column(name = "source_id", type = ColumnType.VARCHAR, length = 128, comment = "Action contribution source id")
     private String sourceId;
 
     @Column(name = "source_version_id", type = ColumnType.VARCHAR, length = 64,
@@ -86,13 +100,29 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity implemen
     @Column(name = "binding_type", type = ColumnType.VARCHAR, length = 64, comment = "Action binding type")
     private ModuleActionBindingType bindingType;
 
-    @Column(name = "binding_id", type = ColumnType.VARCHAR, length = 64, comment = "Action binding id")
+    @Column(name = "binding_id", type = ColumnType.VARCHAR, length = 128, comment = "Action binding id")
     private String bindingId;
 
-    @Column(name = "binding_alias", type = ColumnType.VARCHAR, length = 64, comment = "Action binding alias")
+    @Column(name = "binding_alias", type = ColumnType.VARCHAR, length = 128, comment = "Action binding alias")
     private String bindingAlias;
 
     @Column(name = "system_managed", comment = "Whether action is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean systemManaged = Boolean.FALSE;
+
+    public EntityActionAccessMode effectiveAccessMode() {
+        return accessModeOverride == null ? accessMode : accessModeOverride;
+    }
+
+    public boolean effectiveActionAuth() {
+        return actionAuthOverride == null ? Boolean.TRUE.equals(actionAuth) : actionAuthOverride;
+    }
+
+    public boolean effectiveDataAuth() {
+        return dataAuthOverride == null ? Boolean.TRUE.equals(dataAuth) : dataAuthOverride;
+    }
+
+    public ActionDefaultGrantPolicy effectiveDefaultGrantPolicy() {
+        return defaultGrantPolicyOverride == null ? defaultGrantPolicy : defaultGrantPolicyOverride;
+    }
 }

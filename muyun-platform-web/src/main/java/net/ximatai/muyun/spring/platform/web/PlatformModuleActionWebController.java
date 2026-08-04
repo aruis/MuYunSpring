@@ -1,15 +1,21 @@
 package net.ximatai.muyun.spring.platform.web;
 
 import net.ximatai.muyun.spring.platform.module.PlatformStaticModule;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.web.NestedEnabledSortableCrudWebSupport;
+import net.ximatai.muyun.spring.web.RecordActionWebRequest;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 
 
 @RestController
@@ -37,6 +43,15 @@ public class PlatformModuleActionWebController
     @Override
     protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
         return "module action does not belong to module: " + moduleAlias(request) + "." + id;
+    }
+
+    @DeleteMapping("/{id}/permission-governance")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public void clearPermissionGovernance(@PathVariable String moduleAlias,
+                                          @PathVariable String id,
+                                          @RequestBody RecordActionWebRequest request) {
+        service().clearPermissionGovernanceOverrides(PlatformNameRules.requireModuleAlias(moduleAlias), id,
+                request.version());
     }
 
     private String moduleAlias(HttpServletRequest request) {

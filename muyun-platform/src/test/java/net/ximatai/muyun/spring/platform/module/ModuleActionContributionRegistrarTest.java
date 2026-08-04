@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.module;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -52,6 +53,41 @@ class ModuleActionContributionRegistrarTest {
         PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
         assertThat(action.getSourceVersionId()).isEqualTo("ver-2");
         assertThat(actionDao.count(Criteria.of())).isEqualTo(1);
+    }
+
+    @Test
+    void shouldKeepPermissionGovernanceOverrideWhenContributionIsRegisteredAgain() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        action.setAccessModeOverride(EntityActionAccessMode.ANONYMOUS_ALLOWED);
+        action.setActionAuthOverride(false);
+        action.setDataAuthOverride(false);
+        action.setDefaultGrantPolicyOverride(ActionDefaultGrantPolicy.ANY_LOGIN_USER);
+        actionService.update(action);
+
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-2", "sync"));
+
+        PlatformModuleAction reloaded = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(reloaded.effectiveAccessMode()).isEqualTo(EntityActionAccessMode.ANONYMOUS_ALLOWED);
+        assertThat(reloaded.effectiveActionAuth()).isFalse();
+        assertThat(reloaded.effectiveDefaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.ANY_LOGIN_USER);
+        assertThat(reloaded.getSourceVersionId()).isEqualTo("ver-2");
+    }
+
+    @Test
+    void shouldRequireCurrentVersionWhenClearingPermissionGovernanceOverrides() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        Integer staleVersion = action.getVersion();
+        action.setActionAuthOverride(false);
+        actionService.update(action);
+
+        assertThatThrownBy(() -> actionService.clearPermissionGovernanceOverrides(
+                "sales.contract", action.getId(), staleVersion))
+                .isInstanceOf(OptimisticLockException.class);
     }
 
     @Test

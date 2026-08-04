@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.function.Supplier;
 
 public final class DynamicActionExecutorRegistry {
@@ -44,6 +45,18 @@ public final class DynamicActionExecutorRegistry {
         return executorKey != null && executorMap().containsKey(executorKey);
     }
 
+    public DynamicActionExecutorDefinition definition(String executorKey) {
+        return require(executorKey).definition();
+    }
+
+    public List<DynamicActionExecutorDefinition> definitions() {
+        return executorMap().values().stream()
+                .map(DynamicActionExecutor::definition)
+                .sorted(java.util.Comparator.comparing(DynamicActionExecutorDefinition::title)
+                        .thenComparing(DynamicActionExecutorDefinition::executorKey))
+                .toList();
+    }
+
     public static DynamicActionExecutorRegistry empty() {
         return new DynamicActionExecutorRegistry();
     }
@@ -67,6 +80,10 @@ public final class DynamicActionExecutorRegistry {
             return;
         }
         String key = requireKey(executor.executorKey());
+        DynamicActionExecutorDefinition definition = executor.definition();
+        if (definition == null || !key.equals(requireKey(definition.executorKey()))) {
+            throw new IllegalArgumentException("dynamic action executor definition key must match executor key: " + key);
+        }
         DynamicActionExecutor previous = registered.putIfAbsent(key, executor);
         if (previous != null) {
             throw new IllegalArgumentException("duplicate dynamic action executor key: " + key);
@@ -79,6 +96,9 @@ public final class DynamicActionExecutorRegistry {
         }
         if (!executorKey.equals(executorKey.trim())) {
             throw new IllegalArgumentException("dynamic action executorKey must not contain leading or trailing spaces");
+        }
+        if (executorKey.length() > 128) {
+            throw new IllegalArgumentException("dynamic action executorKey must not exceed 128 characters");
         }
         return executorKey;
     }

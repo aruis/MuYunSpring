@@ -835,6 +835,36 @@ export interface PlatformModule extends StandardEnabledTreeEntity {
   systemManaged?: boolean;
 }
 
+/** A governed operation exposed by one platform module. */
+export interface PlatformModuleAction extends StandardEnabledSortableEntity {
+  moduleAlias?: string;
+  actionCode?: string;
+  entityAlias?: string;
+  permissionActionCode?: string;
+  category?: 'STANDARD' | 'CUSTOM' | 'DIALOG' | 'WORKFLOW' | 'GENERATE';
+  actionLevel?: 'LIST' | 'RECORD' | 'BATCH' | 'ANY';
+  accessMode?: 'AUTH_REQUIRED' | 'LOGIN_REQUIRED' | 'ANONYMOUS_ALLOWED';
+  actionAuth?: boolean;
+  dataAuth?: boolean;
+  defaultGrantPolicy?: 'NONE' | 'ANY_LOGIN_USER' | 'OWNER' | 'ASSIGNEE' | 'MEMBER';
+  /** Governance-only overrides. Code declarations remain the default action fact. */
+  accessModeOverride?: 'AUTH_REQUIRED' | 'LOGIN_REQUIRED' | 'ANONYMOUS_ALLOWED';
+  actionAuthOverride?: boolean;
+  dataAuthOverride?: boolean;
+  defaultGrantPolicyOverride?: 'NONE' | 'ANY_LOGIN_USER' | 'OWNER' | 'ASSIGNEE' | 'MEMBER';
+  availableExpression?: string;
+  unavailableMessage?: string;
+  executorType?: 'STANDARD' | 'SERVICE' | 'DIALOG' | 'WORKFLOW' | 'GENERATE';
+  executorKey?: string;
+  sourceType?: string;
+  sourceId?: string;
+  sourceVersionId?: string;
+  bindingType?: string;
+  bindingId?: string;
+  bindingAlias?: string;
+  systemManaged?: boolean;
+}
+
 export interface Tenant extends StandardEnabledSortableEntity {
   alias?: string;
 }

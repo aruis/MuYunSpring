@@ -11,6 +11,7 @@ import {
   ExportOutlined,
   FilterOutlined,
   LockOutlined,
+  QuestionCircleOutlined,
   PlusOutlined,
   PoweroffOutlined,
   ReloadOutlined,
@@ -30,6 +31,7 @@ export type UiIconName =
   | 'edit'
   | 'export'
   | 'filter'
+  | 'help'
   | 'lock'
   | 'notification'
   | 'plus'
@@ -52,6 +54,7 @@ const icons = {
   edit: EditOutlined,
   export: ExportOutlined,
   filter: FilterOutlined,
+  help: QuestionCircleOutlined,
   lock: LockOutlined,
   notification: BellOutlined,
   plus: PlusOutlined,
