@@ -26,7 +26,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -160,6 +159,33 @@ class ApplicationServiceContractTest {
                 .hasMessageContaining("字典类目");
     }
 
+    @Test
+    void shouldRejectDeletingApplicationReferencedByContributedApplicationFact() {
+        ApplicationReferenceContributor contributor = new ApplicationReferenceContributor() {
+            @Override
+            public String resourceKey() {
+                return "workflowDefinition";
+            }
+
+            @Override
+            public String resourceName() {
+                return "工作流定义";
+            }
+
+            @Override
+            public boolean hasReferenceTo(String applicationAlias) {
+                return "crm".equals(applicationAlias);
+            }
+        };
+        ApplicationService service = new ApplicationService(new ApplicationMemoryDao(), List.of(contributor));
+        service.insert(application("crm"));
+
+        assertThatThrownBy(() -> service.delete("crm"))
+                .isInstanceOf(PlatformException.class)
+                .satisfies(cause -> assertApplicationReferencedError(cause, "workflowDefinition"))
+                .hasMessageContaining("工作流定义");
+    }
+
     private Application application(String alias) {
         Application application = new Application();
         application.setAlias(alias);
@@ -170,8 +196,8 @@ class ApplicationServiceContractTest {
     private ApplicationService applicationService(PlatformModuleService moduleService,
                                                   MetadataService metadataService,
                                                   DictionaryCategoryService dictionaryCategoryService) {
-        return new ApplicationService(new ApplicationMemoryDao(), Optional.of(moduleService), Optional.of(metadataService),
-                Optional.of(dictionaryCategoryService));
+        return new ApplicationService(new ApplicationMemoryDao(), List.of(moduleService, metadataService,
+                dictionaryCategoryService));
     }
 
     private PlatformModule module(String alias, String applicationAlias) {

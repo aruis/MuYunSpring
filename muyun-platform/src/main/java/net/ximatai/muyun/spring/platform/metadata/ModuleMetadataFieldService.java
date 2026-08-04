@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +45,16 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     private final PlatformFieldTypeService fieldTypeService;
     private final ModuleMetadataFieldReferenceGenerateRuleValidator referenceGenerateRuleValidator;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
+    private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
+
+    private static <T> ObjectProvider<T> provider(T value) {
+        return new ObjectProvider<>() {
+            @Override public T getObject(Object... args) { return value; }
+            @Override public T getIfAvailable() { return value; }
+            @Override public T getIfUnique() { return value; }
+            @Override public T getObject() { return value; }
+        };
+    }
 
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
@@ -67,7 +78,18 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       PlatformFieldTypeService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
         this(moduleMetadataFieldDao, relationService, metadataService, fieldService, fieldTypeService,
-                referenceGenerateRuleValidator, Optional.empty());
+                referenceGenerateRuleValidator, Optional.empty(), provider(null));
+    }
+
+    public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataService metadataService,
+                                      MetadataFieldService fieldService,
+                                      PlatformFieldTypeService fieldTypeService,
+                                      Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator,
+                                      Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, fieldTypeService,
+                referenceGenerateRuleValidator, runtimeRefreshCoordinator, provider(null));
     }
 
     @Autowired
@@ -77,7 +99,8 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       MetadataFieldService fieldService,
                                       PlatformFieldTypeService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator,
-                                      Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+                                      Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                      ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
         super(MODULE_ALIAS, ModuleMetadataField.class, moduleMetadataFieldDao);
         this.relationService = relationService;
         this.metadataService = metadataService;
@@ -87,12 +110,19 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 ? null
                 : referenceGenerateRuleValidator.orElse(null);
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+        this.referenceGuardProvider = referenceGuardProvider;
     }
 
     @Override
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataField.class, java.util.List.of("id", "relationId", "metadataFieldId", "cloneable", "dictionaryApplicationAlias", "dictionaryCategoryAlias", "referenceModuleAlias", "referenceTargetUnavailablePolicy", "referenceModuleKeyField", "referenceModuleLabelField", "referenceGenerateRuleId", "referenceQueryTemplateId", "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode", "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode", "unitConversionMode", "conversionScopeFieldId", "unitRequired", "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode", "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode", "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId", "moneyCurrencyRequired", "title", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        ConfigurationReferenceDeletionGuard guard = referenceGuardProvider.getIfAvailable();
+        if (guard != null) guard.assertCanDelete(ConfigurationReferenceTarget.MODULE_METADATA_FIELD, id);
     }
 
     @Override

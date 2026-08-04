@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -25,21 +26,23 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
         SoftDeleteAbility<Metadata>,
         EnableAbility<Metadata>,
         SortAbility<Metadata>,
-        QueryAbility<Metadata> {
+        QueryAbility<Metadata>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "platform.metadata";
     public static final String DEFAULT_SCHEMA = "public";
 
     private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
     private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
+    private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
 
     public MetadataService(BaseDao<Metadata, String> metadataDao) {
-        this(metadataDao, provider(null), Optional.empty());
+        this(metadataDao, provider(null), Optional.empty(), provider(null));
     }
 
     public MetadataService(BaseDao<Metadata, String> metadataDao,
                            Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
         this(metadataDao, provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)),
-                Optional.empty());
+                Optional.empty(), provider(null));
     }
 
     public MetadataService(BaseDao<Metadata, String> metadataDao,
@@ -47,24 +50,48 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         this(metadataDao,
                 provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)),
-                runtimeRefreshCoordinator == null ? Optional.empty() : runtimeRefreshCoordinator);
+                runtimeRefreshCoordinator == null ? Optional.empty() : runtimeRefreshCoordinator,
+                provider(null));
     }
 
     @Autowired
     public MetadataService(BaseDao<Metadata, String> metadataDao,
                            ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
-                           Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+                           Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                           ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
         super(MODULE_ALIAS, Metadata.class, metadataDao);
         this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
                 "schemaEnsureServiceProvider must not be null");
         this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
                 "runtimeRefreshCoordinator must not be null");
+        this.referenceGuardProvider = Objects.requireNonNull(referenceGuardProvider, "referenceGuardProvider must not be null");
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        ConfigurationReferenceDeletionGuard guard = referenceGuardProvider.getIfAvailable();
+        if (guard != null) guard.assertCanDelete(ConfigurationReferenceTarget.METADATA, id);
     }
 
     @Override
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, Metadata.class, java.util.List.of("id", "applicationAlias", "alias", "schemaName", "tableName", "dataScopeEnabled", "sortPartitionFields", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "metadata";
+    }
+
+    @Override
+    public String resourceName() {
+        return "元数据";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

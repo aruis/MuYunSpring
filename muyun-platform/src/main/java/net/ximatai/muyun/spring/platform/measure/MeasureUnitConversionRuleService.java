@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -30,7 +31,8 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
         EnableAbility<MeasureUnitConversionRule>,
         SortAbility<MeasureUnitConversionRule>,
         ReferenceAbility<MeasureUnitConversionRule>,
-        QueryAbility<MeasureUnitConversionRule> {
+        QueryAbility<MeasureUnitConversionRule>,
+        ApplicationReferenceContributor {
     public static final String MODULE_ALIAS = "platform.measure_unit_conversion_rule";
 
     private final MeasureUnitService unitService;
@@ -47,6 +49,21 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
                 net.ximatai.muyun.database.core.orm.Sort.desc("priority"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "measureUnitConversionRule";
+    }
+
+    @Override
+    public String resourceName() {
+        return "计量单位换算规则";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

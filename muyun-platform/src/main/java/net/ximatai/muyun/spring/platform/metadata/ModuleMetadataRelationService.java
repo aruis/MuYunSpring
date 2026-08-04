@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -28,23 +29,46 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
     private final PlatformModuleService moduleService;
     private final MetadataService metadataService;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
+    private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
 
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
                                          MetadataService metadataService) {
-        this(relationDao, moduleService, metadataService, Optional.empty());
+        this(relationDao, moduleService, metadataService, Optional.empty(), provider(null));
+    }
+
+    public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
+                                         PlatformModuleService moduleService,
+                                         MetadataService metadataService,
+                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+        this(relationDao, moduleService, metadataService, runtimeRefreshCoordinator, provider(null));
     }
 
     @Autowired
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
                                          MetadataService metadataService,
-                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                         ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
         super(MODULE_ALIAS, ModuleMetadataRelation.class, relationDao);
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+        this.referenceGuardProvider = referenceGuardProvider;
     }
+
+    @Override
+    public void beforeDelete(String id) {
+        ConfigurationReferenceDeletionGuard guard = referenceGuardProvider.getIfAvailable();
+        if (guard != null) guard.assertCanDelete(ConfigurationReferenceTarget.MODULE_METADATA_RELATION, id);
+    }
+
+    private static <T> ObjectProvider<T> provider(T value) { return new ObjectProvider<>() {
+        @Override public T getObject(Object... args) { return value; }
+        @Override public T getIfAvailable() { return value; }
+        @Override public T getIfUnique() { return value; }
+        @Override public T getObject() { return value; }
+    }; }
 
     @Override
     public QueryDescriptor queryDescriptor() {

@@ -33,11 +33,12 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     private final PlatformFieldTypeService fieldTypeService;
     private final ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider;
     private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
+    private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService) {
-        this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null));
+        this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null), provider(null));
     }
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
@@ -46,7 +47,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         this(fieldDao, metadataService, fieldTypeService, provider(runtimeRefreshCoordinator == null
                 ? null
-                : runtimeRefreshCoordinator.orElse(null)), provider(null));
+                : runtimeRefreshCoordinator.orElse(null)), provider(null), provider(null));
     }
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
@@ -56,7 +57,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
         this(fieldDao, metadataService, fieldTypeService,
                 provider(runtimeRefreshCoordinator == null ? null : runtimeRefreshCoordinator.orElse(null)),
-                provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)));
+                provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)), provider(null));
     }
 
     @Autowired
@@ -64,7 +65,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService,
                                 ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider,
-                                ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider) {
+                                ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
+                                ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
@@ -72,6 +74,14 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                 "runtimeRefreshCoordinatorProvider must not be null");
         this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
                 "schemaEnsureServiceProvider must not be null");
+        this.referenceGuardProvider = Objects.requireNonNull(referenceGuardProvider,
+                "referenceGuardProvider must not be null");
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        ConfigurationReferenceDeletionGuard guard = referenceGuardProvider.getIfAvailable();
+        if (guard != null) guard.assertCanDelete(ConfigurationReferenceTarget.METADATA_FIELD, id);
     }
 
     @Override

@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.application.ApplicationReferenceContributor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,7 +31,8 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
         EnableAbility<PlatformModule>,
         TreeAbility<PlatformModule>,
         PlatformManagedProtectionAbility<PlatformModule>,
-        QueryAbility<PlatformModule> {
+        QueryAbility<PlatformModule>,
+        ApplicationReferenceContributor {
 
     public static final String MODULE_ALIAS = "platform.module";
 
@@ -42,6 +44,21 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModule.class, java.util.List.of("id", "parentId", "applicationAlias", "moduleKind", "systemManaged", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    @Override
+    public String resourceKey() {
+        return "module";
+    }
+
+    @Override
+    public String resourceName() {
+        return "模块";
+    }
+
+    @Override
+    public boolean hasReferenceTo(String applicationAlias) {
+        return findOne(Criteria.of().eq("applicationAlias", applicationAlias)) != null;
     }
 
     @Override

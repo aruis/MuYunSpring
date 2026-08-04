@@ -62,6 +62,7 @@ class CurrentUserWebFilterTest {
     @Test
     void shouldKeepCorsHeadersWhenRejectingInvalidBearerToken() throws Exception {
         MuYunSpringCorsProperties properties = new MuYunSpringCorsProperties();
+        properties.setAllowedOrigins(java.util.List.of("http://127.0.0.1:5173"));
         FilterRegistrationBean<CorsFilter> cors = new MuYunSpringWebConfiguration(properties)
                 .corsFilterRegistration();
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new TestController())
@@ -74,6 +75,19 @@ class CurrentUserWebFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5173"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("AUTH_REQUIRED")));
+    }
+
+    @Test
+    void shouldDenyCrossOriginByDefault() throws Exception {
+        MuYunSpringCorsProperties properties = new MuYunSpringCorsProperties();
+        FilterRegistrationBean<CorsFilter> cors = new MuYunSpringWebConfiguration(properties)
+                .corsFilterRegistration();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new TestController())
+                .addFilters(cors.getFilter())
+                .build();
+
+        mvc.perform(get("/business").header("Origin", "http://127.0.0.1:5173"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
     private MockMvc restrictedMvc() {

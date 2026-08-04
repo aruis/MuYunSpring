@@ -7,10 +7,11 @@ import java.util.List;
 
 @ConfigurationProperties("muyun.web.cors")
 public class MuYunSpringCorsProperties {
-    private List<String> allowedOrigins = new ArrayList<>(List.of(
-            "http://127.0.0.1:5173",
-            "http://localhost:5173"
-    ));
+    /**
+     * Cross-origin access is opt-in. Local development origins belong in the local profile,
+     * rather than becoming an implicit production deployment policy.
+     */
+    private List<String> allowedOrigins = new ArrayList<>();
 
     public List<String> getAllowedOrigins() {
         return allowedOrigins;
