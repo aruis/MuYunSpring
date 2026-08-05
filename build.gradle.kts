@@ -113,6 +113,15 @@ gradle.projectsEvaluated {
             mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
         }
     }
+
+    // The Sonatype Portal uploader creates and polls a deployment per module. Running those
+    // polls concurrently can race the Portal API and produce transient 404 responses, so the
+    // final remote publishing phase is deliberately serialized.
+    publicArtifactProjectNames.zipWithNext().forEach { (precedingProjectName, projectName) ->
+        project(":$projectName").tasks.named("publishToSonatype") {
+            mustRunAfter(project(":$precedingProjectName").tasks.named("publishToSonatype"))
+        }
+    }
 }
 
 val testcontainersVersion = libs.versions.testcontainers.get()
