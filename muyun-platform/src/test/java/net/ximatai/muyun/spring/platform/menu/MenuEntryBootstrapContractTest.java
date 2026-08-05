@@ -8,12 +8,12 @@ import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlProperty;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlPropertyService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
@@ -244,11 +244,11 @@ class MenuEntryBootstrapContractTest {
         MenuService mockedMenuService = mock(MenuService.class);
         PlatformPageConfigSnapshotService mockedSnapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService mockedModuleFieldService = mock(ModuleMetadataFieldService.class);
-        PlatformFieldUiTypeService mockedFieldUiTypeService = mock(PlatformFieldUiTypeService.class);
-        PlatformFieldUiTypeAttributeService mockedAttributeService = mock(PlatformFieldUiTypeAttributeService.class);
-        PlatformFieldUiTypeFieldMappingService mockedMappingService = mock(PlatformFieldUiTypeFieldMappingService.class);
+        FieldUiControlService mockedFieldUiControlService = mock(FieldUiControlService.class);
+        FieldUiControlPropertyService mockedAttributeService = mock(FieldUiControlPropertyService.class);
+        FieldUiControlBindingService mockedMappingService = mock(FieldUiControlBindingService.class);
         PlatformPageBootstrapService service = new PlatformPageBootstrapService(
-                mockedMenuService, mockedSnapshotService, mockedModuleFieldService, mockedFieldUiTypeService,
+                mockedMenuService, mockedSnapshotService, mockedModuleFieldService, mockedFieldUiControlService,
                 mockedAttributeService, mockedMappingService);
         Menu menu = moduleMenu("scheme-1", "客户", "crm.customer");
         menu.setId("menu-1");
@@ -268,25 +268,26 @@ class MenuEntryBootstrapContractTest {
         ));
         when(mockedModuleFieldService.resolve("field-web")).thenReturn(resolvedField("field-web", "webName"));
         when(mockedModuleFieldService.resolve("field-app")).thenReturn(resolvedField("field-app", "appName"));
-        PlatformFieldUiType textType = new PlatformFieldUiType();
+        FieldUiControl textType = new FieldUiControl();
         textType.setAlias("text");
         textType.setTitle("Text");
-        textType.setDefaultFieldTypeAlias("text");
-        PlatformFieldUiTypeAttribute placeholder = new PlatformFieldUiTypeAttribute();
-        placeholder.setFieldUiTypeAlias("text");
+        textType.setDefaultFieldSpecAlias("text");
+        FieldUiControlProperty placeholder = new FieldUiControlProperty();
+        placeholder.setFieldUiControlAlias("text");
         placeholder.setAttributeAlias("placeholder");
         placeholder.setTitle("Placeholder");
-        placeholder.setValueFieldTypeAlias("text");
+        placeholder.setValueFieldSpecAlias("text");
         placeholder.setDefaultValue("请输入");
-        PlatformFieldUiTypeFieldMapping labelMapping = new PlatformFieldUiTypeFieldMapping();
-        labelMapping.setFieldUiTypeAlias("text");
-        labelMapping.setSourceKey("label");
+        FieldUiControlBinding labelMapping = new FieldUiControlBinding();
+        labelMapping.setFieldUiControlAlias("text");
+        labelMapping.setValueKey("label");
+        labelMapping.setValueFieldSpecAlias("string");
         labelMapping.setTitle("Label");
-        when(mockedFieldUiTypeService.listEnabledByAliases(java.util.List.of("text")))
+        when(mockedFieldUiControlService.listEnabledByAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of(textType));
-        when(mockedAttributeService.listByFieldUiTypeAliases(java.util.List.of("text")))
+        when(mockedAttributeService.listByFieldUiControlAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of(placeholder));
-        when(mockedMappingService.listByFieldUiTypeAliases(java.util.List.of("text")))
+        when(mockedMappingService.listByFieldUiControlAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of(labelMapping));
 
         PlatformPageBootstrap appBootstrap = service.bootstrapByMenu("menu-1", PlatformUiClientType.APP);
@@ -295,14 +296,14 @@ class MenuEntryBootstrapContractTest {
                 .extracting(PlatformResolvedUiField::moduleMetadataFieldId)
                 .containsExactly("field-app");
         assertThat(appBootstrap.entry().defaultUiConfigId()).isEqualTo("ui-app");
-        assertThat(appBootstrap.resolvedConfig().fieldUiTypes())
+        assertThat(appBootstrap.resolvedConfig().fieldUiControls())
                 .extracting("alias")
                 .containsExactly("text");
-        assertThat(appBootstrap.resolvedConfig().fieldUiTypes().getFirst().attributes())
+        assertThat(appBootstrap.resolvedConfig().fieldUiControls().getFirst().properties())
                 .extracting("attributeAlias")
                 .containsExactly("placeholder");
-        assertThat(appBootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
-                .extracting("sourceKey")
+        assertThat(appBootstrap.resolvedConfig().fieldUiControls().getFirst().bindings())
+                .extracting("valueKey")
                 .containsExactly("label");
     }
 
@@ -440,11 +441,11 @@ class MenuEntryBootstrapContractTest {
         MenuService mockedMenuService = mock(MenuService.class);
         PlatformPageConfigSnapshotService mockedSnapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService mockedModuleFieldService = mock(ModuleMetadataFieldService.class);
-        PlatformFieldUiTypeService mockedFieldUiTypeService = mock(PlatformFieldUiTypeService.class);
-        PlatformFieldUiTypeAttributeService mockedAttributeService = mock(PlatformFieldUiTypeAttributeService.class);
-        PlatformFieldUiTypeFieldMappingService mockedMappingService = mock(PlatformFieldUiTypeFieldMappingService.class);
+        FieldUiControlService mockedFieldUiControlService = mock(FieldUiControlService.class);
+        FieldUiControlPropertyService mockedAttributeService = mock(FieldUiControlPropertyService.class);
+        FieldUiControlBindingService mockedMappingService = mock(FieldUiControlBindingService.class);
         PlatformPageBootstrapService service = new PlatformPageBootstrapService(
-                mockedMenuService, mockedSnapshotService, mockedModuleFieldService, mockedFieldUiTypeService,
+                mockedMenuService, mockedSnapshotService, mockedModuleFieldService, mockedFieldUiControlService,
                 mockedAttributeService, mockedMappingService);
         Menu menu = moduleMenu("scheme-1", "客户", "crm.customer");
         menu.setId("menu-1");
@@ -461,16 +462,16 @@ class MenuEntryBootstrapContractTest {
                 java.util.List.of()
         ));
         when(mockedModuleFieldService.resolve("field-web")).thenReturn(resolvedField("field-web", "webName"));
-        when(mockedFieldUiTypeService.listEnabledByAliases(java.util.List.of("text")))
+        when(mockedFieldUiControlService.listEnabledByAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of());
-        when(mockedAttributeService.listByFieldUiTypeAliases(java.util.List.of("text")))
+        when(mockedAttributeService.listByFieldUiControlAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of());
-        when(mockedMappingService.listByFieldUiTypeAliases(java.util.List.of("text")))
+        when(mockedMappingService.listByFieldUiControlAliases(java.util.List.of("text")))
                 .thenReturn(java.util.List.of());
 
         assertThatThrownBy(() -> service.bootstrapByMenu("menu-1"))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("field UI types");
+                .hasMessageContaining("field UI controls");
     }
 
     private void insertModule(String moduleAlias) {
@@ -583,7 +584,7 @@ class MenuEntryBootstrapContractTest {
         PlatformUiConfigField field = new PlatformUiConfigField();
         field.setUiConfigId(uiConfigId);
         field.setModuleMetadataFieldId(moduleFieldId);
-        field.setFieldUiTypeAlias("text");
+        field.setFieldUiControlAlias("text");
         return field;
     }
 

@@ -25,8 +25,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = PlatformFieldTypeRepositoryIT.TestApplication.class)
-class PlatformFieldTypeRepositoryIT {
+@SpringBootTest(classes = FieldSpecRepositoryIT.TestApplication.class)
+class FieldSpecRepositoryIT {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
@@ -35,17 +35,17 @@ class PlatformFieldTypeRepositoryIT {
         registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
     }
 
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
 
     @Autowired
-    PlatformFieldTypeRepositoryIT(PlatformFieldTypeService fieldTypeService) {
+    FieldSpecRepositoryIT(FieldSpecService fieldTypeService) {
         this.fieldTypeService = fieldTypeService;
     }
 
     @Test
     void shouldPersistQueryOperatorsAsJsonSetThroughRepository() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        PlatformFieldType fieldType = new PlatformFieldType();
+        FieldSpec fieldType = new FieldSpec();
         fieldType.setAlias("string_" + suffix);
         fieldType.setTitle("String " + suffix);
         fieldType.setFieldType(FieldType.STRING);
@@ -55,7 +55,7 @@ class PlatformFieldTypeRepositoryIT {
 
         String id = fieldTypeService.insert(fieldType);
 
-        PlatformFieldType selected = fieldTypeService.select(id);
+        FieldSpec selected = fieldTypeService.select(id);
         assertThat(selected.getQueryOperators()).containsExactly("EQ", "LIKE");
         assertThat(selected.queryDefinition().operators()).containsExactlyInAnyOrder(DynamicQueryOperator.EQ, DynamicQueryOperator.LIKE);
     }
@@ -63,11 +63,11 @@ class PlatformFieldTypeRepositoryIT {
     @Test
     void shouldQueryJsonSetFieldWithCollectionCriteria() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        PlatformFieldType stringType = fieldType("string_" + suffix, FieldType.STRING,
+        FieldSpec stringType = fieldType("string_" + suffix, FieldType.STRING,
                 Set.of("LIKE", "EQ"), Set.of("input", "select"));
-        PlatformFieldType dateType = fieldType("date_" + suffix, FieldType.DATE,
+        FieldSpec dateType = fieldType("date_" + suffix, FieldType.DATE,
                 Set.of("BETWEEN", "EQ"), Set.of("date"));
-        PlatformFieldType emptyType = fieldType("empty_" + suffix, FieldType.TEXT,
+        FieldSpec emptyType = fieldType("empty_" + suffix, FieldType.TEXT,
                 Set.of(), Set.of());
         emptyType.setDefaultQueryOperator(null);
         fieldTypeService.insert(stringType);
@@ -78,47 +78,47 @@ class PlatformFieldTypeRepositoryIT {
         assertThat(fieldTypeService.list(Criteria.of()
                         .in("alias", aliases)
                         .contains("queryOperators", "LIKE")))
-                .extracting(PlatformFieldType::getAlias)
+                .extracting(FieldSpec::getAlias)
                 .containsExactly(stringType.getAlias());
         assertThat(fieldTypeService.list(Criteria.of()
                         .in("alias", aliases)
                         .containsAny("queryOperators", List.of("LIKE", "BETWEEN"))))
-                .extracting(PlatformFieldType::getAlias)
+                .extracting(FieldSpec::getAlias)
                 .containsExactlyInAnyOrder(stringType.getAlias(), dateType.getAlias());
         assertThat(fieldTypeService.list(Criteria.of()
                         .in("alias", aliases)
-                        .containsAll("uiTypeAliases", List.of("input", "select"))))
-                .extracting(PlatformFieldType::getAlias)
+                        .containsAll("uiControlAliases", List.of("input", "select"))))
+                .extracting(FieldSpec::getAlias)
                 .containsExactly(stringType.getAlias());
         assertThat(fieldTypeService.list(Criteria.of()
                         .in("alias", aliases)
-                        .isEmpty("uiTypeAliases")))
-                .extracting(PlatformFieldType::getAlias)
+                        .isEmpty("uiControlAliases")))
+                .extracting(FieldSpec::getAlias)
                 .containsExactly(emptyType.getAlias());
         assertThat(fieldTypeService.list(Criteria.of()
                         .in("alias", aliases)
-                        .isNotEmpty("uiTypeAliases")))
-                .extracting(PlatformFieldType::getAlias)
+                        .isNotEmpty("uiControlAliases")))
+                .extracting(FieldSpec::getAlias)
                 .containsExactlyInAnyOrder(stringType.getAlias(), dateType.getAlias());
     }
 
-    private PlatformFieldType fieldType(String alias,
+    private FieldSpec fieldType(String alias,
                                         FieldType fieldType,
                                         Set<String> queryOperators,
-                                        Set<String> uiTypeAliases) {
-        PlatformFieldType type = new PlatformFieldType();
+                                        Set<String> uiControlAliases) {
+        FieldSpec type = new FieldSpec();
         type.setAlias(alias);
         type.setTitle(alias);
         type.setFieldType(fieldType);
         type.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType));
         type.setQueryOperators(queryOperators);
-        type.setUiTypeAliases(uiTypeAliases);
+        type.setUiControlAliases(uiControlAliases);
         return type;
     }
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @EnableMuYunRepositories(basePackageClasses = PlatformFieldTypeDao.class)
+    @EnableMuYunRepositories(basePackageClasses = FieldSpecDao.class)
     static class TestApplication {
         @Bean
         DataSource dataSource() {
@@ -131,8 +131,8 @@ class PlatformFieldTypeRepositoryIT {
         }
 
         @Bean
-        PlatformFieldTypeService fieldTypeService(PlatformFieldTypeDao fieldTypeDao) {
-            return new PlatformFieldTypeService(fieldTypeDao);
+        FieldSpecService fieldTypeService(FieldSpecDao fieldTypeDao) {
+            return new FieldSpecService(fieldTypeDao);
         }
     }
 }

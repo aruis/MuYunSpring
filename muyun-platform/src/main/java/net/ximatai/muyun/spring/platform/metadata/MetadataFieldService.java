@@ -30,20 +30,20 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     public static final String MODULE_ALIAS = "platform.metadata_field";
 
     private final MetadataService metadataService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider;
     private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
     private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
-                                PlatformFieldTypeService fieldTypeService) {
+                                FieldSpecService fieldTypeService) {
         this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null), provider(null));
     }
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
-                                PlatformFieldTypeService fieldTypeService,
+                                FieldSpecService fieldTypeService,
                                 Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         this(fieldDao, metadataService, fieldTypeService, provider(runtimeRefreshCoordinator == null
                 ? null
@@ -52,7 +52,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
-                                PlatformFieldTypeService fieldTypeService,
+                                FieldSpecService fieldTypeService,
                                 Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
                                 Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
         this(fieldDao, metadataService, fieldTypeService,
@@ -63,7 +63,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     @Autowired
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
-                                PlatformFieldTypeService fieldTypeService,
+                                FieldSpecService fieldTypeService,
                                 ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider,
                                 ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
                                 ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
@@ -86,7 +86,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataField.class, java.util.List.of("id", "metadataId", "fieldName", "columnName", "fieldTypeAlias", "fieldOwnership", "fieldForm", "ownerFieldId", "fieldRole", "systemManaged", "required", "uniqueField", "indexed", "sortableField", "titleField", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataField.class, java.util.List.of("id", "metadataId", "fieldName", "columnName", "fieldSpecAlias", "fieldOwnership", "fieldForm", "ownerFieldId", "fieldRole", "systemManaged", "required", "uniqueField", "indexed", "sortableField", "titleField", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -143,8 +143,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         requireMetadata(field.getMetadataId());
         PlatformNameRules.requireFieldName(field.getFieldName(), "fieldName");
         PlatformNameRules.requireDatabaseName(field.getColumnName(), "columnName");
-        field.setFieldTypeAlias(PlatformNameRules.requireIdentifier(field.getFieldTypeAlias(), "fieldTypeAlias"));
-        fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        field.setFieldSpecAlias(PlatformNameRules.requireIdentifier(field.getFieldSpecAlias(), "fieldSpecAlias"));
+        fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         normalizeFieldKind(field);
         if (field.getRequired() == null) {
             field.setRequired(Boolean.FALSE);

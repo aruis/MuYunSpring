@@ -35,8 +35,8 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
     private final MetadataViewService viewService;
     private final MetadataFieldService fieldService;
     private final ModuleMetadataRelationService relationService;
-    private final PlatformFieldUiTypeService fieldUiTypeService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldUiControlService fieldUiTypeService;
+    private final FieldSpecService fieldTypeService;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
@@ -50,8 +50,8 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,
                                     ModuleMetadataRelationService relationService,
-                                    PlatformFieldUiTypeService fieldUiTypeService,
-                                    PlatformFieldTypeService fieldTypeService) {
+                                    FieldUiControlService fieldUiTypeService,
+                                    FieldSpecService fieldTypeService) {
         this(viewFieldDao, viewService, fieldService, relationService, fieldUiTypeService, fieldTypeService,
                 Optional.empty());
     }
@@ -61,8 +61,8 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,
                                     ModuleMetadataRelationService relationService,
-                                    PlatformFieldUiTypeService fieldUiTypeService,
-                                    PlatformFieldTypeService fieldTypeService,
+                                    FieldUiControlService fieldUiTypeService,
+                                    FieldSpecService fieldTypeService,
                                     Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataViewField.class, viewFieldDao);
         this.viewService = viewService;
@@ -75,7 +75,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataViewField.class, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiTypeAlias", "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataViewField.class, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiControlAlias", "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -115,7 +115,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                 title,
                 !Boolean.FALSE.equals(viewField.getVisible()),
                 viewField.getControlType(),
-                viewField.getFieldUiTypeAlias(),
+                viewField.getFieldUiControlAlias(),
                 viewField.getReadOnly(),
                 viewField.getRequiredOverride()
         );
@@ -140,14 +140,14 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         if (viewField.getReadOnly() == null) {
             viewField.setReadOnly(Boolean.FALSE);
         }
-        if (viewField.getFieldUiTypeAlias() != null && !viewField.getFieldUiTypeAlias().isBlank()) {
-            viewField.setFieldUiTypeAlias(PlatformNameRules.requireIdentifier(
-                    viewField.getFieldUiTypeAlias(), "fieldUiTypeAlias"));
+        if (viewField.getFieldUiControlAlias() != null && !viewField.getFieldUiControlAlias().isBlank()) {
+            viewField.setFieldUiControlAlias(PlatformNameRules.requireIdentifier(
+                    viewField.getFieldUiControlAlias(), "fieldUiControlAlias"));
             if (fieldUiTypeService != null) {
-                PlatformFieldUiType fieldUiType = fieldUiTypeService.requireFieldUiType(viewField.getFieldUiTypeAlias());
+                FieldUiControl fieldUiType = fieldUiTypeService.requireFieldUiControl(viewField.getFieldUiControlAlias());
                 validateUiTypeCompatibility(field, fieldUiType);
                 if (viewField.getControlType() == null) {
-                    viewField.setControlType(fieldUiType.getControlType());
+                    viewField.setControlType(fieldUiType.getRendererType());
                 }
             }
         }
@@ -160,20 +160,20 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                 "metadata view field must be unique in view: " + viewField.getMetadataFieldId());
     }
 
-    private void validateUiTypeCompatibility(MetadataField field, PlatformFieldUiType fieldUiType) {
+    private void validateUiTypeCompatibility(MetadataField field, FieldUiControl fieldUiType) {
         if (fieldTypeService == null) {
             return;
         }
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
-        if (fieldType.getUiTypeAliases() != null && !fieldType.getUiTypeAliases().isEmpty()) {
-            if (!fieldType.getUiTypeAliases().contains(fieldUiType.getAlias())) {
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
+        if (fieldType.getUiControlAliases() != null && !fieldType.getUiControlAliases().isEmpty()) {
+            if (!fieldType.getUiControlAliases().contains(fieldUiType.getAlias())) {
                 throw new PlatformException("Field UI type is not allowed by field type: "
                         + field.getFieldName() + "." + fieldUiType.getAlias());
             }
             return;
         }
-        if (fieldUiType.getDefaultFieldTypeAlias() != null
-                && !fieldUiType.getDefaultFieldTypeAlias().equals(fieldType.getAlias())) {
+        if (fieldUiType.getDefaultFieldSpecAlias() != null
+                && !fieldUiType.getDefaultFieldSpecAlias().equals(fieldType.getAlias())) {
             throw new PlatformException("Field UI type default field type mismatch: "
                     + field.getFieldName() + "." + fieldUiType.getAlias());
         }

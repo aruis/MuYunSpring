@@ -14,10 +14,10 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.springframework.stereotype.Service;
 
@@ -39,16 +39,16 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
     private final PlatformUiConfigService uiConfigService;
     private final PlatformUiSetService uiSetService;
     private final ModuleMetadataFieldService moduleFieldService;
-    private final PlatformFieldTypeService fieldTypeService;
-    private final PlatformFieldUiTypeService fieldUiTypeService;
+    private final FieldSpecService fieldTypeService;
+    private final FieldUiControlService fieldUiTypeService;
     private final MetadataFieldService metadataFieldService;
 
     public PlatformUiConfigFieldService(BaseDao<PlatformUiConfigField, String> uiConfigFieldDao,
                                         PlatformUiConfigService uiConfigService,
                                         PlatformUiSetService uiSetService,
                                         ModuleMetadataFieldService moduleFieldService,
-                                        PlatformFieldTypeService fieldTypeService,
-                                        PlatformFieldUiTypeService fieldUiTypeService,
+                                        FieldSpecService fieldTypeService,
+                                        FieldUiControlService fieldUiTypeService,
                                         MetadataFieldService metadataFieldService) {
         super(MODULE_ALIAS, PlatformUiConfigField.class, uiConfigFieldDao);
         this.uiConfigService = uiConfigService;
@@ -61,7 +61,7 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfigField.class, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiTypeAlias", "visible", "readOnly", "requiredOverride", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfigField.class, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiControlAlias", "visible", "readOnly", "requiredOverride", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
@@ -134,29 +134,29 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
     }
 
     private void normalizeUiType(PlatformUiConfigField field, ResolvedModuleMetadataField moduleField) {
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(moduleField.fieldTypeAlias());
-        String uiTypeAlias = field.getFieldUiTypeAlias();
+        FieldSpec fieldType = fieldTypeService.requireFieldType(moduleField.fieldSpecAlias());
+        String uiTypeAlias = field.getFieldUiControlAlias();
         if (uiTypeAlias == null || uiTypeAlias.isBlank()) {
-            uiTypeAlias = fieldType.getDefaultUiTypeAlias();
+            uiTypeAlias = fieldType.getDefaultUiControlAlias();
         }
         if (uiTypeAlias == null || uiTypeAlias.isBlank()) {
             throw new PlatformException("Field UI type is required and field type has no default UI type: "
-                    + moduleField.fieldTypeAlias());
+                    + moduleField.fieldSpecAlias());
         }
-        uiTypeAlias = PlatformNameRules.requireIdentifier(uiTypeAlias, "fieldUiTypeAlias");
-        PlatformFieldUiType uiType = fieldUiTypeService.requireFieldUiType(uiTypeAlias);
-        if (fieldType.getUiTypeAliases() != null && !fieldType.getUiTypeAliases().isEmpty()) {
-            if (!fieldType.getUiTypeAliases().contains(uiTypeAlias)) {
+        uiTypeAlias = PlatformNameRules.requireIdentifier(uiTypeAlias, "fieldUiControlAlias");
+        FieldUiControl uiType = fieldUiTypeService.requireFieldUiControl(uiTypeAlias);
+        if (fieldType.getUiControlAliases() != null && !fieldType.getUiControlAliases().isEmpty()) {
+            if (!fieldType.getUiControlAliases().contains(uiTypeAlias)) {
                 throw new PlatformException("Field UI type is not allowed by field type: "
-                        + moduleField.fieldTypeAlias() + "." + uiTypeAlias);
+                        + moduleField.fieldSpecAlias() + "." + uiTypeAlias);
             }
-        } else if (uiType.getDefaultFieldTypeAlias() != null
-                && !uiType.getDefaultFieldTypeAlias().isBlank()
-                && !Objects.equals(uiType.getDefaultFieldTypeAlias(), moduleField.fieldTypeAlias())) {
+        } else if (uiType.getDefaultFieldSpecAlias() != null
+                && !uiType.getDefaultFieldSpecAlias().isBlank()
+                && !Objects.equals(uiType.getDefaultFieldSpecAlias(), moduleField.fieldSpecAlias())) {
             throw new PlatformException("Field UI type default field type mismatch: "
-                    + uiTypeAlias + "." + moduleField.fieldTypeAlias());
+                    + uiTypeAlias + "." + moduleField.fieldSpecAlias());
         }
-        field.setFieldUiTypeAlias(uiTypeAlias);
+        field.setFieldUiControlAlias(uiTypeAlias);
     }
 
     private void validateRequiredOverride(PlatformUiConfigField field, ResolvedModuleMetadataField moduleField) {

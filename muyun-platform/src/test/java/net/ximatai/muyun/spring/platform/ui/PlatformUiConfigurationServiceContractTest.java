@@ -36,14 +36,15 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlValueShape;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlProperty;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlPropertyService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -71,10 +72,10 @@ class PlatformUiConfigurationServiceContractTest {
     private final TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataField> moduleFieldDao = new TestMemoryDao<>();
-    private final TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
-    private final TestMemoryDao<PlatformFieldUiType> fieldUiTypeDao = new TestMemoryDao<>();
-    private final TestMemoryDao<PlatformFieldUiTypeAttribute> fieldUiTypeAttributeDao = new TestMemoryDao<>();
-    private final TestMemoryDao<PlatformFieldUiTypeFieldMapping> fieldUiTypeFieldMappingDao = new TestMemoryDao<>();
+    private final TestMemoryDao<FieldSpec> fieldTypeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<FieldUiControl> fieldUiTypeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<FieldUiControlProperty> fieldUiTypeAttributeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<FieldUiControlBinding> fieldUiTypeFieldMappingDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiSet> uiSetDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiConfig> uiConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiConfigField> uiConfigFieldDao = new TestMemoryDao<>();
@@ -83,13 +84,13 @@ class PlatformUiConfigurationServiceContractTest {
 
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
-    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao, fieldUiTypeDao);
-    private final PlatformFieldUiTypeService fieldUiTypeService =
-            new PlatformFieldUiTypeService(fieldUiTypeDao, fieldTypeService);
-    private final PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService =
-            new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
-    private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
-            new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
+    private final FieldSpecService fieldTypeService = new FieldSpecService(fieldTypeDao, fieldUiTypeDao);
+    private final FieldUiControlService fieldUiTypeService =
+            new FieldUiControlService(fieldUiTypeDao, fieldTypeService);
+    private final FieldUiControlPropertyService fieldUiTypeAttributeService =
+            new FieldUiControlPropertyService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
+    private final FieldUiControlBindingService fieldUiTypeFieldMappingService =
+            new FieldUiControlBindingService(fieldUiTypeFieldMappingDao, fieldUiTypeService, fieldTypeService);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
@@ -141,11 +142,11 @@ class PlatformUiConfigurationServiceContractTest {
         assertThat(snapshot.uiFields())
                 .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
                 .containsExactly(customerNameField);
-        assertThat(snapshot.uiFields().getFirst().getFieldUiTypeAlias()).isEqualTo("text");
+        assertThat(snapshot.uiFields().getFirst().getFieldUiControlAlias()).isEqualTo("text");
     }
 
     @Test
-    void shouldExposeFieldUiTypeMappingsInPageBootstrap() {
+    void shouldExposeFieldUiControlMappingsInPageBootstrap() {
         seedFieldType("date", FieldType.DATE, DynamicQueryOperator.BETWEEN);
         seedUiType("date_range", "date");
         seedUiTypeFieldMapping("date_range", "end");
@@ -173,12 +174,15 @@ class PlatformUiConfigurationServiceContractTest {
         PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu("menu-1", PlatformUiClientType.WEB);
 
         assertThat(bootstrap.resolvedConfig().uiFields()).hasSize(1);
-        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldUiTypeAlias()).isEqualTo("date_range");
-        assertThat(bootstrap.resolvedConfig().fieldUiTypes()).hasSize(1);
-        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().alias()).isEqualTo("date_range");
-        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
-                .extracting(PlatformResolvedFieldUiTypeFieldMapping::sourceKey)
+        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldUiControlAlias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiControls()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().fieldUiControls().getFirst().alias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiControls().getFirst().bindings())
+                .extracting(PlatformResolvedFieldUiControlBinding::valueKey)
                 .containsExactly("end");
+        assertThat(bootstrap.resolvedConfig().fieldUiControls().getFirst().bindings())
+                .extracting(PlatformResolvedFieldUiControlBinding::valueFieldSpecAlias)
+                .containsExactly("date");
     }
 
     @Test
@@ -727,7 +731,7 @@ class PlatformUiConfigurationServiceContractTest {
                 .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
                 .doesNotContain(childField);
         assertThat(uiConfigFieldService.listByUiConfigIds(configIds))
-                .extracting(PlatformUiConfigField::getFieldUiTypeAlias)
+                .extracting(PlatformUiConfigField::getFieldUiControlAlias)
                 .containsOnly("text");
 
         uiConfigService.disable(configIds.getFirst());
@@ -1039,7 +1043,7 @@ class PlatformUiConfigurationServiceContractTest {
         String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
         String uiFieldId = uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
         PlatformUiConfigField brokenUiField = uiConfigFieldService.select(uiFieldId);
-        brokenUiField.setFieldUiTypeAlias("number");
+        brokenUiField.setFieldUiControlAlias("number");
         uiConfigFieldDao.updateById(brokenUiField);
 
         assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
@@ -1267,7 +1271,7 @@ class PlatformUiConfigurationServiceContractTest {
 
     private void seedFieldType(String alias, FieldType type, DynamicQueryOperator defaultOperator,
                                DynamicQueryOperator... extraOperators) {
-        PlatformFieldType fieldType = new PlatformFieldType();
+        FieldSpec fieldType = new FieldSpec();
         fieldType.setAlias(alias);
         fieldType.setTitle(alias);
         fieldType.setFieldType(type);
@@ -1281,28 +1285,33 @@ class PlatformUiConfigurationServiceContractTest {
         fieldTypeService.insert(fieldType);
     }
 
-    private void seedUiType(String alias, String defaultFieldTypeAlias) {
-        PlatformFieldUiType uiType = new PlatformFieldUiType();
+    private void seedUiType(String alias, String defaultFieldSpecAlias) {
+        FieldUiControl uiType = new FieldUiControl();
         uiType.setAlias(alias);
         uiType.setTitle(alias);
-        uiType.setDefaultFieldTypeAlias(defaultFieldTypeAlias);
+        uiType.setDefaultFieldSpecAlias(defaultFieldSpecAlias);
+        if ("date_range".equals(alias)) {
+            uiType.setValueShape(FieldUiControlValueShape.COMPOSITE);
+            uiType.setPrimaryValueKey("start");
+        }
         fieldUiTypeService.insert(uiType);
     }
 
-    private void seedUiTypeAttribute(String fieldUiTypeAlias, String attributeAlias, String valueFieldTypeAlias,
+    private void seedUiTypeAttribute(String fieldUiControlAlias, String attributeAlias, String valueFieldSpecAlias,
                                      String defaultValue) {
-        PlatformFieldUiTypeAttribute attribute = new PlatformFieldUiTypeAttribute();
-        attribute.setFieldUiTypeAlias(fieldUiTypeAlias);
+        FieldUiControlProperty attribute = new FieldUiControlProperty();
+        attribute.setFieldUiControlAlias(fieldUiControlAlias);
         attribute.setAttributeAlias(attributeAlias);
-        attribute.setValueFieldTypeAlias(valueFieldTypeAlias);
+        attribute.setValueFieldSpecAlias(valueFieldSpecAlias);
         attribute.setDefaultValue(defaultValue);
         fieldUiTypeAttributeService.insert(attribute);
     }
 
-    private void seedUiTypeFieldMapping(String fieldUiTypeAlias, String sourceKey) {
-        PlatformFieldUiTypeFieldMapping mapping = new PlatformFieldUiTypeFieldMapping();
-        mapping.setFieldUiTypeAlias(fieldUiTypeAlias);
-        mapping.setSourceKey(sourceKey);
+    private void seedUiTypeFieldMapping(String fieldUiControlAlias, String valueKey) {
+        FieldUiControlBinding mapping = new FieldUiControlBinding();
+        mapping.setFieldUiControlAlias(fieldUiControlAlias);
+        mapping.setValueKey(valueKey);
+        mapping.setValueFieldSpecAlias("date");
         fieldUiTypeFieldMappingService.insert(mapping);
     }
 
@@ -1310,17 +1319,17 @@ class PlatformUiConfigurationServiceContractTest {
                                    String metadataAlias,
                                    String fieldName,
                                    String columnName,
-                                   String fieldTypeAlias) {
-        return seedModuleField(moduleAlias, metadataAlias, fieldName, columnName, fieldTypeAlias, false);
+                                   String fieldSpecAlias) {
+        return seedModuleField(moduleAlias, metadataAlias, fieldName, columnName, fieldSpecAlias, false);
     }
 
     private String seedModuleField(String moduleAlias,
                                    String metadataAlias,
                                    String fieldName,
                                    String columnName,
-                                   String fieldTypeAlias,
+                                   String fieldSpecAlias,
                                    boolean required) {
-        return seedModuleField(moduleAlias, metadataAlias, fieldName, columnName, fieldTypeAlias, required,
+        return seedModuleField(moduleAlias, metadataAlias, fieldName, columnName, fieldSpecAlias, required,
                 MetadataFieldForm.PHYSICAL);
     }
 
@@ -1328,7 +1337,7 @@ class PlatformUiConfigurationServiceContractTest {
                                    String metadataAlias,
                                    String fieldName,
                                    String columnName,
-                                   String fieldTypeAlias,
+                                   String fieldSpecAlias,
                                    boolean required,
                                    MetadataFieldForm fieldForm) {
         String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
@@ -1350,7 +1359,7 @@ class PlatformUiConfigurationServiceContractTest {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldTypeAlias);
+        field.setFieldSpecAlias(fieldSpecAlias);
         field.setTitle(fieldName);
         field.setRequired(required);
         field.setFieldForm(fieldForm);
@@ -1383,7 +1392,7 @@ class PlatformUiConfigurationServiceContractTest {
     private record ResolvedField(String metadataFieldId, String relationId) {
     }
 
-    private String addModuleField(String moduleAlias, String fieldName, String columnName, String fieldTypeAlias) {
+    private String addModuleField(String moduleAlias, String fieldName, String columnName, String fieldSpecAlias) {
         ModuleMetadataRelation relation = relationDao
                 .query(Criteria.of().eq("moduleAlias", moduleAlias), new PageRequest(0, 1))
                 .getFirst();
@@ -1391,7 +1400,7 @@ class PlatformUiConfigurationServiceContractTest {
         field.setMetadataId(relation.getMetadataId());
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldTypeAlias);
+        field.setFieldSpecAlias(fieldSpecAlias);
         field.setTitle(fieldName);
         String fieldId = fieldService.insert(field);
 
@@ -1406,7 +1415,7 @@ class PlatformUiConfigurationServiceContractTest {
                                        String metadataAlias,
                                        String fieldName,
                                        String columnName,
-                                       String fieldTypeAlias) {
+                                       String fieldSpecAlias) {
         String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
         ModuleMetadataRelation mainRelation = relationDao
                 .query(Criteria.of()
@@ -1423,7 +1432,7 @@ class PlatformUiConfigurationServiceContractTest {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldTypeAlias);
+        field.setFieldSpecAlias(fieldSpecAlias);
         field.setTitle(fieldName);
         String fieldId = fieldService.insert(field);
 
@@ -1475,11 +1484,11 @@ class PlatformUiConfigurationServiceContractTest {
         return target;
     }
 
-    private PlatformUiConfigField uiField(String uiConfigId, String moduleMetadataFieldId, String fieldUiTypeAlias) {
+    private PlatformUiConfigField uiField(String uiConfigId, String moduleMetadataFieldId, String fieldUiControlAlias) {
         PlatformUiConfigField field = new PlatformUiConfigField();
         field.setUiConfigId(uiConfigId);
         field.setModuleMetadataFieldId(moduleMetadataFieldId);
-        field.setFieldUiTypeAlias(fieldUiTypeAlias);
+        field.setFieldUiControlAlias(fieldUiControlAlias);
         return field;
     }
 
@@ -1490,7 +1499,7 @@ class PlatformUiConfigurationServiceContractTest {
         target.setVersion(source.getVersion());
         target.setUiConfigId(source.getUiConfigId());
         target.setModuleMetadataFieldId(source.getModuleMetadataFieldId());
-        target.setFieldUiTypeAlias(source.getFieldUiTypeAlias());
+        target.setFieldUiControlAlias(source.getFieldUiControlAlias());
         target.setVisible(source.getVisible());
         target.setRequiredOverride(source.getRequiredOverride());
         target.setReadOnly(source.getReadOnly());

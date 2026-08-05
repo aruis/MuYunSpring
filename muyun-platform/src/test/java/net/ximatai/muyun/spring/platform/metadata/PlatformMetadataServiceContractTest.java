@@ -68,6 +68,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import net.ximatai.muyun.spring.platform.runtime.PlatformModuleDefinitionCompiler;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -100,10 +101,10 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<PlatformModule> moduleDao = new MemoryDao<>();
     private final MemoryDao<Metadata> metadataDao = new MemoryDao<>();
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
-    private final MemoryDao<PlatformFieldType> fieldTypeDao = new MemoryDao<>();
-    private final MemoryDao<PlatformFieldUiType> fieldUiTypeDao = new MemoryDao<>();
-    private final MemoryDao<PlatformFieldUiTypeAttribute> fieldUiTypeAttributeDao = new MemoryDao<>();
-    private final MemoryDao<PlatformFieldUiTypeFieldMapping> fieldUiTypeFieldMappingDao = new MemoryDao<>();
+    private final MemoryDao<FieldSpec> fieldTypeDao = new MemoryDao<>();
+    private final MemoryDao<FieldUiControl> fieldUiTypeDao = new MemoryDao<>();
+    private final MemoryDao<FieldUiControlProperty> fieldUiTypeAttributeDao = new MemoryDao<>();
+    private final MemoryDao<FieldUiControlBinding> fieldUiTypeFieldMappingDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldProtectionConfig> protectionConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new MemoryDao<>();
@@ -117,13 +118,13 @@ class PlatformMetadataServiceContractTest {
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
-    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao, fieldUiTypeDao);
-    private final PlatformFieldUiTypeService fieldUiTypeService =
-            new PlatformFieldUiTypeService(fieldUiTypeDao, fieldTypeService);
-    private final PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService =
-            new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
-    private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
-            new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
+    private final FieldSpecService fieldTypeService = new FieldSpecService(fieldTypeDao, fieldUiTypeDao);
+    private final FieldUiControlService fieldUiTypeService =
+            new FieldUiControlService(fieldUiTypeDao, fieldTypeService);
+    private final FieldUiControlPropertyService fieldUiTypeAttributeService =
+            new FieldUiControlPropertyService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
+    private final FieldUiControlBindingService fieldUiTypeFieldMappingService =
+            new FieldUiControlBindingService(fieldUiTypeFieldMappingDao, fieldUiTypeService, fieldTypeService);
     private final PlatformMetadataSchemaEnsureService schemaEnsureService = mock(PlatformMetadataSchemaEnsureService.class);
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator =
             mock(PlatformDynamicRuntimeRefreshCoordinator.class);
@@ -195,7 +196,7 @@ class PlatformMetadataServiceContractTest {
         protectedUpdate.setMetadataId(metadataId);
         protectedUpdate.setFieldName("changedName");
         protectedUpdate.setColumnName("changed_name");
-        protectedUpdate.setFieldTypeAlias("string");
+        protectedUpdate.setFieldSpecAlias("string");
         protectedUpdate.setTitle("Changed");
 
         assertThatThrownBy(() -> fieldService.update(protectedUpdate))
@@ -515,13 +516,13 @@ class PlatformMetadataServiceContractTest {
 
     @Test
     void shouldNormalizeQueryOperatorSetBeforeSavingFieldType() {
-        PlatformFieldType type = fieldType("custom_string", FieldType.STRING, 128);
+        FieldSpec type = fieldType("custom_string", FieldType.STRING, 128);
         type.setDefaultQueryOperator(null);
         type.setQueryOperators(java.util.Set.of(" LIKE ", "EQ"));
 
         String id = fieldTypeService.insert(type);
 
-        PlatformFieldType saved = fieldTypeService.select(id);
+        FieldSpec saved = fieldTypeService.select(id);
         assertThat(saved.getDefaultQueryOperator()).isEqualTo(DynamicQueryOperator.LIKE);
         assertThat(saved.getQueryOperators()).containsExactly("EQ", "LIKE");
         assertThat(saved.queryDefinition().operators()).contains(DynamicQueryOperator.EQ, DynamicQueryOperator.LIKE);
@@ -531,24 +532,24 @@ class PlatformMetadataServiceContractTest {
     void shouldNormalizeFieldTypeUiAliases() {
         fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
         fieldUiTypeService.insert(fieldUiType("select", "下拉单选", "string", ViewControlType.SELECT));
-        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
-        type.setDefaultUiTypeAlias(" text ");
-        type.setUiTypeAliases(java.util.Set.of(" text ", "select"));
+        FieldSpec type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiControlAlias(" text ");
+        type.setUiControlAliases(java.util.Set.of(" text ", "select"));
 
         String id = fieldTypeService.insert(type);
 
-        PlatformFieldType saved = fieldTypeService.select(id);
-        assertThat(saved.getDefaultUiTypeAlias()).isEqualTo("text");
-        assertThat(saved.getUiTypeAliases()).containsExactlyInAnyOrder("text", "select");
+        FieldSpec saved = fieldTypeService.select(id);
+        assertThat(saved.getDefaultUiControlAlias()).isEqualTo("text");
+        assertThat(saved.getUiControlAliases()).containsExactlyInAnyOrder("text", "select");
     }
 
     @Test
     void shouldRejectFieldTypeDefaultUiTypeOutsideAllowedSet() {
         fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
         fieldUiTypeService.insert(fieldUiType("select", "下拉单选", "string", ViewControlType.SELECT));
-        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
-        type.setDefaultUiTypeAlias("text");
-        type.setUiTypeAliases(java.util.Set.of("select"));
+        FieldSpec type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiControlAlias("text");
+        type.setUiControlAliases(java.util.Set.of("select"));
 
         assertThatThrownBy(() -> fieldTypeService.insert(type))
                 .isInstanceOf(PlatformException.class)
@@ -557,8 +558,8 @@ class PlatformMetadataServiceContractTest {
 
     @Test
     void shouldRejectFieldTypeUnknownUiAlias() {
-        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
-        type.setDefaultUiTypeAlias("missing_ui");
+        FieldSpec type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiControlAlias("missing_ui");
 
         assertThatThrownBy(() -> fieldTypeService.insert(type))
                 .isInstanceOf(PlatformException.class)
@@ -567,83 +568,144 @@ class PlatformMetadataServiceContractTest {
 
     @Test
     void shouldValidateFieldTypeUiAliasesByUiTypeAliasNotRecordId() {
-        PlatformFieldUiType uiType = fieldUiType("text_alias", "输入框", "string", ViewControlType.TEXT);
+        FieldUiControl uiType = fieldUiType("text_alias", "输入框", "string", ViewControlType.TEXT);
         uiType.setId("custom_ui_type_id");
         fieldUiTypeService.insert(uiType);
-        PlatformFieldType displayString = fieldType("display_string", FieldType.STRING, 128);
-        displayString.setDefaultUiTypeAlias("text_alias");
-        displayString.setUiTypeAliases(java.util.Set.of("text_alias"));
+        FieldSpec displayString = fieldType("display_string", FieldType.STRING, 128);
+        displayString.setDefaultUiControlAlias("text_alias");
+        displayString.setUiControlAliases(java.util.Set.of("text_alias"));
 
         fieldTypeService.insert(displayString);
 
-        assertThat(fieldTypeService.select(displayString.getId()).getDefaultUiTypeAlias()).isEqualTo("text_alias");
+        assertThat(fieldTypeService.select(displayString.getId()).getDefaultUiControlAlias()).isEqualTo("text_alias");
     }
 
     @Test
-    void shouldManageFieldUiTypesWithAttributesAndFieldMappings() {
-        String uiTypeId = fieldUiTypeService.insert(fieldUiType("date_time_with_time_zone", "日期时间（含时区）",
-                "zoned_datetime", ViewControlType.DATETIME));
+    void shouldManageFieldUiControlsWithAttributesAndFieldMappings() {
+        FieldUiControl uiType = fieldUiType("date_time_with_time_zone", "日期时间（含时区）",
+                "zoned_datetime", ViewControlType.DATETIME);
+        uiType.setValueShape(FieldUiControlValueShape.COMPOSITE);
+        uiType.setPrimaryValueKey("dateTime");
+        String uiTypeId = fieldUiTypeService.insert(uiType);
         fieldUiTypeAttributeService.insert(fieldUiTypeAttribute("date_time_with_time_zone", "format", "格式",
                 "string", "YYYY-MM-DD HH:mm:ss"));
         fieldUiTypeFieldMappingService.insert(fieldUiTypeMapping("date_time_with_time_zone", "timeZone", "时区"));
 
-        PlatformFieldUiType saved = fieldUiTypeService.select(uiTypeId);
+        FieldUiControl saved = fieldUiTypeService.select(uiTypeId);
         assertThat(saved.getAlias()).isEqualTo("date_time_with_time_zone");
-        assertThat(saved.getDefaultFieldTypeAlias()).isEqualTo("zoned_datetime");
-        assertThat(saved.getControlType()).isEqualTo(ViewControlType.DATETIME);
-        assertThat(fieldUiTypeAttributeService.list(Criteria.of().eq("fieldUiTypeAlias", "date_time_with_time_zone"),
+        assertThat(saved.getDefaultFieldSpecAlias()).isEqualTo("zoned_datetime");
+        assertThat(saved.getRendererType()).isEqualTo(ViewControlType.DATETIME);
+        assertThat(fieldUiTypeAttributeService.list(Criteria.of().eq("fieldUiControlAlias", "date_time_with_time_zone"),
                 new PageRequest(0, 10), Sort.asc("sortOrder")))
-                .extracting(PlatformFieldUiTypeAttribute::getAttributeAlias)
+                .extracting(FieldUiControlProperty::getAttributeAlias)
                 .containsExactly("format");
-        assertThat(fieldUiTypeFieldMappingService.list(Criteria.of().eq("fieldUiTypeAlias", "date_time_with_time_zone"),
+        assertThat(fieldUiTypeFieldMappingService.list(Criteria.of().eq("fieldUiControlAlias", "date_time_with_time_zone"),
                 new PageRequest(0, 10), Sort.asc("sortOrder")))
-                .extracting(PlatformFieldUiTypeFieldMapping::getSourceKey)
+                .extracting(FieldUiControlBinding::getValueKey)
                 .containsExactly("timeZone");
     }
 
     @Test
-    void shouldRejectUnknownFieldTypeOnFieldUiTypeAttribute() {
+    void shouldReconcileMissingSemanticDefaultsForPlatformFieldUiControls() {
+        FieldUiControl historicText = new FieldUiControl();
+        historicText.setId("text");
+        historicText.setAlias("text");
+        historicText.setTitle("输入框");
+        historicText.setValueShape(FieldUiControlValueShape.SCALAR);
+        fieldUiTypeService.insert(historicText);
+
+        PlatformFieldCatalogInitialDataDeclarationProvider provider =
+                new PlatformFieldCatalogInitialDataDeclarationProvider(
+                        fieldTypeService, fieldUiTypeService, fieldUiTypeAttributeService, fieldUiTypeFieldMappingService);
+        new InitialDataExecutor(List.of(), List.of(provider)).initializeAll();
+
+        FieldUiControl text = fieldUiTypeService.requireFieldUiControl("text");
+        assertThat(text.getDefaultFieldSpecAlias()).isEqualTo("string");
+        assertThat(text.getRendererType()).isEqualTo(ViewControlType.TEXT);
+        assertThat(text.getValueShape()).isEqualTo(FieldUiControlValueShape.SCALAR);
+
+        FieldUiControl dateRange = fieldUiTypeService.requireFieldUiControl("date_range");
+        assertThat(dateRange.getDefaultFieldSpecAlias()).isEqualTo("date");
+        assertThat(dateRange.getPrimaryValueKey()).isEqualTo("start");
+        assertThat(dateRange.getQueryMode()).isEqualTo(FieldUiControlQueryMode.BETWEEN);
+    }
+
+    @Test
+    void shouldRequireTypedComponentsForCompositeFieldUiControls() {
         fieldUiTypeService.insert(fieldUiType("text_input", "输入框", "string", ViewControlType.TEXT));
-        PlatformFieldUiTypeAttribute attribute = fieldUiTypeAttribute("text_input", "maxLength", "字数限制",
+        FieldUiControlBinding scalarBinding = fieldUiTypeMapping("text_input", "label", "标签");
+
+        assertThatThrownBy(() -> fieldUiTypeFieldMappingService.insert(scalarBinding))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("require COMPOSITE value shape");
+
+        FieldUiControl composite = fieldUiType("date_range", "日期区间", "date", ViewControlType.DATE);
+        composite.setValueShape(FieldUiControlValueShape.COMPOSITE);
+        composite.setPrimaryValueKey("start");
+        fieldUiTypeService.insert(composite);
+        FieldUiControlBinding invalidSpec = fieldUiTypeMapping("date_range", "end", "结束值");
+        invalidSpec.setValueFieldSpecAlias("missing_spec");
+
+        assertThatThrownBy(() -> fieldUiTypeFieldMappingService.insert(invalidSpec))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Field spec requires existing type");
+    }
+
+    @Test
+    void shouldRejectUnknownFieldTypeOnFieldUiControlAttribute() {
+        fieldUiTypeService.insert(fieldUiType("text_input", "输入框", "string", ViewControlType.TEXT));
+        FieldUiControlProperty attribute = fieldUiTypeAttribute("text_input", "maxLength", "字数限制",
                 "missing_type", null);
 
         assertThatThrownBy(() -> fieldUiTypeAttributeService.insert(attribute))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("Field type requires existing type");
+                .hasMessageContaining("Field spec requires existing type");
     }
 
     @Test
-    void shouldExposePresetFieldUiTypeBusinessGranularity() {
-        assertThat(PlatformFieldUiTypePresetCatalog.fieldUiTypes())
-                .extracting(PlatformFieldUiType::getAlias)
+    void shouldExposePresetFieldUiControlBusinessGranularity() {
+        assertThat(FieldUiControlPresetCatalog.fieldUiControls())
+                .extracting(FieldUiControl::getAlias)
                 .contains("text", "textarea", "amount", "select", "multi_select", "date_time_with_time_zone");
-        assertThat(PlatformFieldUiTypePresetCatalog.attributes())
+        assertThat(FieldUiControlPresetCatalog.fieldUiControls())
+                .filteredOn(control -> "multi_select".equals(control.getAlias()))
+                .extracting(FieldUiControl::getValueShape)
+                .containsExactly(FieldUiControlValueShape.COLLECTION);
+        assertThat(FieldUiControlPresetCatalog.fieldUiControls())
+                .filteredOn(control -> "date_time_with_time_zone".equals(control.getAlias()))
+                .extracting(FieldUiControl::getValueShape)
+                .containsExactly(FieldUiControlValueShape.COMPOSITE);
+        assertThat(FieldUiControlPresetCatalog.fieldUiControls())
+                .filteredOn(control -> "date_range".equals(control.getAlias()))
+                .extracting(FieldUiControl::getPrimaryValueKey)
+                .containsExactly("start");
+        assertThat(FieldUiControlPresetCatalog.properties())
                 .anySatisfy(attribute -> {
-                    assertThat(attribute.getFieldUiTypeAlias()).isEqualTo("date_time_with_time_zone");
+                    assertThat(attribute.getFieldUiControlAlias()).isEqualTo("date_time_with_time_zone");
                     assertThat(attribute.getAttributeAlias()).isEqualTo("format");
                 });
-        assertThat(PlatformFieldUiTypePresetCatalog.fieldMappings())
+        assertThat(FieldUiControlPresetCatalog.bindings())
                 .anySatisfy(mapping -> {
-                    assertThat(mapping.getFieldUiTypeAlias()).isEqualTo("date_time_with_time_zone");
-                    assertThat(mapping.getSourceKey()).isEqualTo("timeZone");
+                    assertThat(mapping.getFieldUiControlAlias()).isEqualTo("date_time_with_time_zone");
+                    assertThat(mapping.getValueKey()).isEqualTo("timeZone");
                 });
     }
 
     @Test
     void shouldCompileDefaultUiTypeFromFieldType() {
         fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
-        PlatformFieldType displayString = fieldType("display_string", FieldType.STRING, 128);
-        displayString.setDefaultUiTypeAlias("text");
-        displayString.setUiTypeAliases(java.util.Set.of("text"));
+        FieldSpec displayString = fieldType("display_string", FieldType.STRING, 128);
+        displayString.setDefaultUiControlAlias("text");
+        displayString.setUiControlAliases(java.util.Set.of("text"));
         fieldTypeService.insert(displayString);
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         MetadataField field = field(metadataId, "displayName", "display_name", FieldType.STRING);
-        field.setFieldTypeAlias("display_string");
+        field.setFieldSpecAlias("display_string");
         fieldService.insert(field);
 
         FieldDefinition definition = fieldDefinitionCompiler.compile(field);
 
-        assertThat(definition.defaultUiTypeAlias()).isEqualTo("text");
+        assertThat(definition.defaultUiControlAlias()).isEqualTo("text");
     }
 
     @Test
@@ -837,7 +899,7 @@ class PlatformMetadataServiceContractTest {
 
     @Test
     void shouldRejectFieldShapeThatDoesNotMatchFieldType() {
-        PlatformFieldType invalidType = fieldType("integer_length", FieldType.INTEGER, 32);
+        FieldSpec invalidType = fieldType("integer_length", FieldType.INTEGER, 32);
         assertThatThrownBy(() -> fieldTypeService.insert(invalidType))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("length only applies");
@@ -1002,7 +1064,7 @@ class PlatformMetadataServiceContractTest {
         MetadataView view = metadataView(relationId, EntityViewType.LIST);
         String viewId = viewService.insert(view);
         MetadataViewField viewField = metadataViewField(viewId, status.getId());
-        viewField.setFieldUiTypeAlias("select");
+        viewField.setFieldUiControlAlias("select");
         viewField.setReadOnly(true);
         viewField.setRequiredOverride(true);
 
@@ -1013,23 +1075,23 @@ class PlatformMetadataServiceContractTest {
                 .containsExactly(viewId);
         assertThat(definition.fieldName()).isEqualTo("status");
         assertThat(definition.controlType()).isEqualTo(ViewControlType.SELECT);
-        assertThat(definition.fieldUiTypeAlias()).isEqualTo("select");
+        assertThat(definition.fieldUiControlAlias()).isEqualTo("select");
         assertThat(definition.readOnly()).isTrue();
         assertThat(definition.required()).isTrue();
     }
 
     @Test
-    void shouldRejectViewFieldUiTypeOutsideFieldTypeAllowedSet() {
+    void shouldRejectViewFieldUiControlOutsideFieldTypeAllowedSet() {
         moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
-        status.setFieldTypeAlias("string");
+        status.setFieldSpecAlias("string");
         fieldService.insert(status);
         fieldUiTypeService.insert(fieldUiType("amount", "金额", "decimal", ViewControlType.DECIMAL));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
         String viewId = viewService.insert(metadataView(relationId, EntityViewType.FORM));
         MetadataViewField viewField = metadataViewField(viewId, status.getId());
-        viewField.setFieldUiTypeAlias("amount");
+        viewField.setFieldUiControlAlias("amount");
 
         assertThatThrownBy(() -> viewFieldService.insert(viewField))
                 .isInstanceOf(PlatformException.class)
@@ -1176,7 +1238,7 @@ class PlatformMetadataServiceContractTest {
         assertThat(resolved.relationAlias()).isEqualTo("customer");
         assertThat(resolved.metadataAlias()).isEqualTo("customer");
         assertThat(resolved.fieldName()).isEqualTo("status");
-        assertThat(resolved.fieldTypeAlias()).isEqualTo("string");
+        assertThat(resolved.fieldSpecAlias()).isEqualTo("string");
     }
 
     @Test
@@ -1953,7 +2015,7 @@ class PlatformMetadataServiceContractTest {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldType.name().toLowerCase());
+        field.setFieldSpecAlias(fieldType.name().toLowerCase());
         field.setTitle(fieldName);
         return field;
     }
@@ -1964,8 +2026,8 @@ class PlatformMetadataServiceContractTest {
         return field;
     }
 
-    private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
-        PlatformFieldType type = new PlatformFieldType();
+    private FieldSpec fieldType(String alias, FieldType fieldType, Integer length) {
+        FieldSpec type = new FieldSpec();
         type.setAlias(alias);
         type.setTitle(alias);
         type.setFieldType(fieldType);
@@ -1975,36 +2037,37 @@ class PlatformMetadataServiceContractTest {
         return type;
     }
 
-    private PlatformFieldUiType fieldUiType(String alias,
+    private FieldUiControl fieldUiType(String alias,
                                             String title,
-                                            String defaultFieldTypeAlias,
+                                            String defaultFieldSpecAlias,
                                             ViewControlType controlType) {
-        PlatformFieldUiType type = new PlatformFieldUiType();
+        FieldUiControl type = new FieldUiControl();
         type.setAlias(alias);
         type.setTitle(title);
-        type.setDefaultFieldTypeAlias(defaultFieldTypeAlias);
-        type.setControlType(controlType);
+        type.setDefaultFieldSpecAlias(defaultFieldSpecAlias);
+        type.setRendererType(controlType);
         return type;
     }
 
-    private PlatformFieldUiTypeAttribute fieldUiTypeAttribute(String fieldUiTypeAlias,
+    private FieldUiControlProperty fieldUiTypeAttribute(String fieldUiControlAlias,
                                                               String attributeAlias,
                                                               String title,
-                                                              String valueFieldTypeAlias,
+                                                              String valueFieldSpecAlias,
                                                               String defaultValue) {
-        PlatformFieldUiTypeAttribute attribute = new PlatformFieldUiTypeAttribute();
-        attribute.setFieldUiTypeAlias(fieldUiTypeAlias);
+        FieldUiControlProperty attribute = new FieldUiControlProperty();
+        attribute.setFieldUiControlAlias(fieldUiControlAlias);
         attribute.setAttributeAlias(attributeAlias);
         attribute.setTitle(title);
-        attribute.setValueFieldTypeAlias(valueFieldTypeAlias);
+        attribute.setValueFieldSpecAlias(valueFieldSpecAlias);
         attribute.setDefaultValue(defaultValue);
         return attribute;
     }
 
-    private PlatformFieldUiTypeFieldMapping fieldUiTypeMapping(String fieldUiTypeAlias, String sourceKey, String title) {
-        PlatformFieldUiTypeFieldMapping mapping = new PlatformFieldUiTypeFieldMapping();
-        mapping.setFieldUiTypeAlias(fieldUiTypeAlias);
-        mapping.setSourceKey(sourceKey);
+    private FieldUiControlBinding fieldUiTypeMapping(String fieldUiControlAlias, String valueKey, String title) {
+        FieldUiControlBinding mapping = new FieldUiControlBinding();
+        mapping.setFieldUiControlAlias(fieldUiControlAlias);
+        mapping.setValueKey(valueKey);
+        mapping.setValueFieldSpecAlias("string");
         mapping.setTitle(title);
         return mapping;
     }

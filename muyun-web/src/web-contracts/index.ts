@@ -879,6 +879,41 @@ export interface Tenant extends StandardEnabledSortableEntity {
   alias?: string;
 }
 
+export interface FieldSpec extends StandardEnabledSortableEntity {
+  alias?: string;
+  fieldType?: string;
+  defaultLength?: number;
+  defaultPrecision?: number;
+  defaultScale?: number;
+  defaultQueryOperator?: string;
+  queryOperators?: string[];
+  defaultUiControlAlias?: string;
+  uiControlAliases?: string[];
+}
+
+export interface FieldUiControl extends StandardEnabledSortableEntity {
+  alias?: string;
+  defaultFieldSpecAlias?: string;
+  valueShape?: 'SCALAR' | 'COLLECTION' | 'COMPOSITE';
+  primaryValueKey?: string;
+  queryMode?: 'DEFAULT' | 'BETWEEN';
+  rendererType?: string;
+  icon?: string;
+}
+
+export interface FieldUiControlProperty extends StandardSortableEntity {
+  fieldUiControlAlias?: string;
+  attributeAlias?: string;
+  valueFieldSpecAlias?: string;
+  defaultValue?: string;
+}
+
+export interface FieldUiControlBinding extends StandardSortableEntity {
+  fieldUiControlAlias?: string;
+  valueKey?: string;
+  valueFieldSpecAlias?: string;
+}
+
 export interface TenantApplication extends StandardTitledEntity {
   tenantId?: string;
   applicationAlias?: string;

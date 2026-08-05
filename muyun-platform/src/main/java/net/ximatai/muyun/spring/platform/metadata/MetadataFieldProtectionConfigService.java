@@ -27,19 +27,19 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
     public static final String MODULE_ALIAS = "platform.metadata_field_protection_config";
 
     private final MetadataFieldService fieldService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final BaseDao<MetadataFieldConfig, String> fieldConfigDao;
     private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
 
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
-                                                PlatformFieldTypeService fieldTypeService) {
+                                                FieldSpecService fieldTypeService) {
         this(configDao, fieldService, fieldTypeService, null, Optional.empty());
     }
 
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
-                                                PlatformFieldTypeService fieldTypeService,
+                                                FieldSpecService fieldTypeService,
                                                 BaseDao<MetadataFieldConfig, String> fieldConfigDao) {
         this(configDao, fieldService, fieldTypeService, fieldConfigDao, Optional.empty());
     }
@@ -47,7 +47,7 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
     @Autowired
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
-                                                PlatformFieldTypeService fieldTypeService,
+                                                FieldSpecService fieldTypeService,
                                                 BaseDao<MetadataFieldConfig, String> fieldConfigDao,
                                                 Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataFieldProtectionConfig.class, configDao);
@@ -126,7 +126,7 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
         if (definition.hasStorageProtection() && field.getFieldForm() == MetadataFieldForm.VIRTUAL) {
             throw new PlatformException("Virtual metadata field cannot use storage protection: " + field.getId());
         }
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         if (definition.hasStorageProtection()
                 && fieldType.getFieldType() != FieldType.STRING
                 && fieldType.getFieldType() != FieldType.TEXT) {
@@ -146,7 +146,7 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
         if (!definition.hasStorageProtection()) {
             return;
         }
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         MetadataFieldConfig config = fieldConfig(field.getId());
         if (config == null) {
             if (fieldType.queryDefinition().queryable()) {

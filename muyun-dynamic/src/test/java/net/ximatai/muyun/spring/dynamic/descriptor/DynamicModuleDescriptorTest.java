@@ -161,7 +161,7 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicViewFieldDescriptor::fieldName)
                 .containsExactly("title", "status", "tags");
         assertThat(listView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
-        assertThat(listView.fields().get(1).fieldUiTypeAlias()).isEqualTo("select");
+        assertThat(listView.fields().get(1).fieldUiControlAlias()).isEqualTo("select");
         assertThat(listView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
                 .isEqualTo(DynamicQueryOperator.LIKE.name());
@@ -469,7 +469,7 @@ class DynamicModuleDescriptorTest {
                 .containsExactly("title", "status", "tags", "description");
         assertThat(formView.fields().getFirst().title()).isEqualTo("Customer name");
         assertThat(formView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
-        assertThat(formView.fields().get(1).fieldUiTypeAlias()).isEqualTo("select");
+        assertThat(formView.fields().get(1).fieldUiControlAlias()).isEqualTo("select");
         assertThat(formView.fields().get(1).readOnly()).isTrue();
         assertThat(formView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
         assertThat(formView.fields().get(3).visible()).isFalse();

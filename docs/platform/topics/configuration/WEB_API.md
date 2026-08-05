@@ -12,10 +12,10 @@
 | 可绑定二开执行器目录 | `DynamicActionExecutorRegistry` | `/platform.module/action-executors` |
 | 元数据 | `MetadataService` | `/platform.metadata` |
 | 元数据字段 | `MetadataFieldService` | `/platform.metadata/{metadataId}/fields` |
-| 字段类型 | `PlatformFieldTypeService` | `/platform.field_type` |
-| 字段 UI 类型 | `PlatformFieldUiTypeService` | `/platform.field_ui_type` |
-| 字段 UI 类型属性 | `PlatformFieldUiTypeAttributeService` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes` |
-| 字段 UI 类型字段映射 | `PlatformFieldUiTypeFieldMappingService` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings` |
+| 字段类型 | `FieldSpecService` | `/platform.field_spec` |
+| 字段 UI 类型 | `FieldUiControlService` | `/platform.field_ui_control` |
+| 字段 UI 类型属性 | `FieldUiControlPropertyService` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes` |
+| 字段 UI 类型字段映射 | `FieldUiControlBindingService` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings` |
 | UI 配置集 | `PlatformUiSetService` | `/platform.module/{moduleAlias}/ui-sets` |
 | UI 配置 | `PlatformUiConfigService` | `/platform.ui-set/{uiSetId}/configs` |
 | UI 字段配置 | `PlatformUiConfigFieldService` | `/platform.ui-config/{uiConfigId}/fields` |
@@ -78,41 +78,41 @@
 | 元数据 | `POST` | `/platform.metadata/delete/{id}` | 删除元数据 |
 | 元数据 | `POST` | `/platform.metadata/enable/{id}`、`/disable/{id}` | 启用或停用元数据 |
 | 元数据 | `POST` | `/platform.metadata/sort/{id}` | 在应用内调整元数据排序 |
-| 字段类型 | `POST` | `/platform.field_type/query` | 查询字段类型目录 |
-| 字段类型 | `GET` | `/platform.field_type/view/{id}` | 查看字段类型 |
-| 字段类型 | `POST` | `/platform.field_type/insert` | 新增字段类型 |
-| 字段类型 | `POST` | `/platform.field_type/update/{id}` | 更新字段类型 |
-| 字段类型 | `POST` | `/platform.field_type/delete/{id}` | 删除字段类型 |
-| 字段类型 | `POST` | `/platform.field_type/enable/{id}`、`/disable/{id}` | 启用或停用字段类型 |
-| 字段类型 | `POST` | `/platform.field_type/sort/{id}` | 调整字段类型排序 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/query` | 查询字段 UI 类型目录 |
-| 字段 UI 类型 | `GET` | `/platform.field_ui_type/view/{id}` | 查看字段 UI 类型 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/insert` | 新增字段 UI 类型 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/update/{id}` | 更新字段 UI 类型 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/delete/{id}` | 删除字段 UI 类型 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/enable/{id}`、`/disable/{id}` | 启用或停用字段 UI 类型 |
-| 字段 UI 类型 | `POST` | `/platform.field_ui_type/sort/{id}` | 调整字段 UI 类型排序 |
+| 字段类型 | `POST` | `/platform.field_spec/query` | 查询字段类型目录 |
+| 字段类型 | `GET` | `/platform.field_spec/view/{id}` | 查看字段类型 |
+| 字段类型 | `POST` | `/platform.field_spec/insert` | 新增字段类型 |
+| 字段类型 | `POST` | `/platform.field_spec/update/{id}` | 更新字段类型 |
+| 字段类型 | `POST` | `/platform.field_spec/delete/{id}` | 删除字段类型 |
+| 字段类型 | `POST` | `/platform.field_spec/enable/{id}`、`/disable/{id}` | 启用或停用字段类型 |
+| 字段类型 | `POST` | `/platform.field_spec/sort/{id}` | 调整字段类型排序 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/query` | 查询字段 UI 类型目录 |
+| 字段 UI 类型 | `GET` | `/platform.field_ui_control/view/{id}` | 查看字段 UI 类型 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/insert` | 新增字段 UI 类型 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/update/{id}` | 更新字段 UI 类型 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/delete/{id}` | 删除字段 UI 类型 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/enable/{id}`、`/disable/{id}` | 启用或停用字段 UI 类型 |
+| 字段 UI 类型 | `POST` | `/platform.field_ui_control/sort/{id}` | 调整字段 UI 类型排序 |
 
 上述标准维护接口中的 `delete`、`enable`、`disable` 必须带请求体 `{"version": n}`，以当前记录版本执行乐观锁校验。版本失效时统一返回 `409 CONFLICT_VERSION`；调用方应先刷新记录，再决定是否重试。
 
 ## 字段 UI 类型配置
 
-字段 UI 类型属性和字段映射挂在字段 UI 类型 alias 下。请求体中的 `fieldUiTypeAlias` 以后端 URL 为准，避免跨 UI 类型维护。
+字段 UI 类型属性和字段映射挂在字段 UI 类型 alias 下。请求体中的 `fieldUiControlAlias` 以后端 URL 为准，避免跨 UI 类型维护。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
-| UI 类型属性 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/query` | 查询 UI 类型属性 |
-| UI 类型属性 | `GET` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/view/{id}` | 查看 UI 类型属性，并校验归属 |
-| UI 类型属性 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/insert` | 新增 UI 类型属性；后端以 URL 中的 `fieldUiTypeAlias` 为准 |
-| UI 类型属性 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/update/{id}` | 更新 UI 类型属性，并保持归属不跨 UI 类型 |
-| UI 类型属性 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/delete/{id}` | 删除 UI 类型属性 |
-| UI 类型属性 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/attributes/sort/{id}` | 在同一 UI 类型内调整属性顺序 |
-| UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/query` | 查询 UI 类型字段映射 |
-| UI 类型字段映射 | `GET` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/view/{id}` | 查看 UI 类型字段映射，并校验归属 |
-| UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/insert` | 新增 UI 类型字段映射；后端以 URL 中的 `fieldUiTypeAlias` 为准 |
-| UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/update/{id}` | 更新 UI 类型字段映射，并保持归属不跨 UI 类型 |
-| UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/delete/{id}` | 删除 UI 类型字段映射 |
-| UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/sort/{id}` | 在同一 UI 类型内调整字段映射顺序 |
+| UI 类型属性 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/query` | 查询 UI 类型属性 |
+| UI 类型属性 | `GET` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/view/{id}` | 查看 UI 类型属性，并校验归属 |
+| UI 类型属性 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/insert` | 新增 UI 类型属性；后端以 URL 中的 `fieldUiControlAlias` 为准 |
+| UI 类型属性 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/update/{id}` | 更新 UI 类型属性，并保持归属不跨 UI 类型 |
+| UI 类型属性 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/delete/{id}` | 删除 UI 类型属性 |
+| UI 类型属性 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/attributes/sort/{id}` | 在同一 UI 类型内调整属性顺序 |
+| UI 类型字段映射 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/query` | 查询 UI 类型字段映射 |
+| UI 类型字段映射 | `GET` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/view/{id}` | 查看 UI 类型字段映射，并校验归属 |
+| UI 类型字段映射 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/insert` | 新增 UI 类型字段映射；后端以 URL 中的 `fieldUiControlAlias` 为准 |
+| UI 类型字段映射 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/update/{id}` | 更新 UI 类型字段映射，并保持归属不跨 UI 类型 |
+| UI 类型字段映射 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/delete/{id}` | 删除 UI 类型字段映射 |
+| UI 类型字段映射 | `POST` | `/platform.field_ui_control/{fieldUiControlAlias}/field-mappings/sort/{id}` | 在同一 UI 类型内调整字段映射顺序 |
 
 ## 数据字典
 

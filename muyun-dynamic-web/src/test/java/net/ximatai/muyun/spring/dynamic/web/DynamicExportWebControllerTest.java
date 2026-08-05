@@ -429,13 +429,13 @@ class DynamicExportWebControllerTest {
         return field;
     }
 
-    private ResolvedModuleMetadataField resolvedField(String id, String fieldName, String fieldTypeAlias) {
-        return resolvedField(id, fieldName, fieldTypeAlias, MetadataFieldForm.PHYSICAL);
+    private ResolvedModuleMetadataField resolvedField(String id, String fieldName, String fieldSpecAlias) {
+        return resolvedField(id, fieldName, fieldSpecAlias, MetadataFieldForm.PHYSICAL);
     }
 
     private ResolvedModuleMetadataField resolvedField(String id,
                                                      String fieldName,
-                                                     String fieldTypeAlias,
+                                                     String fieldSpecAlias,
                                                      MetadataFieldForm fieldForm) {
         return new ResolvedModuleMetadataField(
                 id,
@@ -450,7 +450,7 @@ class DynamicExportWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                fieldTypeAlias,
+                fieldSpecAlias,
                 fieldForm
         );
     }

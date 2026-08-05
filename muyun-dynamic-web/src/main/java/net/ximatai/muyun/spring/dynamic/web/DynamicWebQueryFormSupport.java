@@ -89,14 +89,14 @@ final class DynamicWebQueryFormSupport {
             }
             ResolvedModuleMetadataField resolved = moduleFieldService.resolve(field.getModuleMetadataFieldId());
             if (resolved.relationRole() == RelationRole.MAIN) {
-                fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(), field.getFieldUiTypeAlias()));
+                fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(), field.getFieldUiControlAlias()));
             }
         }
         return fields;
     }
 
     private static DynamicQueryCondition condition(QueryFormField field, Object value) {
-        if (isRangeUiType(field.fieldUiTypeAlias())) {
+        if (isRangeUiType(field.fieldUiControlAlias())) {
             RangeQueryValue range = rangeValue(field.fieldName(), value);
             if (range.values().isEmpty()) {
                 return null;
@@ -111,8 +111,8 @@ final class DynamicWebQueryFormSupport {
         return new DynamicQueryCondition(field.fieldName(), null, values);
     }
 
-    private static boolean isRangeUiType(String fieldUiTypeAlias) {
-        return "date_range".equals(fieldUiTypeAlias) || "date_time_range".equals(fieldUiTypeAlias);
+    private static boolean isRangeUiType(String fieldUiControlAlias) {
+        return "date_range".equals(fieldUiControlAlias) || "date_time_range".equals(fieldUiControlAlias);
     }
 
     private static RangeQueryValue rangeValue(String fieldName, Object value) {
@@ -129,23 +129,16 @@ final class DynamicWebQueryFormSupport {
             return new RangeQueryValue(values, textValue(map.get("timeZone")));
         }
         List<?> values = values(value);
-        if (values.isEmpty()) {
-            return new RangeQueryValue(List.of(), null);
-        }
-        if (values.size() != 2) {
-            throw new PlatformException("Query form range requires exactly two values: " + fieldName);
-        }
+        if (values.isEmpty()) return new RangeQueryValue(List.of(), null);
+        if (values.size() != 2) throw new PlatformException("Query form range requires exactly two values: " + fieldName);
         return new RangeQueryValue(values, null);
     }
 
     private static Object firstPresent(Map<?, ?> map, String... keys) {
-        for (String key : keys) {
-            if (map.containsKey(key)) {
-                return map.get(key);
-            }
-        }
+        for (String key : keys) if (map.containsKey(key)) return map.get(key);
         return null;
     }
+
 
     private static PlatformUiConfig publishedUiConfig(PlatformPageConfigSnapshot snapshot, String uiConfigId) {
         return snapshot.uiConfigs().stream()
@@ -218,7 +211,7 @@ final class DynamicWebQueryFormSupport {
         return text.isBlank() ? null : text;
     }
 
-    private record QueryFormField(String fieldName, String fieldUiTypeAlias) {
+    private record QueryFormField(String fieldName, String fieldUiControlAlias) {
     }
 
     private record RangeQueryValue(List<?> values, String timeZone) {

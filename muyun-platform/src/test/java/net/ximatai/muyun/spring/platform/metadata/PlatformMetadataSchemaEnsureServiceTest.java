@@ -47,7 +47,7 @@ class PlatformMetadataSchemaEnsureServiceTest {
     void shouldEnsureOwningMetadataSchemaAfterMetadataFieldSave() {
         PlatformMetadataSchemaEnsureService schemaEnsureService = mock(PlatformMetadataSchemaEnsureService.class);
         MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<>());
+        FieldSpecService fieldTypeService = new FieldSpecService(new TestMemoryDao<>());
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         MetadataFieldService fieldService = new MetadataFieldService(
                 new TestMemoryDao<>(), metadataService, fieldTypeService, Optional.empty(),
@@ -178,7 +178,7 @@ class PlatformMetadataSchemaEnsureServiceTest {
 
     private TestContext testContext() {
         MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<>());
+        FieldSpecService fieldTypeService = new FieldSpecService(new TestMemoryDao<>());
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
@@ -212,18 +212,18 @@ class PlatformMetadataSchemaEnsureServiceTest {
         return field;
     }
 
-    private MetadataField field(String metadataId, String fieldName, String columnName, String fieldTypeAlias) {
+    private MetadataField field(String metadataId, String fieldName, String columnName, String fieldSpecAlias) {
         MetadataField field = new MetadataField();
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
         field.setTitle(fieldName);
-        field.setFieldTypeAlias(fieldTypeAlias);
+        field.setFieldSpecAlias(fieldSpecAlias);
         return field;
     }
 
-    private PlatformFieldType fieldType(String alias, FieldType type, Integer length) {
-        PlatformFieldType fieldType = new PlatformFieldType();
+    private FieldSpec fieldType(String alias, FieldType type, Integer length) {
+        FieldSpec fieldType = new FieldSpec();
         fieldType.setAlias(alias);
         fieldType.setTitle(alias);
         fieldType.setFieldType(type);

@@ -43,12 +43,12 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlProperty;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlPropertyService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
@@ -643,11 +643,11 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldExposeFieldTypeDirectory() throws Exception {
-        PlatformFieldTypeService service = queryService(mock(PlatformFieldTypeService.class));
-        PlatformFieldTypeWebController controller = new PlatformFieldTypeWebController();
+        FieldSpecService service = queryService(mock(FieldSpecService.class));
+        FieldSpecWebController controller = new FieldSpecWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
-        PlatformFieldType fieldType = new PlatformFieldType();
+        FieldSpec fieldType = new FieldSpec();
         fieldType.setId("string");
         fieldType.setAlias("string");
         fieldType.setTitle("String");
@@ -656,7 +656,7 @@ class PlatformConfigurationWebControllerTest {
                 .thenReturn(PageResult.of(List.of(fieldType), 1, PageRequest.of(1, 20)));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.field_type/query")
+        mvc.perform(post("/platform.field_spec/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"conditions":[{"fieldName":"alias","values":["string"]}]}
@@ -926,109 +926,109 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldManageFieldUiTypeAttributesWithinPathUiType() throws Exception {
-        PlatformFieldUiTypeAttributeService service = queryService(mock(PlatformFieldUiTypeAttributeService.class));
-        PlatformFieldUiTypeAttributeWebController controller = new PlatformFieldUiTypeAttributeWebController();
+    void shouldManageFieldUiControlAttributesWithinPathUiType() throws Exception {
+        FieldUiControlPropertyService service = queryService(mock(FieldUiControlPropertyService.class));
+        FieldUiControlPropertyWebController controller = new FieldUiControlPropertyWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
-        PlatformFieldUiTypeAttribute attribute = fieldUiTypeAttribute("attr-1", "text", "placeholder");
+        FieldUiControlProperty attribute = fieldUiTypeAttribute("attr-1", "text", "placeholder");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(attribute), 1, PageRequest.of(1, 20)));
-        when(service.insert(any(PlatformFieldUiTypeAttribute.class))).thenReturn("attr-1");
+        when(service.insert(any(FieldUiControlProperty.class))).thenReturn("attr-1");
         when(service.select("attr-1")).thenReturn(attribute);
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.field_ui_type/text/attributes/query")
+        mvc.perform(post("/platform.field_ui_control/text/properties/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"conditions":[{"fieldName":"attributeAlias","values":["placeholder"]}]}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].fieldUiTypeAlias").value("text"))
+                .andExpect(jsonPath("$.records[0].fieldUiControlAlias").value("text"))
                 .andExpect(jsonPath("$.records[0].attributeAlias").value("placeholder"));
-        mvc.perform(post("/platform.field_ui_type/text/attributes/insert")
+        mvc.perform(post("/platform.field_ui_control/text/properties/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"fieldUiTypeAlias":"other","attributeAlias":"placeholder","title":"Placeholder"}
+                                {"fieldUiControlAlias":"other","attributeAlias":"placeholder","title":"Placeholder"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fieldUiTypeAlias").value("text"));
+                .andExpect(jsonPath("$.fieldUiControlAlias").value("text"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
-        assertClause(criteria.getValue(), "fieldUiTypeAlias", "text");
+        assertClause(criteria.getValue(), "fieldUiControlAlias", "text");
         assertClause(criteria.getValue(), "attributeAlias", "placeholder");
-        ArgumentCaptor<PlatformFieldUiTypeAttribute> attributeCaptor =
-                ArgumentCaptor.forClass(PlatformFieldUiTypeAttribute.class);
+        ArgumentCaptor<FieldUiControlProperty> attributeCaptor =
+                ArgumentCaptor.forClass(FieldUiControlProperty.class);
         verify(service).insert(attributeCaptor.capture());
-        assertThat(attributeCaptor.getValue().getFieldUiTypeAlias()).isEqualTo("text");
+        assertThat(attributeCaptor.getValue().getFieldUiControlAlias()).isEqualTo("text");
     }
 
     @Test
-    void shouldRejectCrossFieldUiTypeAttributeUpdate() {
-        PlatformFieldUiTypeAttributeService service = mock(PlatformFieldUiTypeAttributeService.class);
-        PlatformFieldUiTypeAttributeWebController controller = new PlatformFieldUiTypeAttributeWebController();
+    void shouldRejectCrossFieldUiControlAttributeUpdate() {
+        FieldUiControlPropertyService service = mock(FieldUiControlPropertyService.class);
+        FieldUiControlPropertyWebController controller = new FieldUiControlPropertyWebController();
         ReflectionTestUtils.setField(controller, "service", service);
         when(service.select("attr-1")).thenReturn(fieldUiTypeAttribute("attr-1", "number", "placeholder"));
 
-        MockHttpServletRequest request = requestVars(Map.of("fieldUiTypeAlias", "text"));
+        MockHttpServletRequest request = requestVars(Map.of("fieldUiControlAlias", "text"));
 
-        assertThatThrownBy(() -> controller.update(request, "attr-1", new PlatformFieldUiTypeAttribute()))
+        assertThatThrownBy(() -> controller.update(request, "attr-1", new FieldUiControlProperty()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("field UI type attribute does not belong to field UI type");
+                .hasMessageContaining("field UI control property does not belong to field UI control");
     }
 
     @Test
-    void shouldManageFieldUiTypeMappingsWithinPathUiType() throws Exception {
-        PlatformFieldUiTypeFieldMappingService service = queryService(mock(PlatformFieldUiTypeFieldMappingService.class));
-        PlatformFieldUiTypeFieldMappingWebController controller = new PlatformFieldUiTypeFieldMappingWebController();
+    void shouldManageFieldUiControlMappingsWithinPathUiType() throws Exception {
+        FieldUiControlBindingService service = queryService(mock(FieldUiControlBindingService.class));
+        FieldUiControlBindingWebController controller = new FieldUiControlBindingWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
-        PlatformFieldUiTypeFieldMapping mapping = fieldUiTypeMapping("mapping-1", "select", "options");
+        FieldUiControlBinding mapping = fieldUiTypeMapping("mapping-1", "select", "options");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(mapping), 1, PageRequest.of(1, 20)));
-        when(service.insert(any(PlatformFieldUiTypeFieldMapping.class))).thenReturn("mapping-1");
+        when(service.insert(any(FieldUiControlBinding.class))).thenReturn("mapping-1");
         when(service.select("mapping-1")).thenReturn(mapping);
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.field_ui_type/select/field-mappings/query")
+        mvc.perform(post("/platform.field_ui_control/select/bindings/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"conditions":[{"fieldName":"sourceKey","values":["options"]}]}
+                                {"conditions":[{"fieldName":"valueKey","values":["options"]}]}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].fieldUiTypeAlias").value("select"))
-                .andExpect(jsonPath("$.records[0].sourceKey").value("options"));
-        mvc.perform(post("/platform.field_ui_type/select/field-mappings/insert")
+                .andExpect(jsonPath("$.records[0].fieldUiControlAlias").value("select"))
+                .andExpect(jsonPath("$.records[0].valueKey").value("options"));
+        mvc.perform(post("/platform.field_ui_control/select/bindings/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"fieldUiTypeAlias":"other","sourceKey":"options","title":"Options"}
+                                {"fieldUiControlAlias":"other","valueKey":"options","valueFieldSpecAlias":"string","title":"Options"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fieldUiTypeAlias").value("select"));
+                .andExpect(jsonPath("$.fieldUiControlAlias").value("select"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
-        assertClause(criteria.getValue(), "fieldUiTypeAlias", "select");
-        assertClause(criteria.getValue(), "sourceKey", "options");
-        ArgumentCaptor<PlatformFieldUiTypeFieldMapping> mappingCaptor =
-                ArgumentCaptor.forClass(PlatformFieldUiTypeFieldMapping.class);
+        assertClause(criteria.getValue(), "fieldUiControlAlias", "select");
+        assertClause(criteria.getValue(), "valueKey", "options");
+        ArgumentCaptor<FieldUiControlBinding> mappingCaptor =
+                ArgumentCaptor.forClass(FieldUiControlBinding.class);
         verify(service).insert(mappingCaptor.capture());
-        assertThat(mappingCaptor.getValue().getFieldUiTypeAlias()).isEqualTo("select");
+        assertThat(mappingCaptor.getValue().getFieldUiControlAlias()).isEqualTo("select");
     }
 
     @Test
-    void shouldRejectCrossFieldUiTypeMappingUpdate() {
-        PlatformFieldUiTypeFieldMappingService service = mock(PlatformFieldUiTypeFieldMappingService.class);
-        PlatformFieldUiTypeFieldMappingWebController controller = new PlatformFieldUiTypeFieldMappingWebController();
+    void shouldRejectCrossFieldUiControlMappingUpdate() {
+        FieldUiControlBindingService service = mock(FieldUiControlBindingService.class);
+        FieldUiControlBindingWebController controller = new FieldUiControlBindingWebController();
         ReflectionTestUtils.setField(controller, "service", service);
         when(service.select("mapping-1")).thenReturn(fieldUiTypeMapping("mapping-1", "radio", "options"));
 
-        MockHttpServletRequest request = requestVars(Map.of("fieldUiTypeAlias", "select"));
+        MockHttpServletRequest request = requestVars(Map.of("fieldUiControlAlias", "select"));
 
-        assertThatThrownBy(() -> controller.update(request, "mapping-1", new PlatformFieldUiTypeFieldMapping()))
+        assertThatThrownBy(() -> controller.update(request, "mapping-1", new FieldUiControlBinding()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("field UI type field mapping does not belong to field UI type");
+                .hasMessageContaining("field UI control binding does not belong to field UI control");
     }
 
     @Test
@@ -1171,21 +1171,22 @@ class PlatformConfigurationWebControllerTest {
         return template;
     }
 
-    private PlatformFieldUiTypeAttribute fieldUiTypeAttribute(String id, String fieldUiTypeAlias, String attributeAlias) {
-        PlatformFieldUiTypeAttribute attribute = new PlatformFieldUiTypeAttribute();
+    private FieldUiControlProperty fieldUiTypeAttribute(String id, String fieldUiControlAlias, String attributeAlias) {
+        FieldUiControlProperty attribute = new FieldUiControlProperty();
         attribute.setId(id);
-        attribute.setFieldUiTypeAlias(fieldUiTypeAlias);
+        attribute.setFieldUiControlAlias(fieldUiControlAlias);
         attribute.setAttributeAlias(attributeAlias);
         attribute.setTitle(attributeAlias);
         return attribute;
     }
 
-    private PlatformFieldUiTypeFieldMapping fieldUiTypeMapping(String id, String fieldUiTypeAlias, String sourceKey) {
-        PlatformFieldUiTypeFieldMapping mapping = new PlatformFieldUiTypeFieldMapping();
+    private FieldUiControlBinding fieldUiTypeMapping(String id, String fieldUiControlAlias, String valueKey) {
+        FieldUiControlBinding mapping = new FieldUiControlBinding();
         mapping.setId(id);
-        mapping.setFieldUiTypeAlias(fieldUiTypeAlias);
-        mapping.setSourceKey(sourceKey);
-        mapping.setTitle(sourceKey);
+        mapping.setFieldUiControlAlias(fieldUiControlAlias);
+        mapping.setValueKey(valueKey);
+        mapping.setValueFieldSpecAlias("string");
+        mapping.setTitle(valueKey);
         return mapping;
     }
 

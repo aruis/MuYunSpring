@@ -50,7 +50,7 @@ final class DynamicWebQueryFieldSupport {
         if (field.relationRole() != RelationRole.MAIN || field.fieldForm() == MetadataFieldForm.VIRTUAL) {
             return false;
         }
-        String alias = field.fieldTypeAlias();
+        String alias = field.fieldSpecAlias();
         return alias != null && SEARCHABLE_TEXT_TYPES.contains(alias.trim().toLowerCase(Locale.ROOT));
     }
 

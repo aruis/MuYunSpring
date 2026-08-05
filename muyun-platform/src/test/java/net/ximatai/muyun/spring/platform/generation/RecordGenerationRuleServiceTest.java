@@ -10,8 +10,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistrar;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -192,13 +192,13 @@ class RecordGenerationRuleServiceTest {
     void shouldResolveModuleMetadataFieldIdsInGenerationMappings() {
         PlatformModuleService moduleService = new PlatformModuleService(new TestMemoryDao<>());
         MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<>());
+        FieldSpecService fieldTypeService = new FieldSpecService(new TestMemoryDao<>());
         MetadataFieldService fieldService = new MetadataFieldService(new TestMemoryDao<>(), metadataService, fieldTypeService);
         ModuleMetadataRelationService relationService = new ModuleMetadataRelationService(
                 new TestMemoryDao<>(), moduleService, metadataService);
         ModuleMetadataFieldService moduleFieldService = new ModuleMetadataFieldService(
                 new TestMemoryDao<>(), relationService, metadataService, fieldService);
-        PlatformFieldType stringType = new PlatformFieldType();
+        FieldSpec stringType = new FieldSpec();
         stringType.setAlias("string");
         stringType.setFieldType(FieldType.STRING);
         fieldTypeService.insert(stringType);
@@ -344,7 +344,7 @@ class RecordGenerationRuleServiceTest {
             field.setFieldName(toFieldName(columnName));
             field.setColumnName(columnName);
             field.setTitle(toFieldName(columnName));
-            field.setFieldTypeAlias("string");
+            field.setFieldSpecAlias("string");
             fieldService.insert(field);
         }
         ModuleMetadataRelation relation = new ModuleMetadataRelation();

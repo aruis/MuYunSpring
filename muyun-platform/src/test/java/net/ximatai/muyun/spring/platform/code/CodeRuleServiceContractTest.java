@@ -12,8 +12,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -235,7 +235,7 @@ class CodeRuleServiceContractTest {
     void shouldValidateTargetAgainstExistingModuleEntityAndFieldWhenServicesAreAvailable() {
         PlatformModuleService moduleService = new PlatformModuleService(new TestMemoryDao<>());
         MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<>());
+        FieldSpecService fieldTypeService = new FieldSpecService(new TestMemoryDao<>());
         MetadataFieldService fieldService = new MetadataFieldService(new TestMemoryDao<>(), metadataService, fieldTypeService);
         ModuleMetadataRelationService relationService = new ModuleMetadataRelationService(
                 new TestMemoryDao<>(), moduleService, metadataService);
@@ -252,7 +252,7 @@ class CodeRuleServiceContractTest {
         metadata.setSchemaName("public");
         metadata.setTableName("crm_order");
         metadataService.insert(metadata);
-        PlatformFieldType stringType = new PlatformFieldType();
+        FieldSpec stringType = new FieldSpec();
         stringType.setAlias("string");
         stringType.setFieldType(FieldType.STRING);
         fieldTypeService.insert(stringType);
@@ -260,7 +260,7 @@ class CodeRuleServiceContractTest {
         orderNo.setMetadataId(metadata.getId());
         orderNo.setFieldName("orderNo");
         orderNo.setColumnName("order_no");
-        orderNo.setFieldTypeAlias("string");
+        orderNo.setFieldSpecAlias("string");
         fieldService.insert(orderNo);
         ModuleMetadataRelation relation = new ModuleMetadataRelation();
         relation.setModuleAlias("crm.order");

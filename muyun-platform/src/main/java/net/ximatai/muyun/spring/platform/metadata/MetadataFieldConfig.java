@@ -63,7 +63,7 @@ public class MetadataFieldConfig extends StandardEntity {
     @Column(name = "write_protected", type = ColumnType.BOOLEAN, comment = "Write protected flag")
     private Boolean writeProtected;
 
-    public FieldQueryDefinition queryDefinition(PlatformFieldType fieldType) {
+    public FieldQueryDefinition queryDefinition(FieldSpec fieldType) {
         if (queryable == null) {
             return fieldType.queryDefinition();
         }
@@ -83,15 +83,15 @@ public class MetadataFieldConfig extends StandardEntity {
         return dictionaryCategoryAlias != null && !dictionaryCategoryAlias.isBlank();
     }
 
-    public Integer effectiveLength(PlatformFieldType fieldType) {
+    public Integer effectiveLength(FieldSpec fieldType) {
         return fieldLength == null ? fieldType.getDefaultLength() : fieldLength;
     }
 
-    public Integer effectivePrecision(PlatformFieldType fieldType) {
+    public Integer effectivePrecision(FieldSpec fieldType) {
         return precision == null ? fieldType.getDefaultPrecision() : precision;
     }
 
-    public Integer effectiveScale(PlatformFieldType fieldType) {
+    public Integer effectiveScale(FieldSpec fieldType) {
         return scale == null ? fieldType.getDefaultScale() : scale;
     }
 

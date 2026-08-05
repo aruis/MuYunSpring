@@ -50,7 +50,7 @@ import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.PasswordPolicyRuleService;
 import net.ximatai.muyun.spring.platform.code.CodeRuleService;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.iam.tenant.TenantApplicationService;
 import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
@@ -731,13 +731,13 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldScanSnakeCaseWebScopeForCamelCaseStaticAlias() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldTypeWebController.class,
-                    () -> withService(new PlatformFieldTypeWebController(), mock(PlatformFieldTypeService.class)));
+            context.registerBean(FieldSpecWebController.class,
+                    () -> withService(new FieldSpecWebController(), mock(FieldSpecService.class)));
             context.refresh();
 
             StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
 
-            assertThat(definition.moduleAlias()).isEqualTo("platform.field_type");
+            assertThat(definition.moduleAlias()).isEqualTo("platform.field_spec");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "create", "view", "update", "delete", "query",
                             "sort", "enable", "disable");
@@ -762,26 +762,26 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @Test
-    void shouldScanFieldUiTypeNestedConfigurationActions() {
+    void shouldScanFieldUiControlNestedConfigurationActions() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(PlatformFieldUiTypeAttributeWebController.class,
-                    () -> withService(new PlatformFieldUiTypeAttributeWebController(),
-                            mock(net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService.class)));
-            context.registerBean(PlatformFieldUiTypeFieldMappingWebController.class,
-                    () -> withService(new PlatformFieldUiTypeFieldMappingWebController(),
-                            mock(net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService.class)));
+            context.registerBean(FieldUiControlPropertyWebController.class,
+                    () -> withService(new FieldUiControlPropertyWebController(),
+                            mock(net.ximatai.muyun.spring.platform.metadata.FieldUiControlPropertyService.class)));
+            context.registerBean(FieldUiControlBindingWebController.class,
+                    () -> withService(new FieldUiControlBindingWebController(),
+                            mock(net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService.class)));
             context.refresh();
 
             Map<String, StaticModuleDefinition> byAlias = new StaticModuleDefinitionScanner(context).scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
-                    "platform.field_ui_type_attribute",
-                    "platform.field_ui_type_field_mapping");
-            assertThat(byAlias.get("platform.field_ui_type_attribute").actions())
+                    "platform.field_ui_control_property",
+                    "platform.field_ui_control_binding");
+            assertThat(byAlias.get("platform.field_ui_control_property").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("query", "view", "create", "update", "delete", "sort");
-            assertThat(byAlias.get("platform.field_ui_type_field_mapping").actions())
+            assertThat(byAlias.get("platform.field_ui_control_binding").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("query", "view", "create", "update", "delete", "sort");
         }
@@ -1074,7 +1074,7 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.field_type", title = "Bad")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = "platform.field_spec", title = "Bad")
     @RequestMapping("/platform.fieldtype")
     static class MissingSeparatorAliasWeb extends net.ximatai.muyun.spring.web.WebSupport<Object> {
     }

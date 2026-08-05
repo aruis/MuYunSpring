@@ -6,6 +6,8 @@ import type {
   RoutePageTarget,
 } from '@muyun/web-contracts';
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
+import FieldSpecManagementView from '../views/FieldSpecManagementView.vue';
+import FieldUiControlManagementView from '../views/FieldUiControlManagementView.vue';
 import DepartmentManagementView from '../views/DepartmentManagementView.vue';
 import DictionaryManagementView from '../views/DictionaryManagementView.vue';
 import EmployeeManagementView from '../views/EmployeeManagementView.vue';
@@ -35,6 +37,18 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/config/applications',
     moduleAlias: 'platform.application',
     component: ApplicationManagementView,
+    layout: 'workspace',
+  },
+  {
+    route: '/config/field-specs',
+    moduleAlias: 'platform.field_spec',
+    component: FieldSpecManagementView,
+    layout: 'workspace',
+  },
+  {
+    route: '/config/field-ui-controls',
+    moduleAlias: 'platform.field_ui_control',
+    component: FieldUiControlManagementView,
     layout: 'workspace',
   },
   {

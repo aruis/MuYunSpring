@@ -1622,7 +1622,7 @@ class DynamicRecordWebControllerTest {
         PlatformUiConfigField codeField = uiField("ui-list", "module-field-code");
         PlatformUiConfigField amountField = uiField("ui-list", "module-field-amount");
         PlatformUiConfigField submittedAtField = uiField("ui-list", "module-field-submitted-at");
-        submittedAtField.setFieldUiTypeAlias("date_time_range");
+        submittedAtField.setFieldUiControlAlias("date_time_range");
         PlatformUiConfigField hiddenField = uiField("ui-list-restricted", "module-field-hidden");
         hiddenField.setVisible(false);
         PlatformUiConfigField lineField = uiField("ui-list-restricted", "module-field-line-code");
@@ -3375,16 +3375,16 @@ class DynamicRecordWebControllerTest {
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
                                                            String fieldName,
                                                            RelationRole relationRole,
-                                                           String fieldTypeAlias) {
-        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "main", fieldTypeAlias);
+                                                           String fieldSpecAlias) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "main", fieldSpecAlias);
     }
 
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
                                                            String fieldName,
                                                            RelationRole relationRole,
                                                            String relationAlias,
-                                                           String fieldTypeAlias) {
-        return resolvedModuleField(moduleFieldId, fieldName, relationRole, relationAlias, fieldTypeAlias,
+                                                           String fieldSpecAlias) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, relationAlias, fieldSpecAlias,
                 MetadataFieldForm.PHYSICAL);
     }
 
@@ -3392,7 +3392,7 @@ class DynamicRecordWebControllerTest {
                                                            String fieldName,
                                                            RelationRole relationRole,
                                                            String relationAlias,
-                                                           String fieldTypeAlias,
+                                                           String fieldSpecAlias,
                                                            MetadataFieldForm fieldForm) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
@@ -3407,7 +3407,7 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                fieldTypeAlias,
+                fieldSpecAlias,
                 fieldForm
         );
     }

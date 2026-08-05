@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.ui;
 
-public record PlatformResolvedFieldUiTypeAttribute(
+public record PlatformResolvedFieldUiControlProperty(
         String attributeAlias,
         String title,
-        String valueFieldTypeAlias,
+        String valueFieldSpecAlias,
         String defaultValue
 ) {
 }

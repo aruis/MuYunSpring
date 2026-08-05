@@ -42,7 +42,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     private final ModuleMetadataRelationService relationService;
     private final MetadataService metadataService;
     private final MetadataFieldService fieldService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final ModuleMetadataFieldReferenceGenerateRuleValidator referenceGenerateRuleValidator;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
     private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
@@ -75,7 +75,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
         this(moduleMetadataFieldDao, relationService, metadataService, fieldService, fieldTypeService,
                 referenceGenerateRuleValidator, Optional.empty(), provider(null));
@@ -85,7 +85,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator,
                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         this(moduleMetadataFieldDao, relationService, metadataService, fieldService, fieldTypeService,
@@ -97,7 +97,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator,
                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
                                       ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
@@ -230,7 +230,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 field.getFieldName(),
                 field.getColumnName(),
                 field.getTitle(),
-                field.getFieldTypeAlias(),
+                field.getFieldSpecAlias(),
                 field.getFieldForm()
         );
     }
@@ -414,7 +414,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 MetadataFieldForm.SHADOW, MetadataFieldRole.MEASURE_BASE_VALUE, "baseValueFieldId")
                 : ensureRelatedField(metadata, field, MetadataFieldForm.SHADOW,
                 MetadataFieldRole.MEASURE_BASE_VALUE, field.getFieldName() + "Base",
-                field.getFieldTypeAlias(), "Base");
+                field.getFieldSpecAlias(), "Base");
         requireNumericField(baseValueField, "measure base value shadow field");
         ensureModuleFieldForRelation(relation, baseValueField);
         moduleField.setBaseValueFieldId(baseValueField.getId());
@@ -511,7 +511,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 MetadataFieldForm.SHADOW, MetadataFieldRole.MONEY_BASE_AMOUNT, "moneyBaseAmountFieldId")
                 : ensureRelatedField(metadata, field, MetadataFieldForm.SHADOW,
                 MetadataFieldRole.MONEY_BASE_AMOUNT, field.getFieldName() + "Base",
-                field.getFieldTypeAlias(), "Base Amount");
+                field.getFieldSpecAlias(), "Base Amount");
         requireNumericField(baseAmountField, "money base amount shadow field");
         ensureModuleFieldForRelation(relation, baseAmountField);
         moduleField.setMoneyBaseAmountFieldId(baseAmountField.getId());
@@ -564,7 +564,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                              MetadataFieldForm form,
                                              MetadataFieldRole role,
                                              String fieldName,
-                                             String fieldTypeAlias,
+                                             String fieldSpecAlias,
                                              String titleSuffix) {
         MetadataField existing = findOneRelatedField(metadata.getId(), owner.getId(), role);
         if (existing != null) {
@@ -580,7 +580,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         field.setMetadataId(metadata.getId());
         field.setFieldName(validFieldName);
         field.setColumnName(toColumnName(validFieldName));
-        field.setFieldTypeAlias(PlatformNameRules.requireIdentifier(fieldTypeAlias, "relatedFieldTypeAlias"));
+        field.setFieldSpecAlias(PlatformNameRules.requireIdentifier(fieldSpecAlias, "relatedFieldTypeAlias"));
         field.setTitle(defaultText(owner.getTitle(), owner.getFieldName()) + " " + titleSuffix);
         field.setFieldForm(form);
         field.setFieldRole(role);
@@ -699,9 +699,9 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
 
     private FieldType requireFieldType(MetadataField field) {
         if (fieldTypeService == null) {
-            throw new PlatformException("module field config requires PlatformFieldTypeService");
+            throw new PlatformException("module field config requires FieldSpecService");
         }
-        return fieldTypeService.requireFieldType(field.getFieldTypeAlias()).getFieldType();
+        return fieldTypeService.requireFieldType(field.getFieldSpecAlias()).getFieldType();
     }
 
     private boolean isMoneyRelatedRole(MetadataFieldRole role) {

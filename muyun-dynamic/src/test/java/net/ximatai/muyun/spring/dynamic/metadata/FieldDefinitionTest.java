@@ -72,7 +72,7 @@ class FieldDefinitionTest {
         assertThat(field.storageForm()).isEqualTo(FieldStorageForm.VIRTUAL);
         assertThat(field.isPhysical()).isFalse();
         assertThat(field.columnName()).isEqualTo("display_code");
-        assertThat(field.defaultUiTypeAlias()).isEqualTo("text");
+        assertThat(field.defaultUiControlAlias()).isEqualTo("text");
         assertThat(field.behavior().copyable()).isFalse();
         assertThat(field.behavior().writeProtected()).isTrue();
     }
@@ -99,7 +99,7 @@ class FieldDefinitionTest {
         assertThat(field.valueShape()).isEqualTo(FieldValueShape.JSON_SET);
         assertThat(field.columnName()).isEqualTo("tag_values");
         assertThat(field.queryDefinition().operators()).containsExactly(DynamicQueryOperator.CONTAINS);
-        assertThat(field.defaultUiTypeAlias()).isEqualTo("multi_select");
+        assertThat(field.defaultUiControlAlias()).isEqualTo("multi_select");
     }
 
     @Test

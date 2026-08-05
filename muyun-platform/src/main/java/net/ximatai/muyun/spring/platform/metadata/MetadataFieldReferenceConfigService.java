@@ -37,7 +37,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
 
     private final MetadataFieldService fieldService;
     private final MetadataService metadataService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final PlatformModuleService moduleService;
     private final ModuleMetadataRelationService relationService;
     private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
@@ -45,7 +45,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,
                                                MetadataService metadataService,
-                                               PlatformFieldTypeService fieldTypeService,
+                                               FieldSpecService fieldTypeService,
                                                PlatformModuleService moduleService,
                                                ModuleMetadataRelationService relationService) {
         this(referenceConfigDao, fieldService, metadataService, fieldTypeService, moduleService, relationService,
@@ -56,7 +56,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,
                                                MetadataService metadataService,
-                                               PlatformFieldTypeService fieldTypeService,
+                                               FieldSpecService fieldTypeService,
                                                PlatformModuleService moduleService,
                                                ModuleMetadataRelationService relationService,
                                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
@@ -117,7 +117,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     private void normalizeAndValidate(MetadataFieldReferenceConfig config) {
         MetadataField sourceField = requireField(config.getMetadataFieldId(), "source metadata field");
         normalizeRelation(config, sourceField);
-        PlatformFieldType sourceType = fieldTypeService.requireFieldType(sourceField.getFieldTypeAlias());
+        FieldSpec sourceType = fieldTypeService.requireFieldType(sourceField.getFieldSpecAlias());
         if (sourceType.getFieldType() != FieldType.STRING && sourceType.getFieldType() != FieldType.TEXT) {
             throw new IllegalArgumentException("reference source field must be string/text: " + sourceField.getFieldName());
         }

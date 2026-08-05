@@ -48,8 +48,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -289,7 +289,7 @@ class PlatformDynamicRuntimeRefresherIT {
         TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
         TestMemoryDao<Metadata> metadataDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
-        TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
+        TestMemoryDao<FieldSpec> fieldTypeDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
@@ -306,7 +306,7 @@ class PlatformDynamicRuntimeRefresherIT {
         DictionaryItemService itemService = new DictionaryItemService(itemDao, categoryService);
         PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
         MetadataService metadataService = new MetadataService(metadataDao);
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
+        FieldSpecService fieldTypeService = new FieldSpecService(fieldTypeDao);
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("id", FieldType.STRING, 32));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
@@ -364,7 +364,7 @@ class PlatformDynamicRuntimeRefresherIT {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldType.name().toLowerCase());
+        field.setFieldSpecAlias(fieldType.name().toLowerCase());
         field.setTitle(fieldName);
         return field;
     }
@@ -375,8 +375,8 @@ class PlatformDynamicRuntimeRefresherIT {
         return field;
     }
 
-    private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
-        PlatformFieldType type = new PlatformFieldType();
+    private FieldSpec fieldType(String alias, FieldType fieldType, Integer length) {
+        FieldSpec type = new FieldSpec();
         type.setAlias(alias);
         type.setTitle(alias);
         type.setFieldType(fieldType);

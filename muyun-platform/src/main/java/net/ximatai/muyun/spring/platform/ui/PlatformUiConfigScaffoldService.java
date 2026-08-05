@@ -3,10 +3,10 @@ package net.ximatai.muyun.spring.platform.ui;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.springframework.stereotype.Service;
 
@@ -21,15 +21,15 @@ public class PlatformUiConfigScaffoldService {
     private final PlatformUiConfigService uiConfigService;
     private final PlatformUiConfigFieldService uiConfigFieldService;
     private final ModuleMetadataFieldService moduleFieldService;
-    private final PlatformFieldTypeService fieldTypeService;
-    private final PlatformFieldUiTypeService fieldUiTypeService;
+    private final FieldSpecService fieldTypeService;
+    private final FieldUiControlService fieldUiTypeService;
 
     public PlatformUiConfigScaffoldService(PlatformUiSetService uiSetService,
                                            PlatformUiConfigService uiConfigService,
                                            PlatformUiConfigFieldService uiConfigFieldService,
                                            ModuleMetadataFieldService moduleFieldService,
-                                           PlatformFieldTypeService fieldTypeService,
-                                           PlatformFieldUiTypeService fieldUiTypeService) {
+                                           FieldSpecService fieldTypeService,
+                                           FieldUiControlService fieldUiTypeService) {
         this.uiSetService = uiSetService;
         this.uiConfigService = uiConfigService;
         this.uiConfigFieldService = uiConfigFieldService;
@@ -61,7 +61,7 @@ public class PlatformUiConfigScaffoldService {
             PlatformUiConfigField field = new PlatformUiConfigField();
             field.setUiConfigId(uiConfigId);
             field.setModuleMetadataFieldId(resolved.moduleMetadataFieldId());
-            field.setFieldUiTypeAlias(defaultUiTypeAlias(resolved));
+            field.setFieldUiControlAlias(defaultUiControlAlias(resolved));
             field.setVisible(Boolean.TRUE);
             field.setReadOnly(uiSet.getSetType() == PlatformUiSetType.DETAIL);
             field.setSortOrder(moduleField.getSortOrder());
@@ -74,26 +74,26 @@ public class PlatformUiConfigScaffoldService {
         return uiConfigService.findByUiSetAndClient(uiSetId, clientType);
     }
 
-    private String defaultUiTypeAlias(ResolvedModuleMetadataField resolved) {
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(resolved.fieldTypeAlias());
-        if (fieldType.getDefaultUiTypeAlias() != null && !fieldType.getDefaultUiTypeAlias().isBlank()) {
-            return fieldType.getDefaultUiTypeAlias();
+    private String defaultUiControlAlias(ResolvedModuleMetadataField resolved) {
+        FieldSpec fieldType = fieldTypeService.requireFieldType(resolved.fieldSpecAlias());
+        if (fieldType.getDefaultUiControlAlias() != null && !fieldType.getDefaultUiControlAlias().isBlank()) {
+            return fieldType.getDefaultUiControlAlias();
         }
-        List<String> allowedAliases = fieldType.getUiTypeAliases() == null
+        List<String> allowedAliases = fieldType.getUiControlAliases() == null
                 ? List.of()
-                : fieldType.getUiTypeAliases().stream().filter(Objects::nonNull).toList();
-        List<PlatformFieldUiType> candidates = allowedAliases.isEmpty()
+                : fieldType.getUiControlAliases().stream().filter(Objects::nonNull).toList();
+        List<FieldUiControl> candidates = allowedAliases.isEmpty()
                 ? fieldUiTypeService.listEnabledForDefaultFieldType(fieldType.getAlias())
                 : fieldUiTypeService.listEnabledByAliases(allowedAliases).stream()
-                .filter(type -> type.getDefaultFieldTypeAlias() == null
-                        || type.getDefaultFieldTypeAlias().isBlank()
-                        || Objects.equals(type.getDefaultFieldTypeAlias(), fieldType.getAlias()))
-                .sorted(Comparator.comparing(PlatformFieldUiType::getSortOrder,
+                .filter(type -> type.getDefaultFieldSpecAlias() == null
+                        || type.getDefaultFieldSpecAlias().isBlank()
+                        || Objects.equals(type.getDefaultFieldSpecAlias(), fieldType.getAlias()))
+                .sorted(Comparator.comparing(FieldUiControl::getSortOrder,
                         Comparator.nullsLast(Integer::compareTo)))
                 .toList();
         if (candidates.isEmpty()) {
-            throw new PlatformException("Cannot scaffold UI config field without field UI type: "
-                    + resolved.fieldTypeAlias() + "." + resolved.fieldName());
+            throw new PlatformException("Cannot scaffold UI config field without field UI control: "
+                    + resolved.fieldSpecAlias() + "." + resolved.fieldName());
         }
         return candidates.getFirst().getAlias();
     }

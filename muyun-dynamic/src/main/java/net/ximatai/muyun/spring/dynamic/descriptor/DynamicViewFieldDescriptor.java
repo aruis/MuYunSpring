@@ -11,7 +11,7 @@ public record DynamicViewFieldDescriptor(
         FieldTemporalSemantics temporalSemantics,
         boolean visible,
         ViewControlType controlType,
-        String fieldUiTypeAlias,
+        String fieldUiControlAlias,
         List<DynamicFieldCompanionDescriptor> companions,
         boolean readOnly,
         boolean required

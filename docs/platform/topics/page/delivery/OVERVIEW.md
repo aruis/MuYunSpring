@@ -57,7 +57,7 @@ AND quickSearch
 
 汇总面板和引用候选复用这条查询语义，避免形成第二套查询协议。
 
-`queryForm` 只接受已发布 LIST UI 中可见的主关系字段。普通字段按字段配置链的默认查询操作符编译；`date_range` 和 `date_time_range` UI 字段类型按 `BETWEEN` 编译，值可以是 `[start, end]` 数组，也可以是 `{ "start": "...", "end": "...", "timeZone": "Asia/Shanghai" }` 对象。复合控件片段由 bootstrap 的 `resolvedConfig.fieldUiTypes[].fieldMappings` 作为 UI 类型目录下发，具体字段通过 `fieldUiTypeAlias` 引用该目录。字段形态由动态 descriptor 的 `fields[].storageForm` 和页面 bootstrap 的 `resolvedConfig.uiFields[].fieldForm` 下发；虚拟字段不会被配置为可查询字段，也不会参与 quickSearch、列表排序或关联视图查询排序。读链路已经注入到记录上的虚拟值可以随列表、详情和 LIST UI 投影输出，公式虚拟值的即时展示仍通过 `formula/preview` 获取。
+`queryForm` 只接受已发布 LIST UI 中可见的主关系字段。普通字段按字段配置链的默认查询操作符编译；`date_range` 和 `date_time_range` 字段 UI 控件按 `BETWEEN` 编译，值可以是 `[start, end]` 数组，也可以是 `{ "start": "...", "end": "...", "timeZone": "Asia/Shanghai" }` 对象。复合控件值分量由 bootstrap 的 `resolvedConfig.fieldUiControls[].bindings` 作为控件目录下发，具体字段通过 `fieldUiControlAlias` 引用该目录。字段形态由动态 descriptor 的 `fields[].storageForm` 和页面 bootstrap 的 `resolvedConfig.uiFields[].fieldForm` 下发；虚拟字段不会被配置为可查询字段，也不会参与 quickSearch、列表排序或关联视图查询排序。读链路已经注入到记录上的虚拟值可以随列表、详情和 LIST UI 投影输出，公式虚拟值的即时展示仍通过 `formula/preview` 获取。
 
 时间字段查询遵循动态字段语义：`DATE` 按业务日期直接查询；`TIMESTAMP` 和 `ZONED_TIMESTAMP` 如果收到 ISO 本地日期闭区间，会按查询项 `timeZone` 或平台默认业务时区转换成 UTC 半开区间执行。查询模板的 `timeZone` 使用 IANA `ZoneId`，不接受 `+08:00` 这类纯 offset。
 
