@@ -31,14 +31,14 @@ MuYunSpring 将平台基础能力、Web 交付和 Spring Boot 自动装配发布
 本地预检：
 
 ```bash
-./gradlew verifyReleaseTagVersion verifyReleaseCredentials -Prelease.tag=v0.1.0
+./gradlew verifyReleaseTagVersion verifyReleaseCredentials -Prelease.tag=v0.26.1
 ```
 
 每次正式发布按以下顺序进行：
 
 1. 将 `build.gradle.kts` 的版本从 `-SNAPSHOT` 更新为正式版本，并更新 [变更记录](CHANGELOG.md)。
 2. 合并版本与变更记录到 `main`。
-3. 推送匹配的 tag，例如 `git tag v0.1.0 && git push origin v0.1.0`。
+3. 推送匹配的 tag，例如 `git tag v0.26.1 && git push origin v0.26.1`。
 
 只有非 `-SNAPSHOT` 版本且 tag 与版本完全一致时，发布流程才会继续。发布任务自身也依赖
 tag/version gate 与消费者验证，不能通过本地命令绕过。发布任务为 `./gradlew publishReleaseToSonatype`。

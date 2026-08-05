@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = "net.ximatai.muyun.spring"
-    version = "0.1.0-SNAPSHOT"
+    version = "0.26.1"
 }
 
 val publicArtifactProjectNames = listOf(

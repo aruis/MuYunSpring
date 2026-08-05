@@ -19,7 +19,7 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("net.ximatai.muyun.spring:muyun-spring-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("net.ximatai.muyun.spring:muyun-spring-bom:0.26.1"))
     implementation("net.ximatai.muyun.spring:muyun-spring-boot-starter")
     runtimeOnly("org.postgresql:postgresql")
 }
