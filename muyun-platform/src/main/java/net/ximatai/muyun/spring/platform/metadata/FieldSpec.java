@@ -15,13 +15,13 @@ import java.util.Set;
 
 @Getter
 @Setter
-@Table(name = "platform_field_type", comment = "Platform field type")
+@Table(name = "platform_field_spec", comment = "Platform field type")
 @CompositeIndex(columns = {"alias"}, unique = true)
-public class PlatformFieldType extends StandardEnabledSortableEntity {
-    @Column(name = "alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Field type alias")
+public class FieldSpec extends StandardEnabledSortableEntity {
+    @Column(name = "alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Field spec alias")
     private String alias;
 
-    @Column(name = "title", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Field type title")
+    @Column(name = "title", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Field spec title")
     private String title;
 
     @Column(name = "field_type", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Runtime field type")
@@ -42,11 +42,11 @@ public class PlatformFieldType extends StandardEnabledSortableEntity {
     @Column(name = "query_operators", type = ColumnType.JSON_SET, comment = "Allowed query operators")
     private Set<String> queryOperators;
 
-    @Column(name = "default_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Default field UI type alias")
-    private String defaultUiTypeAlias;
+    @Column(name = "default_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Default field UI control alias")
+    private String defaultUiControlAlias;
 
-    @Column(name = "ui_type_aliases", type = ColumnType.JSON_SET, comment = "Allowed field UI type aliases")
-    private Set<String> uiTypeAliases;
+    @Column(name = "ui_type_aliases", type = ColumnType.JSON_SET, comment = "Allowed field UI control aliases")
+    private Set<String> uiControlAliases;
 
     public FieldQueryDefinition queryDefinition() {
         if (defaultQueryOperator == null && (queryOperators == null || queryOperators.isEmpty())) {

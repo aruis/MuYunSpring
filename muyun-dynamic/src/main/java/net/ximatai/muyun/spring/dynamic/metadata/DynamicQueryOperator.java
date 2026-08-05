@@ -31,7 +31,8 @@ public enum DynamicQueryOperator {
             case BOOLEAN -> EnumSet.of(EQ, NOT_EQUAL, NULL, NOT_NULL);
             case INTEGER, LONG, DECIMAL, TIMESTAMP, ZONED_TIMESTAMP, DATE ->
                     EnumSet.of(EQ, NOT_EQUAL, IN, NOT_IN, BETWEEN, GT, GTE, LT, LTE, NULL, NOT_NULL);
-            case JSON -> EnumSet.of(EQ, NOT_EQUAL, NULL, NOT_NULL);
+            case JSON -> EnumSet.of(EQ, NOT_EQUAL, NULL, NOT_NULL, CONTAINS, CONTAINS_ANY, CONTAINS_ALL,
+                    EMPTY, NOT_EMPTY);
         };
     }
 

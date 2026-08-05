@@ -185,6 +185,7 @@ backend_args() {
   args+=" --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring"
   args+=" --spring.datasource.username=postgres"
   args+=" --spring.datasource.password=muyun_dev"
+  args+=" --muyun.web.cors.allowed-origins=http://127.0.0.1:${FRONTEND_PORT},http://localhost:${FRONTEND_PORT}"
   printf '%s' "$args"
 }
 

@@ -19,8 +19,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicTemporalRangeCriteriaSupport;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,14 +50,14 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
 
     private final PlatformQueryTemplateService queryTemplateService;
     private final ModuleMetadataFieldService moduleFieldService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler;
     private final PlatformTimeService timeService;
 
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,
-                                    PlatformFieldTypeService fieldTypeService) {
+                                    FieldSpecService fieldTypeService) {
         this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, null, new PlatformTimeService());
     }
 
@@ -65,7 +65,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,
-                                    PlatformFieldTypeService fieldTypeService,
+                                    FieldSpecService fieldTypeService,
                                     MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                     ObjectProvider<PlatformTimeService> timeServiceProvider) {
         this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, fieldDefinitionCompiler,
@@ -76,7 +76,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,
-                                    PlatformFieldTypeService fieldTypeService,
+                                    FieldSpecService fieldTypeService,
                                     PlatformTimeService timeService) {
         this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, null, timeService);
     }
@@ -84,7 +84,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,
-                                    PlatformFieldTypeService fieldTypeService,
+                                    FieldSpecService fieldTypeService,
                                     MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                     PlatformTimeService timeService) {
         super(MODULE_ALIAS, PlatformQueryItem.class, queryItemDao);
@@ -212,7 +212,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             throw new PlatformException("Query item requires module field in the same module: "
                     + template.getModuleAlias() + "." + moduleField.moduleAlias());
         }
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(moduleField.fieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(moduleField.fieldSpecAlias());
         FieldQueryDefinition queryDefinition = queryDefinition(moduleField, fieldType);
         if (!queryDefinition.queryable()) {
             throw new PlatformException("Query item field is not queryable: " + moduleField.fieldName());
@@ -239,7 +239,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         }
     }
 
-    private FieldQueryDefinition queryDefinition(ResolvedModuleMetadataField moduleField, PlatformFieldType fieldType) {
+    private FieldQueryDefinition queryDefinition(ResolvedModuleMetadataField moduleField, FieldSpec fieldType) {
         if (fieldDefinitionCompiler == null) {
             return fieldType.queryDefinition();
         }
@@ -285,7 +285,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             return criteria;
         }
         ResolvedModuleMetadataField moduleField = moduleFieldService.resolve(item.getModuleMetadataFieldId());
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(moduleField.fieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(moduleField.fieldSpecAlias());
         validateCurrentQueryDefinition(moduleField, fieldType, item);
         Object value = resolveQueryValue(item, externalValues);
         if (isEmptyValue(value) && !isNoValueOperator(item.getOperator())) {
@@ -298,7 +298,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     }
 
     private void validateCurrentQueryDefinition(ResolvedModuleMetadataField moduleField,
-                                                PlatformFieldType fieldType,
+                                                FieldSpec fieldType,
                                                 PlatformQueryItem item) {
         FieldQueryDefinition queryDefinition = queryDefinition(moduleField, fieldType);
         if (!queryDefinition.queryable()) {
@@ -349,7 +349,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
 
     private void appendLeaf(Criteria criteria,
                             String fieldName,
-                            PlatformFieldType fieldType,
+                            FieldSpec fieldType,
                             PlatformQueryItem item,
                             Object value) {
         DynamicQueryOperator operator = item.getOperator();

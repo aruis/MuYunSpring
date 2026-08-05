@@ -12,24 +12,24 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MetadataFieldDefinitionCompiler {
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final MetadataFieldConfigService configService;
     private final MetadataFieldProtectionConfigService protectionConfigService;
     private final MetadataFieldService fieldService;
 
-    public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
+    public MetadataFieldDefinitionCompiler(FieldSpecService fieldTypeService,
                                            MetadataFieldConfigService configService) {
         this(fieldTypeService, configService, null, null);
     }
 
-    public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
+    public MetadataFieldDefinitionCompiler(FieldSpecService fieldTypeService,
                                            MetadataFieldConfigService configService,
                                            MetadataFieldProtectionConfigService protectionConfigService) {
         this(fieldTypeService, configService, protectionConfigService, null);
     }
 
     @Autowired
-    public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
+    public MetadataFieldDefinitionCompiler(FieldSpecService fieldTypeService,
                                            MetadataFieldConfigService configService,
                                            MetadataFieldProtectionConfigService protectionConfigService,
                                            MetadataFieldService fieldService) {
@@ -48,7 +48,7 @@ public class MetadataFieldDefinitionCompiler {
     }
 
     public FieldDefinition compile(MetadataField field, String relationId, ModuleMetadataField moduleField) {
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
         MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
         MetadataFieldConfig shapeConfig = defaultConfig;
@@ -79,7 +79,7 @@ public class MetadataFieldDefinitionCompiler {
                 scale,
                 null,
                 queryDefinition,
-                fieldType.getDefaultUiTypeAlias(),
+                fieldType.getDefaultUiControlAlias(),
                 behavior(fieldType, defaultConfig, relationConfig, moduleField, field.getId()),
                 protectionConfigService == null
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
@@ -114,13 +114,13 @@ public class MetadataFieldDefinitionCompiler {
         if (field.getFieldForm() == MetadataFieldForm.VIRTUAL) {
             return FieldQueryDefinition.disabled();
         }
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
         MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
         return queryDefinition(fieldType, defaultConfig, relationConfig);
     }
 
-    private FieldQueryDefinition queryDefinition(PlatformFieldType fieldType,
+    private FieldQueryDefinition queryDefinition(FieldSpec fieldType,
                                                  MetadataFieldConfig defaultConfig,
                                                  MetadataFieldConfig relationConfig) {
         MetadataFieldConfig queryConfig = relationConfig != null && relationConfig.getQueryable() != null
@@ -137,12 +137,12 @@ public class MetadataFieldDefinitionCompiler {
                 : FieldStorageForm.PHYSICAL;
     }
 
-    private boolean isJsonSetFieldType(PlatformFieldType fieldType) {
+    private boolean isJsonSetFieldType(FieldSpec fieldType) {
         return fieldType.getFieldType() == net.ximatai.muyun.spring.dynamic.metadata.FieldType.JSON
                 && "json_set".equals(fieldType.getAlias());
     }
 
-    private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,
+    private FieldBehaviorDefinition behavior(FieldSpec fieldType,
                                              MetadataFieldConfig defaultConfig,
                                              MetadataFieldConfig relationConfig,
                                              String fieldId) {
@@ -172,7 +172,7 @@ public class MetadataFieldDefinitionCompiler {
         return behavior;
     }
 
-    private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,
+    private FieldBehaviorDefinition behavior(FieldSpec fieldType,
                                              MetadataFieldConfig defaultConfig,
                                              MetadataFieldConfig relationConfig,
                                              ModuleMetadataField moduleField,
@@ -201,7 +201,7 @@ public class MetadataFieldDefinitionCompiler {
         return behavior;
     }
 
-    private void validateModuleDictionary(PlatformFieldType fieldType,
+    private void validateModuleDictionary(FieldSpec fieldType,
                                           ModuleMetadataField moduleField,
                                           String fieldId) {
         FieldType type = fieldType.getFieldType();

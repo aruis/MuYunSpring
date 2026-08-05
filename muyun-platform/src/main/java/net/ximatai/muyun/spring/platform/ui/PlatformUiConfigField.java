@@ -23,8 +23,8 @@ public class PlatformUiConfigField extends StandardEnabledSortableEntity {
             comment = "Module metadata field id")
     private String moduleMetadataFieldId;
 
-    @Column(name = "field_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Field UI type alias")
-    private String fieldUiTypeAlias;
+    @Column(name = "field_ui_control_alias", type = ColumnType.VARCHAR, length = 64, comment = "Field UI type alias")
+    private String fieldUiControlAlias;
 
     @Column(name = "visible", type = ColumnType.BOOLEAN, comment = "Visible flag",
             defaultVal = @Default(bool = TrueOrFalse.TRUE))

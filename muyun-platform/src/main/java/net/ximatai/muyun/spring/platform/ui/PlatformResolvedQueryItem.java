@@ -12,7 +12,7 @@ public record PlatformResolvedQueryItem(
         String metadataAlias,
         String fieldName,
         String fieldTitle,
-        String fieldTypeAlias,
+        String fieldSpecAlias,
         DynamicQueryOperator operator,
         String defaultValue,
         Boolean allowExternalValue,

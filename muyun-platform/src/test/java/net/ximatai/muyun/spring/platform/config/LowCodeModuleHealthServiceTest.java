@@ -367,16 +367,16 @@ class LowCodeModuleHealthServiceTest {
                                 "fields", List.of(
                                         Map.of(
                                                 "fieldName", "amount",
-                                                "fieldTypeAlias", "decimal",
+                                                "fieldSpecAlias", "decimal",
                                                 "currencyMode", "SELECTABLE",
                                                 "currencyFieldName", "amountCurrency",
                                                 "baseAmountFieldName", "amountBase",
                                                 "rateTypeCode", "SPOT",
                                                 "rateDateFieldName", "rateAt"
                                         ),
-                                        Map.of("fieldName", "amountCurrency", "fieldTypeAlias", "string"),
-                                        Map.of("fieldName", "amountBase", "fieldTypeAlias", "decimal"),
-                                        Map.of("fieldName", "rateAt", "fieldTypeAlias", "zoned_datetime")
+                                        Map.of("fieldName", "amountCurrency", "fieldSpecAlias", "string"),
+                                        Map.of("fieldName", "amountBase", "fieldSpecAlias", "decimal"),
+                                        Map.of("fieldName", "rateAt", "fieldSpecAlias", "zoned_datetime")
                                 )
                         ))),
                 new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.exchangeRateType("SPOT"))),

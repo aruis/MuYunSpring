@@ -19,7 +19,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -129,7 +129,7 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
                 new TestMemoryDao<>(), mock(PlatformModuleService.class), mock(MetadataService.class),
                 Optional.of(refreshCoordinator));
         MetadataFieldService metadataFieldHook = new MetadataFieldService(
-                new TestMemoryDao<>(), mock(MetadataService.class), mock(PlatformFieldTypeService.class),
+                new TestMemoryDao<>(), mock(MetadataService.class), mock(FieldSpecService.class),
                 Optional.of(refreshCoordinator));
         ModuleMetadataFieldService moduleFieldHook = new ModuleMetadataFieldService(
                 new TestMemoryDao<>(), mock(ModuleMetadataRelationService.class), mock(MetadataService.class),

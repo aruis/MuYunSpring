@@ -21,61 +21,61 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
-public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFieldType> implements
-        SoftDeleteAbility<PlatformFieldType>,
-        EnableAbility<PlatformFieldType>,
-        SortAbility<PlatformFieldType>,
-        QueryAbility<PlatformFieldType> {
-    public static final String MODULE_ALIAS = "platform.field_type";
-    private final BaseDao<PlatformFieldUiType, String> fieldUiTypeDao;
+public class FieldSpecService extends AbstractAbilityService<FieldSpec> implements
+        SoftDeleteAbility<FieldSpec>,
+        EnableAbility<FieldSpec>,
+        SortAbility<FieldSpec>,
+        QueryAbility<FieldSpec> {
+    public static final String MODULE_ALIAS = "platform.field_spec";
+    private final BaseDao<FieldUiControl, String> fieldUiTypeDao;
 
-    public PlatformFieldTypeService(BaseDao<PlatformFieldType, String> fieldTypeDao) {
+    public FieldSpecService(BaseDao<FieldSpec, String> fieldTypeDao) {
         this(fieldTypeDao, null);
     }
 
     @Autowired
-    public PlatformFieldTypeService(BaseDao<PlatformFieldType, String> fieldTypeDao,
-                                    BaseDao<PlatformFieldUiType, String> fieldUiTypeDao) {
-        super(MODULE_ALIAS, PlatformFieldType.class, fieldTypeDao);
+    public FieldSpecService(BaseDao<FieldSpec, String> fieldTypeDao,
+                                    BaseDao<FieldUiControl, String> fieldUiTypeDao) {
+        super(MODULE_ALIAS, FieldSpec.class, fieldTypeDao);
         this.fieldUiTypeDao = fieldUiTypeDao;
     }
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformFieldType.class, java.util.List.of("id", "alias", "title", "fieldType", "defaultLength", "defaultPrecision", "defaultScale", "defaultQueryOperator", "defaultUiTypeAlias", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, FieldSpec.class, java.util.List.of("id", "alias", "title", "fieldType", "defaultLength", "defaultPrecision", "defaultScale", "defaultQueryOperator", "queryOperators", "defaultUiControlAlias", "uiControlAliases", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override
-    public void beforePrepareInsert(PlatformFieldType fieldType) {
+    public void beforePrepareInsert(FieldSpec fieldType) {
         if (fieldType.getId() == null || fieldType.getId().isBlank()) {
-            fieldType.setId(PlatformNameRules.requireIdentifier(fieldType.getAlias(), "fieldTypeAlias"));
+            fieldType.setId(PlatformNameRules.requireIdentifier(fieldType.getAlias(), "fieldSpecAlias"));
         }
     }
 
     @Override
-    public void beforeInsert(PlatformFieldType fieldType) {
+    public void beforeInsert(FieldSpec fieldType) {
         normalizeAndValidate(fieldType);
     }
 
     @Override
-    public void beforeUpdate(PlatformFieldType fieldType) {
+    public void beforeUpdate(FieldSpec fieldType) {
         normalizeAndValidate(fieldType);
-        PlatformFieldType existing = selectIncludingDeleted(fieldType.getId());
-        rejectChanged(existing, fieldType, "Field type alias", PlatformFieldType::getAlias);
+        FieldSpec existing = selectIncludingDeleted(fieldType.getId());
+        rejectChanged(existing, fieldType, "Field spec alias", FieldSpec::getAlias);
     }
 
-    public PlatformFieldType requireFieldType(String alias) {
-        String validAlias = PlatformNameRules.requireIdentifier(alias, "fieldTypeAlias");
-        PlatformFieldType fieldType = findOne(Criteria.of().eq("alias", validAlias));
+    public FieldSpec requireFieldType(String alias) {
+        String validAlias = PlatformNameRules.requireIdentifier(alias, "fieldSpecAlias");
+        FieldSpec fieldType = findOne(Criteria.of().eq("alias", validAlias));
         if (fieldType == null) {
-            throw new PlatformException("Field type requires existing type: " + validAlias);
+            throw new PlatformException("Field spec requires existing type: " + validAlias);
         }
         return fieldType;
     }
 
-    private void normalizeAndValidate(PlatformFieldType fieldType) {
-        String alias = PlatformNameRules.requireIdentifier(fieldType.getAlias(), "fieldTypeAlias");
+    private void normalizeAndValidate(FieldSpec fieldType) {
+        String alias = PlatformNameRules.requireIdentifier(fieldType.getAlias(), "fieldSpecAlias");
         fieldType.setAlias(alias);
         if (fieldType.getTitle() == null || fieldType.getTitle().isBlank()) {
             fieldType.setTitle(alias);
@@ -86,12 +86,12 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         FieldShapeRules.validate(fieldType.getFieldType(), fieldType.getDefaultLength(),
                 fieldType.getDefaultPrecision(), fieldType.getDefaultScale(), alias);
         normalizeQueryDefinition(fieldType);
-        normalizeUiTypeAliases(fieldType);
+        normalizeUiControlAliases(fieldType);
         rejectDuplicate(fieldType, Criteria.of().eq("alias", alias),
-                "fieldTypeAlias must be unique: " + alias);
+                "fieldSpecAlias must be unique: " + alias);
     }
 
-    private void normalizeQueryDefinition(PlatformFieldType fieldType) {
+    private void normalizeQueryDefinition(FieldSpec fieldType) {
         if (fieldType.getDefaultQueryOperator() == null && (fieldType.getQueryOperators() == null
                 || fieldType.getQueryOperators().isEmpty())) {
             return;
@@ -107,32 +107,32 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         fieldType.queryDefinition();
     }
 
-    private void normalizeUiTypeAliases(PlatformFieldType fieldType) {
-        if (fieldType.getDefaultUiTypeAlias() != null && !fieldType.getDefaultUiTypeAlias().isBlank()) {
-            fieldType.setDefaultUiTypeAlias(PlatformNameRules.requireIdentifier(
-                    fieldType.getDefaultUiTypeAlias().trim(), "defaultUiTypeAlias"));
-            requireFieldUiType(fieldType.getDefaultUiTypeAlias());
+    private void normalizeUiControlAliases(FieldSpec fieldType) {
+        if (fieldType.getDefaultUiControlAlias() != null && !fieldType.getDefaultUiControlAlias().isBlank()) {
+            fieldType.setDefaultUiControlAlias(PlatformNameRules.requireIdentifier(
+                    fieldType.getDefaultUiControlAlias().trim(), "defaultUiControlAlias"));
+            requireFieldUiControl(fieldType.getDefaultUiControlAlias());
         }
-        if (fieldType.getUiTypeAliases() == null || fieldType.getUiTypeAliases().isEmpty()) {
+        if (fieldType.getUiControlAliases() == null || fieldType.getUiControlAliases().isEmpty()) {
             return;
         }
         Set<String> aliases = new LinkedHashSet<>();
-        for (String alias : fieldType.getUiTypeAliases()) {
+        for (String alias : fieldType.getUiControlAliases()) {
             String validAlias = PlatformNameRules.requireIdentifier(alias == null ? null : alias.trim(), "uiTypeAlias");
-            requireFieldUiType(validAlias);
+            requireFieldUiControl(validAlias);
             aliases.add(validAlias);
         }
-        if (fieldType.getDefaultUiTypeAlias() != null && !aliases.contains(fieldType.getDefaultUiTypeAlias())) {
+        if (fieldType.getDefaultUiControlAlias() != null && !aliases.contains(fieldType.getDefaultUiControlAlias())) {
             throw new PlatformException("default UI type must be included in allowed UI types: "
-                    + fieldType.getDefaultUiTypeAlias());
+                    + fieldType.getDefaultUiControlAlias());
         }
-        fieldType.setUiTypeAliases(aliases);
+        fieldType.setUiControlAliases(aliases);
     }
 
-    private void requireFieldUiType(String alias) {
+    private void requireFieldUiControl(String alias) {
         if (fieldUiTypeDao != null
                 && fieldUiTypeDao.list(Criteria.of().eq("alias", alias), new PageRequest(0, 1)).isEmpty()) {
-            throw new PlatformException("Field type UI alias requires existing UI type: " + alias);
+            throw new PlatformException("Field spec UI alias requires existing UI type: " + alias);
         }
     }
 }

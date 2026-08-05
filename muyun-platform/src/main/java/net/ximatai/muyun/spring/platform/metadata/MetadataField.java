@@ -24,8 +24,8 @@ public class MetadataField extends StandardEnabledSortableEntity implements Plat
     @Column(name = "column_name", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Column name")
     private String columnName;
 
-    @Column(name = "field_type_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Field type alias")
-    private String fieldTypeAlias;
+    @Column(name = "field_spec_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Field spec alias")
+    private String fieldSpecAlias;
 
     @Column(name = "field_ownership", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Field ownership")

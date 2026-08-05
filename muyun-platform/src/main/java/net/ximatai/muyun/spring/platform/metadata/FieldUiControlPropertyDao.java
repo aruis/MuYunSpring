@@ -4,5 +4,5 @@ import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
 import net.ximatai.muyun.spring.ability.BaseDao;
 
 @MuYunRepository
-public interface PlatformFieldUiTypeAttributeDao extends BaseDao<PlatformFieldUiTypeAttribute, String> {
+public interface FieldUiControlPropertyDao extends BaseDao<FieldUiControlProperty, String> {
 }

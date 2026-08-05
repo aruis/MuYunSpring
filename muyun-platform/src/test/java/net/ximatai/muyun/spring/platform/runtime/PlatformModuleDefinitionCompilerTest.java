@@ -54,8 +54,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
@@ -77,7 +77,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
     private final TestMemoryDao<Metadata> metadataDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
-    private final TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<FieldSpec> fieldTypeDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
@@ -92,7 +92,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
-    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
+    private final FieldSpecService fieldTypeService = new FieldSpecService(fieldTypeDao);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
@@ -949,7 +949,7 @@ class PlatformModuleDefinitionCompilerTest {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldTypeAlias(fieldType.name().toLowerCase());
+        field.setFieldSpecAlias(fieldType.name().toLowerCase());
         field.setTitle(fieldName);
         return field;
     }
@@ -972,12 +972,12 @@ class PlatformModuleDefinitionCompilerTest {
 
     private MetadataField parentField(String metadataId) {
         MetadataField field = field(metadataId, "parentId", "parent_id", FieldType.STRING);
-        field.setFieldTypeAlias("id");
+        field.setFieldSpecAlias("id");
         return field;
     }
 
-    private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
-        PlatformFieldType type = new PlatformFieldType();
+    private FieldSpec fieldType(String alias, FieldType fieldType, Integer length) {
+        FieldSpec type = new FieldSpec();
         type.setAlias(alias);
         type.setTitle(alias);
         type.setFieldType(fieldType);

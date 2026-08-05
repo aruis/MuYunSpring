@@ -10,12 +10,12 @@ import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlProperty;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlPropertyService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,9 +33,9 @@ public class PlatformPageBootstrapService {
     private final MenuService menuService;
     private final PlatformPageConfigSnapshotService snapshotService;
     private final ModuleMetadataFieldService moduleFieldService;
-    private final PlatformFieldUiTypeService fieldUiTypeService;
-    private final PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService;
-    private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService;
+    private final FieldUiControlService fieldUiTypeService;
+    private final FieldUiControlPropertyService fieldUiTypeAttributeService;
+    private final FieldUiControlBindingService fieldUiTypeFieldMappingService;
 
     public PlatformPageBootstrapService(MenuService menuService,
                                         PlatformPageConfigSnapshotService snapshotService) {
@@ -52,9 +52,9 @@ public class PlatformPageBootstrapService {
     public PlatformPageBootstrapService(MenuService menuService,
                                         PlatformPageConfigSnapshotService snapshotService,
                                         ModuleMetadataFieldService moduleFieldService,
-                                        PlatformFieldUiTypeService fieldUiTypeService,
-                                        PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService,
-                                        PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService) {
+                                        FieldUiControlService fieldUiTypeService,
+                                        FieldUiControlPropertyService fieldUiTypeAttributeService,
+                                        FieldUiControlBindingService fieldUiTypeFieldMappingService) {
         this.menuService = menuService;
         this.snapshotService = snapshotService;
         this.moduleFieldService = moduleFieldService;
@@ -206,7 +206,7 @@ public class PlatformPageBootstrapService {
         List<PlatformResolvedQueryItem> queryItems = snapshot.queryItems().stream()
                 .map(this::resolvedQueryItem)
                 .toList();
-        return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiTypes(uiFields),
+        return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiControls(uiFields),
                 associationBlocks(snapshot, clientType, defaultUiConfigId),
                 actionBlocks(snapshot, clientType, defaultUiConfigId),
                 taskBlocks(snapshot, clientType, defaultUiConfigId));
@@ -412,9 +412,9 @@ public class PlatformPageBootstrapService {
                 resolved.fieldName(),
                 resolved.columnName(),
                 resolved.fieldTitle(),
-                resolved.fieldTypeAlias(),
+                resolved.fieldSpecAlias(),
                 resolved.fieldForm() == null ? null : resolved.fieldForm().name(),
-                field.getFieldUiTypeAlias(),
+                field.getFieldUiControlAlias(),
                 field.getVisible(),
                 field.getReadOnly(),
                 field.getRequiredOverride(),
@@ -441,7 +441,7 @@ public class PlatformPageBootstrapService {
                 resolved == null ? null : resolved.metadataAlias(),
                 resolved == null ? null : resolved.fieldName(),
                 resolved == null ? null : resolved.fieldTitle(),
-                resolved == null ? null : resolved.fieldTypeAlias(),
+                resolved == null ? null : resolved.fieldSpecAlias(),
                 item.getOperator(),
                 item.getDefaultValue(),
                 item.getAllowExternalValue(),
@@ -450,64 +450,68 @@ public class PlatformPageBootstrapService {
         );
     }
 
-    private List<PlatformResolvedFieldUiType> resolvedFieldUiTypes(List<PlatformResolvedUiField> uiFields) {
+    private List<PlatformResolvedFieldUiControl> resolvedFieldUiControls(List<PlatformResolvedUiField> uiFields) {
         if (fieldUiTypeService == null || fieldUiTypeAttributeService == null || fieldUiTypeFieldMappingService == null
                 || uiFields.isEmpty()) {
             return List.of();
         }
         List<String> aliases = uiFields.stream()
-                .map(PlatformResolvedUiField::fieldUiTypeAlias)
+                .map(PlatformResolvedUiField::fieldUiControlAlias)
                 .filter(alias -> alias != null && !alias.isBlank())
                 .distinct()
                 .toList();
         if (aliases.isEmpty()) {
             return List.of();
         }
-        Map<String, List<PlatformFieldUiTypeAttribute>> attributesByType =
-                fieldUiTypeAttributeService.listByFieldUiTypeAliases(aliases)
+        Map<String, List<FieldUiControlProperty>> propertiesByType =
+                fieldUiTypeAttributeService.listByFieldUiControlAliases(aliases)
                         .stream()
-                        .collect(Collectors.groupingBy(PlatformFieldUiTypeAttribute::getFieldUiTypeAlias));
-        Map<String, List<PlatformFieldUiTypeFieldMapping>> mappingsByType =
-                fieldUiTypeFieldMappingService.listByFieldUiTypeAliases(aliases)
+                        .collect(Collectors.groupingBy(FieldUiControlProperty::getFieldUiControlAlias));
+        Map<String, List<FieldUiControlBinding>> mappingsByType =
+                fieldUiTypeFieldMappingService.listByFieldUiControlAliases(aliases)
                         .stream()
-                        .collect(Collectors.groupingBy(PlatformFieldUiTypeFieldMapping::getFieldUiTypeAlias));
-        List<PlatformFieldUiType> fieldUiTypes = fieldUiTypeService.listEnabledByAliases(aliases);
-        Set<String> resolvedAliases = fieldUiTypes.stream()
-                .map(PlatformFieldUiType::getAlias)
+                        .collect(Collectors.groupingBy(FieldUiControlBinding::getFieldUiControlAlias));
+        List<FieldUiControl> fieldUiControls = fieldUiTypeService.listEnabledByAliases(aliases);
+        Set<String> resolvedAliases = fieldUiControls.stream()
+                .map(FieldUiControl::getAlias)
                 .collect(Collectors.toSet());
         List<String> missingAliases = aliases.stream()
                 .filter(alias -> !resolvedAliases.contains(alias))
                 .toList();
         if (!missingAliases.isEmpty()) {
-            throw new PlatformException("Resolved page config references disabled or missing field UI types: "
+            throw new PlatformException("Resolved page config references disabled or missing field UI controls: "
                     + missingAliases);
         }
-        return fieldUiTypes.stream()
-                .map(type -> resolvedFieldUiType(type, attributesByType.get(type.getAlias()),
+        return fieldUiControls.stream()
+                .map(type -> resolvedFieldUiControl(type, propertiesByType.get(type.getAlias()),
                         mappingsByType.get(type.getAlias())))
                 .toList();
     }
 
-    private PlatformResolvedFieldUiType resolvedFieldUiType(PlatformFieldUiType type,
-                                                            List<PlatformFieldUiTypeAttribute> attributes,
-                                                            List<PlatformFieldUiTypeFieldMapping> mappings) {
-        return new PlatformResolvedFieldUiType(
+    private PlatformResolvedFieldUiControl resolvedFieldUiControl(FieldUiControl type,
+                                                            List<FieldUiControlProperty> properties,
+                                                            List<FieldUiControlBinding> mappings) {
+        return new PlatformResolvedFieldUiControl(
                 type.getAlias(),
                 type.getTitle(),
-                type.getDefaultFieldTypeAlias(),
-                type.getControlType(),
+                type.getDefaultFieldSpecAlias(),
+                type.getValueShape(),
+                type.getPrimaryValueKey(),
+                type.getQueryMode(),
+                type.getRendererType(),
                 type.getIcon(),
-                attributes == null ? List.of() : attributes.stream()
-                        .map(attribute -> new PlatformResolvedFieldUiTypeAttribute(
+                properties == null ? List.of() : properties.stream()
+                        .map(attribute -> new PlatformResolvedFieldUiControlProperty(
                                 attribute.getAttributeAlias(),
                                 attribute.getTitle(),
-                                attribute.getValueFieldTypeAlias(),
+                                attribute.getValueFieldSpecAlias(),
                                 attribute.getDefaultValue()))
                         .toList(),
                 mappings == null ? List.of() : mappings.stream()
-                        .map(mapping -> new PlatformResolvedFieldUiTypeFieldMapping(
-                                mapping.getSourceKey(),
-                                mapping.getTitle()))
+                        .map(mapping -> new PlatformResolvedFieldUiControlBinding(
+                                mapping.getValueKey(),
+                                mapping.getTitle(),
+                                mapping.getValueFieldSpecAlias()))
                         .toList()
         );
     }

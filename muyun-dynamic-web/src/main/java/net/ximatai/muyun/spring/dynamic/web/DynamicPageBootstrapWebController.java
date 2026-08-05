@@ -73,7 +73,7 @@ public class DynamicPageBootstrapWebController {
         return new PlatformResolvedPageConfig(
                 config.uiFields(),
                 config.queryItems(),
-                config.fieldUiTypes(),
+                config.fieldUiControls(),
                 config.associationBlocks(),
                 actionBlocks,
                 config.taskBlocks()

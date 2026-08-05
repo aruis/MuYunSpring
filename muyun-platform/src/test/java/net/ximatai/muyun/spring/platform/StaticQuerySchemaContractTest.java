@@ -26,8 +26,8 @@ import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
-import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpec;
+import net.ximatai.muyun.spring.platform.metadata.FieldSpecService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
@@ -64,7 +64,7 @@ class StaticQuerySchemaContractTest {
         assertThat(exchangeRate.defaultSorts().getFirst().desc()).isTrue();
 
         MetadataService metadataService = new MetadataService(new TestMemoryDao<Metadata>());
-        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<PlatformFieldType>());
+        FieldSpecService fieldTypeService = new FieldSpecService(new TestMemoryDao<FieldSpec>());
         QuerySchema metadataField = new MetadataFieldService(new TestMemoryDao<MetadataField>(), metadataService,
                 fieldTypeService).querySchema();
         assertField(metadataField, "required", QueryValueType.BOOLEAN);

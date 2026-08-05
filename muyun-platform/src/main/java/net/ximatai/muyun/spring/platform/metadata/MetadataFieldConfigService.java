@@ -27,7 +27,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
 
     private final MetadataFieldService fieldService;
     private final MetadataService metadataService;
-    private final PlatformFieldTypeService fieldTypeService;
+    private final FieldSpecService fieldTypeService;
     private final DictionaryCategoryService categoryService;
     private final ModuleMetadataRelationService relationService;
     private final MetadataFieldProtectionConfigService protectionConfigService;
@@ -36,7 +36,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
                                       MetadataService metadataService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService) {
         this(configDao, fieldService, metadataService, fieldTypeService, categoryService, relationService, null,
@@ -46,7 +46,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
                                       MetadataService metadataService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService,
                                       MetadataFieldProtectionConfigService protectionConfigService) {
@@ -58,7 +58,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
                                       MetadataService metadataService,
-                                      PlatformFieldTypeService fieldTypeService,
+                                      FieldSpecService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService,
                                       MetadataFieldProtectionConfigService protectionConfigService,
@@ -112,7 +112,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     private void normalizeAndValidate(MetadataFieldConfig config) {
         MetadataField field = requireField(config.getMetadataFieldId());
         normalizeRelation(config, field);
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        FieldSpec fieldType = fieldTypeService.requireFieldType(field.getFieldSpecAlias());
         normalizeFieldShape(config, fieldType);
         normalizeDictionaryBinding(config, field, fieldType);
         validateVirtualQueryBoundary(config, field);
@@ -156,7 +156,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         }
     }
 
-    private void normalizeFieldShape(MetadataFieldConfig config, PlatformFieldType fieldType) {
+    private void normalizeFieldShape(MetadataFieldConfig config, FieldSpec fieldType) {
         if (config.getRelationId() != null
                 && (config.getFieldLength() != null || config.getPrecision() != null || config.getScale() != null)) {
             throw new PlatformException("Relation field config cannot override physical field shape: "
@@ -168,7 +168,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
 
     private void normalizeDictionaryBinding(MetadataFieldConfig config,
                                             MetadataField field,
-                                            PlatformFieldType fieldType) {
+                                            FieldSpec fieldType) {
         boolean hasCategory = config.getDictionaryCategoryAlias() != null && !config.getDictionaryCategoryAlias().isBlank();
         boolean hasApplication = config.getDictionaryApplicationAlias() != null && !config.getDictionaryApplicationAlias().isBlank();
         if (!hasCategory && !hasApplication) {
@@ -203,7 +203,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         categoryService.requireDictionaryCategory(config.getDictionaryApplicationAlias(), config.getDictionaryCategoryAlias());
     }
 
-    private void normalizeQueryDefinition(MetadataFieldConfig config, PlatformFieldType fieldType) {
+    private void normalizeQueryDefinition(MetadataFieldConfig config, FieldSpec fieldType) {
         if (config.getQueryable() == null) {
             config.setDefaultQueryOperator(null);
             config.setQueryOperators(null);
@@ -235,7 +235,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         }
     }
 
-    private void validateProtectionQueryBoundary(MetadataFieldConfig config, PlatformFieldType fieldType) {
+    private void validateProtectionQueryBoundary(MetadataFieldConfig config, FieldSpec fieldType) {
         if (protectionConfigService == null) {
             return;
         }
@@ -249,7 +249,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         }
     }
 
-    private void normalizeBehavior(MetadataFieldConfig config, PlatformFieldType fieldType) {
+    private void normalizeBehavior(MetadataFieldConfig config, FieldSpec fieldType) {
         if (config.getDefaultValue() != null && config.getDefaultValue().isBlank()) {
             config.setDefaultValue(null);
         }

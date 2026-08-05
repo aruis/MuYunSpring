@@ -5,7 +5,7 @@ public record EntityViewFieldDefinition(
         String title,
         boolean visible,
         ViewControlType controlType,
-        String fieldUiTypeAlias,
+        String fieldUiControlAlias,
         Boolean readOnly,
         Boolean required
 ) {
@@ -18,15 +18,15 @@ public record EntityViewFieldDefinition(
     }
 
     public EntityViewFieldDefinition hidden() {
-        return new EntityViewFieldDefinition(fieldName, title, false, controlType, fieldUiTypeAlias, readOnly, required);
+        return new EntityViewFieldDefinition(fieldName, title, false, controlType, fieldUiControlAlias, readOnly, required);
     }
 
     public EntityViewFieldDefinition title(String value) {
-        return new EntityViewFieldDefinition(fieldName, value, visible, controlType, fieldUiTypeAlias, readOnly, required);
+        return new EntityViewFieldDefinition(fieldName, value, visible, controlType, fieldUiControlAlias, readOnly, required);
     }
 
     public EntityViewFieldDefinition control(ViewControlType value) {
-        return new EntityViewFieldDefinition(fieldName, title, visible, value, fieldUiTypeAlias, readOnly, required);
+        return new EntityViewFieldDefinition(fieldName, title, visible, value, fieldUiControlAlias, readOnly, required);
     }
 
     public EntityViewFieldDefinition fieldUiType(String value) {
@@ -34,10 +34,10 @@ public record EntityViewFieldDefinition(
     }
 
     public EntityViewFieldDefinition readOnly(boolean value) {
-        return new EntityViewFieldDefinition(fieldName, title, visible, controlType, fieldUiTypeAlias, value, required);
+        return new EntityViewFieldDefinition(fieldName, title, visible, controlType, fieldUiControlAlias, value, required);
     }
 
     public EntityViewFieldDefinition required(boolean value) {
-        return new EntityViewFieldDefinition(fieldName, title, visible, controlType, fieldUiTypeAlias, readOnly, value);
+        return new EntityViewFieldDefinition(fieldName, title, visible, controlType, fieldUiControlAlias, readOnly, value);
     }
 }
