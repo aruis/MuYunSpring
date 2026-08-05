@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: muyun_dev
+      POSTGRES_DB: muyun_consumer
+    ports:
+      - "${MUYUN_CONSUMER_DB_PORT:-54323}:5432"

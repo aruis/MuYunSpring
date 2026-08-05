@@ -27,5 +27,7 @@ include(
     "muyun-dynamic-web",
     "muyun-demo",
     "muyun-demo-web",
+    "muyun-spring-bom",
+    "muyun-spring-boot-starter",
     "muyun-boot"
 )

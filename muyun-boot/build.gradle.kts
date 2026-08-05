@@ -13,18 +13,7 @@ configurations.configureEach {
 }
 
 dependencies {
-    implementation(project(":muyun-platform"))
-    implementation(project(":muyun-iam"))
-    implementation(project(":muyun-web-adapter"))
-    implementation(project(":muyun-platform-web"))
-    implementation(project(":muyun-iam-web"))
-    implementation(project(":muyun-dynamic-web"))
-    implementation(libs.spring.boot.starter.web)
-    implementation(libs.spring.boot.starter.websocket)
-    implementation(libs.spring.boot.jackson2)
-    implementation(libs.spring.boot.starter.jdbc)
-    implementation(libs.spring.tx)
-    implementation(libs.muyun.database.spring.boot.starter)
+    implementation(project(":muyun-spring-boot-starter"))
     runtimeOnly(libs.postgresql)
     developmentOnly(libs.spring.boot.devtools)
 

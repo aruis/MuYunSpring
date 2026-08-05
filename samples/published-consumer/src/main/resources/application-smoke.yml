@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:${MUYUN_CONSUMER_DB_PORT:54323}/muyun_consumer
+    username: postgres
+    password: muyun_dev
+server:
+  port: ${MUYUN_CONSUMER_PORT:18080}
+muyun:
+  runtime:
+    mode: development
+  initial-admin:
+    initial-password: admin123
