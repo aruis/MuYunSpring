@@ -1,9 +1,9 @@
 .gradle/
 .gradle-workspace/
+.idea/
 build/
 **/build/
 out/
-.idea/
 .codex/
 *.iml
 *.log

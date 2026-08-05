@@ -1,0 +1,21 @@
+dependencies {
+    api(project(":muyun-platform"))
+    api(project(":muyun-iam"))
+    api(project(":muyun-web-adapter"))
+    api(project(":muyun-platform-web"))
+    api(project(":muyun-iam-web"))
+    api(project(":muyun-dynamic-web"))
+    api(libs.spring.boot.starter.web)
+    api(libs.spring.boot.starter.websocket)
+    api(libs.spring.boot.starter.jdbc)
+    api(libs.spring.boot.jackson2)
+    api(libs.muyun.database.spring.boot.starter)
+
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.starter.webmvc.test)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(testFixtures(project(":muyun-iam")))
+    testImplementation(testFixtures(project(":muyun-platform")))
+    testRuntimeOnly(libs.junit.platform.launcher)
+}

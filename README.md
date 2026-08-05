@@ -60,12 +60,18 @@ muyun-iam-web     IAM 领域的 Web 交付
 muyun-dynamic-web 动态记录和元数据的 Web 交付
 muyun-demo        演示业务模型与服务
 muyun-demo-web    演示业务的 Web 交付
+muyun-spring-bom  面向业务应用的依赖版本清单
+muyun-spring-boot-starter Spring Boot 自动装配、平台组件扫描与标准运行时依赖
 muyun-boot        Spring Boot 应用、装配、配置和本地启动入口
 muyun-web         Vue 前端工作台、平台 UI adapter、动态页面骨架和业务示例
 docs              架构原则、平台专题、前端路线和技术债记录
 ```
 
 领域模块不承载 HTTP 入口；`*-web` 模块依赖领域模块和 `muyun-web-adapter` 完成交付。`muyun-boot` 只负责组装这些模块并启动应用，不沉淀领域模型、Controller 或可复用测试构造。
+
+业务二开应用应依赖 `muyun-spring-bom` 和 `muyun-spring-boot-starter`，并保留自己的
+`@SpringBootApplication`、业务模型和 Web 交付；不复制或依赖 `muyun-boot`。本仓库可通过
+`./gradlew publishReleaseToConsumerRepository` 生成统一本地 Maven 仓库，用于验证外部消费者。
 
 ## 技术栈
 
@@ -200,6 +206,12 @@ muyun.demo-bootstrap.admin-initial-password=demo123
 ./gradlew verifyAll
 ```
 
+发布前可生成 Maven 消费者仓库：
+
+```bash
+./gradlew publishReleaseToConsumerRepository
+```
+
 该任务统一运行所有子模块的单元测试和 `*IT` 集成测试，与 CI 后端验证入口一致。开发过程中也可以按需单独运行：
 
 ```bash
@@ -224,6 +236,8 @@ npm run check
 - [平台文档入口](docs/platform/README.md)：按业务专题整理的平台能力和 Web 接口交接入口。
 - [前端技术架构](docs/frontend/TECHNICAL_ARCHITECTURE.md)：Vue 前端技术路线、组件契约、运行器边界和协作方式。
 - [技术债记录](docs/TECHNICAL_DEBT.md)：已确认但暂缓处理的平台级问题。
+- [发布流程](docs/RELEASE_PROCESS.md)：Maven Central 发布、签名凭据和消费者验证。
+- [变更记录](docs/CHANGELOG.md)：正式版本面向使用者的能力与兼容性变化。
 
 更多专题能力和 Web 接口说明从 [平台文档入口](docs/platform/README.md) 继续阅读。
 
