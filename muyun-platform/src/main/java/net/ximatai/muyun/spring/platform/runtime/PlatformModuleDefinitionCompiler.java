@@ -44,6 +44,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterServi
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataCapabilityPolicy;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -236,11 +237,14 @@ public class PlatformModuleDefinitionCompiler {
                                     Metadata metadata,
                                     List<ModuleMetadataRelation> relations) {
         List<FieldDefinition> fields = fields(metadata.getId(), relation.getId());
-        EnumSet<EntityCapability> capabilities = capabilities(fields);
+        if (relation.getRelationRole() == RelationRole.CHILD) {
+            ModuleMetadataCapabilityPolicy.validateChildDefinition(metadata, fields);
+        }
+        EnumSet<EntityCapability> capabilities = capabilities(relation, fields);
         if (relations.stream().anyMatch(child -> metadata.getId().equals(child.getParentMetadataId()))) {
             capabilities.add(EntityCapability.CHILD_RELATION);
         }
-        if (Boolean.TRUE.equals(metadata.getDataScopeEnabled())) {
+        if (relation.getRelationRole() == RelationRole.MAIN && Boolean.TRUE.equals(metadata.getDataScopeEnabled())) {
             capabilities.add(EntityCapability.DATA_SCOPE);
         }
         return new EntityDefinition(metadata.getAlias(),
@@ -300,7 +304,7 @@ public class PlatformModuleDefinitionCompiler {
                 );
     }
 
-    private EnumSet<EntityCapability> capabilities(List<FieldDefinition> fields) {
+    private EnumSet<EntityCapability> capabilities(ModuleMetadataRelation relation, List<FieldDefinition> fields) {
         EnumSet<EntityCapability> capabilities = EnumSet.noneOf(EntityCapability.class);
         capabilities.add(EntityCapability.CRUD);
         for (FieldDefinition field : fields) {
@@ -358,20 +362,37 @@ public class PlatformModuleDefinitionCompiler {
     private List<EntityReferenceDefinition> references(String moduleAlias,
                                                        List<ModuleMetadataRelation> relations,
                                                        Map<String, Metadata> metadataById) {
-        return relations.stream()
-                .flatMap(relation -> references(moduleAlias, relation, metadataById).stream())
-                .toList();
+        Set<String> childForeignKeys = relations.stream()
+                .filter(relation -> relation.getRelationRole() == RelationRole.CHILD)
+                .map(relation -> relation.getMetadataId() + ":" + relation.getForeignKey())
+                .collect(java.util.stream.Collectors.toSet());
+        List<EntityReferenceDefinition> references = new ArrayList<>();
+        for (ModuleMetadataRelation relation : relations) {
+            references.addAll(references(moduleAlias, relation, metadataById, childForeignKeys));
+        }
+        for (ModuleMetadataRelation relation : relations) {
+            if (relation.getRelationRole() == RelationRole.CHILD) {
+                references.add(childForeignKeyReference(moduleAlias, relation, metadataById));
+            }
+        }
+        return List.copyOf(references);
     }
 
     private List<EntityReferenceDefinition> references(String moduleAlias,
                                                        ModuleMetadataRelation relation,
-                                                       Map<String, Metadata> metadataById) {
+                                                       Map<String, Metadata> metadataById,
+                                                       Set<String> childForeignKeys) {
         Metadata sourceMetadata = metadataById.get(relation.getMetadataId());
         List<EntityReferenceDefinition> references = new java.util.ArrayList<>();
         Set<String> moduleReferenceFieldIds = new LinkedHashSet<>();
         if (moduleFieldService != null) {
             for (ModuleMetadataField moduleField : moduleFieldService.listByRelationId(relation.getId())) {
                 if (moduleField.getReferenceModuleAlias() != null && !moduleField.getReferenceModuleAlias().isBlank()) {
+                    MetadataField sourceField = requireField(moduleField);
+                    if (childForeignKeys.contains(sourceMetadata.getId() + ":" + sourceField.getFieldName())) {
+                        throw new PlatformException("Child relation foreign key cannot use module reference configuration: "
+                                + sourceField.getFieldName());
+                    }
                     moduleReferenceFieldIds.add(moduleField.getMetadataFieldId());
                     references.add(moduleReference(moduleField, sourceMetadata));
                 }
@@ -379,10 +400,41 @@ public class PlatformModuleDefinitionCompiler {
         }
         references.addAll(metadataFields(sourceMetadata.getId()).stream()
                 .filter(field -> !moduleReferenceFieldIds.contains(field.getId()))
+                .filter(field -> !childForeignKeys.contains(sourceMetadata.getId() + ":" + field.getFieldName()))
                 .map(field -> reference(moduleAlias, relation, sourceMetadata, field, metadataById))
                 .filter(Objects::nonNull)
                 .toList());
         return references;
+    }
+
+    private EntityReferenceDefinition childForeignKeyReference(String moduleAlias,
+                                                                ModuleMetadataRelation relation,
+                                                                Map<String, Metadata> metadataById) {
+        Metadata parentMetadata = metadataById.get(relation.getParentMetadataId());
+        Metadata childMetadata = metadataById.get(relation.getMetadataId());
+        if (parentMetadata == null || childMetadata == null) {
+            throw new PlatformException("Child relation metadata is incomplete: " + relation.getRelationAlias());
+        }
+        MetadataField foreignKey = metadataFields(childMetadata.getId()).stream()
+                .filter(field -> relation.getForeignKey().equals(field.getFieldName()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Child relation requires physical foreign key field: "
+                        + relation.getForeignKey()));
+        ModuleMetadataCapabilityPolicy.validateChildForeignKey(foreignKey);
+        MetadataFieldReferenceConfig config = referenceConfigService.findForRelation(foreignKey.getId(), relation.getId());
+        if (config == null) {
+            return EntityReferenceDefinition.to(childMetadata.getAlias(), foreignKey.getFieldName(),
+                    moduleAlias + "." + parentMetadata.getAlias());
+        }
+        ModuleMetadataCapabilityPolicy.validateChildForeignKeyReference(relation, foreignKey, config);
+        return new EntityReferenceDefinition(
+                childMetadata.getAlias(),
+                foreignKey.getFieldName(),
+                moduleAlias + "." + parentMetadata.getAlias(),
+                config.getCardinality(),
+                config.projections(), null, null, null, null, Set.of(), List.of(), List.of(),
+                new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy())
+        );
     }
 
     private EntityReferenceDefinition moduleReference(ModuleMetadataField moduleField,
@@ -495,6 +547,7 @@ public class PlatformModuleDefinitionCompiler {
         String targetModuleAlias = config.getTargetModuleAlias() == null || config.getTargetModuleAlias().isBlank()
                 ? moduleAlias
                 : config.getTargetModuleAlias();
+        validateReferenceTargetBinding(config, relation, targetModuleAlias, targetMetadata);
         EntityReferenceDefinition definition = new EntityReferenceDefinition(
                 sourceMetadata.getAlias(),
                 sourceField.getFieldName(),
@@ -504,6 +557,29 @@ public class PlatformModuleDefinitionCompiler {
                 new ReferenceIntegrityPolicy(config.getTargetUnavailablePolicy())
         );
         return definition;
+    }
+
+    private void validateReferenceTargetBinding(MetadataFieldReferenceConfig config,
+                                                ModuleMetadataRelation sourceRelation,
+                                                String targetModuleAlias,
+                                                Metadata targetMetadata) {
+        boolean crossModule = !sourceRelation.getModuleAlias().equals(targetModuleAlias);
+        if (crossModule && (config.getRelationId() == null || config.getRelationId().isBlank())) {
+            throw new PlatformException("Cross-module reference config must be relation-scoped: "
+                    + config.getMetadataFieldId());
+        }
+        List<ModuleMetadataRelation> targetRelations = relationService.list(Criteria.of()
+                        .eq("moduleAlias", targetModuleAlias)
+                        .eq("metadataId", targetMetadata.getId()),
+                ALL);
+        if (targetRelations.isEmpty()) {
+            throw new PlatformException("Reference target metadata is not bound to module: "
+                    + targetModuleAlias + "." + targetMetadata.getAlias());
+        }
+        if (crossModule && targetRelations.stream().noneMatch(item -> item.getRelationRole() == RelationRole.MAIN)) {
+            throw new PlatformException("Cross-module reference target must be the target module MAIN metadata: "
+                    + targetModuleAlias);
+        }
     }
 
     private List<EntityViewDefinition> views(List<ModuleMetadataRelation> relations, Map<String, Metadata> metadataById) {

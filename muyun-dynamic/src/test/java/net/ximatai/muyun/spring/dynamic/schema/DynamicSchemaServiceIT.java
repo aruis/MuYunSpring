@@ -10,10 +10,18 @@ import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.deletion.DeletionContext;
+import net.ximatai.muyun.spring.ability.deletion.DeletionMode;
+import net.ximatai.muyun.spring.ability.deletion.DeletionNode;
+import net.ximatai.muyun.spring.ability.reference.ReferenceDeletionGuard;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTargets;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrityPolicy;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -118,6 +126,73 @@ class DynamicSchemaServiceIT {
             assertThat(secondShape.primaryKeys()).containsExactly("id");
             assertThat(secondShape.uniqueIndexColumns()).contains(List.of("tenant_id", "code"));
         }
+    }
+
+    @Test
+    void shouldApplyChildReferenceDeletionPoliciesThroughDynamicRecordServiceOnRealDatabase() {
+        assertChildReferenceDeletionPolicy(ReferenceTargetUnavailablePolicy.CASCADE_DELETE);
+        assertChildReferenceDeletionPolicy(ReferenceTargetUnavailablePolicy.RESTRICT);
+        assertChildReferenceDeletionPolicy(ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
+    }
+
+    private void assertChildReferenceDeletionPolicy(ReferenceTargetUnavailablePolicy policy) {
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String moduleAlias = "sales.deletion_" + suffix;
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        new DynamicModuleRuntimeRefresher(schemaService, runtime).refresh(
+                deletionPolicyModule(moduleAlias, "app_invoice_deletion_" + suffix,
+                        "app_invoice_line_deletion_" + suffix, policy));
+        DynamicRecordService service = new DynamicRecordService(runtime);
+
+        PlatformAbilityRuntime.configureReferenceDeletionGuard(dynamicReferenceGuard(runtime));
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-deletion-" + suffix)) {
+            String invoiceId = service.create(moduleAlias, "invoice",
+                    service.newRecord(moduleAlias, "invoice").setValue("title", "Invoice " + policy));
+            String lineId = service.create(moduleAlias, "invoice_line",
+                    service.newRecord(moduleAlias, "invoice_line")
+                            .setValue("title", "Line " + policy)
+                            .setValue("invoiceId", invoiceId));
+
+            if (policy == ReferenceTargetUnavailablePolicy.RESTRICT) {
+                assertThatThrownBy(() -> service.delete(moduleAlias, "invoice", invoiceId))
+                        .isInstanceOf(PlatformException.class)
+                        .hasMessageContaining("cannot make reference target unavailable");
+                assertThat(service.select(moduleAlias, "invoice", invoiceId)).isNotNull();
+                assertThat(service.select(moduleAlias, "invoice_line", lineId)).isNotNull();
+                return;
+            }
+
+            assertThat(service.delete(moduleAlias, "invoice", invoiceId)).isEqualTo(1);
+            assertThat(service.select(moduleAlias, "invoice", invoiceId)).isNull();
+            if (policy == ReferenceTargetUnavailablePolicy.CASCADE_DELETE) {
+                assertThat(service.select(moduleAlias, "invoice_line", lineId)).isNull();
+                assertThat(service.selectIgnoreSoftDelete(moduleAlias, "invoice_line", lineId)).isNotNull();
+            } else {
+                assertThat(service.select(moduleAlias, "invoice_line", lineId))
+                        .extracting(record -> record.getValue("invoiceId"))
+                        .isEqualTo(invoiceId);
+            }
+        } finally {
+            PlatformAbilityRuntime.resetReferenceDeletionGuard();
+        }
+    }
+
+    private ReferenceDeletionGuard dynamicReferenceGuard(DynamicRecordRuntime runtime) {
+        return new ReferenceDeletionGuard() {
+            @Override
+            public void beforeSoftDelete(CrudAbility<?> targetAbility, EntityContract target) {
+                runtime.validateReferenceTargetDeletion(ReferenceTargets.of(targetAbility), target.getId());
+            }
+
+            @Override
+            public void cascadeTargetUnavailable(CrudAbility<?> targetAbility,
+                                                 EntityContract target,
+                                                 DeletionContext context,
+                                                 DeletionNode node,
+                                                 DeletionMode mode) {
+                runtime.cascadeReferenceTargetUnavailable(ReferenceTargets.of(targetAbility), target.getId(), context, node);
+            }
+        };
     }
 
     @Test
@@ -844,6 +919,28 @@ class DynamicSchemaServiceIT {
                         ))
                 .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withIntegrity(new ReferenceIntegrityPolicy(ReferenceTargetUnavailablePolicy.CASCADE_DELETE))))
+                .build();
+    }
+
+    private ModuleDefinition deletionPolicyModule(String moduleAlias,
+                                                  String invoiceTable,
+                                                  String lineTable,
+                                                  ReferenceTargetUnavailablePolicy policy) {
+        return ModuleDefinition.builder(moduleAlias, "Deletion policy invoice")
+                .entities(List.of(
+                        new EntityDefinition("invoice", invoiceTable, "Invoice", List.of(
+                                FieldDefinition.titleField().required()
+                        )).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE),
+                        new EntityDefinition("invoice_line", lineTable, "Invoice line", List.of(
+                                FieldDefinition.string("invoiceId", "Invoice")
+                                        .column("invoice_id").length(64).required().indexed(),
+                                FieldDefinition.titleField().required()
+                        )).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE)
+                ))
+                .relations(List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")))
+                .references(List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId",
+                                ReferenceTarget.of(moduleAlias, "invoice"))
+                        .withIntegrity(new ReferenceIntegrityPolicy(policy))))
                 .build();
     }
 

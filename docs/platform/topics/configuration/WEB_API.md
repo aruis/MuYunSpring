@@ -366,6 +366,7 @@
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/sort/{id}` | 在模块内调整动作顺序 |
 | 模块动作 | `DELETE` | `/platform.module/{moduleAlias}/actions/{id}/permission-governance` | 清除托管动作的权限治理覆盖，恢复代码声明默认策略 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/query` | 查询模块绑定的元数据关系 |
+| 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/create-main-metadata` | 原子创建动态模块的主实体及其 MAIN 关系；实体应用归属以后端模块为准 |
 | 元数据关系 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/view/{id}` | 查看模块元数据关系 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/insert` | 新增模块元数据关系 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/update/{id}` | 更新模块元数据关系 |

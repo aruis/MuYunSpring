@@ -34,15 +34,16 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
     private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
     private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
+    private final ObjectProvider<ModuleMetadataRelationService> relationServiceProvider;
 
     public MetadataService(BaseDao<Metadata, String> metadataDao) {
-        this(metadataDao, provider(null), Optional.empty(), provider(null));
+        this(metadataDao, provider(null), Optional.empty(), provider(null), provider(null));
     }
 
     public MetadataService(BaseDao<Metadata, String> metadataDao,
                            Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
         this(metadataDao, provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)),
-                Optional.empty(), provider(null));
+                Optional.empty(), provider(null), provider(null));
     }
 
     public MetadataService(BaseDao<Metadata, String> metadataDao,
@@ -51,20 +52,23 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
         this(metadataDao,
                 provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)),
                 runtimeRefreshCoordinator == null ? Optional.empty() : runtimeRefreshCoordinator,
-                provider(null));
+                provider(null), provider(null));
     }
 
     @Autowired
     public MetadataService(BaseDao<Metadata, String> metadataDao,
                            ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
-                           ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
+                           ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider,
+                           ObjectProvider<ModuleMetadataRelationService> relationServiceProvider) {
         super(MODULE_ALIAS, Metadata.class, metadataDao);
         this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
                 "schemaEnsureServiceProvider must not be null");
         this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
                 "runtimeRefreshCoordinator must not be null");
         this.referenceGuardProvider = Objects.requireNonNull(referenceGuardProvider, "referenceGuardProvider must not be null");
+        this.relationServiceProvider = Objects.requireNonNull(relationServiceProvider,
+                "relationServiceProvider must not be null");
     }
 
     @Override
@@ -152,6 +156,9 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
         if (metadata.getDataScopeEnabled() == null) {
             metadata.setDataScopeEnabled(Boolean.FALSE);
         }
+        if (isChildMetadata(metadata.getId())) {
+            ModuleMetadataCapabilityPolicy.validateChildMetadataConfiguration(metadata);
+        }
         if (metadata.getSortPartitionFields() != null) {
             LinkedHashSet<String> fields = new LinkedHashSet<>();
             for (String fieldName : metadata.getSortPartitionFields()) {
@@ -161,6 +168,13 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
         }
         rejectDuplicateMetadataAlias(metadata);
         rejectDuplicatePhysicalTable(metadata);
+    }
+
+    private boolean isChildMetadata(String metadataId) {
+        ModuleMetadataRelationService relationService = relationServiceProvider.getIfAvailable();
+        return relationService != null && metadataId != null && !metadataId.isBlank()
+                && relationService.count(Criteria.of().eq("metadataId", metadataId)
+                        .eq("relationRole", RelationRole.CHILD)) > 0;
     }
 
     private void rejectDuplicateMetadataAlias(Metadata metadata) {

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
@@ -30,6 +31,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
     private final MetadataService metadataService;
     private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
     private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
+    private final ObjectProvider<MetadataFieldService> metadataFieldServiceProvider;
 
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
@@ -44,17 +46,36 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         this(relationDao, moduleService, metadataService, runtimeRefreshCoordinator, provider(null));
     }
 
-    @Autowired
+    public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
+                                         PlatformModuleService moduleService,
+                                         MetadataService metadataService,
+                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                         Optional<MetadataFieldService> metadataFieldService) {
+        this(relationDao, moduleService, metadataService, runtimeRefreshCoordinator, provider(null),
+                provider(metadataFieldService == null ? null : metadataFieldService.orElse(null)));
+    }
+
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
                                          MetadataService metadataService,
                                          Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
                                          ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
+        this(relationDao, moduleService, metadataService, runtimeRefreshCoordinator, referenceGuardProvider, provider(null));
+    }
+
+    @Autowired
+    public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
+                                         PlatformModuleService moduleService,
+                                         MetadataService metadataService,
+                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                         ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider,
+                                         ObjectProvider<MetadataFieldService> metadataFieldServiceProvider) {
         super(MODULE_ALIAS, ModuleMetadataRelation.class, relationDao);
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
         this.referenceGuardProvider = referenceGuardProvider;
+        this.metadataFieldServiceProvider = metadataFieldServiceProvider;
     }
 
     @Override
@@ -113,7 +134,10 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         if (relation.getRelationRole() == RelationRole.MAIN) {
             rejectDuplicateMainRelation(relation);
         } else {
-            validateChildOrRelatedRelation(relation);
+            if (Boolean.TRUE.equals(metadata.getDataScopeEnabled())) {
+                throw new PlatformException("Child metadata cannot enable module data scope: " + metadata.getAlias());
+            }
+            validateChildRelation(relation, metadata);
         }
         rejectDuplicateRelationAlias(relation);
         if (relation.getAutoPopulate() == null) {
@@ -131,9 +155,9 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         relation.setForeignKey(null);
     }
 
-    private void validateChildOrRelatedRelation(ModuleMetadataRelation relation) {
+    private void validateChildRelation(ModuleMetadataRelation relation, Metadata metadata) {
         if (relation.getParentMetadataId() == null || relation.getParentMetadataId().isBlank()) {
-            throw new PlatformException("Non-main relation requires parentMetadataId");
+            throw new PlatformException("Child relation requires parentMetadataId");
         }
         if (metadataService.select(relation.getParentMetadataId()) == null) {
             throw new PlatformException("Relation requires existing parent metadata: " + relation.getParentMetadataId());
@@ -145,9 +169,27 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
                     + relation.getParentMetadataId());
         }
         if (relation.getForeignKey() == null || relation.getForeignKey().isBlank()) {
-            throw new PlatformException("Non-main relation requires foreignKey");
+            throw new PlatformException("Child relation requires foreignKey");
         }
         PlatformNameRules.requireFieldName(relation.getForeignKey(), "foreignKey");
+        MetadataFieldService fieldService = metadataFieldServiceProvider.getIfAvailable();
+        if (fieldService != null) {
+            MetadataField foreignKey = fieldService.list(Criteria.of()
+                            .eq("metadataId", relation.getMetadataId())
+                            .eq("fieldName", relation.getForeignKey()),
+                    new PageRequest(0, 1)).stream().findFirst().orElse(null);
+            if (foreignKey == null) {
+                throw new PlatformException("Child relation requires physical foreign key field: "
+                        + relation.getForeignKey());
+            }
+            if (foreignKey.getFieldForm() != MetadataFieldForm.PHYSICAL) {
+                throw new PlatformException("Child relation foreign key must be a physical field: "
+                        + relation.getForeignKey());
+            }
+            ModuleMetadataCapabilityPolicy.validateChildMetadata(metadata,
+                    fieldService.list(Criteria.of().eq("metadataId", relation.getMetadataId()),
+                            new PageRequest(0, Integer.MAX_VALUE)));
+        }
     }
 
     private void rejectDuplicateRelationAlias(ModuleMetadataRelation relation) {

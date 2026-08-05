@@ -386,7 +386,12 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(relation.childEntityAlias()).isEqualTo("invoice_line");
         assertThat(relation.childForeignKeyField()).isEqualTo("invoiceId");
         assertThat(relation.autoPopulate()).isTrue();
-        assertThat(definition.associationViews()).hasSize(1);
+        assertThat(definition.references()).singleElement().satisfies(reference -> {
+            assertThat(reference.sourceEntityAlias()).isEqualTo("invoice_line");
+            assertThat(reference.sourceField()).isEqualTo("invoiceId");
+            assertThat(reference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
+        });
+        assertThat(definition.associationViews()).hasSize(2);
         EntityAssociationViewDefinition associationView = definition.associationViews().getFirst();
         assertThat(associationView.sourceEntityAlias()).isEqualTo("invoice");
         assertThat(associationView.targetModuleAlias()).isEqualTo("sales.invoice");
@@ -394,6 +399,42 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(associationView.displayMode()).isEqualTo(AssociationViewDisplayMode.INLINE_LIST);
         assertThat(associationView.relationCode()).isEqualTo("lines");
         assertThat(associationView.queryable()).isTrue();
+    }
+
+    @Test
+    void shouldRejectReservedModuleCapabilitiesOnChildMetadata() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(titleField(lineId));
+        MetadataField sortOrder = field(lineId, "sortOrder", "sort_order", FieldType.INTEGER);
+        sortOrder.setSortableField(true);
+        fieldService.insert(sortOrder);
+        fieldService.insert(field(lineId, "invoiceId", "invoice_id", FieldType.STRING));
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+
+        assertThatThrownBy(() -> compiler.compile("sales.invoice"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reserved module capability field: sortOrder");
+    }
+
+    @Test
+    void shouldRejectEnableCapabilityColumnAliasOnChildMetadata() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(titleField(lineId));
+        fieldService.insert(field(lineId, "active", "enabled", FieldType.BOOLEAN));
+        fieldService.insert(field(lineId, "invoiceId", "invoice_id", FieldType.STRING));
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+
+        assertThatThrownBy(() -> compiler.compile("sales.invoice"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reserved module capability field: active");
     }
 
     @Test
@@ -447,7 +488,7 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
-    void shouldCompileManyReferenceAssociationViewAsLinkedList() {
+    void shouldRejectManyReferenceOnChildForeignKey() {
         moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
         String invoiceId = metadataService.insert(metadata("sales", "invoice"));
         String lineId = metadataService.insert(metadata("sales", "invoice_line"));
@@ -459,17 +500,27 @@ class PlatformModuleDefinitionCompilerTest {
         relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
         MetadataFieldReferenceConfig referenceConfig = referenceConfig(invoiceField.getId(), invoiceId);
         referenceConfig.setCardinality(ReferenceCardinality.MANY);
-        referenceConfigService.insert(referenceConfig);
+        assertThatThrownBy(() -> referenceConfigService.insert(referenceConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must use ONE cardinality");
+    }
 
-        ModuleDefinition definition = compiler.compile("sales.invoice");
-
-        EntityAssociationViewDefinition referenceView = definition.associationViews().stream()
-                .filter(view -> "invoiceId".equals(view.code()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(referenceView.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_LIST);
-        assertThat(referenceView.viewType()).isEqualTo(EntityViewType.LIST);
-        assertThat(referenceView.queryable()).isTrue();
+    @Test
+    void shouldRejectChildForeignKeyReferenceThatDoesNotTargetItsParent() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String customerId = metadataService.insert(metadata("sales", "customer"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(titleField(customerId));
+        fieldService.insert(titleField(lineId));
+        MetadataField invoiceField = field(lineId, "invoiceId", "invoice_id", FieldType.STRING);
+        fieldService.insert(invoiceField);
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+        assertThatThrownBy(() -> referenceConfigService.insert(referenceConfig(invoiceField.getId(), customerId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must reference its parent metadata");
     }
 
     @Test
@@ -513,10 +564,11 @@ class PlatformModuleDefinitionCompilerTest {
         MetadataField ownerField = field(lineId, "ownerId", "owner_id", FieldType.STRING);
         fieldService.insert(ownerField);
         relationService.insert(mainRelation("sales.invoice", invoiceId));
-        relationService.insert(childRelation("sales.invoice", lineId, invoiceId, "ownerId"));
+        String salesLineRelationId = relationService.insert(childRelation("sales.invoice", lineId, invoiceId, "ownerId"));
         relationService.insert(mainRelation("support.ticket", ticketId));
         String supportLineRelationId = relationService.insert(childRelation("support.ticket", lineId, ticketId, "ownerId"));
         MetadataFieldReferenceConfig defaultReference = referenceConfig(ownerField.getId(), invoiceId);
+        defaultReference.setRelationId(salesLineRelationId);
         defaultReference.setProjectionMappings("title:invoiceTitle,code:invoiceCode");
         referenceConfigService.insert(defaultReference);
         MetadataFieldReferenceConfig supportReference = referenceConfig(ownerField.getId(), ticketId);

@@ -132,6 +132,8 @@ class PlatformMetadataServiceContractTest {
             Optional.of(runtimeRefreshCoordinator), Optional.of(schemaEnsureService));
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+    private final ModuleMetadataOrchestrationService orchestrationService =
+            new ModuleMetadataOrchestrationService(moduleService, metadataService, relationService);
     private final ModuleMetadataFieldService moduleFieldService =
             new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService,
                     fieldTypeService, Optional.empty(), Optional.of(runtimeRefreshCoordinator));
@@ -1022,6 +1024,77 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldRequireRelationScopedCrossModuleReferenceConfig() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String orderId = metadataService.insert(metadata("crm", "order"));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField customerField = field(orderId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        relationService.insert(mainRelation("crm.customer", customerId));
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setTargetModuleAlias("crm.customer");
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("relation-scoped");
+    }
+
+    @Test
+    void shouldRejectSameModuleReferenceTargetThatIsNotBoundToSourceModule() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        String orderId = metadataService.insert(metadata("crm", "order"));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField customerField = field(orderId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        relationService.insert(mainRelation("crm.order", orderId));
+
+        assertThatThrownBy(() -> referenceConfigService.insert(referenceConfig(customerField.getId(), customerId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("target metadata is not bound to module");
+    }
+
+    @Test
+    void shouldRequireCrossModuleReferenceTargetToBeModuleMainMetadata() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String orderId = metadataService.insert(metadata("crm", "order"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        MetadataField contactField = field(orderId, "contactId", "contact_id", FieldType.STRING);
+        fieldService.insert(contactField);
+        String orderRelationId = relationService.insert(mainRelation("crm.order", orderId));
+        MetadataFieldReferenceConfig config = referenceConfig(contactField.getId(), contactId);
+        config.setRelationId(orderRelationId);
+        config.setTargetModuleAlias("crm.customer");
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("target module MAIN metadata");
+    }
+
+    @Test
+    void shouldCreateRelationScopedCrossModuleReferenceConfigToModuleMainMetadata() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String orderId = metadataService.insert(metadata("crm", "order"));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField customerField = field(orderId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        String orderRelationId = relationService.insert(mainRelation("crm.order", orderId));
+        relationService.insert(mainRelation("crm.customer", customerId));
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setRelationId(orderRelationId);
+        config.setTargetModuleAlias("crm.customer");
+
+        String id = referenceConfigService.insert(config);
+
+        assertThat(referenceConfigService.select(id))
+                .extracting(MetadataFieldReferenceConfig::getTargetModuleAlias,
+                        MetadataFieldReferenceConfig::getTargetMetadataId)
+                .containsExactly("crm.customer", customerId);
+    }
+
+    @Test
     void shouldRejectReferenceTitleOutputConflictWithSourceField() {
         String customerId = metadataService.insert(metadata("crm", "customer"));
         String contactId = metadataService.insert(metadata("crm", "contact"));
@@ -1050,6 +1123,40 @@ class PlatformMetadataServiceContractTest {
         assertThatThrownBy(() -> referenceConfigService.insert(config))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("reference projection output field conflicts with source field");
+    }
+
+    @Test
+    void shouldCreateDynamicModuleMainMetadataAsOneOrchestrationOperation() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+
+        ModuleMainMetadataCreationResult result = orchestrationService.createMainMetadata("crm.customer",
+                new ModuleMainMetadataCreateCommand("customer", "客户", null, null, true));
+
+        assertThat(result.metadata().getApplicationAlias()).isEqualTo("crm");
+        assertThat(result.metadata().getAlias()).isEqualTo("customer");
+        assertThat(result.metadata().getTableName()).isEqualTo("crm_customer");
+        assertThat(result.metadata().getDataScopeEnabled()).isTrue();
+        assertThat(result.relation().getModuleAlias()).isEqualTo("crm.customer");
+        assertThat(result.relation().getMetadataId()).isEqualTo(result.metadata().getId());
+        assertThat(result.relation().getRelationRole()).isEqualTo(RelationRole.MAIN);
+    }
+
+    @Test
+    void shouldRejectMainMetadataOrchestrationForStaticOrAlreadyBoundModule() {
+        moduleService.insert(module("crm.static_customer", "crm", ModuleKind.STATIC));
+        assertThatThrownBy(() -> orchestrationService.createMainMetadata("crm.static_customer",
+                new ModuleMainMetadataCreateCommand("customer", "客户", null, null, false)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports dynamic module");
+
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        orchestrationService.createMainMetadata("crm.customer",
+                new ModuleMainMetadataCreateCommand("customer", "客户", null, null, false));
+
+        assertThatThrownBy(() -> orchestrationService.createMainMetadata("crm.customer",
+                new ModuleMainMetadataCreateCommand("contact", "联系人", null, null, false)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("already has MAIN metadata relation");
     }
 
     @Test
@@ -1214,6 +1321,50 @@ class PlatformMetadataServiceContractTest {
         assertThat(relationService.list(Criteria.of().eq("moduleAlias", "crm.customer"), PageRequest.of(1, 10)))
                 .extracting(ModuleMetadataRelation::getRelationRole)
                 .containsExactly(RelationRole.MAIN, RelationRole.CHILD);
+    }
+
+    @Test
+    void shouldRequireChildRelationForeignKeyToBeExistingPhysicalFieldAndKeepDataScopeOnMainOnly() {
+        ModuleMetadataRelationService validatingRelationService = new ModuleMetadataRelationService(
+                relationDao, moduleService, metadataService, Optional.empty(), Optional.of(fieldService));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        String profileMetadataId = metadataService.insert(metadata("crm", "profile"));
+        validatingRelationService.insert(mainRelation("crm.customer", customerMetadataId));
+
+        ModuleMetadataRelation missingField = childRelation("crm.customer", profileMetadataId, customerMetadataId);
+        assertThatThrownBy(() -> validatingRelationService.insert(missingField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("physical foreign key field");
+
+        fieldService.insert(field(profileMetadataId, "customerId", "customer_id", FieldType.STRING));
+        Metadata scopedChild = metadataService.select(profileMetadataId);
+        scopedChild.setDataScopeEnabled(Boolean.TRUE);
+        metadataService.update(scopedChild);
+
+        assertThatThrownBy(() -> validatingRelationService.insert(
+                childRelation("crm.customer", profileMetadataId, customerMetadataId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot enable module data scope");
+    }
+
+    @Test
+    void shouldRejectSortPartitionConfigurationOnChildMetadata() {
+        ModuleMetadataRelationService validatingRelationService = new ModuleMetadataRelationService(
+                relationDao, moduleService, metadataService, Optional.empty(), Optional.of(fieldService));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        String profileMetadataId = metadataService.insert(metadata("crm", "profile"));
+        validatingRelationService.insert(mainRelation("crm.customer", customerMetadataId));
+        fieldService.insert(field(profileMetadataId, "customerId", "customer_id", FieldType.STRING));
+        Metadata profile = metadataService.select(profileMetadataId);
+        profile.setSortPartitionFields(java.util.Set.of("customer_id"));
+        metadataService.update(profile);
+
+        assertThatThrownBy(() -> validatingRelationService.insert(
+                childRelation("crm.customer", profileMetadataId, customerMetadataId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot configure sort partition fields");
     }
 
     @Test

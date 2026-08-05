@@ -34,11 +34,12 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     private final ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider;
     private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
     private final ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider;
+    private final ObjectProvider<ModuleMetadataRelationService> relationServiceProvider;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 FieldSpecService fieldTypeService) {
-        this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null), provider(null));
+        this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null), provider(null), provider(null));
     }
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
@@ -47,7 +48,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         this(fieldDao, metadataService, fieldTypeService, provider(runtimeRefreshCoordinator == null
                 ? null
-                : runtimeRefreshCoordinator.orElse(null)), provider(null), provider(null));
+                : runtimeRefreshCoordinator.orElse(null)), provider(null), provider(null), provider(null));
     }
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
@@ -57,7 +58,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
         this(fieldDao, metadataService, fieldTypeService,
                 provider(runtimeRefreshCoordinator == null ? null : runtimeRefreshCoordinator.orElse(null)),
-                provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)), provider(null));
+                provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)), provider(null), provider(null));
     }
 
     @Autowired
@@ -66,7 +67,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                                 FieldSpecService fieldTypeService,
                                 ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider,
                                 ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider,
-                                ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider) {
+                                ObjectProvider<ConfigurationReferenceDeletionGuard> referenceGuardProvider,
+                                ObjectProvider<ModuleMetadataRelationService> relationServiceProvider) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
@@ -76,10 +78,13 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                 "schemaEnsureServiceProvider must not be null");
         this.referenceGuardProvider = Objects.requireNonNull(referenceGuardProvider,
                 "referenceGuardProvider must not be null");
+        this.relationServiceProvider = Objects.requireNonNull(relationServiceProvider,
+                "relationServiceProvider must not be null");
     }
 
     @Override
     public void beforeDelete(String id) {
+        assertNotChildForeignKey(id);
         ConfigurationReferenceDeletionGuard guard = referenceGuardProvider.getIfAvailable();
         if (guard != null) guard.assertCanDelete(ConfigurationReferenceTarget.METADATA_FIELD, id);
     }
@@ -162,8 +167,45 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
             field.setTitleField(Boolean.FALSE);
         }
         validateFieldFormBoundary(field);
+        validateChildMetadataBoundary(field);
         rejectDuplicateField(field);
         rejectDuplicateSingleFlag(field);
+    }
+
+    private void validateChildMetadataBoundary(MetadataField field) {
+        ModuleMetadataRelationService relationService = relationServiceProvider.getIfAvailable();
+        if (relationService == null || !isChildMetadata(field.getMetadataId(), relationService)) {
+            return;
+        }
+        ModuleMetadataCapabilityPolicy.validateChildField(field);
+        for (ModuleMetadataRelation relation : childRelations(field.getMetadataId(), relationService)) {
+            if (field.getFieldName().equals(relation.getForeignKey())) {
+                ModuleMetadataCapabilityPolicy.validateChildForeignKey(field);
+            }
+        }
+    }
+
+    private void assertNotChildForeignKey(String id) {
+        MetadataField field = id == null || id.isBlank() ? null : select(id);
+        ModuleMetadataRelationService relationService = relationServiceProvider.getIfAvailable();
+        if (field == null || relationService == null) {
+            return;
+        }
+        if (childRelations(field.getMetadataId(), relationService).stream()
+                .anyMatch(relation -> field.getFieldName().equals(relation.getForeignKey()))) {
+            throw new PlatformException("Child relation foreign key cannot be deleted: " + field.getFieldName());
+        }
+    }
+
+    private boolean isChildMetadata(String metadataId, ModuleMetadataRelationService relationService) {
+        return !childRelations(metadataId, relationService).isEmpty();
+    }
+
+    private java.util.List<ModuleMetadataRelation> childRelations(String metadataId,
+                                                                    ModuleMetadataRelationService relationService) {
+        return relationService.list(Criteria.of().eq("metadataId", metadataId)
+                        .eq("relationRole", RelationRole.CHILD),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE));
     }
 
     private void normalizeFieldKind(MetadataField field) {
