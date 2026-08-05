@@ -13,7 +13,7 @@ allprojects {
     version = "0.1.0-SNAPSHOT"
 }
 
-val releasePublishProjectNames = listOf(
+val publicArtifactProjectNames = listOf(
     "muyun-common",
     "muyun-ability",
     "muyun-dynamic",
@@ -26,6 +26,7 @@ val releasePublishProjectNames = listOf(
     "muyun-spring-bom",
     "muyun-spring-boot-starter"
 )
+rootProject.extra["publicArtifactProjectNames"] = publicArtifactProjectNames
 
 fun Project.releaseValue(propertyName: String, environmentName: String): String? =
     findProperty(propertyName)?.toString()?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
@@ -72,22 +73,46 @@ tasks.register("verifyReleaseTagVersion") {
 tasks.register("publishReleaseToLocalRepository") {
     group = "publishing"
     description = "Publishes all public MuYunSpring artifacts to their local staging repositories."
-    dependsOn(releasePublishProjectNames.map { ":$it:publishAllPublicationsToMavenRepository" })
+    dependsOn(publicArtifactProjectNames.map { ":$it:publishAllPublicationsToMavenRepository" })
 }
 
 tasks.register("publishReleaseToConsumerRepository") {
     group = "publishing"
     description = "Publishes all public artifacts to one repository consumable by an external sample application."
-    dependsOn(releasePublishProjectNames.map { ":$it:publishAllPublicationsToConsumerRepository" })
+    dependsOn(publicArtifactProjectNames.map { ":$it:publishAllPublicationsToConsumerRepository" })
+}
+
+tasks.register<Exec>("verifyPublishedConsumer") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Builds and starts an isolated application that consumes only published Maven artifacts."
+    dependsOn("publishReleaseToConsumerRepository")
+    commandLine("bash", "scripts/verify-published-consumer.sh")
 }
 
 tasks.register("publishReleaseToSonatype") {
     group = "publishing"
     description = "Publishes all public MuYunSpring artifacts to Maven Central through Sonatype."
     dependsOn("verifyReleaseCredentials")
-    dependsOn(releasePublishProjectNames.map { ":$it:clean" })
-    dependsOn(releasePublishProjectNames.map { ":$it:publishToSonatype" })
+    dependsOn("verifyReleaseTagVersion")
+    dependsOn("verifyPublishedConsumer")
+    dependsOn(publicArtifactProjectNames.map { ":$it:clean" })
+    dependsOn(publicArtifactProjectNames.map { ":$it:publishToSonatype" })
     doFirst { requireReleaseCredentials() }
+}
+
+val releaseTagVerification = tasks.named("verifyReleaseTagVersion")
+val releaseCredentialVerification = tasks.named("verifyReleaseCredentials")
+val publishedConsumerVerification = tasks.named("verifyPublishedConsumer")
+gradle.projectsEvaluated {
+    publicArtifactProjectNames.forEach { projectName ->
+        val artifactProject = project(":$projectName")
+        artifactProject.tasks.named("publishAllPublicationsToConsumerRepository") {
+            mustRunAfter(artifactProject.tasks.named("clean"))
+        }
+        artifactProject.tasks.named("publishToSonatype") {
+            mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
+        }
+    }
 }
 
 val testcontainersVersion = libs.versions.testcontainers.get()
@@ -147,7 +172,7 @@ subprojects {
     }
 }
 
-configure(subprojects.filter { it.name in releasePublishProjectNames }) {
+configure(subprojects.filter { it.name in publicArtifactProjectNames }) {
     apply(plugin = "maven-publish")
     apply(plugin = "signing")
     apply(plugin = "io.github.jeadyx.sonatype-uploader")

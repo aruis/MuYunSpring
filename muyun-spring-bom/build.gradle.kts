@@ -7,9 +7,11 @@ javaPlatform {
 }
 
 dependencies {
+    @Suppress("UNCHECKED_CAST")
+    val publicArtifactProjectNames = rootProject.extra["publicArtifactProjectNames"] as List<String>
     constraints {
-        rootProject.subprojects
-            .filter { it.name.startsWith("muyun-") && it.name !in setOf("muyun-boot", "muyun-demo", "muyun-demo-web", "muyun-spring-bom") }
-            .forEach { api(project(it.path)) }
+        publicArtifactProjectNames
+            .filter { it != project.name }
+            .forEach { api(project(":$it")) }
     }
 }
