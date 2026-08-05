@@ -116,7 +116,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
 
     private void normalizeAndValidate(MetadataFieldReferenceConfig config) {
         MetadataField sourceField = requireField(config.getMetadataFieldId(), "source metadata field");
-        normalizeRelation(config, sourceField);
+        ModuleMetadataRelation sourceRelation = normalizeRelation(config, sourceField);
         FieldSpec sourceType = fieldTypeService.requireFieldType(sourceField.getFieldSpecAlias());
         if (sourceType.getFieldType() != FieldType.STRING && sourceType.getFieldType() != FieldType.TEXT) {
             throw new IllegalArgumentException("reference source field must be string/text: " + sourceField.getFieldName());
@@ -134,9 +134,12 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         } else {
             config.setTargetModuleAlias(null);
         }
+        validateCrossModuleTarget(config, sourceRelation);
         if (config.getCardinality() == null) {
             config.setCardinality(ReferenceCardinality.ONE);
         }
+        validateChildForeignKeyReference(sourceField, config);
+        validateTargetBinding(config, sourceField, sourceRelation);
         if (config.getTargetUnavailablePolicy() == null) {
             config.setTargetUnavailablePolicy(ReferenceTargetUnavailablePolicy.PRESERVE_HISTORY);
         }
@@ -150,6 +153,17 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         }
         rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
                 "metadata field reference config must be unique in scope: " + config.getMetadataFieldId());
+    }
+
+    private void validateChildForeignKeyReference(MetadataField sourceField,
+                                                   MetadataFieldReferenceConfig config) {
+        relationService.list(Criteria.of().eq("metadataId", sourceField.getMetadataId())
+                        .eq("relationRole", RelationRole.CHILD),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))
+                .stream()
+                .filter(relation -> config.getRelationId() == null || config.getRelationId().equals(relation.getId()))
+                .forEach(relation -> ModuleMetadataCapabilityPolicy.validateChildForeignKeyReference(
+                        relation, sourceField, config));
     }
 
     private Criteria scopeCriteria(String metadataFieldId, String relationId) {
@@ -170,10 +184,10 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         }
     }
 
-    private void normalizeRelation(MetadataFieldReferenceConfig config, MetadataField field) {
+    private ModuleMetadataRelation normalizeRelation(MetadataFieldReferenceConfig config, MetadataField field) {
         if (config.getRelationId() == null || config.getRelationId().isBlank()) {
             config.setRelationId(null);
-            return;
+            return null;
         }
         ModuleMetadataRelation relation = relationService.select(config.getRelationId());
         if (relation == null) {
@@ -181,6 +195,55 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         }
         if (!field.getMetadataId().equals(relation.getMetadataId())) {
             throw new PlatformException("Reference config relation metadata mismatch: " + config.getRelationId());
+        }
+        return relation;
+    }
+
+    private void validateCrossModuleTarget(MetadataFieldReferenceConfig config,
+                                           ModuleMetadataRelation sourceRelation) {
+        String targetModuleAlias = config.getTargetModuleAlias();
+        if (targetModuleAlias == null || targetModuleAlias.isBlank()) {
+            return;
+        }
+        if (sourceRelation == null) {
+            throw new PlatformException("Cross-module reference config must be relation-scoped: "
+                    + config.getMetadataFieldId());
+        }
+        if (targetModuleAlias.equals(sourceRelation.getModuleAlias())) {
+            config.setTargetModuleAlias(null);
+            return;
+        }
+        boolean targetIsMainMetadata = relationService.count(Criteria.of()
+                .eq("moduleAlias", targetModuleAlias)
+                .eq("metadataId", config.getTargetMetadataId())
+                .eq("relationRole", RelationRole.MAIN)) > 0;
+        if (!targetIsMainMetadata) {
+            throw new PlatformException("Cross-module reference target must be the target module MAIN metadata: "
+                    + targetModuleAlias);
+        }
+    }
+
+    /**
+     * A default reference is shared by every relation using its source metadata, so its target
+     * must be bound in every one of those module contexts before the configuration is persisted.
+     */
+    private void validateTargetBinding(MetadataFieldReferenceConfig config,
+                                       MetadataField sourceField,
+                                       ModuleMetadataRelation sourceRelation) {
+        List<ModuleMetadataRelation> sourceRelations = sourceRelation == null
+                ? relationService.list(Criteria.of().eq("metadataId", sourceField.getMetadataId()),
+                        new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE))
+                : List.of(sourceRelation);
+        for (ModuleMetadataRelation relation : sourceRelations) {
+            String targetModuleAlias = config.getTargetModuleAlias() == null
+                    ? relation.getModuleAlias()
+                    : config.getTargetModuleAlias();
+            if (relationService.count(Criteria.of()
+                    .eq("moduleAlias", targetModuleAlias)
+                    .eq("metadataId", config.getTargetMetadataId())) <= 0) {
+                throw new PlatformException("Reference target metadata is not bound to module: "
+                        + targetModuleAlias + "." + config.getTargetMetadataId());
+            }
         }
     }
 
@@ -222,7 +285,4 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         return field;
     }
 
-    private String sourceFieldName(MetadataFieldReferenceConfig config) {
-        return requireField(config.getMetadataFieldId(), "source metadata field").getFieldName();
-    }
 }

@@ -49,6 +49,7 @@ final class FieldCatalogLegacySchemaBridge implements PlatformBootstrapTask {
                 addColumn("platform_field_ui_control", "primary_value_key varchar(64)"),
                 addColumn("platform_field_ui_control", "query_mode varchar(16)"),
                 addColumn("platform_field_ui_control_field_mapping", "value_field_spec_alias varchar(64)"),
+                reconcileThenDropLegacyColumn("platform_metadata_field", "field_type_alias", "field_spec_alias"),
                 "UPDATE platform_field_ui_control SET value_shape = CASE alias "
                         + "WHEN 'multi_select' THEN 'COLLECTION' WHEN 'date_range' THEN 'COMPOSITE' "
                         + "WHEN 'date_time_range' THEN 'COMPOSITE' WHEN 'date_time_with_time_zone' THEN 'COMPOSITE' "
@@ -83,6 +84,15 @@ final class FieldCatalogLegacySchemaBridge implements PlatformBootstrapTask {
 
     private static String addColumn(String table, String definition) {
         return "ALTER TABLE IF EXISTS " + table + " ADD COLUMN IF NOT EXISTS " + definition;
+    }
+
+    private static String reconcileThenDropLegacyColumn(String table, String oldName, String newName) {
+        return "DO $$ BEGIN IF to_regclass('public." + table + "') IS NOT NULL AND EXISTS (SELECT 1 "
+                + "FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '" + table
+                + "' AND column_name = '" + oldName + "') AND EXISTS (SELECT 1 FROM information_schema.columns "
+                + "WHERE table_schema = 'public' AND table_name = '" + table + "' AND column_name = '" + newName
+                + "') THEN UPDATE " + table + " SET " + newName + " = " + oldName + " WHERE " + newName
+                + " IS NULL; ALTER TABLE " + table + " DROP COLUMN " + oldName + "; END IF; END $$";
     }
 
     private static String setNotNull(String table, String column) {

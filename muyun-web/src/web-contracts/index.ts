@@ -875,6 +875,42 @@ export interface PlatformModuleAction extends StandardEnabledSortableEntity {
   systemManaged?: boolean;
 }
 
+export interface Metadata extends StandardEnabledSortableEntity {
+  applicationAlias?: string;
+  alias?: string;
+  schemaName?: string;
+  tableName?: string;
+  dataScopeEnabled?: boolean;
+  sortPartitionFields?: string[];
+}
+
+export interface MetadataField extends StandardEnabledSortableEntity {
+  metadataId?: string;
+  fieldName?: string;
+  columnName?: string;
+  fieldSpecAlias?: string;
+  fieldOwnership?: string;
+  fieldForm?: string;
+  ownerFieldId?: string;
+  fieldRole?: string;
+  systemManaged?: boolean;
+  required?: boolean;
+  uniqueField?: boolean;
+  indexed?: boolean;
+  sortableField?: boolean;
+  titleField?: boolean;
+}
+
+export interface ModuleMetadataRelation extends StandardSortableEntity {
+  moduleAlias?: string;
+  metadataId?: string;
+  relationAlias?: string;
+  relationRole?: 'MAIN' | 'CHILD';
+  parentMetadataId?: string;
+  foreignKey?: string;
+  autoPopulate?: boolean;
+}
+
 export interface Tenant extends StandardEnabledSortableEntity {
   alias?: string;
 }

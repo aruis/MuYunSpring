@@ -12,6 +12,8 @@ class FieldCatalogLegacySchemaBridgeTest {
                 .anyMatch(sql -> sql.contains("field_ui_type_alias") && sql.contains("field_ui_control_alias"))
                 .anyMatch(sql -> sql.contains("value_shape varchar(16)"))
                 .anyMatch(sql -> sql.contains("query_mode") && sql.contains("BETWEEN"))
-                .anyMatch(sql -> sql.contains("value_field_spec_alias") && sql.contains("SET NOT NULL"));
+                .anyMatch(sql -> sql.contains("value_field_spec_alias") && sql.contains("SET NOT NULL"))
+                .anyMatch(sql -> sql.contains("UPDATE platform_metadata_field SET field_spec_alias = field_type_alias")
+                        && sql.contains("DROP COLUMN field_type_alias"));
     }
 }

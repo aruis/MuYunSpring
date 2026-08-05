@@ -37,6 +37,7 @@ import { createModuleOpenApiPageDescriptor, loadOpenApiCatalog } from '../app/mo
 import { useWorkbenchNavigation } from '../app/workbenchNavigation';
 import { createWorkspaceViewDescriptor } from '../app/workspaceViews';
 import { moduleActionManagementWorkspaceView } from './moduleActionManagementWorkspaceView';
+import { metadataOrchestrationWorkspaceView } from './metadataOrchestrationWorkspaceView';
 
 defineOptions({ name: 'ModuleManagementView' });
 
@@ -147,6 +148,9 @@ const moduleActions = computed<RecordActionItem[]>(() => {
   const moduleAlias = selectedModule.value?.alias ?? selectedModule.value?.id;
   if (moduleAlias) {
     actions.unshift({ key: 'actions', title: '动作' });
+  }
+  if (moduleAlias && selectedModule.value?.moduleKind === 'dynamic') {
+    actions.unshift({ key: 'metadata-orchestration', title: '元数据编排' });
   }
   if (moduleAlias && openApiModuleAliases.value.has(moduleAlias)) {
     actions.unshift({ key: 'openapi', title: '查看 OpenAPI' });
@@ -267,6 +271,7 @@ function handleModuleTreeAction(action: UiRecordInlineAction, record: PlatformMo
 }
 
 function handleModuleAction(action: RecordActionItem) {
+  if (action.key === 'metadata-orchestration') openMetadataOrchestration();
   if (action.key === 'actions') openModuleActions();
   if (action.key === 'openapi') openModuleOpenApi();
   if (action.key === 'edit') startEdit();
@@ -274,6 +279,18 @@ function handleModuleAction(action: RecordActionItem) {
   if (action.key === 'delete') void removeSelected();
   if (action.key === 'cancel') cancelEdit();
   if (action.key === 'save') void save();
+}
+
+function openMetadataOrchestration() {
+  const module = selectedModule.value;
+  const moduleAlias = module?.alias ?? module?.id;
+  if (!moduleAlias || module?.moduleKind !== 'dynamic') return;
+  workbenchNavigation?.openPage(
+    createWorkspaceViewDescriptor(metadataOrchestrationWorkspaceView, {
+      moduleAlias,
+      moduleTitle: module.title,
+    }),
+  );
 }
 
 function openModuleActions() {

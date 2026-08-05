@@ -245,6 +245,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         }
         validateVirtualFieldBoundary(moduleField, field);
         normalizeReferenceConfig(moduleField, metadata, relation);
+        validateChildForeignKeyReference(moduleField, relation, field);
         normalizeMeasureUnitConfig(moduleField, metadata, relation, field);
         normalizeMoneyConfig(moduleField, metadata, relation, field);
         rejectDuplicate(moduleField, Criteria.of()
@@ -253,6 +254,17 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 "module metadata field must be unique: " + relation.getId() + "." + field.getId());
         moduleField.setRelationId(relation.getId());
         moduleField.setMetadataFieldId(field.getId());
+    }
+
+    private void validateChildForeignKeyReference(ModuleMetadataField moduleField,
+                                                   ModuleMetadataRelation relation,
+                                                   MetadataField field) {
+        if (relation.getRelationRole() == RelationRole.CHILD
+                && field.getFieldName().equals(relation.getForeignKey())
+                && hasText(moduleField.getReferenceModuleAlias())) {
+            throw new PlatformException("Child relation foreign key cannot use module reference configuration: "
+                    + field.getFieldName());
+        }
     }
 
     private void validateVirtualFieldBoundary(ModuleMetadataField moduleField, MetadataField field) {
