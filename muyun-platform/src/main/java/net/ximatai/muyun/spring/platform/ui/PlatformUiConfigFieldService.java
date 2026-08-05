@@ -145,6 +145,9 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         }
         uiTypeAlias = PlatformNameRules.requireIdentifier(uiTypeAlias, "fieldUiControlAlias");
         FieldUiControl uiType = fieldUiTypeService.requireFieldUiControl(uiTypeAlias);
+        if (!Boolean.TRUE.equals(uiType.getEnabled())) {
+            throw new PlatformException("Field UI control must be enabled: " + uiTypeAlias);
+        }
         if (fieldType.getUiControlAliases() != null && !fieldType.getUiControlAliases().isEmpty()) {
             if (!fieldType.getUiControlAliases().contains(uiTypeAlias)) {
                 throw new PlatformException("Field UI type is not allowed by field type: "

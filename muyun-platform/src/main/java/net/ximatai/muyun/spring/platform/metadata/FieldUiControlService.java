@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,11 +26,20 @@ public class FieldUiControlService extends AbstractAbilityService<FieldUiControl
     public static final String MODULE_ALIAS = "platform.field_ui_control";
 
     private final FieldSpecService fieldTypeService;
+    private final BaseDao<PlatformUiConfigField, String> uiConfigFieldDao;
 
     public FieldUiControlService(BaseDao<FieldUiControl, String> fieldUiTypeDao,
                                       FieldSpecService fieldTypeService) {
+        this(fieldUiTypeDao, fieldTypeService, null);
+    }
+
+    @Autowired
+    public FieldUiControlService(BaseDao<FieldUiControl, String> fieldUiTypeDao,
+                                 FieldSpecService fieldTypeService,
+                                 BaseDao<PlatformUiConfigField, String> uiConfigFieldDao) {
         super(MODULE_ALIAS, FieldUiControl.class, fieldUiTypeDao);
         this.fieldTypeService = fieldTypeService;
+        this.uiConfigFieldDao = uiConfigFieldDao;
     }
 
     @Override
@@ -54,6 +65,7 @@ public class FieldUiControlService extends AbstractAbilityService<FieldUiControl
         normalizeAndValidate(fieldUiType);
         FieldUiControl existing = selectIncludingDeleted(fieldUiType.getId());
         rejectChanged(existing, fieldUiType, "Field UI type alias", FieldUiControl::getAlias);
+        rejectDisableWhenReferenced(existing, fieldUiType);
     }
 
     public FieldUiControl requireFieldUiControl(String alias) {
@@ -116,5 +128,17 @@ public class FieldUiControlService extends AbstractAbilityService<FieldUiControl
         }
         fieldUiControl.setPrimaryValueKey(PlatformNameRules.requireFieldName(
                 fieldUiControl.getPrimaryValueKey(), "primaryValueKey"));
+    }
+
+    private void rejectDisableWhenReferenced(FieldUiControl existing, FieldUiControl updated) {
+        if (uiConfigFieldDao == null || existing == null || !Boolean.FALSE.equals(updated.getEnabled())) {
+            return;
+        }
+        boolean referenced = !uiConfigFieldDao.list(Criteria.of().eq("fieldUiControlAlias", existing.getAlias()),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, 1)).isEmpty();
+        if (referenced) {
+            throw new PlatformException("Field UI control is referenced by UI config fields and cannot be disabled: "
+                    + existing.getAlias());
+        }
     }
 }

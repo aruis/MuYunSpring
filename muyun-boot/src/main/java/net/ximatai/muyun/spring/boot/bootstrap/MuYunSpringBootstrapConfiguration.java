@@ -25,6 +25,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Profile;
+import org.jdbi.v3.core.Jdbi;
 
 import java.util.List;
 
@@ -35,6 +37,13 @@ import java.util.List;
 @Configuration(proxyBeanMethods = false)
 @Import(MuYunSpringStaticDeclarationConfiguration.class)
 public class MuYunSpringBootstrapConfiguration {
+    @Bean
+    @Profile("local")
+    @ConditionalOnMissingBean(FieldCatalogLegacySchemaBridge.class)
+    FieldCatalogLegacySchemaBridge fieldCatalogLegacySchemaBridge(Jdbi jdbi) {
+        return new FieldCatalogLegacySchemaBridge(jdbi);
+    }
+
     @Bean
     @ConditionalOnMissingBean(InitialDataExecutor.class)
     /** 汇集各领域的初始数据能力与声明提供者，避免由具体领域直接编排启动顺序。 */

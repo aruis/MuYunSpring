@@ -6,6 +6,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlQueryMode;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
@@ -32,6 +37,8 @@ final class DynamicWebQueryFormSupport {
                                       WebQueryRequest request,
                                       PlatformPageConfigSnapshotService snapshotService,
                                       ModuleMetadataFieldService moduleFieldService,
+                                      FieldUiControlService fieldUiControlService,
+                                      FieldUiControlBindingService fieldUiControlBindingService,
                                       Function<List<DynamicQueryCondition>, Criteria> conditionCompiler) {
         if (request == null || request.queryForm().isEmpty()) {
             return Criteria.of();
@@ -49,7 +56,8 @@ final class DynamicWebQueryFormSupport {
         PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(moduleAlias);
         PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
         requireListUiConfig(snapshot, uiConfig);
-        Map<String, QueryFormField> fields = visibleMainFields(snapshot, uiConfig, moduleFieldService);
+        Map<String, QueryFormField> fields = visibleMainFields(snapshot, uiConfig, moduleFieldService,
+                fieldUiControlService, fieldUiControlBindingService);
         List<DynamicQueryCondition> conditions = new ArrayList<>();
         for (Map.Entry<String, Object> entry : effectiveValues.entrySet()) {
             String fieldName = normalizeKey(entry.getKey());
@@ -80,8 +88,12 @@ final class DynamicWebQueryFormSupport {
 
     private static Map<String, QueryFormField> visibleMainFields(PlatformPageConfigSnapshot snapshot,
                                                                  PlatformUiConfig uiConfig,
-                                                                 ModuleMetadataFieldService moduleFieldService) {
+                                                                 ModuleMetadataFieldService moduleFieldService,
+                                                                 FieldUiControlService fieldUiControlService,
+                                                                 FieldUiControlBindingService bindingService) {
         Map<String, QueryFormField> fields = new LinkedHashMap<>();
+        Map<String, FieldUiControl> controls = new LinkedHashMap<>();
+        Map<String, List<String>> bindingKeys = new LinkedHashMap<>();
         for (PlatformUiConfigField field : snapshot.uiFields()) {
             if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
                     || !Boolean.TRUE.equals(field.getVisible())) {
@@ -89,15 +101,29 @@ final class DynamicWebQueryFormSupport {
             }
             ResolvedModuleMetadataField resolved = moduleFieldService.resolve(field.getModuleMetadataFieldId());
             if (resolved.relationRole() == RelationRole.MAIN) {
-                fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(), field.getFieldUiControlAlias()));
+                if (!hasText(field.getFieldUiControlAlias())) {
+                    fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(),
+                            FieldUiControlQueryMode.DEFAULT, List.of()));
+                    continue;
+                }
+                if (fieldUiControlService == null || bindingService == null) {
+                    throw new PlatformException("field UI control query services are not configured");
+                }
+                FieldUiControl control = controls.computeIfAbsent(field.getFieldUiControlAlias(),
+                        fieldUiControlService::requireFieldUiControl);
+                List<String> keys = bindingKeys.computeIfAbsent(control.getAlias(), alias -> bindingService
+                        .listByFieldUiControlAliases(List.of(alias)).stream()
+                        .map(FieldUiControlBinding::getValueKey)
+                        .toList());
+                fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(), control.getQueryMode(), keys));
             }
         }
         return fields;
     }
 
     private static DynamicQueryCondition condition(QueryFormField field, Object value) {
-        if (isRangeUiType(field.fieldUiControlAlias())) {
-            RangeQueryValue range = rangeValue(field.fieldName(), value);
+        if (field.queryMode() == FieldUiControlQueryMode.BETWEEN) {
+            RangeQueryValue range = rangeValue(field.fieldName(), value, field.bindingKeys());
             if (range.values().isEmpty()) {
                 return null;
             }
@@ -111,15 +137,11 @@ final class DynamicWebQueryFormSupport {
         return new DynamicQueryCondition(field.fieldName(), null, values);
     }
 
-    private static boolean isRangeUiType(String fieldUiControlAlias) {
-        return "date_range".equals(fieldUiControlAlias) || "date_time_range".equals(fieldUiControlAlias);
-    }
-
-    private static RangeQueryValue rangeValue(String fieldName, Object value) {
+    private static RangeQueryValue rangeValue(String fieldName, Object value, List<String> bindingKeys) {
         if (value instanceof Map<?, ?> map) {
-            Object start = firstPresent(map, "start", "from", "startInclusive");
-            Object end = firstPresent(map, "end", "to", "endInclusive");
-            List<?> values = values(java.util.Arrays.asList(start, end));
+            List<?> values = values((bindingKeys == null ? List.<String>of() : bindingKeys).stream()
+                    .map(map::get)
+                    .toList());
             if (values.isEmpty()) {
                 return new RangeQueryValue(List.of(), textValue(map.get("timeZone")));
             }
@@ -132,11 +154,6 @@ final class DynamicWebQueryFormSupport {
         if (values.isEmpty()) return new RangeQueryValue(List.of(), null);
         if (values.size() != 2) throw new PlatformException("Query form range requires exactly two values: " + fieldName);
         return new RangeQueryValue(values, null);
-    }
-
-    private static Object firstPresent(Map<?, ?> map, String... keys) {
-        for (String key : keys) if (map.containsKey(key)) return map.get(key);
-        return null;
     }
 
 
@@ -211,7 +228,7 @@ final class DynamicWebQueryFormSupport {
         return text.isBlank() ? null : text;
     }
 
-    private record QueryFormField(String fieldName, String fieldUiControlAlias) {
+    private record QueryFormField(String fieldName, FieldUiControlQueryMode queryMode, List<String> bindingKeys) {
     }
 
     private record RangeQueryValue(List<?> values, String timeZone) {

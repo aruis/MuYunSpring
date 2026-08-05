@@ -20,6 +20,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
@@ -56,11 +58,14 @@ public class DynamicExportWebController {
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
+    private final FieldUiControlService fieldUiControlService;
+    private final FieldUiControlBindingService fieldUiControlBindingService;
 
     public DynamicExportWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
                                       DynamicExportFacade exportFacade) {
-        this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null, null, null);
+        this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null,
+                null, null, null, null);
     }
 
     @Autowired
@@ -69,11 +74,15 @@ public class DynamicExportWebController {
                                       DynamicExportFacade exportFacade,
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
-                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider) {
+                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
+                                      ObjectProvider<FieldUiControlService> fieldUiControlServiceProvider,
+                                      ObjectProvider<FieldUiControlBindingService> fieldUiControlBindingServiceProvider) {
         this(recordService, activeTenantVerifier, exportFacade,
                 pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
                 queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
-                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable());
+                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
+                fieldUiControlServiceProvider == null ? null : fieldUiControlServiceProvider.getIfAvailable(),
+                fieldUiControlBindingServiceProvider == null ? null : fieldUiControlBindingServiceProvider.getIfAvailable());
     }
 
     public DynamicExportWebController(DynamicRecordService recordService,
@@ -81,7 +90,7 @@ public class DynamicExportWebController {
                                       DynamicExportFacade exportFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService) {
-        this(recordService, activeTenantVerifier, exportFacade, pageConfigSnapshotService, queryItemService, null);
+        this(recordService, activeTenantVerifier, exportFacade, pageConfigSnapshotService, queryItemService, null, null, null);
     }
 
     public DynamicExportWebController(DynamicRecordService recordService,
@@ -90,12 +99,26 @@ public class DynamicExportWebController {
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService) {
+        this(recordService, activeTenantVerifier, exportFacade, pageConfigSnapshotService, queryItemService,
+                moduleMetadataFieldService, null, null);
+    }
+
+    public DynamicExportWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      DynamicExportFacade exportFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      FieldUiControlService fieldUiControlService,
+                                      FieldUiControlBindingService fieldUiControlBindingService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.exportFacade = exportFacade;
         this.pageConfigSnapshotService = pageConfigSnapshotService;
         this.queryItemService = queryItemService;
         this.moduleMetadataFieldService = moduleMetadataFieldService;
+        this.fieldUiControlService = fieldUiControlService;
+        this.fieldUiControlBindingService = fieldUiControlBindingService;
     }
 
     @PostMapping("/data")
@@ -173,7 +196,8 @@ public class DynamicExportWebController {
                 ? Criteria.of()
                 : DynamicWebQueryMapper.queryCriteria(request.criteria(), operations::queryCriteria);
         Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(moduleAlias,
-                request, pageConfigSnapshotService, moduleMetadataFieldService, operations::queryCriteria);
+                request, pageConfigSnapshotService, moduleMetadataFieldService, fieldUiControlService,
+                fieldUiControlBindingService, operations::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(moduleAlias, request);
         return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
     }

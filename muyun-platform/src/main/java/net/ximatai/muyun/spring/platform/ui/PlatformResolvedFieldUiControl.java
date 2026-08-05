@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.ui;
 
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.platform.metadata.FieldUiControlValueShape;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlQueryMode;
 
 import java.util.List;
 
@@ -11,6 +12,7 @@ public record PlatformResolvedFieldUiControl(
         String defaultFieldSpecAlias,
         FieldUiControlValueShape valueShape,
         String primaryValueKey,
+        FieldUiControlQueryMode queryMode,
         ViewControlType rendererType,
         String icon,
         List<PlatformResolvedFieldUiControlProperty> properties,

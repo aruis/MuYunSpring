@@ -59,7 +59,7 @@ const fieldTypeOptions: Option[] = [
 ].map((value) => ({ label: value, value }));
 const queryOperatorOptions: Option[] = [
   'EQ',
-  'NE',
+  'NOT_EQUAL',
   'GT',
   'GTE',
   'LT',
@@ -67,8 +67,8 @@ const queryOperatorOptions: Option[] = [
   'LIKE',
   'IN',
   'NOT_IN',
-  'IS_NULL',
-  'IS_NOT_NULL',
+  'NULL',
+  'NOT_NULL',
   'BETWEEN',
 ].map((value) => ({ label: value, value }));
 const uiControlOptions = computed<Option[]>(() =>

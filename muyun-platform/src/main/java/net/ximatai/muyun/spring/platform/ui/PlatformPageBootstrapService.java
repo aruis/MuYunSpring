@@ -497,6 +497,7 @@ public class PlatformPageBootstrapService {
                 type.getDefaultFieldSpecAlias(),
                 type.getValueShape(),
                 type.getPrimaryValueKey(),
+                type.getQueryMode(),
                 type.getRendererType(),
                 type.getIcon(),
                 properties == null ? List.of() : properties.stream()

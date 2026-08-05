@@ -55,6 +55,8 @@ import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
 import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -142,6 +144,8 @@ public class DynamicRecordWebController implements
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
+    private final FieldUiControlService fieldUiControlService;
+    private final FieldUiControlBindingService fieldUiControlBindingService;
     private final RecordAttachmentService recordAttachmentService;
     private final RecordAttachmentAccessService recordAttachmentAccessService;
     private final RecordDuplicateCheckService duplicateCheckService;
@@ -164,6 +168,8 @@ public class DynamicRecordWebController implements
         this.pageConfigSnapshotService = queryServices.pageConfigSnapshotService();
         this.queryItemService = queryServices.queryItemService();
         this.moduleMetadataFieldService = queryServices.moduleMetadataFieldService();
+        this.fieldUiControlService = queryServices.fieldUiControlService();
+        this.fieldUiControlBindingService = queryServices.fieldUiControlBindingService();
         this.recordAttachmentService = attachmentServices.attachmentService();
         this.recordAttachmentAccessService = attachmentServices.attachmentAccessService();
         this.duplicateCheckService = actionServices.duplicateCheckService();
@@ -205,7 +211,8 @@ public class DynamicRecordWebController implements
                 ? Criteria.of()
                 : DynamicWebQueryMapper.queryCriteria(request.criteria(), service()::queryCriteria);
         Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(DynamicWebRequest.moduleAlias(),
-                request, pageConfigSnapshotService, moduleMetadataFieldService, service()::queryCriteria);
+                request, pageConfigSnapshotService, moduleMetadataFieldService, fieldUiControlService,
+                fieldUiControlBindingService, service()::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(DynamicWebRequest.moduleAlias(), request);
         return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
     }
@@ -876,7 +883,8 @@ public class DynamicRecordWebController implements
                 ? Criteria.of()
                 : criteria(moduleAlias, entityAlias, request.criteria());
         Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(moduleAlias,
-                request, pageConfigSnapshotService, moduleMetadataFieldService,
+                request, pageConfigSnapshotService, moduleMetadataFieldService, fieldUiControlService,
+                fieldUiControlBindingService,
                 conditions -> recordService.queryCriteria(moduleAlias, entityAlias, conditions));
         Criteria quickCriteria = quickSearchCriteria(moduleAlias, request);
         return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);

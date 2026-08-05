@@ -42,7 +42,7 @@ public class FieldSpecService extends AbstractAbilityService<FieldSpec> implemen
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, FieldSpec.class, java.util.List.of("id", "alias", "title", "fieldType", "defaultLength", "defaultPrecision", "defaultScale", "defaultQueryOperator", "defaultUiControlAlias", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, FieldSpec.class, java.util.List.of("id", "alias", "title", "fieldType", "defaultLength", "defaultPrecision", "defaultScale", "defaultQueryOperator", "queryOperators", "defaultUiControlAlias", "uiControlAliases", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

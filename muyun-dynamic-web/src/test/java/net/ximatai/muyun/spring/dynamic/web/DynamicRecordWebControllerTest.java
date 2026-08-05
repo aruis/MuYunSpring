@@ -86,6 +86,11 @@ import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFac
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControl;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBinding;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlBindingService;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlQueryMode;
+import net.ximatai.muyun.spring.platform.metadata.FieldUiControlService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
@@ -1300,7 +1305,8 @@ class DynamicRecordWebControllerTest {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade)
+                        .query(snapshotService, null, moduleFieldService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler(), new DynamicWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1597,8 +1603,11 @@ class DynamicRecordWebControllerTest {
     void shouldApplyQueryFormWithinPublishedListUiConfig() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        FieldUiControlService fieldUiControlService = mock(FieldUiControlService.class);
+        FieldUiControlBindingService bindingService = mock(FieldUiControlBindingService.class);
         MockMvc lowCodeMvc = MockMvcBuilders
-                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade).query(snapshotService, null, moduleFieldService).build())
+                .standaloneSetup(controllerFixture(service, activeTenantVerifier).codePreview(codeBusinessPreviewService).generation(referenceGenerationFacade)
+                        .query(snapshotService, null, moduleFieldService, fieldUiControlService, bindingService).build())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler(), new DynamicWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
@@ -1622,7 +1631,7 @@ class DynamicRecordWebControllerTest {
         PlatformUiConfigField codeField = uiField("ui-list", "module-field-code");
         PlatformUiConfigField amountField = uiField("ui-list", "module-field-amount");
         PlatformUiConfigField submittedAtField = uiField("ui-list", "module-field-submitted-at");
-        submittedAtField.setFieldUiControlAlias("date_time_range");
+        submittedAtField.setFieldUiControlAlias("period_window");
         PlatformUiConfigField hiddenField = uiField("ui-list-restricted", "module-field-hidden");
         hiddenField.setVisible(false);
         PlatformUiConfigField lineField = uiField("ui-list-restricted", "module-field-line-code");
@@ -1643,6 +1652,21 @@ class DynamicRecordWebControllerTest {
                 "module-field-submitted-at", "submittedAt", RelationRole.MAIN, "timestamp"));
         when(moduleFieldService.resolve("module-field-line-code")).thenReturn(resolvedModuleField(
                 "module-field-line-code", "lineCode", RelationRole.CHILD));
+        when(fieldUiControlService.requireFieldUiControl(anyString())).thenAnswer(invocation -> {
+            FieldUiControl control = new FieldUiControl();
+            control.setAlias(invocation.getArgument(0));
+            control.setQueryMode(FieldUiControlQueryMode.DEFAULT);
+            return control;
+        });
+        FieldUiControl periodWindow = new FieldUiControl();
+        periodWindow.setAlias("period_window");
+        periodWindow.setQueryMode(FieldUiControlQueryMode.BETWEEN);
+        when(fieldUiControlService.requireFieldUiControl("period_window")).thenReturn(periodWindow);
+        FieldUiControlBinding begin = new FieldUiControlBinding();
+        begin.setValueKey("beginAt");
+        FieldUiControlBinding finish = new FieldUiControlBinding();
+        finish.setValueKey("finishAt");
+        when(bindingService.listByFieldUiControlAliases(List.of("period_window"))).thenReturn(List.of(begin, finish));
         when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().like("code", "C-001"));
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
@@ -1658,8 +1682,8 @@ class DynamicRecordWebControllerTest {
                                     "code": "C-001",
                                     "amount": 1200,
                                     "submittedAt": {
-                                      "start": "2026-01-01",
-                                      "end": "2026-01-31",
+                                      "beginAt": "2026-01-01",
+                                      "finishAt": "2026-01-31",
                                       "timeZone": "Asia/Shanghai"
                                     }
                                   }
@@ -3453,6 +3477,8 @@ class DynamicRecordWebControllerTest {
         private PlatformPageConfigSnapshotService pageConfigSnapshotService;
         private PlatformQueryItemService queryItemService;
         private ModuleMetadataFieldService moduleMetadataFieldService;
+        private FieldUiControlService fieldUiControlService;
+        private FieldUiControlBindingService fieldUiControlBindingService;
         private RecordAttachmentService recordAttachmentService;
         private RecordAttachmentAccessService recordAttachmentAccessService;
         private RecordDuplicateCheckService duplicateCheckService;
@@ -3481,9 +3507,20 @@ class DynamicRecordWebControllerTest {
                 PlatformPageConfigSnapshotService pageConfig,
                 PlatformQueryItemService queryItems,
                 ModuleMetadataFieldService metadataFields) {
+            return query(pageConfig, queryItems, metadataFields, null, null);
+        }
+
+        DynamicRecordWebControllerFixture query(
+                PlatformPageConfigSnapshotService pageConfig,
+                PlatformQueryItemService queryItems,
+                ModuleMetadataFieldService metadataFields,
+                FieldUiControlService fieldUiControls,
+                FieldUiControlBindingService bindings) {
             pageConfigSnapshotService = pageConfig;
             queryItemService = queryItems;
             moduleMetadataFieldService = metadataFields;
+            fieldUiControlService = fieldUiControls;
+            fieldUiControlBindingService = bindings;
             return this;
         }
 
@@ -3517,7 +3554,8 @@ class DynamicRecordWebControllerTest {
                     recordService,
                     activeTenantVerifier,
                     new DynamicRecordQueryServices(pageConfigSnapshotService, queryItemService,
-                            moduleMetadataFieldService, relationProjectionReadService),
+                            moduleMetadataFieldService, fieldUiControlService, fieldUiControlBindingService,
+                            relationProjectionReadService),
                     new DynamicRecordAttachmentServices(recordAttachmentService, recordAttachmentAccessService),
                     new DynamicRecordActionServices(codeBusinessPreviewService, referenceRecordGenerationFacade,
                             duplicateCheckService, navigationService));

@@ -146,6 +146,23 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldRejectDisablingUiControlReferencedByUiConfigField() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String moduleFieldId = seedModuleField("crm.customer", "customer", "name", "name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, moduleFieldId, "text"));
+
+        FieldUiControlService protectedService = new FieldUiControlService(
+                fieldUiTypeDao, fieldTypeService, uiConfigFieldDao);
+
+        assertThatThrownBy(() -> protectedService.disable("text"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot be disabled");
+    }
+
+    @Test
     void shouldExposeFieldUiControlMappingsInPageBootstrap() {
         seedFieldType("date", FieldType.DATE, DynamicQueryOperator.BETWEEN);
         seedUiType("date_range", "date");
