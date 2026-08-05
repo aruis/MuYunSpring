@@ -112,14 +112,23 @@ gradle.projectsEvaluated {
         artifactProject.tasks.named("publishToSonatype") {
             mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
         }
+        artifactProject.tasks.named("2.uploadDeploymentDir") {
+            mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
+        }
     }
 
-    // The Sonatype Portal uploader creates and polls a deployment per module. Running those
-    // polls concurrently can race the Portal API and produce transient 404 responses, so the
-    // final remote publishing phase is deliberately serialized.
+    // The Sonatype Portal uploader creates and polls a deployment per module. Running any part
+    // of that upload-to-publish flow concurrently can race the Portal API and produce transient
+    // 404 responses, so the final remote publishing phase is deliberately serialized.
     publicArtifactProjectNames.zipWithNext().forEach { (precedingProjectName, projectName) ->
-        project(":$projectName").tasks.named("publishToSonatype") {
-            mustRunAfter(project(":$precedingProjectName").tasks.named("publishToSonatype"))
+        val precedingProject = project(":$precedingProjectName")
+        val artifactProject = project(":$projectName")
+
+        artifactProject.tasks.named("2.uploadDeploymentDir") {
+            mustRunAfter(precedingProject.tasks.named("publishToSonatype"))
+        }
+        artifactProject.tasks.named("publishToSonatype") {
+            mustRunAfter(precedingProject.tasks.named("publishToSonatype"))
         }
     }
 }
