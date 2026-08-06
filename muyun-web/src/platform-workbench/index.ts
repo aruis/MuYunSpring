@@ -1,6 +1,8 @@
 export { default as Workbench } from './Workbench.vue';
 export { default as WorkbenchMenu } from './WorkbenchMenu.vue';
 export { default as WorkbenchOutlet } from './WorkbenchOutlet.vue';
+export { provideWorkbenchNavigation, useWorkbenchNavigation } from './workbenchNavigation';
+export type { WorkbenchNavigation, WorkbenchPageOpenResult } from './workbenchNavigation';
 export {
   createMenuTab,
   findFirstNavigationMenu,

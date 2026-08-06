@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
-import { createBackendHttpClient } from '../app/backendHttp';
-import { loadOpenApiCatalog, type OpenApiModuleCatalogItem } from '../app/moduleOpenApi';
+import { createBackendHttpClient } from '../platform-admin-runtime/backendHttp';
+import { loadOpenApiCatalog, type OpenApiModuleCatalogItem } from '../platform-admin-runtime/moduleOpenApi';
 
 const emit = defineEmits<{ open: [moduleAlias: string, title: string]; back: [] }>();
 const modules = ref<OpenApiModuleCatalogItem[]>([]);

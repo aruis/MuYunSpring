@@ -17,12 +17,15 @@ import {
   tryPageDescriptorFromUrl,
   type PageDescriptorResolveOptions,
 } from '@muyun/platform-workbench';
-import { createWorkspaceViewDescriptor, resolveWorkspaceView } from './workspaceViews';
+import {
+  createWorkspaceViewDescriptor,
+  resolveWorkspaceView,
+} from '../platform-admin-runtime/workspaceViews';
 import {
   createModuleOpenApiPageDescriptor,
   isModuleOpenApiPage,
   moduleAliasFromOpenApiPath,
-} from './moduleOpenApi';
+} from '../platform-admin-runtime/moduleOpenApi';
 
 export interface WorkbenchStartupClients {
   sessionClient: SessionClient;

@@ -1,5 +1,5 @@
 import { defineAsyncComponent } from 'vue';
-import { defineWorkspaceView } from '../app/workspaceViewContract';
+import { defineWorkspaceView } from '../platform-admin-runtime/workspaceViewContract';
 
 /** Role identity is sufficient: the authorization APIs validate ownership server-side. */
 export interface RoleAuthorizationWorkspaceViewInput {

@@ -37,8 +37,9 @@ muyun-web/src/vue-ui-antdv        Vue + Ant Design Vue UI adapter
 muyun-web/src/dynamic-page-runtime        动态页面运行器
 muyun-web/src/platform-components    跨业务可复用的平台业务组件
 muyun-web/src/platform-workbench      平台工作台
-muyun-web/src/app                 当前应用装配、路由和 provider
-muyun-web/src/views               当前应用页面入口
+muyun-web/src/platform-admin-runtime 平台管理页、路由注册和工作区运行时
+muyun-web/src/views                 平台自有管理页实现
+muyun-web/src/app                   框架仓库自身的启动、登录和开发宿主装配
 ```
 
 未来包名按前端职责命名，避免复用后端 Gradle 子项目名：
@@ -50,7 +51,10 @@ muyun-web/src/views               当前应用页面入口
 @muyun/dynamic-page-runtime
 @muyun/platform-components
 @muyun/platform-workbench
+@muyun/platform-admin-runtime
 ```
+
+首个对外运行时不会仓促把上述内部目录逐个冻结为 npm 包。当前以 `@ximatai/muyun-web-app` 交付面向管理型 App 的组合包：公开 Workbench、标准模块运行器、认证/HTTP/menu 基础原语、平台业务组件、平台管理运行时和样式入口。平台自有管理页随包交付；消费应用自己的业务页面、登录品牌和路由组合不进入包。UI adapter 目前是组合包的内部实现，不单独承诺其组件级 API；等内部 API、声明文件和独立版本策略稳定后，再按职责拆包，避免把当前源码目录直接变成长期发布承诺。
 
 ## 能力分层
 
@@ -99,16 +103,22 @@ dynamic-page-runtime 不直接依赖 Ant Design Vue；它依赖 MuYun 契约、w
 
 承载平台工作台，包括布局、菜单、登录态入口、租户切换入口、全局错误出口和路由框架。它面向平台应用和业务应用提供统一承载形态。
 
+登录页本身不是唯一的 Workbench 视觉实现。平台应提供认证会话、认证失效、强制改密与错误归一等可复用内核，并可提供默认登录页；业务 App 可以复用默认页，也可以按自身品牌实现登录 UI。自定义页面仍必须消费平台认证 client，不复制登录协议、token/session 存储或认证错误策略。
+
+### platform-admin-runtime
+
+承载平台自有的应用、模块、元数据、IAM 等管理页，以及它们的静态路由注册、工作区视图和上下文契约。它是管理型 App 的默认平台交付，不是业务 App 页面收容层。业务 App 通过显式路由挂接自身页面；平台管理菜单通过后端声明的 `route + moduleAlias` 命中本运行时，仍复用模块权限、上下文和标准模块运行器。
+
 ## 交付准备度
 
-当前前端平台交付面已经具备基础承载能力，但还没有进入真实动态业务页面开发：
+当前前端平台交付面已经具备管理型 App 的基础承载能力；动态 LIST 入口已有真实 CRUD 闭环，但尚未覆盖完整页面交付：
 
 | 方向                 | 当前状态                                                                                                                                                                            | 后续触发                                                                                            |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Workbench            | 登录、token 保存、session/menu 启动、菜单页签、URL 恢复、mock client、后端模式构建已有测试或构建覆盖。                                                                              | 进入全局通知、租户切换、用户偏好或生产级登录安全时，再补真实 UI 出口和会话治理。                    |
 | 页面交付后端契约     | `page/delivery` 后端接口已形成阶段契约，覆盖 bootstrap、查询、保存、附件、查重、引用、导航和偏好；接口细节以 [页面交付 Web API](../platform/topics/page/delivery/WEB_API.md) 为准。 | 前端动态页面运行器开始接真实后端时，再把这些接口固化到 `web-contracts` 和 `web-core` client。       |
 | UI adapter           | `vue-ui-antdv` 已提供表单、输入、选择、菜单、页签、表格、空态、错误态等基础组件，并通过边界检查限制 Ant Design Vue 直接外泄。                                                       | 出现真实页面字段、表格、动作区或布局需求时，按 MuYun 组件语义扩展，不透传 Ant Design Vue 完整 API。 |
-| dynamic-page-runtime | 目前是 skeleton，只消费 mock descriptor 展示表单、列表和动作，不读取页面 bootstrap，不执行真实查询或保存。                                                                          | 动态页面开发启动时，先接 bootstrap 和列表查询，再接表单保存、局部错误 handler、查重和附件。         |
+| dynamic-page-runtime | 标准模块 LIST 入口已接运行时上下文，支持真实查询、新增、编辑、删除和表单字段解析；mock descriptor 仍保留为组件级演示。                                                                  | 继续接 bootstrap 的完整视图语义、FORM/DETAIL 入口、局部错误、查重和附件，不把阶段能力表述为完整设计器。 |
 | platform-components  | 当前只保留跨业务组件边界说明，没有沉淀真实业务组件。                                                                                                                                | 引用选择、附件面板、导入导出、审批动作区等至少出现稳定跨项目复用语义后再进入。                      |
 | 业务示例             | `examples/business-web` 验证业务项目可通过本地 alias 消费平台包，且不直接依赖 Ant Design Vue。                                                                                      | 平台包正式拆分或业务团队开始独立仓库接入时，补私有 npm 发布和迁移说明。                             |
 
@@ -217,9 +227,9 @@ npm run check:boundaries
 2. 多 UI 库并行 adapter。
 3. 可视化流程设计器。
 4. 完整插件市场。
-5. 前端真实动态业务页面闭环。
+5. 完整动态页面交付闭环（FORM/DETAIL、查重、附件、导入和工作流动作）。
 
-当前重点是先固定技术路线、分层骨架、团队协作模型、平台 workbench 承载能力和可演进方向。后端页面交付接口已有阶段契约，但前端运行器尚未接入真实页面交付链路。
+当前重点是固定技术路线、分层骨架、团队协作模型、平台 workbench 与管理型 App 的交付能力。后端页面交付接口已有阶段契约；前端已接入标准 LIST CRUD，剩余页面语义按真实业务触发逐步闭合。
 
 ## 验证命令
 

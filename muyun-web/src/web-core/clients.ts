@@ -4,6 +4,8 @@ import type {
   LoginRequest,
   LoginResult,
   MenuMineResponse,
+  MenuOpenMode,
+  MenuTreeNode,
 } from '@muyun/web-contracts';
 import type { HttpClient } from './http';
 
@@ -29,8 +31,51 @@ export function createSessionClient(http: HttpClient): SessionClient {
 
 export function createMenuClient(http: HttpClient): MenuClient {
   return {
-    mine: () => http.request<MenuMineResponse>({ path: '/platform.menu/mine' }),
+    mine: async () => normalizeMenuMineResponse(await http.request<unknown>({ path: '/platform.menu/mine' })),
   };
+}
+
+/**
+ * The backend serializes Java enum values as upper-case identifiers while the
+ * web contract deliberately uses lower-case literals.  Normalize once at the
+ * HTTP projection boundary so every workbench consumer sees the same menu
+ * contract instead of requiring application-level compatibility code.
+ */
+export function normalizeMenuMineResponse(response: unknown): MenuMineResponse {
+  if (!isRecord(response) || !Array.isArray(response.records)) {
+    return response as MenuMineResponse;
+  }
+
+  return {
+    ...response,
+    records: response.records.map(normalizeMenuTreeNode),
+  } as MenuMineResponse;
+}
+
+function normalizeMenuTreeNode(node: unknown): MenuTreeNode {
+  if (!isRecord(node)) {
+    return node as MenuTreeNode;
+  }
+
+  const record = node.record;
+  return {
+    ...node,
+    record: isRecord(record) ? { ...record, openMode: normalizeMenuOpenMode(record.openMode) } : record,
+    children: Array.isArray(node.children) ? node.children.map(normalizeMenuTreeNode) : [],
+  } as MenuTreeNode;
+}
+
+function normalizeMenuOpenMode(value: unknown): MenuOpenMode | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.toLowerCase();
+  return normalized === 'tab' || normalized === 'window' ? normalized : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 export function createAuthClient(http: HttpClient): AuthClient {

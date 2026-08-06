@@ -15,6 +15,7 @@ export interface PageDescriptorResolveOptions {
   title?: string;
   platformRoutePrefixes?: string[];
   businessRoutePrefixes?: string[];
+  /** Optional legacy mapping for framework-owned static business pages. */
   businessModuleRoutes?: Record<string, string>;
   /** Page layout contracts keyed by a static business route. */
   businessRouteLayouts?: Record<string, PageLayoutMode>;
@@ -100,10 +101,7 @@ export function resolvePageDescriptor(
         title: options.title,
         layout: businessRouteLayoutsOf({ route: businessRoute }, options),
         menuId: target.menuId,
-        target: {
-          route: businessRoute,
-          moduleAlias: target.moduleAlias,
-        },
+        target: { route: businessRoute, moduleAlias: target.moduleAlias },
         entryParamsJson: target.entryParamsJson,
         tabPolicy: { identity: 'by-menu', closable: true, cacheable: true },
       };

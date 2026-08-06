@@ -1,5 +1,5 @@
 import { defineAsyncComponent } from 'vue';
-import { defineWorkspaceView } from '../app/workspaceViewContract';
+import { defineWorkspaceView } from '../platform-admin-runtime/workspaceViewContract';
 
 export interface SystemUserDetailWorkspaceViewInput {
   recordId: string;

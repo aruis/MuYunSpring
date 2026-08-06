@@ -22,7 +22,7 @@ import SystemUserManagementView from '../views/SystemUserManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
 import UserManagementView from '../views/UserManagementView.vue';
 
-export interface StaticBusinessRoute {
+export interface PlatformAdminRoute {
   route: string;
   moduleAlias: string;
   component: Component;
@@ -32,7 +32,7 @@ export interface StaticBusinessRoute {
   menuEntry?: boolean;
 }
 
-export const staticBusinessRoutes: StaticBusinessRoute[] = [
+export const platformAdminRoutes: PlatformAdminRoute[] = [
   {
     route: '/config/applications',
     moduleAlias: 'platform.application',
@@ -132,31 +132,33 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
   },
 ];
 
-export const businessRoutePrefixes = Array.from(new Set(staticBusinessRoutes.map((route) => route.route)));
-export const businessModuleRoutes = Object.fromEntries(
-  staticBusinessRoutes
+export const platformAdminRoutePrefixes = Array.from(
+  new Set(platformAdminRoutes.map((route) => route.route)),
+);
+export const platformAdminModuleRoutes = Object.fromEntries(
+  platformAdminRoutes
     .filter((route) => route.menuEntry !== false)
     .map((route) => [route.moduleAlias, route.route]),
 );
-export const businessRouteLayouts = Object.fromEntries(
-  staticBusinessRoutes.map((route) => [route.route, route.layout]),
+export const platformAdminRouteLayouts = Object.fromEntries(
+  platformAdminRoutes.map((route) => [route.route, route.layout]),
 );
 
-export function resolveStaticBusinessRoute(
+export function resolvePlatformAdminRoute(
   descriptor?: BusinessRoutePageDescriptor,
-): StaticBusinessRoute | undefined {
+): PlatformAdminRoute | undefined {
   if (!descriptor) {
     return undefined;
   }
-  return staticBusinessRoutes.find((route) => routeMatchesTarget(route, descriptor.target));
+  return platformAdminRoutes.find((route) => routeMatchesTarget(route, descriptor.target));
 }
 
-export function isStaticBusinessRoutePage(
+export function isPlatformAdminRoutePage(
   descriptor?: PageDescriptor,
 ): descriptor is BusinessRoutePageDescriptor {
-  return descriptor?.pageType === 'business-route' && Boolean(resolveStaticBusinessRoute(descriptor));
+  return descriptor?.pageType === 'business-route' && Boolean(resolvePlatformAdminRoute(descriptor));
 }
 
-function routeMatchesTarget(route: StaticBusinessRoute, target: RoutePageTarget) {
+function routeMatchesTarget(route: PlatformAdminRoute, target: RoutePageTarget) {
   return target.route ? target.route === route.route : target.moduleAlias === route.moduleAlias;
 }

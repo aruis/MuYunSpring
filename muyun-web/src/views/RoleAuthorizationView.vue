@@ -29,9 +29,9 @@ import type {
   RolePermissionAction,
 } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import WorkspaceViewDrawer from '../app/WorkspaceViewDrawer.vue';
-import { useWorkspaceViewHost } from '../app/workspaceViewHost';
-import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import WorkspaceViewDrawer from '../platform-admin-runtime/WorkspaceViewDrawer.vue';
+import { useWorkspaceViewHost } from '../platform-admin-runtime/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../platform-admin-runtime/useWorkspaceViewPromotion';
 import { createRoleGrantClient } from './roleGrantClient';
 import { roleAuthorizationWorkspaceView } from './roleAuthorizationWorkspaceView';
 import {

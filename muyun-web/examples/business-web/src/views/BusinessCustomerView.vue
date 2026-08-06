@@ -1,29 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ActionBar, UiForm, UiTable } from '@muyun/vue-ui-antdv';
-import type { ActionContract, FormContract, RecordData, TableContract } from '@muyun/web-contracts';
-
-const formContract: FormContract = {
-  fields: [
-    { name: 'customerName', label: '客户名称', kind: 'input', required: true },
-    { name: 'industry', label: '行业', kind: 'dictionary-select', dictionaryAlias: 'crm.industry' },
-    { name: 'level', label: '客户等级', kind: 'dictionary-select', dictionaryAlias: 'crm.customer.level' },
-  ],
-};
-
-const tableContract: TableContract = {
-  rowKey: 'id',
-  columns: [
-    { key: 'customerName', title: '客户名称' },
-    { key: 'industry', title: '行业', dictionaryAlias: 'crm.industry' },
-    { key: 'level', title: '等级', dictionaryAlias: 'crm.customer.level' },
-  ],
-};
-
-const actions: ActionContract[] = [
-  { actionCode: 'save', title: '保存', level: 'primary', refresh: 'record' },
-  { actionCode: 'submit', title: '提交审批', refresh: 'all' },
-];
+import { RecordDetailPanel, formatPlatformDateTime } from '@ximatai/muyun-web-app';
+import type { RecordData } from '@ximatai/muyun-web-app';
 
 const record = ref<RecordData>({
   customerName: '业务项目客户',
@@ -34,19 +12,45 @@ const record = ref<RecordData>({
 const rows = ref<RecordData[]>([
   { id: 'biz-001', customerName: '业务项目客户', industry: 'software', level: 'key' },
 ]);
+
+const generatedAt = formatPlatformDateTime('2026-08-06T08:00:00Z');
 </script>
 
 <template>
   <section class="business-grid">
     <article class="business-card">
       <h2>业务表单</h2>
-      <UiForm v-model="record" :contract="formContract" submit-text="业务保存" />
-      <ActionBar :actions="actions" />
+      <RecordDetailPanel title="客户信息">
+        <dl>
+          <dt>客户名称</dt>
+          <dd>{{ record.customerName }}</dd>
+          <dt>行业</dt>
+          <dd>{{ record.industry }}</dd>
+          <dt>客户等级</dt>
+          <dd>{{ record.level }}</dd>
+        </dl>
+      </RecordDetailPanel>
     </article>
 
     <article class="business-card">
       <h2>业务列表</h2>
-      <UiTable :contract="tableContract" :rows="rows" />
+      <p class="generated-at">构建时间：{{ generatedAt }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>客户名称</th>
+            <th>行业</th>
+            <th>等级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in rows" :key="String(row.id)">
+            <td>{{ row.customerName }}</td>
+            <td>{{ row.industry }}</td>
+            <td>{{ row.level }}</td>
+          </tr>
+        </tbody>
+      </table>
     </article>
   </section>
 </template>

@@ -32,9 +32,12 @@ import type {
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { usePageBusinessEventHandler, usePageRecordExternalChange } from '../app/pageRealtime';
-import { useWorkspaceViewHost } from '../app/workspaceViewHost';
-import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import {
+  usePageBusinessEventHandler,
+  usePageRecordExternalChange,
+} from '../platform-admin-runtime/pageRealtime';
+import { useWorkspaceViewHost } from '../platform-admin-runtime/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../platform-admin-runtime/useWorkspaceViewPromotion';
 import { systemUserDetailWorkspaceView } from './systemUserDetailWorkspaceView';
 import {
   handOffSystemUserDetailWorkspaceSession,

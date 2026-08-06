@@ -6,8 +6,8 @@ import {
   createWorkspaceViewRegistry,
   dismissWorkspaceViewDescriptor,
   defineWorkspaceView,
-} from '../src/app/workspaceViews.ts';
-import { canPromoteWorkspaceView } from '../src/app/useWorkspaceViewPromotion.ts';
+} from '../src/platform-admin-runtime/workspaceViews.ts';
+import { canPromoteWorkspaceView } from '../src/platform-admin-runtime/useWorkspaceViewPromotion.ts';
 import { roleDetailWorkspaceView } from '../src/views/roleDetailWorkspaceView.ts';
 import { roleAuthorizationWorkspaceView } from '../src/views/roleAuthorizationWorkspaceView.ts';
 import { systemUserDetailWorkspaceView } from '../src/views/systemUserDetailWorkspaceView.ts';

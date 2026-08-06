@@ -8,6 +8,7 @@ import {
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
+import { confirmAction } from '@muyun/vue-ui-antdv';
 import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 
@@ -21,13 +22,20 @@ const context = useModuleContext<QueryListRecord>({
   moduleAlias: props.descriptor.target.moduleAlias,
 });
 const selectedRecord = ref<QueryListRecord>();
+const editingRecord = ref<QueryListRecord>();
+const editorMode = ref<'create' | 'edit' | 'view'>('view');
 const formViewCode = ref<string>();
 const formFields = ref(resolveRecordFormFields(undefined));
+const reloadKey = ref(0);
+const saving = ref(false);
 
 const title = computed(
   () => props.descriptor.title ?? context.runtime.snapshot()?.title ?? context.moduleAlias,
 );
-const detailTitle = computed(() => recordTitle(selectedRecord.value) ?? '记录详情');
+const detailTitle = computed(() => {
+  if (editorMode.value === 'create') return `新建${title.value}`;
+  return recordTitle(editingRecord.value ?? selectedRecord.value) ?? '记录详情';
+});
 const pageMode = computed<MenuPageMode>(() => props.descriptor.target.pageMode ?? 'LIST');
 const isListPage = computed(() => pageMode.value === 'LIST');
 const listUiConfigId = computed(() =>
@@ -55,26 +63,95 @@ function handleLoaded(records: QueryListRecord[]) {
   if (selectedRecord.value) {
     selectedRecord.value =
       records.find((record) => record.id === selectedRecord.value?.id) ?? selectedRecord.value;
+    if (editorMode.value === 'view') {
+      editingRecord.value = selectedRecord.value;
+    }
     return;
   }
   selectedRecord.value = records[0];
+  editingRecord.value = records[0];
 }
 
 function selectRecord(record: QueryListRecord) {
   selectedRecord.value = record;
+  editingRecord.value = record;
+  editorMode.value = 'view';
 }
 
 function updateDraftField(
   fieldName: string,
   value: import('@muyun/platform-components').RecordFormFieldValue,
 ) {
-  if (!selectedRecord.value) {
+  if (!editingRecord.value) {
     return;
   }
-  selectedRecord.value = {
-    ...selectedRecord.value,
+  editingRecord.value = {
+    ...editingRecord.value,
     [fieldName]: value,
   };
+}
+
+function createRecord() {
+  editingRecord.value = { enabled: true };
+  editorMode.value = 'create';
+}
+
+async function editRecord(record: QueryListRecord) {
+  const id = record.id == null ? undefined : String(record.id);
+  if (!id) return;
+  editingRecord.value = await context.crud.view(id);
+  selectedRecord.value = editingRecord.value;
+  editorMode.value = 'edit';
+}
+
+async function saveRecord() {
+  const record = editingRecord.value;
+  if (!record || saving.value) return;
+  saving.value = true;
+  try {
+    const id = record.id == null ? undefined : String(record.id);
+    const result =
+      editorMode.value === 'edit' && id
+        ? await context.crud.update(id, record)
+        : await context.crud.insert(record);
+    selectedRecord.value = result.record;
+    editingRecord.value = result.record;
+    editorMode.value = 'view';
+    reloadKey.value += 1;
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function deleteRecord(record: QueryListRecord) {
+  const id = record.id == null ? undefined : String(record.id);
+  const version = typeof record.version === 'number' ? record.version : undefined;
+  if (!id || version === undefined) return;
+  if (
+    !(await confirmAction({
+      title: '删除记录',
+      content: `确认删除「${recordTitle(record) ?? id}」？`,
+      okText: '删除',
+      danger: true,
+    }))
+  ) {
+    return;
+  }
+  await context.crud.delete(id, { version });
+  if (selectedRecord.value?.id === id) {
+    selectedRecord.value = undefined;
+    editingRecord.value = undefined;
+  }
+  reloadKey.value += 1;
+}
+
+function handleListAction(action: { key?: string }) {
+  if (action.key === 'create') createRecord();
+}
+
+function handleRowAction(action: { key?: string }, record: QueryListRecord) {
+  if (action.key === 'edit') void editRecord(record);
+  if (action.key === 'delete') void deleteRecord(record);
 }
 
 function recordTitle(record: QueryListRecord | undefined) {
@@ -90,8 +167,9 @@ function recordTitle(record: QueryListRecord | undefined) {
       :context="context"
       :title="title"
       :selected-key="selectedRecord?.id"
-      :standard-crud-actions="false"
-      :standard-crud-row-actions="false"
+      :reload-key="reloadKey"
+      :standard-crud-actions="true"
+      :standard-crud-row-actions="true"
       :ui-config-id="listUiConfigId"
       :query-template-id="descriptor.target.defaultQueryTemplateId"
       quick-search-placeholder="搜索动态记录"
@@ -99,19 +177,31 @@ function recordTitle(record: QueryListRecord | undefined) {
       @loaded="handleLoaded"
       @select="selectRecord"
       @row-dblclick="selectRecord"
+      @action="handleListAction"
+      @row-action="handleRowAction"
     />
 
     <RecordDetailPanel class="dynamic-detail" :title="detailTitle">
       <template #actions>
         <span v-if="formViewCode" class="view-code">{{ formViewCode }}</span>
+        <button
+          v-if="selectedRecord && editorMode === 'view'"
+          type="button"
+          @click="editRecord(selectedRecord)"
+        >
+          编辑
+        </button>
+        <button v-if="editorMode !== 'view'" type="button" :disabled="saving" @click="saveRecord">
+          {{ saving ? '保存中' : '保存' }}
+        </button>
       </template>
       <RecordFormFields
-        v-if="selectedRecord"
+        v-if="editingRecord"
         class="dynamic-form"
-        :record="selectedRecord as RecordFormRecord"
+        :record="editingRecord as RecordFormRecord"
         :fields="formFields"
         :option-context="context"
-        :disabled="true"
+        :disabled="editorMode === 'view'"
         @update:field="updateDraftField"
       />
       <p v-else class="empty-detail">请选择一条动态记录</p>

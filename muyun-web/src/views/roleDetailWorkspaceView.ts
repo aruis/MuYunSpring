@@ -1,6 +1,6 @@
 import { defineAsyncComponent } from 'vue';
 import type { RoleOwnerScopeType } from '@muyun/web-contracts';
-import { defineWorkspaceView } from '../app/workspaceViewContract';
+import { defineWorkspaceView } from '../platform-admin-runtime/workspaceViewContract';
 
 export interface RoleDetailWorkspaceViewInput {
   recordId: string;

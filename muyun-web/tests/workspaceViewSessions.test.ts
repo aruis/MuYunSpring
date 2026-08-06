@@ -8,8 +8,8 @@ import {
   registerWorkspaceViewHandoffRecipient,
   takeWorkspaceViewSession,
   workspaceViewInstanceKey,
-} from '../src/app/workspaceViewSessions.ts';
-import { defineWorkspaceView } from '../src/app/workspaceViews.ts';
+} from '../src/platform-admin-runtime/workspaceViewSessions.ts';
+import { defineWorkspaceView } from '../src/platform-admin-runtime/workspaceViewContract.ts';
 
 const view = defineWorkspaceView({
   type: 'iam.user.detail.session-test',

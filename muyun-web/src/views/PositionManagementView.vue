@@ -25,7 +25,7 @@ import {
 } from '@muyun/platform-components';
 import type { Option, Position, PositionCategory, Tenant } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { useCurrentUserContext } from '../app/currentUserContext';
+import { useCurrentUserContext } from '../platform-admin-runtime/currentUserContext';
 import { confirmAction, UiEmpty, UiInput, UiSpin, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createPositionManagementState,

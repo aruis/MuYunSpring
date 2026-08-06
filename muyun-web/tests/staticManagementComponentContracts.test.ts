@@ -74,7 +74,7 @@ test('workbench keeps the sidebar separator when the mega menu opens', () => {
 
 test('workbench presents realtime transport state through an application facade', () => {
   const appSource = readSource('src/App.vue');
-  const appRealtimeSource = readSource('src/app/realtime.ts');
+  const appRealtimeSource = readSource('src/platform-admin-runtime/realtime.ts');
   const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
   const menuSource = readSource('src/platform-workbench/WorkbenchMenu.vue');
   const workbenchStart = appSource.indexOf('<Workbench');
@@ -116,7 +116,7 @@ test('record mode drawer owns detail mode branch switching', () => {
   const detailLayoutSource = readSource('src/platform-components/RecordDetailLayout.vue');
   const operationBarSource = readSource('src/platform-components/DrawerOperationBar.vue');
   const indexSource = readSource('src/platform-components/index.ts');
-  const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
+  const pageRealtimeSource = readSource('src/platform-admin-runtime/pageRealtime.ts');
   const employeeDetailContentSource = readSource('src/views/EmployeeDetailContent.vue');
 
   assert.match(indexSource, /export \{ default as RecordModeDrawer \}/);
@@ -368,7 +368,7 @@ test('management workspace consumes the page layout contract for constrained des
 
 test('system user management fills the constrained work area and leaves scrolling to its list panel', () => {
   const systemUserSource = readSource('src/views/SystemUserManagementView.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
 
   assert.match(
     systemUserSource,
@@ -383,7 +383,7 @@ test('system user management fills the constrained work area and leaves scrollin
 
 test('user management fills the constrained work area and leaves scrolling to its scope and list panels', () => {
   const userSource = readSource('src/views/UserManagementView.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
 
   assert.match(
     userSource,
@@ -1099,7 +1099,7 @@ test('employee management uses organization scope and platform query list panel'
 
 test('role management keeps basic scope management separate from binding and authorization', () => {
   const roleViewSource = readSource('src/views/RoleManagementView.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
 
@@ -1214,7 +1214,7 @@ test('role management keeps basic scope management separate from binding and aut
   assert.doesNotMatch(roleViewSource, /createWorkspaceViewDescriptor\([\s\S]*roleAuthorizationWorkspaceView/);
   const roleAuthorizationViewSource = readSource('src/views/RoleAuthorizationView.vue');
   const roleAuthorizationWorkspaceViewSource = readSource('src/views/roleAuthorizationWorkspaceView.ts');
-  const workspaceDrawerSource = readSource('src/app/WorkspaceViewDrawer.vue');
+  const workspaceDrawerSource = readSource('src/platform-admin-runtime/WorkspaceViewDrawer.vue');
   assert.match(roleAuthorizationViewSource, /角色组不独立授权/);
   assert.match(roleAuthorizationViewSource, /标准动作的数据范围模板/);
   assert.match(roleAuthorizationViewSource, /dataScopePolicyCatalog/);
@@ -1260,7 +1260,7 @@ test('user management keeps account basics separate from employment binding and 
   const userDetailContentSource = readSource('src/views/UserDetailContent.vue');
   const userSessionRowsSource = readSource('src/views/useUserSessionRows.ts');
   const userSessionExpandedSource = readSource('src/platform-components/UserSessionExpandedSubtable.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
   const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
   const iconSource = readSource('src/vue-ui-antdv/components/UiIcon.vue');
@@ -1387,7 +1387,7 @@ test('system user management is a separate root account entry', () => {
   const systemUserViewSource = readSource('src/views/SystemUserManagementView.vue');
   const userSessionRowsSource = readSource('src/views/useUserSessionRows.ts');
   const userViewSource = readSource('src/views/UserManagementView.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
 
   assert.match(routesSource, /moduleAlias: 'iam\.system_user'/);
   assert.match(routesSource, /route: '\/iam\/system-users'/);
@@ -1485,14 +1485,14 @@ test('ordinary management pages do not infer their height from the workbench chr
 
 test('password management is a dedicated security settings page', () => {
   const passwordViewSource = readSource('src/views/PasswordManagementView.vue');
-  const routesSource = readSource('src/app/businessRoutes.ts');
+  const routesSource = readSource('src/platform-admin-runtime/platformAdminRoutes.ts');
   const startupSource = readSource('src/app/appWorkbenchStartup.ts');
   const contractsSource = readSource('src/web-contracts/index.ts');
 
   assert.match(routesSource, /moduleAlias: 'iam\.password_policy_rule'/);
   assert.match(routesSource, /route: '\/platform\/security\/passwords'/);
-  assert.match(startupSource, /businessModuleRoutes/);
-  assert.match(startupSource, /businessRoutePrefixes/);
+  assert.match(startupSource, /platformAdminModuleRoutes/);
+  assert.match(startupSource, /platformAdminRoutePrefixes/);
   assert.match(passwordViewSource, /defineOptions\(\{ name: 'PasswordManagementView' \}\)/);
   assert.match(passwordViewSource, /moduleAlias: 'iam\.password_policy_rule'/);
   assert.match(passwordViewSource, /<StaticManagementLayout/);
@@ -1514,8 +1514,8 @@ test('password management is a dedicated security settings page', () => {
 
 test('workbench exposes own password change through auth boundary', () => {
   const appSource = readSource('src/App.vue');
-  const realtimeSource = readSource('src/app/realtime.ts');
-  const pageRealtimeSource = readSource('src/app/pageRealtime.ts');
+  const realtimeSource = readSource('src/platform-admin-runtime/realtime.ts');
+  const pageRealtimeSource = readSource('src/platform-admin-runtime/pageRealtime.ts');
   const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
   const dialogSource = readSource('src/app/ChangeOwnPasswordDialog.vue');
   const authClientSource = readSource('src/web-core/clients.ts');
@@ -1765,10 +1765,12 @@ test('side panels use an explicit tab host and fixed drawer action regions', () 
   const sidePanelHostSource = readSource('src/vue-ui-antdv/components/UiSidePanelHost.vue');
   const workbenchSource = readSource('src/platform-workbench/Workbench.vue');
   const detailDrawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
-  const workspaceViewOutletSource = readSource('src/app/WorkspaceViewOutlet.vue');
-  const workspaceViewContributionsSource = readSource('src/app/workspaceViewContributions.ts');
-  const workspaceViewsSource = readSource('src/app/workspaceViews.ts');
-  const viewPromotionSource = readSource('src/app/useWorkspaceViewPromotion.ts');
+  const workspaceViewOutletSource = readSource('src/platform-admin-runtime/WorkspaceViewOutlet.vue');
+  const workspaceViewContributionsSource = readSource(
+    'src/platform-admin-runtime/workspaceViewContributions.ts',
+  );
+  const workspaceViewsSource = readSource('src/platform-admin-runtime/workspaceViews.ts');
+  const viewPromotionSource = readSource('src/platform-admin-runtime/useWorkspaceViewPromotion.ts');
   const tenantSource = readSource('src/views/TenantManagementView.vue');
   const userSource = readSource('src/views/UserManagementView.vue');
   const userDetailContentSource = readSource('src/views/UserDetailContent.vue');
@@ -1806,7 +1808,10 @@ test('side panels use an explicit tab host and fixed drawer action regions', () 
   assert.match(viewPromotionSource, /accepted === false/);
   assert.match(viewPromotionSource, /title\?: MaybeRefOrGetter<string \| undefined>/);
   assert.match(workspaceViewOutletSource, /setTitle\(title\)/);
-  assert.match(readSource('src/app/StaticBusinessRouteOutlet.vue'), /workspaceViewPresentation === 'drawer'/);
+  assert.match(
+    readSource('src/platform-admin-runtime/PlatformAdminOutlet.vue'),
+    /workspaceViewPresentation === 'drawer'/,
+  );
   assert.match(userSource, /useWorkspaceViewHost/);
   assert.match(userSource, /isDrawerWorkspaceTask/);
   assert.match(employeeSource, /useWorkspaceViewHost/);

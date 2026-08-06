@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
-import { createBackendHttpClient } from '../app/backendHttp';
+import { createBackendHttpClient } from '../platform-admin-runtime/backendHttp';
 import {
   createOpenApiAuthenticatedFetch,
   loadModuleOpenApi,
   openApiBackendBaseUrl,
   type ModuleOpenApiDocument,
-} from '../app/moduleOpenApi';
+} from '../platform-admin-runtime/moduleOpenApi';
 
 const props = defineProps<{ moduleAlias: string }>();
 const emit = defineEmits<{ titleResolved: [title: string] }>();

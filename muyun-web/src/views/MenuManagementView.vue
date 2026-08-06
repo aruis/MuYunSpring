@@ -20,7 +20,7 @@ import {
 import type { MenuRecord, MenuScheme, Option, PlatformModule } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, UiSelect, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
-import { useCurrentUserContext } from '../app/currentUserContext';
+import { useCurrentUserContext } from '../platform-admin-runtime/currentUserContext';
 import { createMenuManagementState, menuTitleOf, schemeTitleOf } from './menuManagementState';
 
 defineOptions({ name: 'MenuManagementView' });

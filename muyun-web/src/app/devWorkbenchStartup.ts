@@ -1,5 +1,9 @@
 import { createMockMenuClient, createMockSessionClient } from '@/web-core/mock';
-import { businessModuleRoutes, businessRouteLayouts, businessRoutePrefixes } from './businessRoutes';
+import {
+  platformAdminModuleRoutes,
+  platformAdminRouteLayouts,
+  platformAdminRoutePrefixes,
+} from '../platform-admin-runtime/platformAdminRoutes';
 import { loadWorkbenchStartupState } from './workbenchStartup';
 
 export function loadDevWorkbenchStartupState() {
@@ -8,6 +12,10 @@ export function loadDevWorkbenchStartupState() {
       sessionClient: createMockSessionClient(),
       menuClient: createMockMenuClient(),
     },
-    { businessModuleRoutes, businessRouteLayouts, businessRoutePrefixes },
+    {
+      businessModuleRoutes: platformAdminModuleRoutes,
+      businessRouteLayouts: platformAdminRouteLayouts,
+      businessRoutePrefixes: platformAdminRoutePrefixes,
+    },
   );
 }

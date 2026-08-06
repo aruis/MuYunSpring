@@ -34,11 +34,11 @@ import type {
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { useCurrentUserContext } from '../app/currentUserContext';
-import { createBackendHttpClient } from '../app/backendHttp';
-import { usePageBusinessEventHandler } from '../app/pageRealtime';
-import { useWorkspaceViewHost } from '../app/workspaceViewHost';
-import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import { useCurrentUserContext } from '../platform-admin-runtime/currentUserContext';
+import { createBackendHttpClient } from '../platform-admin-runtime/backendHttp';
+import { usePageBusinessEventHandler } from '../platform-admin-runtime/pageRealtime';
+import { useWorkspaceViewHost } from '../platform-admin-runtime/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../platform-admin-runtime/useWorkspaceViewPromotion';
 import UserDetailContent from './UserDetailContent.vue';
 import { userDetailWorkspaceView } from './userDetailWorkspaceView';
 import {
