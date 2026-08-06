@@ -4,9 +4,12 @@
 
 ## Unreleased
 
+## 0.26.3 - 2026-08-06
+
 ### Changed
 
 - 发布前以本地 Maven 坐标启动独立消费者；Maven Central 真实坐标验证保留为首发或发布链路调整后的人工检查。
+- Release workflow 将消费者预检、发布工作区清理和 Maven Central 上传分阶段执行，保证上传只使用本次构建的构件。
 
 ### Removed
 
