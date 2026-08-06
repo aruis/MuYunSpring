@@ -1,4 +1,5 @@
 import java.util.Base64
+import org.gradle.api.component.AdhocComponentWithVariants
 
 plugins {
     alias(libs.plugins.spring.boot) apply false
@@ -6,11 +7,6 @@ plugins {
     signing
     id("io.github.jeadyx.sonatype-uploader") version "2.8" apply false
     java
-}
-
-allprojects {
-    group = "net.ximatai.muyun.spring"
-    version = "0.26.1"
 }
 
 val publicArtifactProjectNames = listOf(
@@ -31,6 +27,24 @@ rootProject.extra["publicArtifactProjectNames"] = publicArtifactProjectNames
 fun Project.releaseValue(propertyName: String, environmentName: String): String? =
     findProperty(propertyName)?.toString()?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
         ?: providers.environmentVariable(environmentName).orNull?.trim()?.takeIf { it.isNotEmpty() }
+
+fun Project.releaseTag(): String? = findProperty("release.tag")?.toString()?.trim()
+    ?.takeIf { it.isNotEmpty() && it != "null" }
+    ?: providers.environmentVariable("GITHUB_REF_TYPE").orNull
+        ?.takeIf { it == "tag" }
+        ?.let { providers.environmentVariable("GITHUB_REF_NAME").orNull?.trim() }
+
+fun Project.releaseVersion(): String? = releaseTag()
+    ?.also { require(it.matches(Regex("v\\d+\\.\\d+\\.\\d+"))) { "Invalid release tag '$it'." } }
+    ?.removePrefix("v")
+
+val developmentVersion = providers.gradleProperty("muyunVersion").get()
+val effectiveVersion = releaseVersion() ?: developmentVersion
+
+allprojects {
+    group = "net.ximatai.muyun.spring"
+    version = effectiveVersion
+}
 
 fun Project.releaseSigningSecretKey(): String? {
     releaseValue("signing.secretKey", "SIGNING_SECRET_KEY")?.let { return it }
@@ -59,13 +73,19 @@ tasks.register("verifyReleaseCredentials") {
 
 tasks.register("verifyReleaseTagVersion") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
-    description = "Verifies that a non-snapshot release version matches the release tag."
+    description = "Verifies that the release tag matches the current development version."
     doLast {
-        require(!version.toString().endsWith("-SNAPSHOT")) { "releaseVersion must not be a SNAPSHOT version." }
-        val tag = releaseValue("release.tag", "GITHUB_REF_NAME")
-            ?: error("Missing release tag. Provide -Prelease.tag=v${project.version} or set GITHUB_REF_NAME.")
-        require(tag == "v${project.version}") {
-            "Release tag '$tag' does not match project version '${project.version}'."
+        require(developmentVersion.endsWith("-SNAPSHOT")) {
+            "muyunVersion '$developmentVersion' must describe the next development version."
+        }
+        val tag = releaseTag()
+            ?: error("Missing release tag. Provide -Prelease.tag=v${developmentVersion.removeSuffix("-SNAPSHOT")} or set GITHUB_REF_NAME.")
+        val expectedTag = "v${developmentVersion.removeSuffix("-SNAPSHOT")}"
+        require(tag == expectedTag) {
+            "Release tag '$tag' must match development version '$developmentVersion' (expected '$expectedTag')."
+        }
+        require(version.toString() == tag.removePrefix("v")) {
+            "Release build version '${project.version}' must be derived from tag '$tag'."
         }
     }
 }
@@ -86,7 +106,14 @@ tasks.register<Exec>("verifyPublishedConsumer") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Builds and starts an isolated application that consumes only published Maven artifacts."
     dependsOn("publishReleaseToConsumerRepository")
+    environment("MUYUN_CONSUMER_VERSION", project.version.toString())
     commandLine("bash", "scripts/verify-published-consumer.sh")
+}
+
+tasks.register<Exec>("verifyMavenCentralConsumer") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Waits for Maven Central indexing, then starts the isolated consumer from Maven Central artifacts."
+    commandLine("bash", "scripts/verify-maven-central-consumer.sh")
 }
 
 tasks.register("publishReleaseToSonatype") {
@@ -202,6 +229,13 @@ configure(subprojects.filter { it.name in publicArtifactProjectNames }) {
         }
     }
 
+    plugins.withId("java-test-fixtures") {
+        (components["java"] as AdhocComponentWithVariants).apply {
+            withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+            withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
+        }
+    }
+
     afterEvaluate {
         extensions.configure<PublishingExtension> {
             publications {
@@ -211,7 +245,7 @@ configure(subprojects.filter { it.name in publicArtifactProjectNames }) {
                 pom {
                     name = "MuYunSpring"
                     description = "A dynamic-static unified enterprise application platform for Spring Boot."
-                    url = "https://github.com/aruis/MuYunSpring"
+                    url = "https://github.com/ximatai/MuYunSpring"
                     licenses {
                         license {
                             name = "The Apache License, Version 2.0"
@@ -227,9 +261,9 @@ configure(subprojects.filter { it.name in publicArtifactProjectNames }) {
                         }
                     }
                     scm {
-                        connection = "scm:git:git://github.com/aruis/MuYunSpring.git"
-                        developerConnection = "scm:git:ssh://github.com/aruis/MuYunSpring.git"
-                        url = "https://github.com/aruis/MuYunSpring"
+                        connection = "scm:git:git://github.com/ximatai/MuYunSpring.git"
+                        developerConnection = "scm:git:ssh://github.com/ximatai/MuYunSpring.git"
+                        url = "https://github.com/ximatai/MuYunSpring"
                     }
                 }
                 }

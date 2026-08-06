@@ -111,11 +111,11 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(FieldSpec.class)))
                 .contains("id", "alias", "title", "field_type", "default_length", "default_precision",
                         "default_scale", "default_query_operator", "query_operators",
-                        "default_ui_type_alias", "ui_type_aliases")
+                        "default_ui_control_alias", "ui_control_aliases")
                 .doesNotContain("verify_regex");
         assertThat(columnType(mapper.toTable(FieldSpec.class), "query_operators"))
                 .isEqualTo(ColumnType.JSON_SET);
-        assertThat(columnType(mapper.toTable(FieldSpec.class), "ui_type_aliases"))
+        assertThat(columnType(mapper.toTable(FieldSpec.class), "ui_control_aliases"))
                 .isEqualTo(ColumnType.JSON_SET);
         assertThat(columnNames(mapper.toTable(FieldUiControl.class)))
                 .contains("id", "alias", "title", "default_field_spec_alias", "value_shape", "primary_value_key", "query_mode", "renderer_type", "icon",

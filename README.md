@@ -1,6 +1,6 @@
 # MuYunSpring
 
-[![CI](https://github.com/aruis/MuYunSpring/actions/workflows/ci.yml/badge.svg)](https://github.com/aruis/MuYunSpring/actions/workflows/ci.yml)
+[![CI](https://github.com/ximatai/MuYunSpring/actions/workflows/ci.yml/badge.svg)](https://github.com/ximatai/MuYunSpring/actions/workflows/ci.yml)
 
 MuYunSpring 是一个基于 Java 21、Spring Boot 和 Vue 3 的企业应用平台底座。项目的核心路线是“动静一体”：静态 Java 业务模型和动态元数据模型复用同一套平台能力、数据访问、生命周期、权限、审计和页面交付链路。
 
@@ -91,9 +91,33 @@ docs              架构原则、平台专题、前端路线和技术债记录
 - Ant Design Vue 作为首个 UI adapter
 - Vue Router / Pinia / TanStack Query for Vue
 
-## 快速开始
+## 二开接入（推荐）
 
-本地开发需要 Java 21、Docker Compose v2、Node.js LTS 和 npm。后端默认连接 PostgreSQL，仓库不内置嵌入式数据库。
+MuYunSpring 已发布到 Maven Central。业务应用应保留自己的
+`@SpringBootApplication`、领域模型与 Web 交付，只通过 BOM 和 Starter 接入平台；不要复制或依赖本仓库的
+`muyun-boot`（它只是框架仓库的本地宿主）。
+
+要求 Java 21 和 PostgreSQL。Gradle Kotlin DSL 示例：
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation(platform("net.ximatai.muyun.spring:muyun-spring-bom:<version>"))
+    implementation("net.ximatai.muyun.spring:muyun-spring-boot-starter")
+    runtimeOnly("org.postgresql:postgresql")
+}
+```
+
+将 `<version>` 替换为 [Maven Central](https://central.sonatype.com/search?q=g%3Anet.ximatai.muyun.spring) 中需要使用的正式版本。再在业务应用配置自己的数据源、运行模式与初始管理员密码。开发环境可使用 `muyun.runtime.mode=development`；生产环境使用默认 `production`，并以严格 schema migration 策略治理变更。不要在公网或共享环境使用示例密码。
+
+平台的公开发布面、消费者验证和首发流程见[发布流程](docs/RELEASE_PROCESS.md)。
+
+## 本地框架开发
+
+本地完整开发栈需要 Java 21、Docker Compose v2、Node.js `>=22.23.0` 和 npm。后端默认使用 PostgreSQL，仓库不内置嵌入式数据库。
 
 | 服务 | 默认地址 |
 | --- | --- |
@@ -101,39 +125,19 @@ docs              架构原则、平台专题、前端路线和技术债记录
 | 后端 API | `http://127.0.0.1:8080` |
 | 前端工作台 | `http://127.0.0.1:5173/` |
 
-> 安全说明：快速开始配置仅用于本地开发。不要在公网或共享环境使用默认数据库密码和 `admin/admin123`。生产或共享环境应显式设置 `muyun.initial-admin.initial-password`，并按 `production` 运行模式治理 schema migration。
-
-一键启动本地开发栈：
+一键启动完整学校演示环境：
 
 ```bash
 ./scripts/dev-local.sh --demo
 ```
 
-该脚本会启动 PostgreSQL、后端连续编译、后端和前端；后端开发态使用 DevTools 在编译输出变化后重启应用上下文，避免跨模块代码已重新编译、运行进程仍加载旧依赖 JAR。`--demo` 以 `school-demo` 运行完整学校演示环境，并准备对应的租户、机构、角色和学校业务数据；这是脚本的默认模式。纯平台开发使用 `./scripts/dev-local.sh --platform`，不加载 Demo。按 `Ctrl-C` 会停止脚本拉起的后端和前端进程，PostgreSQL 容器会继续保留。
-
-也可以按下面步骤分开启动。
-
-1. 启动 PostgreSQL：
+该脚本会启动 PostgreSQL、后端连续编译、后端和前端；`Ctrl-C` 仅停止脚本拉起的后端和前端进程，数据库容器会保留。`--demo` 是默认模式，会加载 `school-demo` 及示例租户、机构、角色和学校数据；纯平台开发使用：
 
 ```bash
-docker compose up -d
+./scripts/dev-local.sh --platform
 ```
 
-Compose 会启动 `postgres:18.4-alpine`，本机端口为 `54321`，数据库名为 `muyun_spring`。
-
-不使用 Compose 时，可以手动启动等价容器：
-
-```bash
-docker run --name muyun-spring-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=muyun_dev \
-  -e POSTGRES_DB=muyun_spring \
-  -p 54321:5432 \
-  -v muyun-spring-postgres-data:/var/lib/postgresql \
-  -d postgres:18.4-alpine
-```
-
-2. 启动后端：
+需要分终端运行时，先 `docker compose up -d`，然后复制本机配置并启动后端：
 
 ```bash
 cp muyun-boot/src/main/resources/application-local.yml.example \
@@ -141,92 +145,36 @@ cp muyun-boot/src/main/resources/application-local.yml.example \
 ./gradlew :muyun-boot:bootRun --args='--spring.profiles.active=local'
 ```
 
-需要启动完整学校演示环境时，使用可选 Demo 运行任务；它会在标准平台 classpath 之外追加 Demo 交付，并自动包含 `school-demo` profile：
+`application-local.yml` 已被 Git 忽略，可通过环境变量覆盖数据库和初始管理员密码。完整学校演示使用 `:muyun-boot:demoBootRun`。前端在另一个终端启动：
 
 ```bash
-./gradlew :muyun-boot:demoBootRun --args='--spring.profiles.active=local'
+npm ci --prefix muyun-web
+npm run dev:backend --prefix muyun-web
 ```
 
-`application-local.yml` 只属于本机开发环境，已被 Git 忽略；可用同名环境变量覆盖样例中的数据库和初始管理员密码。生产或共享环境不要启用 `local` profile。
-
-后端默认监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。分终端开发时，额外在另一个终端运行连续编译命令；它与开发态 DevTools 共同保证跨模块代码变化会重启本地后端。纯平台运行使用：
-
-```bash
-./gradlew :muyun-boot:classes --continuous
-```
-
-学校演示运行使用：
-
-```bash
-./gradlew demoClasses --continuous
-```
-
-3. 启动前端：
-
-```bash
-cd muyun-web
-npm ci
-npm run dev:backend
-```
-
-前端默认监听 `http://127.0.0.1:5173/`。`dev:backend` 会读取 `muyun-web/.env.backend`，连接本地后端。
-
-裸库首次启动会创建平台超级管理员。默认登录信息：
-
-```text
-用户名：admin
-密码：admin123
-租户：不填
-```
-
-初始密码可通过 `muyun.initial-admin.initial-password` 调整。平台超级管理员是系统用户，不归属默认租户。
-
-`school-demo` profile 表示完整的学校演示环境：它会创建学校模块以及一组租户、组织、部门、职员、租户管理员和角色授权示例数据。演示数据不是平台 baseline，纯平台启动不会加载 Demo 模块或这些数据。需要调整示例数据文案时可配置：
-
-```properties
-muyun.demo-bootstrap.tenant-title=演示租户
-muyun.demo-bootstrap.organization-title=戏码台
-muyun.demo-bootstrap.department-title=综合管理部
-muyun.demo-bootstrap.employee-title=演示租户管理员
-muyun.demo-bootstrap.admin-username=demo_admin
-muyun.demo-bootstrap.admin-initial-password=demo123
-```
-
-该能力只用于学校演示启动；生产环境不应把演示租户、组织、部门、职员、租户管理员账号和租户管理员账号角色授权视为平台 baseline 数据。演示租户管理员是普通租户用户，默认授予内置 `tenant.admin` 账号角色，默认登录时租户填写 `demo`，不要和系统超级管理员 `admin` 混用。
-
-租户创建成功后，平台会自动准备租户级默认菜单方案和独立菜单数据；当前实现采用每租户复制菜单树，后续会收敛为系统菜单模板加租户覆盖差异。
-
-首次登录后可进入平台工作台，查看菜单、平台配置、IAM 等静态管理入口。动态页面闭环仍以文档和测试契约为准。
+裸库首次启动会创建平台超级管理员：用户名 `admin`、密码 `admin123`、租户留空。该默认值只允许本地开发使用。
 
 ## 运行验证
 
-后端默认完整验证：
+后端完整验证（单元测试、`*IT` 集成测试和模块边界检查）：
 
 ```bash
 ./gradlew verifyAll
 ```
 
-发布前可生成 Maven 消费者仓库：
+框架发布前应验证真实 Maven 消费者，而不只验证发布任务：
 
 ```bash
-./gradlew publishReleaseToConsumerRepository
+./gradlew verifyAll verifyPublishedConsumer
 ```
 
-该任务统一运行所有子模块的单元测试和 `*IT` 集成测试，与 CI 后端验证入口一致。开发过程中也可以按需单独运行：
-
-```bash
-./gradlew test
-./gradlew integrationTest
-```
+`verifyPublishedConsumer` 会将当前构建发布到本地消费者仓库，再构建并启动只依赖 Maven 坐标的独立消费者。首次正式发布或发布链路调整后，可人工运行 `MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer`，确认 Maven Central 中的 BOM 与 Starter 可被真实解析和启动；该远端检查不阻塞 Release CI。
 
 前端验证：
 
 ```bash
-cd muyun-web
-npm run check
+npm run check --prefix muyun-web
 ```
-
-只改文档时可以不运行测试，但提交说明应写明原因。涉及 Java 代码、构建配置或平台契约时，默认运行 `./gradlew verifyAll`。
 
 ## 文档导航
 
