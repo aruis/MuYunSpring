@@ -256,6 +256,19 @@ test('static business route registry resolves menu scheme as menu management ent
   assert.equal(isPlatformAdminRoutePage(descriptor), true);
 });
 
+test('static business route registry does not capture a business module that reuses a platform route', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/iam/roles', moduleAlias: 'crm.customer' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  assert.equal(resolvePlatformAdminRoute(descriptor), undefined);
+  assert.equal(isPlatformAdminRoutePage(descriptor), false);
+});
+
 test('static business route registry prefers explicit route over module alias fallback', () => {
   const descriptor: BusinessRoutePageDescriptor = {
     pageType: 'business-route',

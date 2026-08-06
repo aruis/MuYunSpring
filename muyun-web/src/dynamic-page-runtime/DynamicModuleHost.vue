@@ -4,11 +4,11 @@ import {
   RecordDetailPanel,
   RecordFormFields,
   RecordQueryListPanel,
+  confirmAction,
   resolveRecordFormFields,
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import { confirmAction } from '@muyun/vue-ui-antdv';
 import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 

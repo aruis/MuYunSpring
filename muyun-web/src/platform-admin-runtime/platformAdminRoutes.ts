@@ -160,5 +160,11 @@ export function isPlatformAdminRoutePage(
 }
 
 function routeMatchesTarget(route: PlatformAdminRoute, target: RoutePageTarget) {
-  return target.route ? target.route === route.route : target.moduleAlias === route.moduleAlias;
+  if (target.route) {
+    return (
+      target.route === route.route &&
+      (target.moduleAlias === undefined || target.moduleAlias === route.moduleAlias)
+    );
+  }
+  return target.moduleAlias === route.moduleAlias;
 }

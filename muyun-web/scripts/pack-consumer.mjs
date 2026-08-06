@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vue from '@vitejs/plugin-vue';
 import { build } from 'vite';
@@ -88,7 +88,46 @@ execFileSync(
   ],
   { cwd: webRoot, stdio: 'inherit' },
 );
+
+rewriteDeclarationAliases(join(stagingDirectory, 'dist', 'types'));
+
 execFileSync('npm', ['pack', '--pack-destination', outputDirectory], {
   cwd: stagingDirectory,
   stdio: 'inherit',
 });
+
+function rewriteDeclarationAliases(typesDirectory) {
+  const declarationFiles = collectFiles(typesDirectory).filter((file) => file.endsWith('.d.ts'));
+  const declarationsByAlias = {
+    '@muyun/web-contracts': join(typesDirectory, 'web-contracts', 'index'),
+    '@muyun/web-core': join(typesDirectory, 'web-core', 'index'),
+    '@muyun/vue-ui-antdv': join(typesDirectory, 'vue-ui-antdv', 'index'),
+    '@muyun/dynamic-page-runtime': join(typesDirectory, 'dynamic-page-runtime', 'index'),
+    '@muyun/platform-components': join(typesDirectory, 'platform-components', 'index'),
+    '@muyun/platform-workbench': join(typesDirectory, 'platform-workbench', 'index'),
+  };
+
+  for (const declarationFile of declarationFiles) {
+    const declaration = readFileSync(declarationFile, 'utf8');
+    const rewritten = Object.entries(declarationsByAlias).reduce(
+      (source, [alias, destination]) =>
+        source.replaceAll(alias, relativeModuleSpecifier(dirname(declarationFile), destination)),
+      declaration,
+    );
+    if (rewritten !== declaration) {
+      writeFileSync(declarationFile, rewritten);
+    }
+  }
+}
+
+function collectFiles(directory) {
+  return readdirSync(directory).flatMap((name) => {
+    const file = join(directory, name);
+    return statSync(file).isDirectory() ? collectFiles(file) : [file];
+  });
+}
+
+function relativeModuleSpecifier(fromDirectory, destination) {
+  const specifier = relative(fromDirectory, destination).replaceAll('\\', '/');
+  return specifier.startsWith('.') ? specifier : `./${specifier}`;
+}

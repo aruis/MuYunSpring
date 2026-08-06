@@ -240,7 +240,7 @@ npm run lint
 npm run format:check
 npm run build
 npm run check:boundaries
-npm run build:business-example
+npm run verify:consumer
 ```
 
 后端仍使用仓库默认验证：
