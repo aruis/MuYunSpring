@@ -30,7 +30,8 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 
 `gradle.properties` 的 `muyunVersion` 只表示下一开发版本，必须保持 `-SNAPSHOT`。发布使用与其去掉
 `-SNAPSHOT` 后一致的 `v<version>` tag 触发 `.github/workflows/release.yml`；workflow 从 tag 推导正式构件版本，
-再执行 `verifyAll`、本地消费者预检和发布任务。
+再依次执行 `verifyAll`、本地消费者预检、独立的发布工作区清理和远端发布任务。消费者预检与发布工作区清理
+必须分开执行：前者需要本地 Maven 仓库，后者则保证上传目录只包含本次构建的构件。
 
 需要配置以下 GitHub Actions secrets：
 
@@ -51,7 +52,8 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 2. 推送匹配该版本的 tag，例如 `muyunVersion=0.26.2-SNAPSHOT` 时推送 `git tag v0.26.2 && git push origin v0.26.2`。
 3. 发布成功后，Release workflow 不修改 `main`；开始下一轮开发时，在正常业务 PR 中将 `muyunVersion` 推进到下一个目标版本，例如 `0.26.3-SNAPSHOT`。
 
-tag 必须与当前 `muyunVersion` 去掉 `-SNAPSHOT` 后完全一致。发布任务自身也依赖该 tag/version gate 与消费者验证，不能通过本地命令绕过。发布任务为 `./gradlew publishReleaseToSonatype`。
+tag 必须与当前 `muyunVersion` 去掉 `-SNAPSHOT` 后完全一致。发布任务自身依赖 tag/version 与凭证 gate；Release workflow
+负责在发布前完成消费者验证和独立清理。发布任务为 `./gradlew publishReleaseToSonatype`。
 
 ## pre-FieldSpec schema 升级
 

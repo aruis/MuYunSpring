@@ -121,26 +121,20 @@ tasks.register("publishReleaseToSonatype") {
     description = "Publishes all public MuYunSpring artifacts to Maven Central through Sonatype."
     dependsOn("verifyReleaseCredentials")
     dependsOn("verifyReleaseTagVersion")
-    dependsOn("verifyPublishedConsumer")
-    dependsOn(publicArtifactProjectNames.map { ":$it:clean" })
     dependsOn(publicArtifactProjectNames.map { ":$it:publishToSonatype" })
     doFirst { requireReleaseCredentials() }
 }
 
 val releaseTagVerification = tasks.named("verifyReleaseTagVersion")
 val releaseCredentialVerification = tasks.named("verifyReleaseCredentials")
-val publishedConsumerVerification = tasks.named("verifyPublishedConsumer")
 gradle.projectsEvaluated {
     publicArtifactProjectNames.forEach { projectName ->
         val artifactProject = project(":$projectName")
-        artifactProject.tasks.named("publishAllPublicationsToConsumerRepository") {
-            mustRunAfter(artifactProject.tasks.named("clean"))
-        }
         artifactProject.tasks.named("publishToSonatype") {
-            mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
+            mustRunAfter(releaseTagVerification, releaseCredentialVerification)
         }
         artifactProject.tasks.named("2.uploadDeploymentDir") {
-            mustRunAfter(releaseTagVerification, releaseCredentialVerification, publishedConsumerVerification)
+            mustRunAfter(releaseTagVerification, releaseCredentialVerification)
         }
     }
 

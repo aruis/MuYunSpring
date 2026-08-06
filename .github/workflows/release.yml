@@ -44,5 +44,11 @@ jobs:
       - name: Verify backend
         run: ./gradlew verifyAll
 
+      - name: Verify published artifact consumer
+        run: ./gradlew verifyPublishedConsumer
+
+      - name: Clean release workspace
+        run: ./gradlew clean
+
       - name: Publish to Maven Central
         run: ./gradlew publishReleaseToSonatype
