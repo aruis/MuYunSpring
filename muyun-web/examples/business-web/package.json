@@ -9,7 +9,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 4174"
   },
   "dependencies": {
-    "@ximatai/muyun-web-app": "0.26.3",
+    "@ximatai/muyun-web-app": "0.26.4",
     "vue": "^3.5.38"
   },
   "devDependencies": {
