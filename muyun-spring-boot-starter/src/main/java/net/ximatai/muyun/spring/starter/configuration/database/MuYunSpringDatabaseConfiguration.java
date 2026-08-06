@@ -25,6 +25,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
 import java.math.BigInteger;
 import java.sql.Types;
@@ -37,18 +38,20 @@ import java.sql.Types;
 @Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
 public class MuYunSpringDatabaseConfiguration {
     @Bean
+    @Primary
     @ConditionalOnMissingBean
     /** 提供静态模型与动态模型共用的实体元数据解析器。 */
-    EntityMetaResolver entityMetaResolver() {
+    EntityMetaResolver platformEntityMetaResolver() {
         return PlatformEntityManagers.entityMetaResolver();
     }
 
     @Bean
+    @Primary
     @ConditionalOnMissingBean
     /** 将数据库操作、实体元数据和字段转换组合为统一实体管理器。 */
-    SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
-                                            EntityMetaResolver entityMetaResolver,
-                                            DatabaseValueConverter databaseValueConverter) {
+    SimpleEntityManager platformSimpleEntityManager(IDatabaseOperations<?> operations,
+                                                    EntityMetaResolver entityMetaResolver,
+                                                    DatabaseValueConverter databaseValueConverter) {
         return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver, databaseValueConverter);
     }
 

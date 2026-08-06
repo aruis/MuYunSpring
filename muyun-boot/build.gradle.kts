@@ -26,7 +26,7 @@ dependencies {
     testImplementation(testFixtures(project(":muyun-platform")))
 }
 
-val demoRuntimeClasspath by configurations.creating {
+val demoRuntimeClasspath = configurations.create("demoRuntimeClasspath") {
     extendsFrom(configurations.runtimeClasspath.get())
 }
 

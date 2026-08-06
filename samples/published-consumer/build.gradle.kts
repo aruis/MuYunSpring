@@ -12,6 +12,8 @@ java {
 
 val muyunRepository = providers.gradleProperty("muyunRepository").orNull
     ?: error("Provide -PmuyunRepository=<published Maven repository>")
+val muyunVersion = providers.gradleProperty("muyunVersion").orNull
+    ?: error("Provide -PmuyunVersion=<MuYunSpring version>")
 
 repositories {
     maven { url = uri(muyunRepository) }
@@ -19,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("net.ximatai.muyun.spring:muyun-spring-bom:0.26.1"))
+    implementation(platform("net.ximatai.muyun.spring:muyun-spring-bom:$muyunVersion"))
     implementation("net.ximatai.muyun.spring:muyun-spring-boot-starter")
     runtimeOnly("org.postgresql:postgresql")
 }

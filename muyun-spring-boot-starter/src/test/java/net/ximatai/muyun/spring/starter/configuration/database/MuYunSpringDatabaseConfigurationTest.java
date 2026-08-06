@@ -1,12 +1,16 @@
 package net.ximatai.muyun.spring.starter.configuration.database;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
+import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
+import net.ximatai.muyun.database.spring.boot.MuYunDatabaseAutoConfiguration;
 import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import javax.sql.DataSource;
 import java.lang.reflect.Field;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +43,21 @@ class MuYunSpringDatabaseConfigurationTest {
 
                     assertThat(options.isStrict()).isFalse();
                     assertThat(options.isDryRun()).isFalse();
+                });
+    }
+
+    @Test
+    void shouldKeepPlatformEntityInfrastructureWhenDatabaseAutoConfigurationIsPresent() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(MuYunSpringDatabaseConfiguration.class,
+                        MuYunDatabaseAutoConfiguration.class)
+                .withBean(IDatabaseOperations.class, () -> mock(IDatabaseOperations.class))
+                .withBean(DataSource.class, () -> mock(DataSource.class))
+                .run(context -> {
+                    assertThat(context).hasSingleBean(EntityMetaResolver.class);
+                    assertThat(context).hasSingleBean(SimpleEntityManager.class);
+                    assertThat(context).hasBean("platformEntityMetaResolver");
+                    assertThat(context).hasBean("platformSimpleEntityManager");
                 });
     }
 

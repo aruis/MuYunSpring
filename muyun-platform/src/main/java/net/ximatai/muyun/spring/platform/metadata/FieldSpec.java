@@ -42,10 +42,10 @@ public class FieldSpec extends StandardEnabledSortableEntity {
     @Column(name = "query_operators", type = ColumnType.JSON_SET, comment = "Allowed query operators")
     private Set<String> queryOperators;
 
-    @Column(name = "default_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Default field UI control alias")
+    @Column(name = "default_ui_control_alias", type = ColumnType.VARCHAR, length = 64, comment = "Default field UI control alias")
     private String defaultUiControlAlias;
 
-    @Column(name = "ui_type_aliases", type = ColumnType.JSON_SET, comment = "Allowed field UI control aliases")
+    @Column(name = "ui_control_aliases", type = ColumnType.JSON_SET, comment = "Allowed field UI control aliases")
     private Set<String> uiControlAliases;
 
     public FieldQueryDefinition queryDefinition() {
