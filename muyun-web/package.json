@@ -1,7 +1,7 @@
 {
   "name": "muyun-web",
   "private": true,
-  "version": "0.26.3",
+  "version": "0.26.4",
   "type": "module",
   "engines": {
     "node": ">=22.23.0"
@@ -11,7 +11,7 @@
     "dev:backend": "vite --host 127.0.0.1 --mode backend",
     "build": "vue-tsc --noEmit && vite build",
     "pack:consumer": "node scripts/pack-consumer.mjs",
-    "verify:consumer": "npm run pack:consumer && node scripts/verify-consumer-declarations.mjs && npm ci --prefix examples/business-web && npm install --prefix examples/business-web --no-save --package-lock=false ../build/consumer-npm/ximatai-muyun-web-app-0.26.3.tgz && npm run build --prefix examples/business-web",
+    "verify:consumer": "npm run pack:consumer && node scripts/verify-consumer.mjs",
     "check": "npm run lint && npm run format:check && npm run test && npm run build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "npm run test:workbench && npm run test:employee-workspace",

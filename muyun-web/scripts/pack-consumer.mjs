@@ -12,6 +12,8 @@ const stagingDirectory = join(outputDirectory, 'staging', 'web-app');
 const consumerEntry = join(webRoot, 'src', 'consumer', 'index.ts');
 const rootPackage = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
 
+assertVersionAlignment(rootPackage.version);
+
 rmSync(outputDirectory, { recursive: true, force: true });
 mkdirSync(stagingDirectory, { recursive: true });
 
@@ -130,4 +132,14 @@ function collectFiles(directory) {
 function relativeModuleSpecifier(fromDirectory, destination) {
   const specifier = relative(fromDirectory, destination).replaceAll('\\', '/');
   return specifier.startsWith('.') ? specifier : `./${specifier}`;
+}
+
+function assertVersionAlignment(packageVersion) {
+  const gradleProperties = readFileSync(join(repositoryRoot, 'gradle.properties'), 'utf8');
+  const match = gradleProperties.match(/^muyunVersion=(.+)-SNAPSHOT$/m);
+  if (!match || match[1] !== packageVersion) {
+    throw new Error(
+      `前端包版本 ${packageVersion} 必须与 gradle.properties 的 muyunVersion 正式版本保持一致。`,
+    );
+  }
 }

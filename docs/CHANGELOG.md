@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+## 0.26.4 - 2026-08-06
+
+### Fixed
+
+- 修复 `@ximatai/muyun-web-app` 的发布声明引用内部 alias、管理型 App 路由误捕获与动态运行器 UI adapter 边界问题。
+
+### Changed
+
+- `gradle.properties` 的 `muyunVersion` 成为前端 npm 包版本的一致性来源；打包时自动校验两者对齐。
+
 ## 0.26.3 - 2026-08-06
 
 ### Changed
