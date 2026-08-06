@@ -39,6 +39,7 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 - `SIGNING_KEY_ID`
 - `SIGNING_SECRET_KEY` 或 `SIGNING_SECRET_KEY_BASE64`
 - `SIGNING_PASSWORD`
+- `NPM_TOKEN`：`@ximatai/muyun-web-app` 的 npm 发布 token。
 
 本地预检：
 
@@ -53,7 +54,8 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 3. 发布成功后，Release workflow 不修改 `main`；开始下一轮开发时，在正常业务 PR 中将 `muyunVersion` 推进到下一个目标版本，例如 `0.26.3-SNAPSHOT`。
 
 tag 必须与当前 `muyunVersion` 去掉 `-SNAPSHOT` 后完全一致。发布任务自身依赖 tag/version 与凭证 gate；Release workflow
-负责在发布前完成消费者验证和独立清理。发布任务为 `./gradlew publishReleaseToSonatype`。
+负责在发布前完成消费者验证和独立清理。发布任务为 `./gradlew publishReleaseToSonatype`；同一 tag 的 npm 包在 Maven
+上传任务成功后发布。
 
 前端 npm 包使用同一个正式版本：`muyun-web/package.json` 的 `version` 必须等于 `muyunVersion` 去掉
 `-SNAPSHOT` 的结果，`pack:consumer` 会在构建前强制校验。这样 Maven tag、npm tarball 与源代码版本保持可追溯一致。

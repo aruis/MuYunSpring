@@ -149,6 +149,10 @@ jobs:
         if: needs.changes.outputs.frontend == 'true'
         run: npm run build --prefix muyun-web
 
+      - name: Verify npm consumer
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run verify:consumer --prefix muyun-web
+
       - name: Skip frontend tests
         if: needs.changes.outputs.frontend != 'true'
         run: echo "No frontend changes detected."

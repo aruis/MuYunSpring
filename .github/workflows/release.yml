@@ -22,6 +22,7 @@ jobs:
       SIGNING_SECRET_KEY: ${{ secrets.SIGNING_SECRET_KEY }}
       SIGNING_SECRET_KEY_BASE64: ${{ secrets.SIGNING_SECRET_KEY_BASE64 }}
       SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +39,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: muyun-web/.nvmrc
+          cache: npm
+          cache-dependency-path: muyun-web/package-lock.json
+          registry-url: https://registry.npmjs.org
+
       - name: Verify release tag and credentials
         run: ./gradlew verifyReleaseTagVersion verifyReleaseCredentials
 
@@ -47,8 +56,21 @@ jobs:
       - name: Verify published artifact consumer
         run: ./gradlew verifyPublishedConsumer
 
+      - name: Verify npm package consumer
+        run: |
+          npm ci --prefix muyun-web
+          npm run verify:consumer --prefix muyun-web
+
+      - name: Verify npm publish payload
+        working-directory: build/consumer-npm/staging/web-app
+        run: npm publish --dry-run --access public
+
       - name: Clean release workspace
         run: ./gradlew clean
 
       - name: Publish to Maven Central
         run: ./gradlew publishReleaseToSonatype
+
+      - name: Publish to npm
+        working-directory: build/consumer-npm/staging/web-app
+        run: npm publish --access public
