@@ -28,7 +28,11 @@ fun Project.releaseValue(propertyName: String, environmentName: String): String?
     findProperty(propertyName)?.toString()?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
         ?: providers.environmentVariable(environmentName).orNull?.trim()?.takeIf { it.isNotEmpty() }
 
-fun Project.releaseTag(): String? = releaseValue("release.tag", "GITHUB_REF_NAME")
+fun Project.releaseTag(): String? = findProperty("release.tag")?.toString()?.trim()
+    ?.takeIf { it.isNotEmpty() && it != "null" }
+    ?: providers.environmentVariable("GITHUB_REF_TYPE").orNull
+        ?.takeIf { it == "tag" }
+        ?.let { providers.environmentVariable("GITHUB_REF_NAME").orNull?.trim() }
 
 fun Project.releaseVersion(): String? = releaseTag()
     ?.also { require(it.matches(Regex("v\\d+\\.\\d+\\.\\d+"))) { "Invalid release tag '$it'." } }

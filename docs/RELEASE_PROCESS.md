@@ -52,3 +52,15 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 3. 发布成功后，Release workflow 不修改 `main`；开始下一轮开发时，在正常业务 PR 中将 `muyunVersion` 推进到下一个目标版本，例如 `0.26.3-SNAPSHOT`。
 
 tag 必须与当前 `muyunVersion` 去掉 `-SNAPSHOT` 后完全一致。发布任务自身也依赖该 tag/version gate 与消费者验证，不能通过本地命令绕过。发布任务为 `./gradlew publishReleaseToSonatype`。
+
+## pre-FieldSpec schema 升级
+
+`FieldCatalogLegacySchemaBridge` 已移除，不再由 `local` profile 自动修改数据库。升级保留该阶段数据库的环境，应先停止应用并备份，再执行：
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f scripts/migrations/field-catalog-pre-fieldspec-postgresql.sql
+```
+
+脚本只支持 PostgreSQL 的 `public` schema，包含旧字段目录表/列重命名、必填字段回填和旧
+`platform_metadata_field.field_type_alias` 的数据合并。执行成功后再部署当前版本；不要在应用运行期间执行。

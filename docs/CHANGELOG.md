@@ -10,7 +10,8 @@
 
 ### Removed
 
-- 不再在 `local` profile 启动时自动升级 pre-FieldSpec 字段目录 schema；升级前须先完成数据库迁移。
+- 不再在 `local` profile 启动时自动升级 pre-FieldSpec 字段目录 schema；升级前须在应用停机后执行
+  `scripts/migrations/field-catalog-pre-fieldspec-postgresql.sql`。
 
 ## 0.26.1 - 2026-08-05
 
