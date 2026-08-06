@@ -6,6 +6,7 @@ import {
   configureModuleContext,
   createAuthClient,
   createHttpClient,
+  createMenuClient,
   createModuleContext,
   createModuleTreeContext,
   createStaticModuleCrudClient,
@@ -43,6 +44,47 @@ import {
   type StompClientFactoryOptions,
   type StompSubscriptionLike,
 } from '../src/web-core/index.ts';
+import { createMenuTab, getMenuNavigationTarget } from '../src/platform-workbench/menuNavigation.ts';
+
+test('menu client normalizes backend enum values before workbench navigation', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      records: [
+        {
+          record: {
+            id: 'todo-board',
+            schemeId: 'default',
+            title: '待办事项',
+            enabled: true,
+            openMode: 'TAB',
+            moduleAlias: 'demo.todo_item',
+            route: '/app/todo',
+          },
+          children: [],
+        },
+      ],
+    });
+
+  try {
+    const response = await createMenuClient(createHttpClient({ baseUrl: 'http://api.local' })).mine();
+    const menu = response.records[0].record;
+    const target = getMenuNavigationTarget(menu);
+
+    assert.equal(menu.openMode, 'tab');
+    assert.deepEqual(target, {
+      menuId: 'todo-board',
+      menuType: 'route',
+      openMode: 'tab',
+      moduleAlias: 'demo.todo_item',
+      route: '/app/todo',
+      entryParamsJson: undefined,
+    });
+    assert.equal(createMenuTab(menu, target!).pageDescriptor.pageType, 'platform-route');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('auth logout posts bearer token to backend logout endpoint', async () => {
   const requests: Request[] = [];

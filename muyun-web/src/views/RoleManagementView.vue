@@ -50,9 +50,9 @@ import type {
   WebQueryRequest,
 } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { useCurrentUserContext } from '../app/currentUserContext';
-import { useWorkspaceViewHost } from '../app/workspaceViewHost';
-import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import { useCurrentUserContext } from '../platform-admin-runtime/currentUserContext';
+import { useWorkspaceViewHost } from '../platform-admin-runtime/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../platform-admin-runtime/useWorkspaceViewPromotion';
 import RoleAccountGrantDrawer from './RoleAccountGrantDrawer.vue';
 import { roleDetailWorkspaceView } from './roleDetailWorkspaceView';
 import {

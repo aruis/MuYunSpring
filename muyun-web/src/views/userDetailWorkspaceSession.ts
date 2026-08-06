@@ -3,7 +3,7 @@ import {
   handOffWorkspaceViewSession,
   registerWorkspaceViewHandoffRecipient,
   takeWorkspaceViewSession,
-} from '../app/workspaceViewSessions';
+} from '../platform-admin-runtime/workspaceViewSessions';
 import { userDetailWorkspaceView, type UserDetailWorkspaceViewInput } from './userDetailWorkspaceView';
 import type { UserDetailMode } from './userDetailStateModel';
 

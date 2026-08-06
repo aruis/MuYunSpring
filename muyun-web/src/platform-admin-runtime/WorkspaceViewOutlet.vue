@@ -3,7 +3,7 @@ import type { BusinessRoutePageDescriptor } from '@muyun/web-contracts';
 import { computed } from 'vue';
 import { UiEmpty } from '@muyun/vue-ui-antdv';
 import { tabKeyOf } from '@muyun/platform-workbench';
-import { useWorkbenchNavigation } from './workbenchNavigation';
+import { useWorkbenchNavigation } from '@muyun/platform-workbench';
 import { provideWorkspaceViewHost } from './workspaceViewHost';
 import { dismissWorkspaceViewDescriptor, resolveWorkspaceView } from './workspaceViews';
 

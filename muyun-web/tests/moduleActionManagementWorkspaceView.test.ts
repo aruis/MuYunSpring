@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceViewDescriptor } from '../src/app/workspaceViews.ts';
+import { createWorkspaceViewDescriptor } from '../src/platform-admin-runtime/workspaceViews.ts';
 import { moduleActionManagementWorkspaceView } from '../src/views/moduleActionManagementWorkspaceView.ts';
 
 test('creates one closable action-management tab per governed module', () => {

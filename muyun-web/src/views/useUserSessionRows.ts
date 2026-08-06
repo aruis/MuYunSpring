@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { presentPlatformError } from '@muyun/platform-components';
 export { userSessionPresenceTitle } from '@muyun/platform-components';
-import { createRealtimeRefreshQueue } from '../app/pageRealtime';
+import { createRealtimeRefreshQueue } from '../platform-admin-runtime/pageRealtime';
 import type {
   UserAccount,
   UserSessionStatusView,

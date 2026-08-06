@@ -1,6 +1,6 @@
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import type { DrawerPromotion } from '@muyun/platform-components';
-import { useWorkbenchNavigation } from './workbenchNavigation';
+import { useWorkbenchNavigation } from '@muyun/platform-workbench';
 import {
   createWorkspaceViewDescriptor,
   type WorkspaceViewDefinition,

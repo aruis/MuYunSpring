@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ActionBar, UiForm, UiTable } from '@muyun/vue-ui-antdv';
 import type { ActionContract, DynamicPageDescriptor, RecordData } from '@muyun/web-contracts';
 import { resolveDynamicActionReactions } from './actionReactions';
 
@@ -38,17 +37,44 @@ function executeAction(action: ActionContract) {
         <h2>{{ descriptor.title }}</h2>
         <p>{{ descriptor.moduleAlias }}</p>
       </div>
-      <ActionBar :actions="descriptor.actions" @execute="executeAction" />
+      <div class="runtime-actions">
+        <button
+          v-for="action in descriptor.actions"
+          :key="action.actionCode"
+          type="button"
+          @click="executeAction(action)"
+        >
+          {{ action.title }}
+        </button>
+      </div>
     </header>
 
     <div class="runtime-grid">
       <article class="panel">
         <h3>动态表单</h3>
-        <UiForm v-model="record" :contract="descriptor.form" submit-text="动态保存" />
+        <dl>
+          <template v-for="field in descriptor.form.fields" :key="field.name">
+            <dt>{{ field.label }}</dt>
+            <dd>{{ record[field.name] ?? '—' }}</dd>
+          </template>
+        </dl>
       </article>
       <article class="panel">
         <h3>动态列表</h3>
-        <UiTable :contract="descriptor.list" :rows="descriptor.records" />
+        <table>
+          <thead>
+            <tr>
+              <th v-for="column in descriptor.list.columns" :key="column.key">{{ column.title }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in descriptor.records" :key="String(row.id)">
+              <td v-for="column in descriptor.list.columns" :key="column.key">
+                {{ row[column.key] ?? '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </article>
     </div>
 

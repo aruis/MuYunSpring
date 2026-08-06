@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class, alias = "iam.tenant", title = "租户管理")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.iam.application.IamApplication.class,
+        alias = "iam.tenant", title = "租户管理", route = "/iam/tenants")
 @StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 10)
 @RequestMapping("/iam.tenant")

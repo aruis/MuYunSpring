@@ -130,9 +130,9 @@ test('resolvePageDescriptor carries a static business route layout without putti
 });
 
 test('every static business route explicitly classifies its page layout', async () => {
-  const { staticBusinessRoutes } = await import('../src/app/businessRoutes');
+  const { platformAdminRoutes } = await import('../src/platform-admin-runtime/platformAdminRoutes');
 
-  assert.ok(staticBusinessRoutes.every((route) => route.layout === 'flow' || route.layout === 'workspace'));
+  assert.ok(platformAdminRoutes.every((route) => route.layout === 'flow' || route.layout === 'workspace'));
 });
 
 test('role management is a constrained workspace page', () => {

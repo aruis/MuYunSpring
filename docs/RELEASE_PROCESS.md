@@ -55,6 +55,9 @@ MUYUN_RELEASE_VERSION=<released-version> ./gradlew verifyMavenCentralConsumer
 tag 必须与当前 `muyunVersion` 去掉 `-SNAPSHOT` 后完全一致。发布任务自身依赖 tag/version 与凭证 gate；Release workflow
 负责在发布前完成消费者验证和独立清理。发布任务为 `./gradlew publishReleaseToSonatype`。
 
+前端 npm 包使用同一个正式版本：`muyun-web/package.json` 的 `version` 必须等于 `muyunVersion` 去掉
+`-SNAPSHOT` 的结果，`pack:consumer` 会在构建前强制校验。这样 Maven tag、npm tarball 与源代码版本保持可追溯一致。
+
 ## pre-FieldSpec schema 升级
 
 `FieldCatalogLegacySchemaBridge` 已移除，不再由 `local` profile 自动修改数据库。升级保留该阶段数据库的环境，应先停止应用并备份，再执行：

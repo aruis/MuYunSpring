@@ -29,27 +29,27 @@ import {
   saveAuthSessionId,
   saveAuthToken,
   storedAuthSessionId,
-} from './app/authSession';
-import { configureAuthenticationRecovery } from './app/sessionRecovery';
+} from './platform-admin-runtime/authSession';
+import { configureAuthenticationRecovery } from './platform-admin-runtime/sessionRecovery';
 import { platformMessage } from './app/platformMessage';
-import { provideCurrentUserContext } from './app/currentUserContext';
+import { provideCurrentUserContext } from './platform-admin-runtime/currentUserContext';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
-import { createBackendHttpClient } from './app/backendHttp';
+import { createBackendHttpClient } from './platform-admin-runtime/backendHttp';
 import {
-  businessModuleRoutes,
-  businessRouteLayouts,
-  businessRoutePrefixes,
-  isStaticBusinessRoutePage,
-} from './app/businessRoutes';
-import { connectAppRealtime } from './app/realtime';
+  platformAdminModuleRoutes,
+  platformAdminRouteLayouts,
+  platformAdminRoutePrefixes,
+  isPlatformAdminRoutePage,
+} from './platform-admin-runtime/platformAdminRoutes';
+import { connectAppRealtime } from './platform-admin-runtime/realtime';
 import ChangeOwnPasswordDialog from './app/ChangeOwnPasswordDialog.vue';
 import LoginView from './app/LoginView.vue';
-import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
+import PlatformAdminRouteOutlet from './platform-admin-runtime/PlatformAdminOutlet.vue';
 import {
   createModuleOpenApiPageDescriptor,
   isModuleOpenApiPage,
   isOpenApiCatalogPath,
-} from './app/moduleOpenApi';
+} from './platform-admin-runtime/moduleOpenApi';
 import ModuleOpenApiView from './views/ModuleOpenApiView.vue';
 import OpenApiCatalogView from './views/OpenApiCatalogView.vue';
 import {
@@ -60,7 +60,7 @@ import {
   openMenuTab,
   restoreWorkbenchStartupStateFromUrl,
 } from './app/workbenchStartup';
-import { provideWorkbenchNavigation } from './app/workbenchNavigation';
+import { provideWorkbenchNavigation } from './platform-workbench/workbenchNavigation';
 
 const startup = ref<WorkbenchStartupState>();
 const currentUser = computed(() => startup.value?.session.currentUser);
@@ -81,7 +81,11 @@ const securityNotification = ref<WebUserNotification>();
 const securityLogoutCountdown = ref(0);
 const openApiCatalogOpen = ref(isOpenApiCatalogPath(window.location.pathname));
 const realtimeStatus = ref<WorkbenchRealtimeStatus>('unavailable');
-const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes, businessRouteLayouts };
+const platformAdminRouteResolveOptions = {
+  businessRoutePrefixes: platformAdminRoutePrefixes,
+  businessModuleRoutes: platformAdminModuleRoutes,
+  businessRouteLayouts: platformAdminRouteLayouts,
+};
 let realtimeConnection: ReturnType<typeof connectAppRealtime> | undefined;
 let securityLogoutTimer: number | undefined;
 
@@ -128,7 +132,7 @@ async function loadWorkbench() {
     const state = restoreWorkbenchStartupStateFromUrl(
       startupState,
       currentBrowserPath(),
-      businessRouteResolveOptions,
+      platformAdminRouteResolveOptions,
     );
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
@@ -400,7 +404,7 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     return;
   }
 
-  const result = openMenuTab(current.tabs ?? [], menu, target, businessRouteResolveOptions);
+  const result = openMenuTab(current.tabs ?? [], menu, target, platformAdminRouteResolveOptions);
   startup.value = {
     ...current,
     tabs: result.tabs,
@@ -543,8 +547,8 @@ function requiresLogin(cause: unknown) {
           resolveModuleOpenApiTitle(activeTab.key, pageDescriptor?.target.moduleAlias ?? '', $event)
         "
       />
-      <StaticBusinessRouteOutlet
-        v-else-if="isStaticBusinessRoutePage(pageDescriptor)"
+      <PlatformAdminRouteOutlet
+        v-else-if="isPlatformAdminRoutePage(pageDescriptor)"
         :descriptor="pageDescriptor"
       />
       <WorkbenchOutlet v-else :descriptor="pageDescriptor" />

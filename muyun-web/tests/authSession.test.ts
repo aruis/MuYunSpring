@@ -9,7 +9,7 @@ import {
   saveAuthSessionId,
   saveAuthToken,
   storedAuthSessionId,
-} from '../src/app/authSession.ts';
+} from '../src/platform-admin-runtime/authSession.ts';
 import { platformMessage } from '../src/app/platformMessage.ts';
 
 test('effectiveAuthToken falls back to env token outside browser storage', () => {

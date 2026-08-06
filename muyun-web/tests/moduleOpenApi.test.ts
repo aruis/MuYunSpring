@@ -8,7 +8,7 @@ import {
   loadModuleOpenApi,
   moduleAliasFromOpenApiPath,
   openApiBackendBaseUrl,
-} from '../src/app/moduleOpenApi.ts';
+} from '../src/platform-admin-runtime/moduleOpenApi.ts';
 
 test('recognizes the dedicated OpenAPI viewer route for a platform module alias', () => {
   assert.equal(moduleAliasFromOpenApiPath('/openapi/education.teacher'), 'education.teacher');

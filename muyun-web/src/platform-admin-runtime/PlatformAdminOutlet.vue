@@ -3,16 +3,16 @@ import { computed } from 'vue';
 import { ModuleContextProvider } from '@muyun/web-core';
 import { providePageLayout } from '@muyun/platform-components';
 import type { BusinessRoutePageDescriptor } from '@muyun/web-contracts';
-import { resolveStaticBusinessRoute } from './businessRoutes';
+import { resolvePlatformAdminRoute } from './platformAdminRoutes';
 import WorkspaceViewOutlet from './WorkspaceViewOutlet.vue';
 
-defineOptions({ name: 'StaticBusinessRouteOutlet' });
+defineOptions({ name: 'PlatformAdminRouteOutlet' });
 
 const props = defineProps<{
   descriptor: BusinessRoutePageDescriptor;
 }>();
 
-const route = computed(() => resolveStaticBusinessRoute(props.descriptor));
+const route = computed(() => resolvePlatformAdminRoute(props.descriptor));
 const moduleAlias = computed(() => props.descriptor.target.moduleAlias ?? route.value?.moduleAlias);
 const workspaceViewPresentation = computed(() => props.descriptor.target.query?.workspacePresentation);
 providePageLayout(computed(() => props.descriptor.layout ?? route.value?.layout));

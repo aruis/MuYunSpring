@@ -39,7 +39,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class, alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
+@PlatformStaticModule(application = net.ximatai.muyun.spring.platform.application.PlatformApplication.class,
+        alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块", route = "/config/modules")
 @StaticModuleOpenApi
 @PlatformMenu(parent = PlatformMenuGroups.MODELING, title = "模块管理", order = 20)
 @RequestMapping("/platform.module")

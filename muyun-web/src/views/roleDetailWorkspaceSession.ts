@@ -3,7 +3,7 @@ import {
   handOffWorkspaceViewSession,
   registerWorkspaceViewHandoffRecipient,
   takeWorkspaceViewSession,
-} from '../app/workspaceViewSessions';
+} from '../platform-admin-runtime/workspaceViewSessions';
 import { roleDetailWorkspaceView, type RoleDetailWorkspaceViewInput } from './roleDetailWorkspaceView';
 
 export interface RoleDetailWorkspaceScope {

@@ -17,7 +17,6 @@ export interface ResolvedWebActionResult {
 }
 
 export { webDataChangeTypes };
-export type { WebDataChange, WebDataChangeType };
 
 export const webDataChanges = {
   recordCreated(moduleAlias: string, recordId: string, facts: WebDataChangeFacts = {}): WebDataChange {

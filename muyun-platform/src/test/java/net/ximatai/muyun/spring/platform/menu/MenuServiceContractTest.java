@@ -203,10 +203,14 @@ class MenuServiceContractTest {
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.actionMessage().code()).isEqualTo("platform.menu.module-not-found"))
                     .hasMessageContaining("existing module");
-            Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
+            Menu moduleWithRoute = moduleMenu(firstSchemeId, "客户看板", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithRoute.setRoute("/customer");
             String moduleWithRouteId = menuService.insert(moduleWithRoute);
-            assertThat(menuService.select(moduleWithRouteId).getRoute()).isNull();
+            assertThat(menuService.select(moduleWithRouteId)).satisfies(menu -> {
+                assertThat(menu.getModuleAlias()).isEqualTo("crm.customer");
+                assertThat(menu.getRoute()).isEqualTo("/customer");
+                assertThat(menu.getPageMode()).isNull();
+            });
             Menu groupWithOpenMode = groupMenu(firstSchemeId, "错误分组打开方式", TreeAbility.ROOT_ID);
             groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
             assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))

@@ -42,9 +42,13 @@ import type {
   WebActionResultEnvelope,
 } from '@muyun/web-contracts';
 import { actionResultData, platformErrorCodes, useModuleContext, type ModuleContext } from '@muyun/web-core';
-import { usePageDataChange, usePageRecordExternalChange, useRealtimeRefreshQueue } from '../app/pageRealtime';
-import { useWorkspaceViewHost } from '../app/workspaceViewHost';
-import { useWorkspaceViewPromotion } from '../app/useWorkspaceViewPromotion';
+import {
+  usePageDataChange,
+  usePageRecordExternalChange,
+  useRealtimeRefreshQueue,
+} from '../platform-admin-runtime/pageRealtime';
+import { useWorkspaceViewHost } from '../platform-admin-runtime/workspaceViewHost';
+import { useWorkspaceViewPromotion } from '../platform-admin-runtime/useWorkspaceViewPromotion';
 import {
   canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,

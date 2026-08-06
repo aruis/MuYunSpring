@@ -35,7 +35,7 @@ const packageLayerRules = [
   },
   {
     prefix: 'src/dynamic-page-runtime/',
-    forbidden: ['@muyun/platform-workbench'],
+    forbidden: ['@muyun/vue-ui-antdv', '@muyun/platform-workbench'],
   },
   {
     prefix: 'src/platform-components/',

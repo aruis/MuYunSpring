@@ -6,7 +6,7 @@ import {
   createPageRecordExternalChangeState,
   createRealtimeRefreshQueue,
   type RealtimeRefreshRun,
-} from '../src/app/pageRealtime.ts';
+} from '../src/platform-admin-runtime/pageRealtime.ts';
 import type { WebBusinessRealtimeEvent } from '../src/web-contracts/index.ts';
 
 test('page business event handler filters by type module and record', async () => {

@@ -350,6 +350,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         ModuleEntryType entryType = module.getEntryType() == null ? ModuleEntryType.MODULE : module.getEntryType();
         switch (entryType) {
             case MODULE -> {
+                if (hasText(menu.getRoute())) {
+                    requireBlank(menu.getExternalUrl(), "Route menu cannot have externalUrl");
+                    clearLowCodeEntry(menu);
+                    return;
+                }
                 menu.setRoute(null);
                 menu.setExternalUrl(null);
                 normalizeModuleEntry(menu, module.getAlias());

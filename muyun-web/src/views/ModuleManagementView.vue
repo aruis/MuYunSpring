@@ -33,9 +33,12 @@ import {
 } from '@muyun/web-core';
 import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import { createModuleManagementState, moduleTitleOf } from './moduleManagementState';
-import { createModuleOpenApiPageDescriptor, loadOpenApiCatalog } from '../app/moduleOpenApi';
-import { useWorkbenchNavigation } from '../app/workbenchNavigation';
-import { createWorkspaceViewDescriptor } from '../app/workspaceViews';
+import {
+  createModuleOpenApiPageDescriptor,
+  loadOpenApiCatalog,
+} from '../platform-admin-runtime/moduleOpenApi';
+import { useWorkbenchNavigation } from '@muyun/platform-workbench';
+import { createWorkspaceViewDescriptor } from '../platform-admin-runtime/workspaceViews';
 import { moduleActionManagementWorkspaceView } from './moduleActionManagementWorkspaceView';
 import { metadataOrchestrationWorkspaceView } from './metadataOrchestrationWorkspaceView';
 

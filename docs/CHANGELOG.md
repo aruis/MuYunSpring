@@ -4,10 +4,21 @@
 
 ## Unreleased
 
+## 0.26.4 - 2026-08-06
+
+### Fixed
+
+- 修复 `@ximatai/muyun-web-app` 的发布声明引用内部 alias、管理型 App 路由误捕获与动态运行器 UI adapter 边界问题。
+
+### Changed
+
+- `gradle.properties` 的 `muyunVersion` 成为前端 npm 包版本的一致性来源；打包时自动校验两者对齐。
+
 ## 0.26.3 - 2026-08-06
 
 ### Changed
 
+- 首发 `@ximatai/muyun-web-app@0.26.3`：面向管理型 App 交付工作台、标准模块运行器、平台管理页与完整 TypeScript 类型声明。
 - 发布前以本地 Maven 坐标启动独立消费者；Maven Central 真实坐标验证保留为首发或发布链路调整后的人工检查。
 - Release workflow 将消费者预检、发布工作区清理和 Maven Central 上传分阶段执行，保证上传只使用本次构建的构件。
 
