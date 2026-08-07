@@ -50,6 +50,12 @@ jobs:
       - name: Verify release tag and credentials
         run: ./gradlew verifyReleaseTagVersion verifyReleaseCredentials
 
+      # Start verification from a clean tree. The consumer verification below
+      # prepares the npm staging package that both dry-run and publish consume.
+      # Do not clean again between those steps and npm publish.
+      - name: Clean release workspace
+        run: ./gradlew clean
+
       - name: Verify backend
         run: ./gradlew verifyAll
 
@@ -64,9 +70,6 @@ jobs:
       - name: Verify npm publish payload
         working-directory: build/consumer-npm/staging/web-app
         run: npm publish --dry-run --access public
-
-      - name: Clean release workspace
-        run: ./gradlew clean
 
       - name: Publish to Maven Central
         run: ./gradlew publishReleaseToSonatype
