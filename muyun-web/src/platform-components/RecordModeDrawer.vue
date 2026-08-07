@@ -27,6 +27,11 @@ const props = withDefaults(
     errorMessage?: string;
     retryTitle?: string;
     externallyChanged?: boolean;
+    editAvailable?: boolean;
+    saveAvailable?: boolean;
+    saving?: boolean;
+    editTitle?: string;
+    saveTitle?: string;
     externalChangeTitle?: string;
     externalChangeMessage?: string;
     externalChangeReloadTitle?: string;
@@ -47,6 +52,11 @@ const props = withDefaults(
     errorMessage: '无法加载详情，请重试',
     retryTitle: '重试',
     externallyChanged: false,
+    editAvailable: false,
+    saveAvailable: false,
+    saving: false,
+    editTitle: '编辑',
+    saveTitle: '保存',
     externalChangeTitle: undefined,
     externalChangeMessage: undefined,
     externalChangeReloadTitle: undefined,
@@ -70,6 +80,8 @@ const emit = defineEmits<{
   retry: [];
   reloadExternalChange: [];
   dismissExternalChange: [];
+  edit: [];
+  save: [];
 }>();
 
 const viewModeActive = computed(() => props.mode === props.viewMode);
@@ -92,8 +104,16 @@ const actualCloseOnOutside = computed(() => props.closeOnOutside ?? viewModeActi
     <template #status>
       <slot name="status" />
     </template>
-    <template v-if="$slots.operation" #operation>
-      <slot name="operation" />
+    <template v-if="$slots.operation || editAvailable || saveAvailable" #operation>
+      <slot v-if="$slots.operation" name="operation" />
+      <template v-else>
+        <UiActionButton v-if="editAvailable" icon-name="edit" @click="emit('edit')">
+          {{ editTitle }}
+        </UiActionButton>
+        <UiActionButton v-if="saveAvailable" emphasis="primary" :loading="saving" @click="emit('save')">
+          {{ saveTitle }}
+        </UiActionButton>
+      </template>
     </template>
 
     <slot />

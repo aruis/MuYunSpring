@@ -10,9 +10,12 @@ import {
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import { UiButton } from '@muyun/vue-ui-antdv';
 import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
+import {
+  canMutateDynamicModuleDetail,
+  shouldCommitDynamicModuleDetailRequest,
+} from './dynamicModuleDetailStateModel';
 
 /**
  * Descriptor-driven CRUD runner shared by static and dynamic modules.
@@ -38,6 +41,9 @@ const formViewCode = ref<string>();
 const formFields = ref(resolveRecordFormFields(undefined));
 const reloadKey = ref(0);
 const saving = ref(false);
+const detailLoading = ref(false);
+const detailLoadFailed = ref(false);
+let detailLoadSequence = 0;
 
 const title = computed(
   () => props.descriptor.title ?? context.runtime.snapshot()?.title ?? context.moduleAlias,
@@ -73,7 +79,7 @@ function handleLoaded(records: QueryListRecord[]) {
   if (selectedRecord.value) {
     selectedRecord.value =
       records.find((record) => record.id === selectedRecord.value?.id) ?? selectedRecord.value;
-    if (detailOpen.value && editorMode.value === 'view') {
+    if (detailOpen.value && !detailLoading.value && editorMode.value === 'view') {
       editingRecord.value = selectedRecord.value;
     }
   }
@@ -86,12 +92,35 @@ function selectRecord(record: QueryListRecord) {
 async function openRecord(record: QueryListRecord, mode: 'edit' | 'view') {
   const id = record.id == null ? undefined : String(record.id);
   if (!id) return;
+  const requestSequence = ++detailLoadSequence;
   selectedRecord.value = record;
-  editingRecord.value = record;
+  editingRecord.value = undefined;
   editorMode.value = mode;
   detailOpen.value = true;
-  editingRecord.value = await context.crud.view(id);
-  selectedRecord.value = editingRecord.value;
+  detailLoading.value = true;
+  detailLoadFailed.value = false;
+  try {
+    const detail = await context.crud.view(id);
+    if (
+      !shouldCommitDynamicModuleDetailRequest({ activeRequestSequence: detailLoadSequence, requestSequence })
+    )
+      return;
+    editingRecord.value = detail;
+    selectedRecord.value = detail;
+  } catch {
+    if (
+      !shouldCommitDynamicModuleDetailRequest({ activeRequestSequence: detailLoadSequence, requestSequence })
+    )
+      return;
+    editingRecord.value = undefined;
+    detailLoadFailed.value = true;
+  } finally {
+    if (
+      shouldCommitDynamicModuleDetailRequest({ activeRequestSequence: detailLoadSequence, requestSequence })
+    ) {
+      detailLoading.value = false;
+    }
+  }
 }
 
 function updateDraftField(
@@ -108,6 +137,9 @@ function updateDraftField(
 }
 
 function createRecord() {
+  detailLoadSequence += 1;
+  detailLoading.value = false;
+  detailLoadFailed.value = false;
   editingRecord.value = {};
   editorMode.value = 'create';
   detailOpen.value = true;
@@ -119,7 +151,17 @@ async function editRecord(record: QueryListRecord) {
 
 async function saveRecord() {
   const record = editingRecord.value;
-  if (!record || saving.value) return;
+  if (!record) return;
+  if (
+    !canMutateDynamicModuleDetail({
+      hasRecord: true,
+      saving: saving.value,
+      loading: detailLoading.value,
+      loadFailed: detailLoadFailed.value,
+    })
+  ) {
+    return;
+  }
   saving.value = true;
   try {
     const id = record.id == null ? undefined : String(record.id);
@@ -170,9 +212,18 @@ function handleRowAction(action: { key?: string }, record: QueryListRecord) {
 
 function closeDetail() {
   if (saving.value) return;
+  detailLoadSequence += 1;
+  detailLoading.value = false;
+  detailLoadFailed.value = false;
   detailOpen.value = false;
   editorMode.value = 'view';
   editingRecord.value = selectedRecord.value;
+}
+
+function retryLoadDetail() {
+  const record = selectedRecord.value;
+  if (!record || editorMode.value === 'create') return;
+  void openRecord(record, editorMode.value);
 }
 
 function recordTitle(record: QueryListRecord | undefined) {
@@ -207,7 +258,17 @@ function recordTitle(record: QueryListRecord | undefined) {
       :title="detailTitle"
       :subtitle="formViewCode"
       :mode="editorMode"
+      :loading="detailLoading"
+      :load-failed="detailLoadFailed"
+      :edit-available="
+        Boolean(selectedRecord) && !detailLoading && !detailLoadFailed && editorMode === 'view'
+      "
+      :save-available="!detailLoading && !detailLoadFailed && editorMode !== 'view'"
+      :saving="saving"
       @close="closeDetail"
+      @retry="retryLoadDetail"
+      @edit="selectedRecord && editRecord(selectedRecord)"
+      @save="saveRecord"
     >
       <template #view>
         <RecordDetailFields
@@ -225,18 +286,6 @@ function recordTitle(record: QueryListRecord | undefined) {
           :option-context="context"
           @update:field="updateDraftField"
         />
-      </template>
-      <template #operation>
-        <UiButton
-          v-if="selectedRecord && editorMode === 'view'"
-          icon-name="edit"
-          @click="editRecord(selectedRecord)"
-        >
-          编辑
-        </UiButton>
-        <UiButton v-if="editorMode !== 'view'" type="primary" :loading="saving" @click="saveRecord">
-          保存
-        </UiButton>
       </template>
     </RecordModeDrawer>
   </section>

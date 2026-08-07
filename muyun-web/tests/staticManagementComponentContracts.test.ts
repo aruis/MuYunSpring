@@ -129,6 +129,12 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(drawerSource, /dismissExternalChange/);
   assert.match(drawerSource, /viewMode: 'view'/);
   assert.match(drawerSource, /formModes: \(\) => \['edit', 'create'\]/);
+  assert.match(drawerSource, /editAvailable\?: boolean/);
+  assert.match(drawerSource, /saveAvailable\?: boolean/);
+  assert.match(drawerSource, /edit: \[\]/);
+  assert.match(drawerSource, /save: \[\]/);
+  assert.match(drawerSource, /<UiActionButton v-if="editAvailable"/);
+  assert.match(drawerSource, /<UiActionButton[\s\S]*v-if="saveAvailable"/);
   assert.match(employeeDetailContentSource, /RecordExternalChangeNotice/);
   assert.match(drawerSource, /const viewModeActive = computed\(\(\) => props\.mode === props\.viewMode\)/);
   assert.match(
@@ -238,6 +244,28 @@ test('record mode drawer owns detail mode branch switching', () => {
   assert.match(recordPickerSource, /if \(props\.mode === 'list'\)[\s\S]*await loadListRecords\(\)/);
   assert.match(recordPickerSource, /props\.context\.crud\.query/);
   assert.doesNotMatch(viewTemplate, /任职管理/);
+});
+
+test('standard module runner waits for a complete detail before enabling mutations', () => {
+  const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
+
+  assert.match(hostSource, /const detailLoading = ref\(false\)/);
+  assert.match(hostSource, /const detailLoadFailed = ref\(false\)/);
+  assert.match(hostSource, /const requestSequence = \+\+detailLoadSequence/);
+  assert.match(hostSource, /editingRecord\.value = undefined;[\s\S]*detailLoading\.value = true/);
+  assert.match(hostSource, /await context\.crud\.view\(id\)/);
+  assert.match(hostSource, /shouldCommitDynamicModuleDetailRequest/);
+  assert.match(hostSource, /detailLoadFailed\.value = true/);
+  assert.match(hostSource, /function retryLoadDetail\(\)/);
+  assert.match(hostSource, /:loading="detailLoading"/);
+  assert.match(hostSource, /:load-failed="detailLoadFailed"/);
+  assert.match(hostSource, /@retry="retryLoadDetail"/);
+  assert.match(hostSource, /canMutateDynamicModuleDetail/);
+  assert.match(
+    hostSource,
+    /:edit-available="[\s\S]*Boolean\(selectedRecord\) && !detailLoading && !detailLoadFailed && editorMode === 'view'/,
+  );
+  assert.match(hostSource, /:save-available="!detailLoading && !detailLoadFailed && editorMode !== 'view'"/);
 });
 
 test('static edit draft normalizers preserve standard record fields', () => {
@@ -1589,7 +1617,8 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /<RecordQueryListPanel/);
   assert.match(hostSource, /<RecordModeDrawer/);
   assert.match(hostSource, /<RecordDetailFields/);
-  assert.match(hostSource, /<UiButton/);
+  assert.match(hostSource, /:edit-available/);
+  assert.match(hostSource, /:save-available/);
   assert.match(hostSource, /<RecordFormFields/);
   assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
   assert.match(hostSource, /isListPage/);
@@ -1599,6 +1628,7 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);
   assert.doesNotMatch(hostSource, /<RecordDetailPanel/);
   assert.doesNotMatch(hostSource, /<button/);
+  assert.doesNotMatch(hostSource, /@muyun\/vue-ui-antdv/);
   assert.doesNotMatch(hostSource, /等待接入页面 bootstrap 与列表查询/);
 });
 
@@ -1614,8 +1644,14 @@ test('data table keeps platform typography when embedded by a consumer App', () 
   const tableSource = readSource('src/vue-ui-antdv/components/UiDataTable.vue');
 
   assert.match(tableSource, /\.ui-data-table :deep\(\.ant-table\)[\s\S]*font-size: 13px/);
-  assert.match(tableSource, /\.ant-table-thead > tr > th\),[\s\S]*\.ant-table-tbody > tr > td\)[\s\S]*font-size: 13px/);
-  assert.match(tableSource, /\.ant-table-thead > tr > th\),[\s\S]*\.ant-table-tbody > tr > td\)[\s\S]*line-height: 1\.5714285714/);
+  assert.match(
+    tableSource,
+    /\.ant-table-thead > tr > th\),[\s\S]*\.ant-table-tbody > tr > td\)[\s\S]*font-size: 13px/,
+  );
+  assert.match(
+    tableSource,
+    /\.ant-table-thead > tr > th\),[\s\S]*\.ant-table-tbody > tr > td\)[\s\S]*line-height: 1\.5714285714/,
+  );
 });
 
 test('record query list panel forwards dynamic ui config and query template ids', () => {
