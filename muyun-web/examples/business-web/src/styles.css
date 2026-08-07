@@ -43,6 +43,22 @@ body {
   margin: 0;
 }
 
+.customer-details {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin: 0;
+}
+
+.customer-details dt {
+  color: #64748b;
+}
+
+.customer-details dd {
+  margin: 0;
+}
+
 .business-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);

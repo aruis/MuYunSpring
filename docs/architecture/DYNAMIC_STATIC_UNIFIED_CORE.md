@@ -123,6 +123,10 @@ Schema migration 默认策略由平台运行模式决定：`DEVELOPMENT` 默认�
 
 UI 配置、查询模板、菜单入口、页面 bootstrap、引用候选、附件页面交付等页面能力应优先编译到静态和动态可共用的 descriptor、读投影和动作语义。短期只落到一侧的能力应记录为阶段限制；能力调用的数据读写、动作权限、数据权限、审计、附件业务关系、事务和生命周期仍必须回到平台统一能力链路，不能绕过静态/动态共用的底层契约。
 
+标准模块管理页也属于这条收敛链：列表、详情抽屉、表单和动作区由同一 descriptor 驱动的模块运行器交付，不因模块来自 Java 静态声明或动态元数据而分出两套页面壳。`dynamic-module-host` 是既有菜单/页签 descriptor 的兼容标识；其运行器实际承载的是来源无关的标准模块 CRUD 页面，不应据此在业务 App 复制动态专用页面。
+
+静态模块的列表和表单字段是对外 UI 暴露策略，不从 Java 实体自动推断。需要通过标准管理页交付的静态 Controller 应实现 `StaticModuleUiContributor` 并声明 `ModuleUiDefinition`；这样字段顺序、标签、必填、控件和敏感字段可见性都有显式边界。业务 App 只写本模块的 UI 声明，继续复用平台的列表、抽屉和表单组件。
+
 静态模块引用和 service 级读投影的当前稳定契约见 [静态模块引用与读投影契约](STATIC_REFERENCE_READ_PROJECTION.md)。静态与动态列表读取都按 `ReferenceTarget` 聚合引用 ID，复用同一 `ReferenceAbility` 批量补齐标题和字段投影；静态可安全编译的 SQL join 只是该统一语义的优化路径。
 静态 `@ReferenceLoad` 的多跳声明会先编译为只含 `ReferenceTarget` 与字段 hop 的 `ReferenceLoadPath`，再通过同一引用投影契约执行；动态元数据接入多跳读取时应产出该路径契约，不得另建动态专用读取内核。
 动态侧使用 `EntityReferenceLoadDefinition` 声明来源字段、终端字段、输出字段与类型化 hop；hop 显式给出 `ReferenceTarget` 和当前节点的 `via` 字段，以便配置保存期完成校验。静态与动态的多跳路径均由 `ReferenceLoadReader` 执行，且来源与可校验 hop 必须为 `ONE` 基数；零跳的直接读取则复用普通引用投影的单值或集合语义。动态 `EntityReferencedByDefinition` 只声明目标实体、来源实体、来源引用字段和虚拟输出字段，运行态按同一 CRUD 查询链路装配反向集合，不把反向关系硬编码到 Service。

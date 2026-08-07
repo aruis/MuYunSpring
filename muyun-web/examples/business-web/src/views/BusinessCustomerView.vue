@@ -1,35 +1,43 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { RecordDetailPanel, formatPlatformDateTime } from '@ximatai/muyun-web-app';
-import type { RecordData } from '@ximatai/muyun-web-app';
+import { UiInput } from '@ximatai/muyun-web-app';
 
-const record = ref<RecordData>({
+interface CustomerRecord {
+  id?: string;
+  customerName: string;
+  industry: string;
+  level: string;
+}
+
+const record = ref<CustomerRecord>({
   customerName: '业务项目客户',
   industry: 'software',
   level: 'key',
 });
 
-const rows = ref<RecordData[]>([
+const rows = ref<CustomerRecord[]>([
   { id: 'biz-001', customerName: '业务项目客户', industry: 'software', level: 'key' },
 ]);
 
-const generatedAt = formatPlatformDateTime('2026-08-06T08:00:00Z');
+const generatedAt = new Intl.DateTimeFormat('zh-CN', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'UTC',
+}).format(new Date('2026-08-06T08:00:00Z'));
 </script>
 
 <template>
   <section class="business-grid">
     <article class="business-card">
       <h2>业务表单</h2>
-      <RecordDetailPanel title="客户信息">
-        <dl>
-          <dt>客户名称</dt>
-          <dd>{{ record.customerName }}</dd>
-          <dt>行业</dt>
-          <dd>{{ record.industry }}</dd>
-          <dt>客户等级</dt>
-          <dd>{{ record.level }}</dd>
-        </dl>
-      </RecordDetailPanel>
+      <dl class="customer-details">
+        <dt>客户名称</dt>
+        <dd><UiInput v-model:value="record.customerName" /></dd>
+        <dt>行业</dt>
+        <dd>{{ record.industry }}</dd>
+        <dt>客户等级</dt>
+        <dd>{{ record.level }}</dd>
+      </dl>
     </article>
 
     <article class="business-card">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { UiSwitch } from '@muyun/vue-ui-antdv';
 import RecordStatusTag from './RecordStatusTag.vue';
 import {
   resolveRecordFormFieldNames,
@@ -74,6 +75,11 @@ function displayValue(field: RecordFormFieldState) {
         <RecordStatusTag
           v-if="field.controlType === 'enabledStatus'"
           :enabled="booleanFieldValue(field.fieldName)"
+        />
+        <UiSwitch
+          v-else-if="field.controlType === 'switch'"
+          :checked="booleanFieldValue(field.fieldName)"
+          disabled
         />
         <span v-else>{{ displayValue(field) }}</span>
       </dd>

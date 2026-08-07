@@ -240,6 +240,18 @@ function isExpandTriggerEvent(event: MouseEvent) {
 .ui-data-table :deep(.ant-table) {
   color: var(--muyun-text-body);
   font-size: 13px;
+  line-height: 1.5714285714;
+}
+
+/*
+ * The native table element can otherwise retain a consumer page's inherited
+ * typography even when the Ant table wrapper has the platform scale. Keep
+ * table header and body text on the same adapter contract in every host.
+ */
+.ui-data-table :deep(.ant-table-thead > tr > th),
+.ui-data-table :deep(.ant-table-tbody > tr > td) {
+  font-size: 13px;
+  line-height: 1.5714285714;
 }
 
 .ui-data-table :deep(.ant-table-thead > tr > th) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiButton, UiInput, UiSelect, UiTreeSelect } from '@muyun/vue-ui-antdv';
+import { UiButton, UiInput, UiSelect, UiSwitch, UiTreeSelect } from '@muyun/vue-ui-antdv';
 import type { OptionItemDescriptor, OptionValue, OptionValueList } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
@@ -190,6 +190,12 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       :enabled="booleanFieldValue(field.fieldName)"
       :disabled="fieldDisabled(field)"
       :show-label="false"
+      @change="updateField(field.fieldName, $event)"
+    />
+    <UiSwitch
+      v-else-if="field.controlType === 'switch'"
+      :checked="booleanFieldValue(field.fieldName)"
+      :disabled="fieldDisabled(field)"
       @change="updateField(field.fieldName, $event)"
     />
     <RecordPicker
