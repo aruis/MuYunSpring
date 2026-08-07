@@ -54,7 +54,9 @@ muyun-web/src/app                   框架仓库自身的启动、登录和开�
 @muyun/platform-admin-runtime
 ```
 
-首个对外运行时不会仓促把上述内部目录逐个冻结为 npm 包。当前以 `@ximatai/muyun-web-app` 交付面向管理型 App 的组合包：公开 Workbench、标准模块运行器、认证/HTTP/menu 基础原语、平台业务组件、平台管理运行时和样式入口。平台自有管理页随包交付；消费应用自己的业务页面、登录品牌和路由组合不进入包。UI adapter 目前是组合包的内部实现，不单独承诺其组件级 API；等内部 API、声明文件和独立版本策略稳定后，再按职责拆包，避免把当前源码目录直接变成长期发布承诺。
+首个对外运行时不会仓促把上述内部目录逐个冻结为 npm 包。当前以 `@ximatai/muyun-web-app` 交付面向管理型 App 的组合包：公开 Workbench、认证/HTTP/menu 基础原语、平台管理运行时和样式入口。标准模块运行器与平台业务组件作为包内实现，经 `PlatformAdminOutlet` 交付平台管理页，而非由业务 App 直接拼装。平台自有管理页随包交付；消费应用自己的业务页面、登录品牌和路由组合不进入包。
+
+组合包同时公开 App 自定义轻量页面必需的 `UiButton`、`UiInput` 和 `UiSwitch`。它们是受控的基础消费面，业务 App 应优先使用这些组件而不是原生控件或直接依赖 Ant Design Vue；其余 adapter 组件仍属于内部实现，待独立版本策略稳定后再按职责拆包，避免把当前源码目录直接变成长期发布承诺。
 
 ## 能力分层
 
@@ -89,7 +91,7 @@ adapter 内部优先使用 Ant Design Vue 的成熟承载能力，而不是重�
 
 ### dynamic-page-runtime
 
-承载动态页面运行器。它负责把后端 descriptor、动作、字段、列表、表单和页面上下文转换成 MuYun 组件组合。
+承载 descriptor 驱动的标准模块运行器。它负责把后端 descriptor、动作、字段、列表、表单和页面上下文转换成 MuYun 组件组合；静态模块声明和动态元数据模块共用此运行器及“列表 + 抽屉”的标准交互。`dynamic-module-host` 是既有菜单和页签 descriptor 的兼容标识，不代表存在动态专用的页面内核。
 
 dynamic-page-runtime 不直接依赖 Ant Design Vue；它依赖 MuYun 契约、web-core 能力和 MuYun 组件。
 

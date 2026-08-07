@@ -96,6 +96,14 @@ test('record form field state resolves select options from fallback metadata', (
   });
 });
 
+test('record form field state preserves a descriptor switch as a generic boolean control', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['completed', field('已完成', { uiType: 'switch' })],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('completed', { fields }).controlType, 'switch');
+});
+
 test('record form field state makes resolved option fields into selects without page fallback metadata', () => {
   const fields = new Map<string, RecordFormFieldDescriptor>([
     [

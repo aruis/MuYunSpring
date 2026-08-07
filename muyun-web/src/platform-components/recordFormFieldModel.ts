@@ -14,7 +14,7 @@ export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewField
 };
 export type RecordFormRecord = Record<string, unknown>;
 export type RecordFormFieldValue = string | number | boolean | OptionValueList | undefined;
-export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'recordPicker';
+export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'switch' | 'recordPicker';
 
 export interface RecordFormFieldFallback {
   label: string;
@@ -146,6 +146,9 @@ function controlTypeOf(
 ): RecordFormFieldControlType {
   if (field?.uiType === 'enabledStatus') {
     return 'enabledStatus';
+  }
+  if (field?.uiType === 'switch') {
+    return 'switch';
   }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';

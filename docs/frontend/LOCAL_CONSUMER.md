@@ -27,7 +27,7 @@ cd <business-app>
 npm link <muyun-spring-repository>/build/consumer-npm/staging/web-app
 ```
 
-之后每次修改平台前端源码，只需再次运行 `npm run pack:consumer --prefix muyun-web`；链接保持不变，业务 App 的 Vite 服务会读取新的构建结果。若开发服务器没有自动刷新，重启其 Vite 进程即可。联调结束后，在业务 App 执行 `npm unlink @ximatai/muyun-web-app`，再执行 `npm install` 回到 npm 中声明的正式版本。
+之后每次修改平台前端源码，只需再次运行 `npm run pack:consumer --prefix muyun-web`；链接保持不变。生成包目录会被整体替换，因此业务 App 必须用 `vite --force` 重启或重新优化依赖，避免继续使用旧的预构建缓存。联调结束后，在业务 App 执行 `npm unlink @ximatai/muyun-web-app`，再执行 `npm install` 回到 npm 中声明的正式版本。
 
 消费者最小接入顺序：
 

@@ -1,17 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
-  RecordDetailPanel,
+  RecordDetailFields,
   RecordFormFields,
+  RecordModeDrawer,
   RecordQueryListPanel,
   confirmAction,
   resolveRecordFormFields,
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
+import { UiButton } from '@muyun/vue-ui-antdv';
 import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 
+/**
+ * Descriptor-driven CRUD runner shared by static and dynamic modules.
+ *
+ * The `DynamicModuleHost` name remains the compatibility counterpart of the
+ * persisted `dynamic-module-host` page descriptor. It does not imply a
+ * dynamic-only UI path.
+ */
 defineOptions({ name: 'DynamicModuleHost' });
 
 const props = defineProps<{
@@ -24,6 +33,7 @@ const context = useModuleContext<QueryListRecord>({
 const selectedRecord = ref<QueryListRecord>();
 const editingRecord = ref<QueryListRecord>();
 const editorMode = ref<'create' | 'edit' | 'view'>('view');
+const detailOpen = ref(false);
 const formViewCode = ref<string>();
 const formFields = ref(resolveRecordFormFields(undefined));
 const reloadKey = ref(0);
@@ -63,19 +73,25 @@ function handleLoaded(records: QueryListRecord[]) {
   if (selectedRecord.value) {
     selectedRecord.value =
       records.find((record) => record.id === selectedRecord.value?.id) ?? selectedRecord.value;
-    if (editorMode.value === 'view') {
+    if (detailOpen.value && editorMode.value === 'view') {
       editingRecord.value = selectedRecord.value;
     }
-    return;
   }
-  selectedRecord.value = records[0];
-  editingRecord.value = records[0];
 }
 
 function selectRecord(record: QueryListRecord) {
   selectedRecord.value = record;
+}
+
+async function openRecord(record: QueryListRecord, mode: 'edit' | 'view') {
+  const id = record.id == null ? undefined : String(record.id);
+  if (!id) return;
+  selectedRecord.value = record;
   editingRecord.value = record;
-  editorMode.value = 'view';
+  editorMode.value = mode;
+  detailOpen.value = true;
+  editingRecord.value = await context.crud.view(id);
+  selectedRecord.value = editingRecord.value;
 }
 
 function updateDraftField(
@@ -92,16 +108,13 @@ function updateDraftField(
 }
 
 function createRecord() {
-  editingRecord.value = { enabled: true };
+  editingRecord.value = {};
   editorMode.value = 'create';
+  detailOpen.value = true;
 }
 
 async function editRecord(record: QueryListRecord) {
-  const id = record.id == null ? undefined : String(record.id);
-  if (!id) return;
-  editingRecord.value = await context.crud.view(id);
-  selectedRecord.value = editingRecord.value;
-  editorMode.value = 'edit';
+  await openRecord(record, 'edit');
 }
 
 async function saveRecord() {
@@ -150,8 +163,16 @@ function handleListAction(action: { key?: string }) {
 }
 
 function handleRowAction(action: { key?: string }, record: QueryListRecord) {
+  if (action.key === 'view') void openRecord(record, 'view');
   if (action.key === 'edit') void editRecord(record);
   if (action.key === 'delete') void deleteRecord(record);
+}
+
+function closeDetail() {
+  if (saving.value) return;
+  detailOpen.value = false;
+  editorMode.value = 'view';
+  editingRecord.value = selectedRecord.value;
 }
 
 function recordTitle(record: QueryListRecord | undefined) {
@@ -176,36 +197,48 @@ function recordTitle(record: QueryListRecord | undefined) {
       empty-description="暂无动态记录"
       @loaded="handleLoaded"
       @select="selectRecord"
-      @row-dblclick="selectRecord"
+      @row-dblclick="(record) => openRecord(record, 'view')"
       @action="handleListAction"
       @row-action="handleRowAction"
     />
 
-    <RecordDetailPanel class="dynamic-detail" :title="detailTitle">
-      <template #actions>
-        <span v-if="formViewCode" class="view-code">{{ formViewCode }}</span>
-        <button
+    <RecordModeDrawer
+      :open="detailOpen"
+      :title="detailTitle"
+      :subtitle="formViewCode"
+      :mode="editorMode"
+      @close="closeDetail"
+    >
+      <template #view>
+        <RecordDetailFields
+          v-if="editingRecord"
+          :record="editingRecord as RecordFormRecord"
+          :fields="formFields"
+        />
+      </template>
+      <template #form>
+        <RecordFormFields
+          v-if="editingRecord"
+          class="dynamic-form"
+          :record="editingRecord as RecordFormRecord"
+          :fields="formFields"
+          :option-context="context"
+          @update:field="updateDraftField"
+        />
+      </template>
+      <template #operation>
+        <UiButton
           v-if="selectedRecord && editorMode === 'view'"
-          type="button"
+          icon-name="edit"
           @click="editRecord(selectedRecord)"
         >
           编辑
-        </button>
-        <button v-if="editorMode !== 'view'" type="button" :disabled="saving" @click="saveRecord">
-          {{ saving ? '保存中' : '保存' }}
-        </button>
+        </UiButton>
+        <UiButton v-if="editorMode !== 'view'" type="primary" :loading="saving" @click="saveRecord">
+          保存
+        </UiButton>
       </template>
-      <RecordFormFields
-        v-if="editingRecord"
-        class="dynamic-form"
-        :record="editingRecord as RecordFormRecord"
-        :fields="formFields"
-        :option-context="context"
-        :disabled="editorMode === 'view'"
-        @update:field="updateDraftField"
-      />
-      <p v-else class="empty-detail">请选择一条动态记录</p>
-    </RecordDetailPanel>
+    </RecordModeDrawer>
   </section>
   <section v-else class="dynamic-module-unsupported">
     <h2>{{ title }}</h2>
@@ -215,14 +248,11 @@ function recordTitle(record: QueryListRecord | undefined) {
 
 <style scoped>
 .dynamic-module-workspace {
-  display: grid;
-  grid-template-columns: minmax(420px, 1.25fr) minmax(320px, 0.75fr);
-  gap: 12px;
+  min-width: 0;
   min-height: calc(100vh - 116px);
 }
 
-.dynamic-list,
-.dynamic-detail {
+.dynamic-list {
   min-width: 0;
 }
 
@@ -230,17 +260,6 @@ function recordTitle(record: QueryListRecord | undefined) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-}
-
-.view-code {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.empty-detail {
-  margin: 0;
-  color: #64748b;
-  font-size: 13px;
 }
 
 .dynamic-module-unsupported {
@@ -264,11 +283,7 @@ function recordTitle(record: QueryListRecord | undefined) {
   font-size: 13px;
 }
 
-@media (max-width: 1100px) {
-  .dynamic-module-workspace {
-    grid-template-columns: 1fr;
-  }
-
+@media (max-width: 720px) {
   .dynamic-form {
     grid-template-columns: 1fr;
   }
