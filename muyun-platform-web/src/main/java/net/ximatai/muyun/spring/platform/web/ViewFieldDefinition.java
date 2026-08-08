@@ -9,7 +9,8 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
                                   String width,
                                   Integer columnSpan,
                                   String align,
-                                  Boolean fixed) {
+                                  Boolean fixed,
+                                  BooleanStatusPresentation booleanStatus) {
     public ViewFieldDefinition {
         if (fieldRef == null) {
             throw new IllegalArgumentException("view field ref must not be null");
@@ -22,6 +23,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         width = width == null || width.isBlank() ? null : width.trim();
         columnSpan = columnSpan == null ? 1 : requireColumnSpan(columnSpan);
         align = align == null || align.isBlank() ? null : align.trim();
+        if (booleanStatus != null && !"booleanStatus".equals(uiType)) {
+            throw new IllegalArgumentException("boolean status presentation requires uiType booleanStatus");
+        }
+        if ("booleanStatus".equals(uiType) && booleanStatus == null) {
+            throw new IllegalArgumentException("uiType booleanStatus requires boolean status presentation");
+        }
     }
 
     public static Builder field(String fieldName) {
@@ -43,6 +50,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         private Integer columnSpan = 1;
         private String align;
         private Boolean fixed;
+        private BooleanStatusPresentation booleanStatus;
 
         private Builder(ViewFieldRef fieldRef) {
             this.fieldRef = fieldRef;
@@ -78,6 +86,24 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
             return this;
         }
 
+        /** Renders this business boolean with declared labels instead of lifecycle labels. */
+        public Builder booleanStatus(String trueLabel, String falseLabel) {
+            return booleanStatus(trueLabel, falseLabel, BooleanStatusTone.SUCCESS, BooleanStatusTone.NEUTRAL);
+        }
+
+        public Builder booleanStatus(String trueLabel, String falseLabel,
+                                     BooleanStatusTone trueTone, BooleanStatusTone falseTone) {
+            this.uiType = "booleanStatus";
+            this.booleanStatus = new BooleanStatusPresentation(trueLabel, falseLabel, trueTone, falseTone);
+            return this;
+        }
+
+        /** Renders a read-only collection of {@code { id, title, color }} reference summaries. */
+        public Builder tagList() {
+            this.uiType = "tagList";
+            return this;
+        }
+
         public Builder width(String width) {
             this.width = width;
             return this;
@@ -101,7 +127,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public ViewFieldDefinition build() {
             return new ViewFieldDefinition(fieldRef, label, visible, required, readOnly,
-                    uiType, width, columnSpan, align, fixed);
+                    uiType, width, columnSpan, align, fixed, booleanStatus);
         }
     }
 

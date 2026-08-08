@@ -8,16 +8,19 @@ import net.ximatai.muyun.spring.common.model.title.TitleField;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceSummary;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModuleUiDescriptorCompilerTest {
@@ -27,7 +30,8 @@ class ModuleUiDescriptorCompilerTest {
                 .listView(list -> list
                         .title("职员列表")
                         .field("employeeNo", field -> field.label("职员编号").width("160px"))
-                        .field("enabled", field -> field.label("状态").uiType("enabledStatus").align("center")))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus").align("center"))
+                        .field("online", field -> field.label("在线状态").booleanStatus("在线", "离线")))
                 .formView(form -> form
                         .title("职员档案")
                         .field("organizationId", field -> field.label("所属机构").required().readOnly())
@@ -44,12 +48,17 @@ class ModuleUiDescriptorCompilerTest {
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                     assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                            .containsExactly("employeeNo", "enabled");
-                    assertThat(view.fields()).last()
+                            .containsExactly("employeeNo", "enabled", "online");
+                    assertThat(view.fields()).element(1)
                             .satisfies(field -> {
                                 assertThat(field.uiType()).isEqualTo("enabledStatus");
                                 assertThat(field.align()).isEqualTo("center");
                             });
+                    assertThat(view.fields()).last().satisfies(field -> {
+                        assertThat(field.uiType()).isEqualTo("booleanStatus");
+                        assertThat(field.booleanStatus().trueLabel()).isEqualTo("在线");
+                        assertThat(field.booleanStatus().falseLabel()).isEqualTo("离线");
+                    });
                 });
         assertThat(descriptor.views()).filteredOn(view -> view.viewCode().equals("default_form"))
                 .singleElement()
@@ -67,6 +76,15 @@ class ModuleUiDescriptorCompilerTest {
                                 assertThat(field.columnSpan()).isEqualTo(2);
                             });
                 });
+    }
+
+    @Test
+    void shouldRequireBusinessBooleanPresentationForItsUiType() {
+        assertThatThrownBy(() -> ViewFieldDefinition.field("online").uiType("booleanStatus").build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("uiType booleanStatus requires boolean status presentation");
+        assertThatCode(() -> ViewFieldDefinition.field("online").booleanStatus("在线", "离线").build())
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -173,10 +191,10 @@ class ModuleUiDescriptorCompilerTest {
         ModuleUiCompilationResult result = ModuleUiDescriptorCompiler.compileModule(definition);
 
         assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
-                .containsExactly("orderNo", "customerId", "customerTitle", "customerLevel");
+                .containsExactly("orderNo", "customerId", "customerTitle", "customerLevel", "tagSummaries");
         assertThat(result.readModel().fields()).filteredOn(ResolvedModuleReadField::platformManaged)
                 .extracting(ResolvedModuleReadField::fieldName)
-                .containsExactly("customerTitle", "customerLevel");
+                .containsExactly("customerTitle", "customerLevel", "tagSummaries");
     }
 
     @Test
@@ -231,7 +249,34 @@ class ModuleUiDescriptorCompilerTest {
         assertThat(workspace.scopeField()).isEqualTo("customerId");
         assertThat(workspace.queryCriteriaKey()).isEqualTo("customerId");
         assertThat(workspace.showScopeItemSubtitle()).isFalse();
+        assertThat(workspace.manageScopeTree()).isFalse();
         assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE);
+    }
+
+    @Test
+    void shouldPublishManageableTreeScopeOnlyWhenExplicitlyEnabled() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("customerId")
+                        .scopedListWorkspace("crm.customer", "customerId", "项目", "搜索项目")
+                        .manageableScopedTree())
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "项目")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().scopedListWorkspace()
+                .manageScopeTree()).isTrue();
+    }
+
+    @Test
+    void shouldRejectManageableTreeScopeWithoutWorkspace() {
+        assertThatThrownBy(() -> ModuleUiDefinition.builder("sales.order")
+                .listView(ViewDefinition.Builder::manageableScopedTree))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("scopedListWorkspace must be configured before manageableScopedTree");
     }
 
     @Test
@@ -289,6 +334,104 @@ class ModuleUiDescriptorCompilerTest {
 
         assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
                 .containsExactly("orderNo", "classroomId", "assistantTitle");
+    }
+
+    @Test
+    void shouldCompileTagListOnlyFromAManyTitleReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.label("标签").tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(definition).views().getFirst()
+                .fields().getFirst();
+
+        assertThat(field.referenceSummary()).satisfies(summary -> {
+            assertThat(summary.sourceField()).isEqualTo("tagIds");
+            assertThat(summary.targetModuleAlias()).isEqualTo("crm.tag");
+            assertThat(summary.cardinality()).isEqualTo(ReferenceCardinality.MANY);
+            assertThat(summary.fields()).containsExactly("title", "color");
+        });
+    }
+
+    @Test
+    void shouldRejectTagListWithoutATitleReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(IdOnlySummaryOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList reference summary must include title");
+    }
+
+    @Test
+    void shouldRejectTagListBoundToARawReferenceField() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagIds", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList UI field must be a structured reference summary");
+    }
+
+    @Test
+    void shouldRejectTagListOutsideListViewsUntilOtherRunnersSupportIt() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .formView(form -> form.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList UI field is only supported in LIST views");
+    }
+
+    @Test
+    void shouldAllowTagListWithTitleOnlyReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(TitleOnlySummaryOrder.class)
+                .build();
+
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().fields().getFirst()
+                .referenceSummary().fields()).containsExactly("title");
+    }
+
+    @Test
+    void shouldRejectTagListForDynamicDescriptorUntilDynamicReferenceSummariesExist() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(uiDefinition, ModuleKind.DYNAMIC, "订单",
+                java.util.Map.of(), java.util.Map.of(), null))
+                .hasMessageContaining("tagList UI field must be a structured reference summary");
     }
 
     @Test
@@ -395,6 +538,25 @@ class ModuleUiDescriptorCompilerTest {
 
         @ReferenceLoad(source = "customerId", field = "level")
         private transient String customerLevel;
+
+        @ReferenceSummary(source = "tagIds", fields = {"title", "color"})
+        private transient List<java.util.Map<String, Object>> tagSummaries;
+    }
+
+    private static final class IdOnlySummaryOrder {
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = {"id"})
+        private transient List<java.util.Map<String, Object>> tagSummaries;
+    }
+
+    private static final class TitleOnlySummaryOrder {
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = "title")
+        private transient List<java.util.Map<String, Object>> tagSummaries;
     }
 
     private static final class MultiHopReferenceOrder {

@@ -102,6 +102,40 @@ export interface WebTreeNode<T> {
   children: WebTreeNode<T>[];
 }
 
+/**
+ * A semantic inline action rendered beside a record in an explorer or tree.
+ *
+ * The icon names are platform presentation tokens. Individual UI adapters map
+ * them to their own icon implementations.
+ */
+export interface RecordInlineAction {
+  key: string;
+  title: string;
+  iconName?: RecordInlineActionIconName;
+  showLabel?: boolean;
+  disabled?: boolean;
+  danger?: boolean;
+}
+
+export type RecordInlineActionIconName =
+  | 'app'
+  | 'check'
+  | 'close'
+  | 'delete'
+  | 'down'
+  | 'edit'
+  | 'export'
+  | 'filter'
+  | 'help'
+  | 'lock'
+  | 'notification'
+  | 'plus'
+  | 'power'
+  | 'reload'
+  | 'save'
+  | 'search'
+  | 'settings';
+
 export interface CurrentUser {
   userId: string;
   username?: string;
@@ -456,7 +490,17 @@ export interface ViewFieldDefinition {
   columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
+  booleanStatus?: BooleanStatusPresentation;
 }
+
+export interface BooleanStatusPresentation {
+  trueLabel: string;
+  falseLabel: string;
+  trueTone?: BooleanStatusTone;
+  falseTone?: BooleanStatusTone;
+}
+
+export type BooleanStatusTone = 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
 
 export interface ResolvedViewFieldDescriptor {
   fieldRef: ViewFieldRef;
@@ -469,8 +513,18 @@ export interface ResolvedViewFieldDescriptor {
   columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
+  booleanStatus?: BooleanStatusPresentation;
   option?: ResolvedOptionFieldDescriptor;
   reference?: ResolvedReferenceFieldDescriptor;
+  referenceSummary?: ResolvedReferenceSummaryFieldDescriptor;
+}
+
+/** Structured summary facts resolved from a reference projection. Every item also contains `id`. */
+export interface ResolvedReferenceSummaryFieldDescriptor {
+  sourceField: string;
+  targetModuleAlias: string;
+  cardinality: 'ONE' | 'MANY';
+  fields: string[];
 }
 
 export interface ResolvedReferenceFieldDescriptor {
@@ -535,6 +589,7 @@ export interface ResolvedScopedListWorkspaceDescriptor {
   /** Scope list items only show a secondary label when the descriptor explicitly enables it. */
   showScopeItemSubtitle: boolean;
   createPolicy: 'REQUIRE_SCOPE' | 'ALLOW_UNSCOPED';
+  manageScopeTree?: boolean;
 }
 
 export interface ModuleUiDefinition {

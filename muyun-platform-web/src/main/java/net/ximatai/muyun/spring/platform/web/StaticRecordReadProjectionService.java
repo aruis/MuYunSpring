@@ -381,6 +381,12 @@ public class StaticRecordReadProjectionService {
                 internal.add(path.sourceField());
             }
         }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceSummaryPlan summary
+                : StaticReferenceResolver.summaryPlans(modelClass)) {
+            if (output.contains(summary.outputField()) && !output.contains(summary.sourceField())) {
+                internal.add(summary.sourceField());
+            }
+        }
         for (net.ximatai.muyun.spring.common.option.OptionLoadDefinition load
                 : OptionLoadResolver.resolve(modelClass)) {
             if (output.contains(load.outputField()) && !output.contains(load.sourceField())) {

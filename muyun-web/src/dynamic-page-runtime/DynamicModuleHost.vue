@@ -28,6 +28,7 @@ import {
 import type {
   DynamicModulePageDescriptor,
   MenuPageMode,
+  RecordInlineAction,
   ResolvedScopedListWorkspaceDescriptor,
   ResolvedViewDescriptor,
 } from '@muyun/web-contracts';
@@ -68,6 +69,11 @@ const selectedScopeRecord = ref<QueryListRecord>();
 const scopeSearchKeyword = ref('');
 const scopeReloadKey = ref(0);
 const scopeTree = ref(false);
+const scopeFormFields = ref(resolveRecordFormFields(undefined));
+const scopeEditorOpen = ref(false);
+const scopeEditorMode = ref<'create' | 'edit'>('create');
+const scopeEditingRecord = ref<QueryListRecord>();
+const scopeSaving = ref(false);
 const saving = ref(false);
 const togglingEnabled = ref(false);
 const detailLoading = ref(false);
@@ -81,6 +87,10 @@ const detailTitle = computed(() => {
   if (editorMode.value === 'create') return `新建${title.value}`;
   return recordTitle(editingRecord.value ?? selectedRecord.value) ?? '记录详情';
 });
+const scopeEditorTitle = computed(
+  () =>
+    `${scopeEditorMode.value === 'create' ? '新建' : '编辑'}${scopedListWorkspace.value?.scopeTitle ?? '目录'}`,
+);
 const pageMode = computed<MenuPageMode>(() => props.descriptor.target.pageMode ?? 'LIST');
 const isListPage = computed(() => pageMode.value === 'LIST');
 const listUiConfigId = computed(() =>
@@ -173,12 +183,51 @@ async function loadRuntimeForm() {
   scopedListWorkspace.value = scopedListWorkspaceFor(runtimeContext.uiDescriptor?.views ?? []);
   scopeTree.value = false;
   if (scopeContext.value) {
-    await scopeContext.value.runtime.ready;
+    const scopeRuntime = await scopeContext.value.runtime.ready;
     scopeTree.value = scopeContext.value.abilities.hasTree() === true;
+    scopeFormFields.value = resolveRecordFormFields(scopeRuntime.uiDescriptor);
   }
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
   formFields.value = resolveRecordFormFields(runtimeContext.uiDescriptor, view?.viewCode);
 }
+
+const scopeParentPickerConfigs = computed<Record<string, RecordFormFieldPickerConfig>>(() => {
+  if (!scopeContext.value || !scopeTree.value || !scopeFormFields.value.has('parentId')) {
+    return {} as Record<string, RecordFormFieldPickerConfig>;
+  }
+  return {
+    parentId: {
+      context: scopeContext.value,
+      mode: 'tree',
+      placeholder: `根${scopedListWorkspace.value?.scopeTitle ?? '目录'}留空`,
+      allowClear: true,
+      constraints: parentRecordConstraints(
+        scopeEditingRecord.value?.id == null ? undefined : String(scopeEditingRecord.value.id),
+      ),
+    },
+  };
+});
+
+/** Scope editors may contain ordinary references as well as the tree's parent field. */
+const scopeReferencePickerConfigs = computed<Record<string, RecordFormFieldPickerConfig>>(() => {
+  const configs: Record<string, RecordFormFieldPickerConfig> = { ...scopeParentPickerConfigs.value };
+  if (!scopeContext.value) {
+    return configs;
+  }
+  for (const field of scopeFormFields.value.values()) {
+    const fieldName = field.fieldRef.fieldName;
+    const reference = field.reference;
+    if (!reference || fieldName === 'parentId') {
+      continue;
+    }
+    configs[fieldName] = {
+      context: createModuleContext({ http: context.http, moduleAlias: reference.targetModuleAlias }),
+      mode: 'tree',
+      allowClear: !field.required?.constant,
+    };
+  }
+  return configs;
+});
 
 function defaultFormView(views: ResolvedViewDescriptor[]) {
   return views.find((view) => view.viewKind === 'FORM');
@@ -220,6 +269,88 @@ function selectScopeRecord(record: { id?: string }) {
     return;
   }
   selectedScopeRecord.value = record as QueryListRecord;
+}
+
+function scopeTreeActions(): RecordInlineAction[] {
+  if (!scopedListWorkspace.value?.manageScopeTree || !scopeTree.value || !scopeContext.value) return [];
+  const actions: RecordInlineAction[] = [];
+  if (scopeContext.value.can('create') === true)
+    actions.push({ key: 'create-child', title: '新增下级', iconName: 'plus' });
+  if (scopeContext.value.can('update') === true)
+    actions.push({ key: 'edit', title: '编辑', iconName: 'edit' });
+  if (scopeContext.value.can('delete') === true)
+    actions.push({ key: 'delete', title: '删除', iconName: 'delete', danger: true });
+  return actions;
+}
+
+function openScopeEditor(mode: 'create' | 'edit', record?: QueryListRecord) {
+  scopeEditorMode.value = mode;
+  scopeEditingRecord.value =
+    mode === 'create'
+      ? record?.id == null
+        ? { enabled: true }
+        : { parentId: record.id, enabled: true }
+      : record;
+  scopeEditorOpen.value = true;
+}
+
+async function editScopeRecord(record: QueryListRecord) {
+  if (!scopeContext.value?.crud || record.id == null) return;
+  const detail = await scopeContext.value.crud.view(String(record.id));
+  openScopeEditor('edit', detail as QueryListRecord);
+}
+
+async function saveScopeRecord() {
+  const scope = scopeContext.value;
+  const record = scopeEditingRecord.value;
+  if (!scope || !record || scopeSaving.value) return;
+  scopeSaving.value = true;
+  try {
+    const result =
+      scopeEditorMode.value === 'edit' && record.id != null
+        ? await scope.crud.update(String(record.id), record)
+        : await scope.crud.insert(record);
+    selectedScopeRecord.value = result.record as QueryListRecord;
+    scopeEditorOpen.value = false;
+    scopeReloadKey.value += 1;
+  } finally {
+    scopeSaving.value = false;
+  }
+}
+
+async function deleteScopeRecord(record: QueryListRecord) {
+  const scope = scopeContext.value;
+  const id = record.id == null ? undefined : String(record.id);
+  const version = typeof record.version === 'number' ? record.version : undefined;
+  if (!scope || !id || version === undefined) return;
+  if (
+    !(await confirmAction({
+      title: `删除${scopedListWorkspace.value?.scopeTitle ?? '目录'}`,
+      content: `确认删除「${recordTitle(record) ?? id}」？`,
+      okText: '删除',
+      danger: true,
+    }))
+  )
+    return;
+  await scope.crud.delete(id, { version });
+  if (selectedScopeRecord.value?.id === id) selectedScopeRecord.value = undefined;
+  scopeReloadKey.value += 1;
+}
+
+function handleScopeTreeAction(action: RecordInlineAction, record: unknown) {
+  const scopeRecord = record as QueryListRecord;
+  selectScopeRecord(scopeRecord);
+  if (action.key === 'create-child') openScopeEditor('create', scopeRecord);
+  if (action.key === 'edit') void editScopeRecord(scopeRecord);
+  if (action.key === 'delete') void deleteScopeRecord(scopeRecord);
+}
+
+function updateScopeDraftField(
+  fieldName: string,
+  value: import('@muyun/platform-components').RecordFormFieldValue,
+) {
+  if (!scopeEditingRecord.value) return;
+  scopeEditingRecord.value = { ...scopeEditingRecord.value, [fieldName]: value };
 }
 
 function selectTreeRecord(record: unknown) {
@@ -446,6 +577,16 @@ function recordTitle(record: QueryListRecord | undefined) {
           @update:search-keyword="scopeSearchKeyword = $event"
           @refresh="scopeReloadKey += 1"
         >
+          <template v-if="scopedListWorkspace.manageScopeTree && scopeTree" #actions>
+            <ModuleActionButton
+              class="record-panel-create-button"
+              :context="scopeContext"
+              action-code="create"
+              icon-only
+              :title="`新增${scopedListWorkspace.scopeTitle}`"
+              @click="openScopeEditor('create')"
+            />
+          </template>
           <TreeRecordExplorer
             v-if="scopeTree"
             :context="scopeContext"
@@ -455,7 +596,9 @@ function recordTitle(record: QueryListRecord | undefined) {
             search-mode="none"
             :empty-description="`暂无${scopedListWorkspace.scopeTitle}`"
             :secondary-of="scopedListWorkspace.showScopeItemSubtitle ? undefined : () => undefined"
+            :actions-of="scopeTreeActions"
             @select="selectScopeRecord"
+            @action="handleScopeTreeAction"
           />
           <CrudRecordListExplorer
             v-else
@@ -467,6 +610,43 @@ function recordTitle(record: QueryListRecord | undefined) {
             :subtitle-of="scopedListWorkspace.showScopeItemSubtitle ? undefined : () => undefined"
             @select="selectScopeRecord"
           />
+          <template #editor>
+            <Transition name="dynamic-scope-editor-drawer">
+              <section
+                v-if="
+                  scopedListWorkspace.manageScopeTree && scopeTree && scopeEditingRecord && scopeEditorOpen
+                "
+                class="dynamic-scope-editor-panel"
+              >
+                <header class="dynamic-scope-editor-header">
+                  <h3>{{ scopeEditorTitle }}</h3>
+                  <div class="dynamic-scope-editor-actions">
+                    <RecordStatusSwitch
+                      :enabled="scopeEditingRecord.enabled !== false"
+                      :disabled="scopeSaving"
+                      :show-label="false"
+                      @change="updateScopeDraftField('enabled', $event)"
+                    />
+                    <RecordPanelButton :disabled="scopeSaving" @click="scopeEditorOpen = false">
+                      取消
+                    </RecordPanelButton>
+                    <RecordPanelButton type="primary" :loading="scopeSaving" @click="saveScopeRecord">
+                      {{ scopeSaving ? '保存中' : '保存' }}
+                    </RecordPanelButton>
+                  </div>
+                </header>
+                <RecordFormFields
+                  class="dynamic-scope-editor-form"
+                  :record="scopeEditingRecord"
+                  :fields="scopeFormFields"
+                  :picker-configs="scopeReferencePickerConfigs"
+                  :disabled="scopeSaving"
+                  :exclude-field-names="['enabled']"
+                  @update:field="updateScopeDraftField"
+                />
+              </section>
+            </Transition>
+          </template>
         </RecordExplorerPanel>
       </ManagementExplorerColumn>
       <RecordQueryListPanel
@@ -719,6 +899,72 @@ function recordTitle(record: QueryListRecord | undefined) {
   height: 28px;
   padding: 0;
   border-radius: 999px;
+}
+
+.dynamic-scope-editor-panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  max-height: min(420px, 68%);
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--muyun-border);
+  border-top-color: var(--muyun-border-subtle);
+  border-radius: 8px 8px 0 0;
+  background: var(--muyun-surface);
+  box-shadow:
+    0 -1px 0 rgb(15 23 42 / 4%),
+    0 -12px 28px rgb(15 23 42 / 12%);
+  overflow: auto;
+}
+
+.dynamic-scope-editor-drawer-enter-active,
+.dynamic-scope-editor-drawer-leave-active {
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.dynamic-scope-editor-drawer-enter-from,
+.dynamic-scope-editor-drawer-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.dynamic-scope-editor-header,
+.dynamic-scope-editor-actions {
+  display: flex;
+  align-items: center;
+}
+
+.dynamic-scope-editor-header {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dynamic-scope-editor-header h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muyun-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-scope-editor-actions {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.dynamic-scope-editor-form {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dynamic-form {

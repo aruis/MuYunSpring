@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class StaticReferenceResolver {
     private static final Map<Class<?>, List<ReferenceRule>> RULES = new ConcurrentHashMap<>();
     private static final Map<Class<?>, List<ReferenceLoadPath>> LOAD_PATHS = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, List<ReferenceSummaryPlan>> SUMMARY_PLANS = new ConcurrentHashMap<>();
 
     private StaticReferenceResolver() {
     }
@@ -64,6 +65,13 @@ public final class StaticReferenceResolver {
         return LOAD_PATHS.computeIfAbsent(modelClass, StaticReferenceResolver::compileLoadPaths);
     }
 
+    public static List<ReferenceSummaryPlan> summaryPlans(Class<?> modelClass) {
+        if (modelClass == null) {
+            return List.of();
+        }
+        return SUMMARY_PLANS.computeIfAbsent(modelClass, StaticReferenceResolver::compileSummaryPlans);
+    }
+
     public static List<String> values(Object record, ReferencePlan plan) {
         if (record == null || plan == null) {
             return List.of();
@@ -92,6 +100,7 @@ public final class StaticReferenceResolver {
     static void clearCacheForTests() {
         RULES.clear();
         LOAD_PATHS.clear();
+        SUMMARY_PLANS.clear();
     }
 
     private static List<ReferenceRule> loadRules(Class<?> modelClass) {
@@ -161,6 +170,52 @@ public final class StaticReferenceResolver {
             paths.add(new ReferenceLoadPath(load.source(), source.target(), hops, load.field(), output.getName()));
         }
         return List.copyOf(paths);
+    }
+
+    private static List<ReferenceSummaryPlan> compileSummaryPlans(Class<?> modelClass) {
+        LinkedHashMap<String, Field> fields = fields(modelClass);
+        Map<String, ReferenceRule> rulesByField = rules(modelClass).stream()
+                .collect(java.util.stream.Collectors.toMap(rule -> rule.plan().sourceField(), rule -> rule,
+                        (first, ignored) -> first, LinkedHashMap::new));
+        List<ReferenceSummaryPlan> summaries = new java.util.ArrayList<>();
+        Set<String> outputFields = new LinkedHashSet<>();
+        for (Field output : fields.values()) {
+            ReferenceSummary summary = output.getAnnotation(ReferenceSummary.class);
+            if (summary == null) {
+                continue;
+            }
+            ReferenceRule source = rulesByField.get(summary.source());
+            if (source == null) {
+                throw new PlatformException("ReferenceSummary source must declare @ReferenceTo: "
+                        + modelClass.getName() + "." + summary.source());
+            }
+            if (!Modifier.isTransient(output.getModifiers())) {
+                throw new PlatformException("ReferenceSummary output must be transient: "
+                        + modelClass.getName() + "." + output.getName());
+            }
+            boolean collection = Collection.class.isAssignableFrom(output.getType());
+            if (source.cardinality() == ReferenceCardinality.MANY && !collection) {
+                throw new PlatformException("ReferenceSummary output for MANY reference must be a Collection: "
+                        + modelClass.getName() + "." + output.getName());
+            }
+            if (source.cardinality() == ReferenceCardinality.ONE && collection) {
+                throw new PlatformException("ReferenceSummary output for ONE reference must not be a Collection: "
+                        + modelClass.getName() + "." + output.getName());
+            }
+            List<String> summaryFields = java.util.Arrays.stream(summary.fields())
+                    .map(StaticReferenceResolver::normalize)
+                    .filter(java.util.Objects::nonNull)
+                    .filter(field -> !"id".equals(field))
+                    .distinct()
+                    .toList();
+            if (!outputFields.add(output.getName())) {
+                throw new PlatformException("duplicate reference summary output field: "
+                        + modelClass.getName() + "." + output.getName());
+            }
+            summaries.add(new ReferenceSummaryPlan(summary.source(), source.target(), source.cardinality(),
+                    summaryFields, output.getName()));
+        }
+        return List.copyOf(summaries);
     }
 
     private static ReferencePlan referenceToPlan(Field field, ReferenceTo referenceTo) {

@@ -268,6 +268,23 @@ test('standard module runner waits for a complete detail before enabling mutatio
   assert.match(hostSource, /:save-available="!detailLoading && !detailLoadFailed && editorMode !== 'view'"/);
 });
 
+test('manageable scoped tree keeps action permission and editor behavior in the standard module runner', () => {
+  const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
+
+  assert.match(hostSource, /RecordInlineAction/);
+  assert.doesNotMatch(hostSource, /@muyun\/vue-ui-antdv/);
+  assert.match(hostSource, /function scopeTreeActions\(\): RecordInlineAction\[\]/);
+  assert.match(hostSource, /scopeContext\.value\.can\('create'\) === true/);
+  assert.match(hostSource, /scopeContext\.value\.can\('update'\) === true/);
+  assert.match(hostSource, /scopeContext\.value\.can\('delete'\) === true/);
+  assert.match(hostSource, /:actions-of="scopeTreeActions"/);
+  assert.match(
+    hostSource,
+    /v-if="\s*scopedListWorkspace\.manageScopeTree && scopeTree && scopeEditingRecord && scopeEditorOpen\s*"/,
+  );
+  assert.match(hostSource, /<RecordFormFields[\s\S]*:fields="scopeFormFields"/);
+});
+
 test('static edit draft normalizers preserve standard record fields', () => {
   const userSource = readSource('src/views/UserManagementView.vue');
   const systemUserSource = readSource('src/views/SystemUserManagementView.vue');

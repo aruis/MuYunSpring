@@ -89,6 +89,18 @@ public record ViewDefinition(String viewCode,
             return this;
         }
 
+        /** Enables standard CRUD management for a tree-shaped scope in this workspace. */
+        public Builder manageableScopedTree() {
+            if (scopedListWorkspace == null) {
+                throw new IllegalStateException("scopedListWorkspace must be configured before manageableScopedTree");
+            }
+            scopedListWorkspace = new ScopedListWorkspaceDefinition(scopedListWorkspace.scopeModuleAlias(),
+                    scopedListWorkspace.scopeField(), scopedListWorkspace.queryCriteriaKey(),
+                    scopedListWorkspace.scopeTitle(), scopedListWorkspace.scopeSearchPlaceholder(),
+                    scopedListWorkspace.showScopeItemSubtitle(), scopedListWorkspace.createPolicy(), true);
+            return this;
+        }
+
         public Builder field(String fieldName) {
             return field(fieldName, ignored -> {
             });

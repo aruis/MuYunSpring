@@ -43,6 +43,7 @@ export {
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
 export { default as RecordTreeSelector } from './RecordTreeSelector.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
+export { default as RecordTagList } from './RecordTagList.vue';
 export { useRecycleBinState } from './recycleBinState';
 export type { RecycleBinStateOptions } from './recycleBinState';
 export {
