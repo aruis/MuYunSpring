@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.web;
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceSummary;
 import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
@@ -96,6 +97,34 @@ class ReferenceReadProjectionPostProcessorTest {
         verify(terminal).projections(List.of("terminal-1", "terminal-2"), List.of("title"));
     }
 
+    @Test
+    void shouldProjectManyReferenceAsStructuredSummaries() {
+        @SuppressWarnings("unchecked") ReferenceAbility<?> tag = mock(ReferenceAbility.class);
+        ReferenceTarget tagTarget = ReferenceTarget.of("mr", "tag");
+        when(tag.projections(eq(List.of("tag-1", "tag-2")), eq(List.of("title", "color"))))
+                .thenReturn(Map.of("tag-1", Map.of("title", "纯电动", "color", "#22C55E"),
+                        "tag-2", Map.of("title", "XE215EV", "color", "#2563EB")));
+        PlatformAbilityRuntime.configureReferenceTargetResolver(target -> tagTarget.equals(target)
+                ? java.util.Optional.of(tag) : java.util.Optional.empty());
+
+        List<Map<String, Object>> result = ReferenceReadProjectionPostProcessor.apply(TaggableRecord.class,
+                List.of(Map.of("id", "device-1", "tagIds", List.of("tag-1", "tag-2"))), List.of("tagSummaries"));
+
+        assertThat(result).singleElement().extracting(record -> record.get("tagSummaries"))
+                .isEqualTo(List.of(Map.of("id", "tag-1", "title", "纯电动", "color", "#22C55E"),
+                        Map.of("id", "tag-2", "title", "XE215EV", "color", "#2563EB")));
+        verify(tag).projections(List.of("tag-1", "tag-2"), List.of("title", "color"));
+    }
+
+    @Test
+    void shouldProjectIdOnlyReferenceSummaryWithoutTargetLookup() {
+        List<Map<String, Object>> result = ReferenceReadProjectionPostProcessor.apply(IdOnlyTaggableRecord.class,
+                List.of(Map.of("id", "device-1", "tagIds", List.of("tag-1", "tag-2"))), List.of("tagSummaries"));
+
+        assertThat(result).singleElement().extracting(record -> record.get("tagSummaries"))
+                .isEqualTo(List.of(Map.of("id", "tag-1"), Map.of("id", "tag-2")));
+    }
+
     private static final class StaticOrder {
         @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
@@ -117,6 +146,23 @@ class ReferenceReadProjectionPostProcessorTest {
 
         @ReferenceLoad(source = "middleId", hops = @ReferenceHop(target = TerminalService.class, via = "terminalId"))
         private transient String terminalTitle;
+    }
+
+    private static final class TaggableRecord {
+        @ReferenceTo(moduleAlias = "mr", entityAlias = "tag", cardinality = net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY)
+        private java.util.Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = {"title", "color"})
+        private transient List<Map<String, Object>> tagSummaries;
+    }
+
+    private static final class IdOnlyTaggableRecord {
+        @ReferenceTo(moduleAlias = "mr", entityAlias = "tag",
+                cardinality = net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY)
+        private java.util.Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = {"id"})
+        private transient List<Map<String, Object>> tagSummaries;
     }
 
     public static final class TerminalService {

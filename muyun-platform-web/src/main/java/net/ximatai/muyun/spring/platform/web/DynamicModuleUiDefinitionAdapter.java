@@ -52,6 +52,21 @@ public final class DynamicModuleUiDefinitionAdapter {
         return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of());
     }
 
+    private static ScopedListWorkspaceDefinition scopedListWorkspace(PlatformUiConfig config,
+                                                                      ModuleViewKind viewKind) {
+        if (viewKind != ModuleViewKind.LIST || config.getScopeModuleAlias() == null
+                || config.getScopeModuleAlias().isBlank()) {
+            return null;
+        }
+        String createPolicy = config.getScopeCreatePolicy();
+        return new ScopedListWorkspaceDefinition(config.getScopeModuleAlias(), config.getScopeField(),
+                config.getScopeQueryCriteriaKey(), config.getScopeTitle(), config.getScopeSearchPlaceholder(),
+                Boolean.TRUE.equals(config.getScopeShowItemSubtitle()),
+                createPolicy == null || createPolicy.isBlank()
+                        ? ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED
+                        : ScopedListWorkspaceCreatePolicy.valueOf(createPolicy));
+    }
+
     private static ViewDefinition view(PlatformUiConfig config,
                                        PlatformUiSet uiSet,
                                        ModuleViewKind viewKind,
@@ -61,7 +76,9 @@ public final class DynamicModuleUiDefinitionAdapter {
                 viewKind,
                 ModuleUiClientType.WEB,
                 viewTitle(config, uiSet),
-                fields(fields)
+                fields(fields),
+                config.getId(),
+                scopedListWorkspace(config, viewKind)
         );
     }
 
@@ -76,17 +93,37 @@ public final class DynamicModuleUiDefinitionAdapter {
     }
 
     private static ViewFieldDefinition field(PlatformResolvedUiField field) {
+        if ("booleanStatus".equals(field.fieldUiControlAlias())) {
+            throw new IllegalArgumentException("dynamic field " + field.fieldName()
+                    + " cannot use uiType booleanStatus until dynamic UI configuration declares its presentation");
+        }
+        if ("fileTransfer".equals(field.fieldUiControlAlias())
+                || "file_transfer".equals(field.fieldUiControlAlias())) {
+            throw new IllegalArgumentException("dynamic field " + field.fieldName()
+                    + " cannot use file transfer until the unified file-reference lifecycle is available");
+        }
         return new ViewFieldDefinition(
                 new ViewFieldRef(field.relationAlias(), field.fieldName(), field.moduleMetadataFieldId()),
                 field.fieldTitle(),
                 UiRule.constant(field.visible() == null ? Boolean.TRUE : field.visible()),
                 UiRule.constant(field.requiredOverride() == null ? Boolean.FALSE : field.requiredOverride()),
                 UiRule.constant(field.readOnly() == null ? Boolean.FALSE : field.readOnly()),
-                field.fieldUiControlAlias(),
+                uiType(field),
+                valuePresentation(field),
                 width(field),
+                field.columnSpan(),
                 field.align(),
-                field.fixedPosition() == null ? null : Boolean.TRUE
+                field.fixedPosition() == null ? null : Boolean.TRUE,
+                null
         );
+    }
+
+    private static String uiType(PlatformResolvedUiField field) {
+        return "file_size".equals(field.fieldUiControlAlias()) ? null : field.fieldUiControlAlias();
+    }
+
+    private static FieldValuePresentation valuePresentation(PlatformResolvedUiField field) {
+        return "file_size".equals(field.fieldUiControlAlias()) ? FieldValuePresentation.FILE_SIZE : null;
     }
 
     private static String width(PlatformResolvedUiField field) {

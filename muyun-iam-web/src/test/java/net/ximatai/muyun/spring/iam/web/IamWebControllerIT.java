@@ -474,7 +474,7 @@ class IamWebControllerIT {
         assertThat(containsCondition(criteria.getValue(), "enabled", true)).isTrue();
         assertThat(containsCondition(criteria.getValue(), "organizationId", "org-1")).isTrue();
         assertThat(containsCondition(criteria.getValue(), "departmentId", "dept-child")).isTrue();
-        assertThat(containsCondition(criteria.getValue(), "title", "Alice")).isTrue();
+        assertThat(containsCondition(criteria.getValue(), "title", "%Alice%")).isTrue();
         assertThat(sorts.getValue()).hasSize(1);
     }
 

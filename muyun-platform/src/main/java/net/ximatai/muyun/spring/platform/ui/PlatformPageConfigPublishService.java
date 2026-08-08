@@ -7,6 +7,11 @@ import net.ximatai.muyun.spring.ability.action.BusinessExceptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,7 +84,35 @@ public class PlatformPageConfigPublishService {
                     "UI config publish requires at least one visible field: " + uiConfigId);
         }
         validateLayoutJson(uiSet.getModuleAlias(), uiConfig);
+        validateScopedListWorkspace(uiSet, uiConfig);
         return uiConfig;
+    }
+
+    private void validateScopedListWorkspace(PlatformUiSet uiSet, PlatformUiConfig uiConfig) {
+        if (uiConfig.getScopeModuleAlias() == null || uiConfig.getScopeModuleAlias().isBlank()
+                || recordService == null) {
+            return;
+        }
+        DynamicModuleDescriptor module = recordService.describe(uiSet.getModuleAlias());
+        DynamicEntityDescriptor entity = module.entities().stream()
+                .filter(candidate -> candidate.entityAlias().equals(module.mainEntityAlias()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Scoped list workspace main entity is unavailable: "
+                        + uiSet.getModuleAlias()));
+        DynamicFieldDescriptor field = entity.fields().stream()
+                .filter(candidate -> candidate.fieldName().equals(uiConfig.getScopeField()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Scoped list workspace field must be a reference: "
+                        + uiSet.getModuleAlias() + "." + uiConfig.getScopeField()));
+        DynamicReferenceDescriptor reference = field.reference();
+        if (reference == null || reference.cardinality() != ReferenceCardinality.ONE) {
+            throw new PlatformException("Scoped list workspace field must be a single reference: "
+                    + uiSet.getModuleAlias() + "." + uiConfig.getScopeField());
+        }
+        if (!uiConfig.getScopeModuleAlias().equals(reference.targetModuleAlias())) {
+            throw new PlatformException("Scoped list workspace reference target must match scope module: "
+                    + uiSet.getModuleAlias() + "." + uiConfig.getScopeField());
+        }
     }
 
     public void publishQueryTemplate(String queryTemplateId) {
@@ -545,6 +578,13 @@ public class PlatformPageConfigPublishService {
         target.setUiSetId(source.getUiSetId());
         target.setClientType(source.getClientType());
         target.setLayoutJson(source.getLayoutJson());
+        target.setScopeModuleAlias(source.getScopeModuleAlias());
+        target.setScopeField(source.getScopeField());
+        target.setScopeQueryCriteriaKey(source.getScopeQueryCriteriaKey());
+        target.setScopeTitle(source.getScopeTitle());
+        target.setScopeSearchPlaceholder(source.getScopeSearchPlaceholder());
+        target.setScopeShowItemSubtitle(source.getScopeShowItemSubtitle());
+        target.setScopeCreatePolicy(source.getScopeCreatePolicy());
         target.setTitle(source.getTitle());
         target.setEnabled(source.getEnabled());
         target.setSortOrder(source.getSortOrder());

@@ -46,6 +46,10 @@ public class PlatformUiConfigField extends StandardEnabledSortableEntity {
     @Column(name = "width", type = ColumnType.INT, comment = "Display width")
     private Integer width;
 
+    @Column(name = "column_span", type = ColumnType.INT, nullable = false, comment = "Form/detail column span",
+            defaultVal = @Default(number = 1))
+    private Integer columnSpan = 1;
+
     @Column(name = "align", type = ColumnType.VARCHAR, length = 16, comment = "Display align")
     private String align;
 

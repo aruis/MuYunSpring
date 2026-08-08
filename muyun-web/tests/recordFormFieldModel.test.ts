@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   childResourceDefaultFormViewCode,
   resolveRecordFormFields,
+  resolveRecordBooleanStatusValue,
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
   type RecordFormFieldDescriptor,
@@ -57,6 +58,7 @@ test('record form field state resolves descriptor facts with fallback control me
     readOnly: false,
     visible: true,
     controlType: 'input',
+    columnSpan: 1,
     hasOption: false,
     pickerConfig: undefined,
     placeholder: '请输入名称',
@@ -86,6 +88,7 @@ test('record form field state resolves select options from fallback metadata', (
     readOnly: false,
     visible: true,
     controlType: 'select',
+    columnSpan: 1,
     hasOption: false,
     pickerConfig: undefined,
     placeholder: undefined,
@@ -102,6 +105,62 @@ test('record form field state preserves a descriptor switch as a generic boolean
   ]);
 
   assert.equal(resolveRecordFormFieldState('completed', { fields }).controlType, 'switch');
+});
+
+test('business boolean status preserves false and unknown values instead of defaulting to enabled', () => {
+  assert.equal(resolveRecordBooleanStatusValue(true), true);
+  assert.equal(resolveRecordBooleanStatusValue(false), false);
+  assert.equal(resolveRecordBooleanStatusValue(null), undefined);
+  assert.equal(resolveRecordBooleanStatusValue(undefined), undefined);
+  assert.equal(resolveRecordBooleanStatusValue('true'), undefined);
+});
+
+test('record form field state renders a textarea descriptor as a text area', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['remark', field('备注', { uiType: 'textarea' })],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('remark', { fields }).controlType, 'textarea');
+});
+
+test('record form field state renders a color picker descriptor with the shared color control', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['color', field('颜色', { uiType: 'colorPicker' })],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('color', { fields }).controlType, 'colorPicker');
+});
+
+test('record form field state preserves typed file size presentation for read-only details', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['fileSize', { ...field('文件大小', { readOnly: true }), valuePresentation: 'FILE_SIZE' }],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileSize', { fields }).valuePresentation, 'FILE_SIZE');
+});
+
+test('record form field state infers reference picker cardinality without a UI override', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'organizationId',
+      { ...field('所属机构'), reference: { targetModuleAlias: 'iam.organization', cardinality: 'ONE' } },
+    ],
+    [
+      'tagIds',
+      { ...field('标签'), uiType: 'text', reference: { targetModuleAlias: 'crm.tag', cardinality: 'MANY' } },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('organizationId', { fields }).controlType, 'recordPicker');
+  assert.equal(resolveRecordFormFieldState('tagIds', { fields }).controlType, 'recordMultiPicker');
+});
+
+test('record form field state exposes a full-row layout span from its descriptor', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['remark', { ...field('备注', { uiType: 'textarea' }), columnSpan: 2 }],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('remark', { fields }).columnSpan, 2);
 });
 
 test('record form field state makes resolved option fields into selects without page fallback metadata', () => {
@@ -126,6 +185,7 @@ test('record form field state makes resolved option fields into selects without 
     readOnly: false,
     visible: true,
     controlType: 'select',
+    columnSpan: 1,
     hasOption: true,
     optionSelectionMode: 'SINGLE',
     optionTitleField: 'genderTitle',
@@ -198,6 +258,70 @@ test('child resource default form view code follows platform naming rules', () =
   assert.equal(childResourceDefaultFormViewCode('position'), 'position_default_form');
   assert.throws(() => childResourceDefaultFormViewCode('Position'), /invalid child resource code/);
   assert.throws(() => childResourceDefaultFormViewCode(''), /invalid child resource code/);
+});
+
+test('record form field state evaluates platform Boolean formulas against the current draft', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('文件标识'),
+        readOnly: {
+          formula: { expression: '!(PRESENT({directoryId}))' },
+        },
+      },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileId', { fields, record: {} }).readOnly, true);
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1' } }).readOnly,
+    false,
+  );
+});
+
+test('record form field state evaluates portable formula conjunctions for create-only editors', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('文件标识'),
+        readOnly: { formula: { expression: '!(PRESENT({directoryId}) && !(PRESENT({id})))' } },
+      },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileId', { fields, record: {} }).readOnly, true);
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1' } }).readOnly,
+    false,
+  );
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1', id: 'file-1' } })
+      .readOnly,
+    true,
+  );
+});
+
+test('record form field state retains a fallback disabled hint when its descriptor has none', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('文件标识'),
+        readOnly: { formula: { expression: '!(PRESENT({directoryId}))' } },
+      },
+    ],
+  ]);
+
+  assert.equal(
+    resolveRecordFormFieldState('fileId', {
+      fields,
+      fallback: { fileId: { label: '上传文件', disabledHint: '请先选择归属目录' } },
+      record: {},
+    }).disabledHint,
+    '请先选择归属目录',
+  );
 });
 
 function field(

@@ -62,6 +62,23 @@ test('record explorer panel uses a single title contract', () => {
   assert.doesNotMatch(layoutSource, /groupTitle/);
 });
 
+test('reference summary tags keep visual rendering inside the UI adapter', () => {
+  const tagListSource = readSource('src/platform-components/RecordTagList.vue');
+  const adapterSource = readSource('src/vue-ui-antdv/components/UiTagList.vue');
+  const adapterIndexSource = readSource('src/vue-ui-antdv/index.ts');
+
+  assert.match(tagListSource, /import \{ UiTagList, type UiTagListItem \} from '@muyun\/vue-ui-antdv'/);
+  assert.match(tagListSource, /<UiTagList :items="tags" :max-visible="maxVisible" \/>/);
+  assert.doesNotMatch(tagListSource, /<style/);
+  assert.doesNotMatch(tagListSource, /backgroundColor/);
+  assert.match(adapterSource, /defineOptions\(\{ name: 'UiTagList', inheritAttrs: false \}\)/);
+  assert.match(adapterSource, /import \{ Tag as ATag, Tooltip as ATooltip \} from 'ant-design-vue'/);
+  assert.match(adapterSource, /<ATag v-for="item in visibleItems"/);
+  assert.match(adapterSource, /<ATooltip v-if="overflowItems.length"/);
+  assert.match(adapterSource, /Math\.max\(0, Math\.floor\(props\.maxVisible\)\)/);
+  assert.match(adapterIndexSource, /export \{ default as UiTagList \}/);
+});
+
 test('workbench keeps the sidebar separator when the mega menu opens', () => {
   const workbenchMenuSource = readSource('src/platform-workbench/WorkbenchMenu.vue');
 
@@ -266,6 +283,34 @@ test('standard module runner waits for a complete detail before enabling mutatio
     /:edit-available="[\s\S]*Boolean\(selectedRecord\) && !detailLoading && !detailLoadFailed && editorMode === 'view'/,
   );
   assert.match(hostSource, /:save-available="!detailLoading && !detailLoadFailed && editorMode !== 'view'"/);
+});
+
+test('manageable scoped tree keeps action permission and editor behavior in the standard module runner', () => {
+  const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
+
+  assert.match(hostSource, /RecordInlineAction/);
+  assert.doesNotMatch(hostSource, /@muyun\/vue-ui-antdv/);
+  assert.match(hostSource, /function scopeTreeActions\(\): RecordInlineAction\[\]/);
+  assert.match(hostSource, /scopeContext\.value\.can\('create'\) === true/);
+  assert.match(hostSource, /scopeContext\.value\.can\('update'\) === true/);
+  assert.match(hostSource, /scopeContext\.value\.can\('delete'\) === true/);
+  assert.match(hostSource, /:actions-of="scopeTreeActions"/);
+  assert.match(
+    hostSource,
+    /presentPlatformError\(cause, \{ source: 'scoped-tree-editor', phase: 'load' \}\)/,
+  );
+  assert.match(
+    hostSource,
+    /presentPlatformError\(cause, \{ source: 'scoped-tree-editor', phase: 'action' \}\)/,
+  );
+  assert.match(hostSource, /async function editScopeRecord[\s\S]*catch \(cause\)/);
+  assert.match(hostSource, /async function saveScopeRecord[\s\S]*catch \(cause\)/);
+  assert.match(hostSource, /async function deleteScopeRecord[\s\S]*catch \(cause\)/);
+  assert.match(
+    hostSource,
+    /v-if="\s*scopedListWorkspace\.manageScopeTree && scopeTree && scopeEditingRecord && scopeEditorOpen\s*"/,
+  );
+  assert.match(hostSource, /<RecordFormFields[\s\S]*:fields="scopeFormFields"/);
 });
 
 test('static edit draft normalizers preserve standard record fields', () => {
@@ -736,6 +781,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(indexSource, /resolveRecordFormFieldNames/);
   assert.match(indexSource, /resolveRecordFormFieldState/);
   assert.match(formFieldsSource, /RecordStatusSwitch/);
+  assert.match(formFieldsSource, /record-form-field-full-row/);
   assert.match(formFieldsSource, /RecordPicker/);
   assert.match(formFieldsSource, /pickerConfigs\?: Record<string, RecordFormFieldPickerConfig>/);
   assert.match(formFieldsSource, /fieldNames\?: string\[\]/);
@@ -790,7 +836,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(uiTableSource, /Table as ATable/);
   assert.match(panelSource, /<UiDataTable/);
   assert.doesNotMatch(panelSource, /<table/);
-  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
+  assert.match(
+    panelSource,
+    /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*queryTemplateId: props\.queryTemplateId,\s*\}\)/,
+  );
   assert.match(panelSource, /emptyQuerySchema/);
   assert.match(panelSource, /isUnsupportedQuerySchemaError/);
   assert.match(panelSource, /query schema is not supported by/);
@@ -870,7 +919,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
   assert.match(contractsSource, /optionTitleField\?: string/);
   assert.match(panelSource, /titleField\?: string/);
-  assert.match(panelSource, /titleField: fieldByName\(field\.fieldRef\.fieldName\)\?\.optionTitleField/);
+  assert.match(panelSource, /titleField: field\.option\?\.titleField \?\? queryField\?\.optionTitleField/);
   assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(panelSource, /return value \? '是' : '否'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
@@ -1117,6 +1166,18 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(contractsSource, /export interface ModuleUiDefinition/);
   assert.match(contractsSource, /export interface ViewDefinition/);
   assert.match(contractsSource, /export interface ViewFieldDefinition/);
+  assert.match(contractsSource, /export type ViewFieldValueType/);
+  assert.match(contractsSource, /valueType\?: ViewFieldValueType/);
+  assert.match(contractsSource, /export type FieldValuePresentation = 'FILE_SIZE'/);
+  assert.match(contractsSource, /valuePresentation\?: FieldValuePresentation/);
+  assert.match(panelSource, /field\.valuePresentation === 'FILE_SIZE'/);
+  assert.match(formFieldsSource, /field\.valuePresentation === 'FILE_SIZE'/);
+  assert.match(formFieldsSource, /<FileSizeText/);
+  assert.match(panelSource, /field\.valueType \?\? queryField\?\.valueType/);
+  assert.match(
+    panelSource,
+    /valueType === 'TIMESTAMP' \|\| valueType === 'ZONED_TIMESTAMP' \|\| valueType === 'INSTANT'/,
+  );
   assert.match(contractsSource, /gender\?: string/);
   assert.match(contractsSource, /schemaVersion: string/);
   assert.doesNotMatch(runtimeContextSource, /uiDefinition\?:/);
@@ -1612,6 +1673,7 @@ test('business views use page realtime lifecycle wrappers only', () => {
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
   const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
+  const listPanelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
 
   assert.match(hostSource, /useModuleContext<QueryListRecord>/);
   assert.match(hostSource, /<RecordQueryListPanel/);
@@ -1620,22 +1682,62 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /:edit-available/);
   assert.match(hostSource, /:save-available/);
   assert.match(hostSource, /<RecordFormFields/);
+  assert.match(hostSource, /RecordStatusSwitch/);
+  assert.match(hostSource, /<template #status>/);
+  assert.match(hostSource, /context\.crud\.enable\(id, \{ version \}\)/);
+  assert.match(hostSource, /context\.crud\.disable\(id, \{ version \}\)/);
+  assert.match(hostSource, /:exclude-field-names="\['enabled'\]"/);
   assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
   assert.match(hostSource, /isListPage/);
   assert.match(hostSource, /listUiConfigId/);
+  assert.match(hostSource, /function scopedListWorkspaceFor\([\s\S]*views: ResolvedViewDescriptor\[\]/);
+  assert.match(hostSource, /view\.sourceUiConfigId === listUiConfigId\.value/);
+  assert.match(hostSource, /configuredList\.scopedListWorkspace/);
   assert.match(hostSource, /:ui-config-id="listUiConfigId"/);
   assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
   assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);
-  assert.doesNotMatch(hostSource, /<RecordDetailPanel/);
+  assert.match(hostSource, /treeModule\.value = context\.abilities\.hasTree\(\) === true/);
+  assert.match(hostSource, /<ManagementWorkspace v-if="scopedListWorkspace && scopeContext"/);
+  assert.match(hostSource, /<ManagementWorkspace v-else-if="treeModule"/);
+  assert.match(hostSource, /<CrudRecordListExplorer/);
+  assert.match(hostSource, /<TreeRecordExplorer[\s\S]*v-if="scopeTree"/);
+  assert.match(hostSource, /await scopeContext\.value\.runtime\.ready/);
+  assert.match(hostSource, /scopeTree\.value = scopeContext\.value\.abilities\.hasTree\(\) === true/);
+  assert.match(hostSource, /search-mode="none"/);
+  assert.match(hostSource, /:external-query-values="scopedExternalQueryValues"/);
+  assert.match(hostSource, /:required-external-criteria-keys="\[scopedListWorkspace\.queryCriteriaKey\]"/);
+  assert.match(hostSource, /selectedScopeRecord\.value\?\.id === record\.id/);
+  assert.match(hostSource, /disabled: !canCreateRecord\.value/);
+  assert.match(listPanelSource, /queryTemplateId: props\.queryTemplateId/);
+  assert.match(listPanelSource, /item\.sourceUiConfigId === uiConfigId/);
+  assert.match(listPanelSource, /props\.requiredExternalCriteriaKeys\.length > 0/);
+  assert.match(hostSource, /\[workspace\.scopeField\]: selectedScopeRecord\.value\.id/);
+  assert.match(hostSource, /<TreeRecordExplorer/);
+  assert.match(hostSource, /<RecordDetailPanel/);
+  assert.match(hostSource, /<RecordMetaSection/);
+  assert.match(hostSource, /<ModuleActionButton/);
+  assert.match(hostSource, /<RecordPanelState/);
+  assert.match(hostSource, /v-if="!treeModule"/);
+  assert.doesNotMatch(hostSource, /formViewCode/);
+  assert.doesNotMatch(hostSource, /:subtitle=/);
   assert.doesNotMatch(hostSource, /<button/);
   assert.doesNotMatch(hostSource, /@muyun\/vue-ui-antdv/);
   assert.doesNotMatch(hostSource, /等待接入页面 bootstrap 与列表查询/);
 });
 
+test('color picker prevents every mutation path while disabled', () => {
+  const colorPickerSource = readSource('src/vue-ui-antdv/components/UiColorPicker.vue');
+
+  assert.match(colorPickerSource, /if \(props\.disabled\) \{[\s\S]*return;/);
+  assert.match(colorPickerSource, /:trigger="props\.disabled \? \[\] : 'click'"/);
+  assert.match(colorPickerSource, /:disabled="props\.disabled"/);
+});
+
 test('consumer surface exposes basic adapter controls for business App composition', () => {
   const consumerSource = readSource('src/consumer/index.ts');
 
-  assert.match(consumerSource, /export \{ UiButton, UiInput, UiSwitch \} from '\.\.\/vue-ui-antdv\/index';/);
+  assert.match(consumerSource, /UiButton,[\s\S]*UiDataTable,[\s\S]*UiSidePanel,[\s\S]*UiTree,/);
+  assert.match(consumerSource, /export \{ default as FileTransferUploader \}/);
   assert.doesNotMatch(consumerSource, /export \* from '\.\.\/platform-components\/index';/);
   assert.doesNotMatch(consumerSource, /export \* from '\.\.\/dynamic-page-runtime\/index';/);
 });
@@ -1659,7 +1761,10 @@ test('record query list panel forwards dynamic ui config and query template ids'
 
   assert.match(panelSource, /uiConfigId\?: string/);
   assert.match(panelSource, /queryTemplateId\?: string/);
-  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
+  assert.match(
+    panelSource,
+    /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*queryTemplateId: props\.queryTemplateId,\s*\}\)/,
+  );
   assert.match(panelSource, /request\.uiConfigId = props\.uiConfigId/);
   assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
 });

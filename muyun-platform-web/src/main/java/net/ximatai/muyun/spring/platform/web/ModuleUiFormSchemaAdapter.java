@@ -64,11 +64,18 @@ public final class ModuleUiFormSchemaAdapter {
         if ("enabledStatus".equals(field.uiType()) || "enabled".equals(field.fieldRef().fieldName())) {
             return FormValueType.BOOLEAN;
         }
+        if ("textarea".equals(field.uiType())) {
+            return FormValueType.TEXT;
+        }
         return FormValueType.STRING;
     }
 
     private static FormControlType controlType(FormValueType valueType) {
-        return valueType == FormValueType.BOOLEAN ? FormControlType.SWITCH : FormControlType.TEXT;
+        return switch (valueType) {
+            case BOOLEAN -> FormControlType.SWITCH;
+            case TEXT -> FormControlType.TEXTAREA;
+            default -> FormControlType.TEXT;
+        };
     }
 
     private static void validate(ModuleUiDefinition definition, ViewDefinition formView, Class<?> modelClass) {

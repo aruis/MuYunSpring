@@ -6,9 +6,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
                                   UiRule<Boolean> required,
                                   UiRule<Boolean> readOnly,
                                   String uiType,
+                                  FieldValuePresentation valuePresentation,
                                   String width,
+                                  Integer columnSpan,
                                   String align,
-                                  Boolean fixed) {
+                                  Boolean fixed,
+                                  BooleanStatusPresentation booleanStatus) {
     public ViewFieldDefinition {
         if (fieldRef == null) {
             throw new IllegalArgumentException("view field ref must not be null");
@@ -18,8 +21,40 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         required = required == null ? UiRule.constant(Boolean.FALSE) : required;
         readOnly = readOnly == null ? UiRule.constant(Boolean.FALSE) : readOnly;
         uiType = uiType == null || uiType.isBlank() ? null : uiType.trim();
+        if ("fileSize".equals(uiType) || "file_size".equals(uiType)) {
+            throw new IllegalArgumentException("file size must use value presentation instead of uiType");
+        }
+        if ("fileTransfer".equals(uiType) || "file_transfer".equals(uiType)) {
+            throw new IllegalArgumentException("file transfer requires the unified file-reference lifecycle");
+        }
+        if (valuePresentation == FieldValuePresentation.FILE_SIZE && uiType != null) {
+            throw new IllegalArgumentException("file size presentation cannot declare an input uiType");
+        }
         width = width == null || width.isBlank() ? null : width.trim();
+        columnSpan = columnSpan == null ? 1 : requireColumnSpan(columnSpan);
         align = align == null || align.isBlank() ? null : align.trim();
+        if (booleanStatus != null && !"booleanStatus".equals(uiType)) {
+            throw new IllegalArgumentException("boolean status presentation requires uiType booleanStatus");
+        }
+        if ("booleanStatus".equals(uiType) && booleanStatus == null) {
+            throw new IllegalArgumentException("uiType booleanStatus requires boolean status presentation");
+        }
+    }
+
+    /** Source- and binary-compatible constructor for definitions created before value presentations were introduced. */
+    public ViewFieldDefinition(ViewFieldRef fieldRef,
+                               String label,
+                               UiRule<Boolean> visible,
+                               UiRule<Boolean> required,
+                               UiRule<Boolean> readOnly,
+                               String uiType,
+                               String width,
+                               Integer columnSpan,
+                               String align,
+                               Boolean fixed,
+                               BooleanStatusPresentation booleanStatus) {
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, columnSpan, align, fixed,
+                booleanStatus);
     }
 
     public static Builder field(String fieldName) {
@@ -37,9 +72,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         private UiRule<Boolean> required = UiRule.constant(Boolean.FALSE);
         private UiRule<Boolean> readOnly = UiRule.constant(Boolean.FALSE);
         private String uiType;
+        private FieldValuePresentation valuePresentation;
         private String width;
+        private Integer columnSpan = 1;
         private String align;
         private Boolean fixed;
+        private BooleanStatusPresentation booleanStatus;
 
         private Builder(ViewFieldRef fieldRef) {
             this.fieldRef = fieldRef;
@@ -70,13 +108,60 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
             return this;
         }
 
+        /**
+         * Enables this editor only when the formula evaluates to true for the current draft.
+         * It is presentation-only; mutation endpoints must still enforce their business invariants.
+         */
+        public Builder enabledWhen(UiFormula formula) {
+            if (formula == null) {
+                throw new IllegalArgumentException("enabled formula must not be null");
+            }
+            this.readOnly = UiRule.formula(formula.negated());
+            return this;
+        }
+
+        public Builder disabledHint(String hint) {
+            this.readOnly = new UiRule<>(readOnly.constant(), readOnly.formula(), hint);
+            return this;
+        }
+
         public Builder uiType(String uiType) {
             this.uiType = uiType;
             return this;
         }
 
+        /** Displays a raw byte count using the platform's standard binary-unit formatter. */
+        public Builder fileSize() {
+            this.valuePresentation = FieldValuePresentation.FILE_SIZE;
+            return this;
+        }
+
+        /** Renders this business boolean with declared labels instead of lifecycle labels. */
+        public Builder booleanStatus(String trueLabel, String falseLabel) {
+            return booleanStatus(trueLabel, falseLabel, BooleanStatusTone.SUCCESS, BooleanStatusTone.NEUTRAL);
+        }
+
+        public Builder booleanStatus(String trueLabel, String falseLabel,
+                                     BooleanStatusTone trueTone, BooleanStatusTone falseTone) {
+            this.uiType = "booleanStatus";
+            this.booleanStatus = new BooleanStatusPresentation(trueLabel, falseLabel, trueTone, falseTone);
+            return this;
+        }
+
+        /** Renders a read-only collection of {@code { id, title, color }} reference summaries. */
+        public Builder tagList() {
+            this.uiType = "tagList";
+            return this;
+        }
+
         public Builder width(String width) {
             this.width = width;
+            return this;
+        }
+
+        /** Sets the field's span in the standard two-column form and detail grid. */
+        public Builder columnSpan(int columnSpan) {
+            this.columnSpan = columnSpan;
             return this;
         }
 
@@ -92,7 +177,14 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public ViewFieldDefinition build() {
             return new ViewFieldDefinition(fieldRef, label, visible, required, readOnly,
-                    uiType, width, align, fixed);
+                    uiType, valuePresentation, width, columnSpan, align, fixed, booleanStatus);
         }
+    }
+
+    private static int requireColumnSpan(int value) {
+        if (value < 1 || value > 2) {
+            throw new IllegalArgumentException("columnSpan must be between 1 and 2");
+        }
+        return value;
     }
 }

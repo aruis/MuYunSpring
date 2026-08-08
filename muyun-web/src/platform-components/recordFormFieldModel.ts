@@ -1,9 +1,14 @@
 import type {
   Option,
   OptionValueList,
+  ResolvedReferenceFieldDescriptor,
+  BooleanStatusPresentation,
   ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
+  FieldValuePresentation,
+  UiFormula,
+  UiRule,
   ViewFieldDefinition,
 } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
@@ -11,10 +16,22 @@ import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstra
 
 export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewFieldDescriptor) & {
   option?: ResolvedOptionFieldDescriptor;
+  reference?: ResolvedReferenceFieldDescriptor;
 };
 export type RecordFormRecord = Record<string, unknown>;
-export type RecordFormFieldValue = string | number | boolean | OptionValueList | undefined;
-export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'switch' | 'recordPicker';
+export type RecordFormFieldValue = string | number | boolean | OptionValueList | string[] | undefined;
+/** A business boolean does not inherit the lifecycle field's implicit enabled default. */
+export type RecordBooleanStatusValue = boolean | undefined;
+export type RecordFormFieldControlType =
+  | 'input'
+  | 'textarea'
+  | 'colorPicker'
+  | 'select'
+  | 'enabledStatus'
+  | 'booleanStatus'
+  | 'switch'
+  | 'recordPicker'
+  | 'recordMultiPicker';
 
 export interface RecordFormFieldFallback {
   label: string;
@@ -23,6 +40,7 @@ export interface RecordFormFieldFallback {
   visible?: boolean;
   controlType?: RecordFormFieldControlType;
   placeholder?: string;
+  disabledHint?: string;
   options?: Option[];
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
 }
@@ -46,10 +64,15 @@ export interface RecordFormFieldState {
   readOnly: boolean;
   visible: boolean;
   controlType: RecordFormFieldControlType;
+  columnSpan: number;
   hasOption: boolean;
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
   optionTitleField?: string;
+  referenceTitleField?: string;
   pickerConfig?: RecordFormFieldPickerConfig;
+  booleanStatus?: BooleanStatusPresentation;
+  valuePresentation?: FieldValuePresentation;
+  disabledHint?: string;
   placeholder?: string;
   options?: Option[];
 }
@@ -105,17 +128,22 @@ export function resolveRecordFormFieldState(
     fallback?: Record<string, RecordFormFieldFallback>;
     pickerConfigs?: Record<string, RecordFormFieldPickerConfig>;
     placeholderOf?: (fieldName: string, field: RecordFormFieldState) => string | undefined;
+    record?: RecordFormRecord;
   } = {},
 ): RecordFormFieldState {
   const field = options.fields?.get(fieldName);
   const fallback = options.fallback?.[fieldName];
   const label = field?.label ?? fallback?.label ?? fieldName;
-  const required = field?.required?.constant ?? fallback?.required ?? false;
-  const readOnly = field?.readOnly?.constant ?? fallback?.readOnly ?? false;
-  const visible = field?.visible?.constant ?? fallback?.visible ?? true;
+  const required = evaluateUiRule(field?.required, options.record, fallback?.required ?? false);
+  const readOnly = evaluateUiRule(field?.readOnly, options.record, fallback?.readOnly ?? false);
+  const visible = evaluateUiRule(field?.visible, options.record, fallback?.visible ?? true);
   const controlType = controlTypeOf(field, fallback);
+  const booleanStatus = controlType === 'booleanStatus' ? field?.booleanStatus : undefined;
   const hasOption = field?.option != null;
-  const pickerConfig = controlType === 'recordPicker' ? options.pickerConfigs?.[fieldName] : undefined;
+  const pickerConfig =
+    controlType === 'recordPicker' || controlType === 'recordMultiPicker'
+      ? options.pickerConfigs?.[fieldName]
+      : undefined;
   const baseState: RecordFormFieldState = {
     fieldName,
     label,
@@ -123,8 +151,14 @@ export function resolveRecordFormFieldState(
     readOnly,
     visible,
     controlType,
+    columnSpan: field?.columnSpan === 2 ? 2 : 1,
     hasOption,
     pickerConfig,
+    ...(booleanStatus ? { booleanStatus } : {}),
+    ...(field?.valuePresentation ? { valuePresentation: field.valuePresentation } : {}),
+    ...((field?.readOnly?.disabledHint ?? fallback?.disabledHint)
+      ? { disabledHint: field?.readOnly?.disabledHint ?? fallback?.disabledHint }
+      : {}),
   };
   return {
     ...baseState,
@@ -134,24 +168,79 @@ export function resolveRecordFormFieldState(
           ...(field.option.titleField ? { optionTitleField: field.option.titleField } : {}),
         }
       : {}),
+    ...(field?.reference?.titleField ? { referenceTitleField: field.reference.titleField } : {}),
     ...(fallback?.options ? { options: fallback.options } : {}),
     placeholder:
       options.placeholderOf?.(fieldName, baseState) ?? fallback?.placeholder ?? pickerConfig?.placeholder,
   };
 }
 
+function evaluateUiRule(
+  rule: UiRule<boolean> | undefined,
+  record: RecordFormRecord | undefined,
+  fallback: boolean,
+) {
+  if (!rule) return fallback;
+  if (typeof rule.constant === 'boolean') return rule.constant;
+  return rule.formula ? evaluateUiFormula(rule.formula, record ?? {}) : fallback;
+}
+
+export function evaluateUiFormula(formula: UiFormula, record: RecordFormRecord): boolean {
+  const expression = formula.expression.replaceAll(/\s/g, '');
+  if (expression.startsWith('!(') && expression.endsWith(')')) {
+    return !evaluateUiFormula({ expression: expression.slice(2, -1) }, record);
+  }
+  const conjunction = expression.split('&&');
+  if (conjunction.length > 1) {
+    return conjunction.every((term) => evaluateUiFormula({ expression: term }, record));
+  }
+  const present = /^PRESENT\(\{([A-Za-z][A-Za-z0-9_]*)\}\)$/i.exec(expression);
+  if (present) {
+    const value = record[present[1]];
+    return value !== null && value !== undefined && value !== '';
+  }
+  // Descriptors produced by the platform are validated against the portable UI grammar.  Keep this safe fallback
+  // for hand-written or stale remote descriptors instead of silently treating an unsupported server formula as
+  // a browser capability.
+  return false;
+}
+
+/**
+ * Preserves an absent business value as unknown instead of treating it as true.
+ * `enabledStatus` deliberately retains its separate lifecycle default semantics.
+ */
+export function resolveRecordBooleanStatusValue(value: unknown): RecordBooleanStatusValue {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function controlTypeOf(
   field: RecordFormFieldDescriptor | undefined,
   fallback: RecordFormFieldFallback | undefined,
 ): RecordFormFieldControlType {
+  const referenceControlType = referenceControlTypeOf(field?.reference, field?.uiType);
+  if (referenceControlType) {
+    return referenceControlType;
+  }
   if (field?.uiType === 'enabledStatus') {
     return 'enabledStatus';
+  }
+  if (field?.uiType === 'booleanStatus' && field.booleanStatus) {
+    return 'booleanStatus';
   }
   if (field?.uiType === 'switch') {
     return 'switch';
   }
+  if (field?.uiType === 'textarea') {
+    return 'textarea';
+  }
+  if (field?.uiType === 'colorPicker') {
+    return 'colorPicker';
+  }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';
+  }
+  if (field?.uiType === 'recordMultiPicker') {
+    return 'recordMultiPicker';
   }
   if (field?.uiType === 'select') {
     return 'select';
@@ -160,4 +249,15 @@ function controlTypeOf(
     return 'select';
   }
   return fallback?.controlType ?? 'input';
+}
+
+/** References are semantic fields: their cardinality determines the default editor when metadata has no explicit picker. */
+function referenceControlTypeOf(
+  reference: ResolvedReferenceFieldDescriptor | undefined,
+  uiType: string | undefined,
+): Extract<RecordFormFieldControlType, 'recordPicker' | 'recordMultiPicker'> | undefined {
+  if (!reference || (uiType != null && uiType !== 'text')) {
+    return undefined;
+  }
+  return reference.cardinality === 'MANY' ? 'recordMultiPicker' : 'recordPicker';
 }

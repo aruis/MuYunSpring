@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceIntegrity;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceSummary;
 import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTargetUnavailablePolicy;
@@ -137,6 +138,21 @@ class StaticReferenceResolverTest {
                 .hasMessageContaining("ReferenceLoad output must be transient");
     }
 
+    @Test
+    void summaryPlansShouldAllowAnIdOnlySummary() {
+        assertThat(StaticReferenceResolver.summaryPlans(IdOnlySummaryRecord.class))
+                .containsExactly(new net.ximatai.muyun.spring.ability.reference.ReferenceSummaryPlan(
+                        "tagIds", ReferenceTarget.of("demo", "tag"), ReferenceCardinality.MANY,
+                        List.of(), "tagSummaries"));
+    }
+
+    @Test
+    void summaryPlansShouldAllowAnEmptyFieldListForAnIdOnlySummary() {
+        assertThat(StaticReferenceResolver.summaryPlans(DefaultIdOnlySummaryRecord.class))
+                .singleElement()
+                .satisfies(summary -> assertThat(summary.fields()).isEmpty());
+    }
+
     private static final class CollectionReferenceRecord {
         @ReferenceTo(moduleAlias = "iam", entityAlias = "user", cardinality = ReferenceCardinality.MANY)
         private List<String> userIds;
@@ -205,5 +221,21 @@ class StaticReferenceResolverTest {
         private String customerId;
         @ReferenceLoad(source = "customerId", field = "title")
         private String customerTitle;
+    }
+
+    private static final class IdOnlySummaryRecord {
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private List<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = {"id"})
+        private transient List<java.util.Map<String, Object>> tagSummaries;
+    }
+
+    private static final class DefaultIdOnlySummaryRecord {
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private List<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds")
+        private transient List<java.util.Map<String, Object>> tagSummaries;
     }
 }

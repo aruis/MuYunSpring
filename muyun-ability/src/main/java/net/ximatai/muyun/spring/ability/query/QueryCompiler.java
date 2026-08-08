@@ -105,15 +105,22 @@ public final class QueryCompiler {
             throw new IllegalArgumentException("quick search fields are not configured by " + descriptor.scopeName());
         }
         Criteria quick = Criteria.of();
+        String pattern = "%" + escapeLikeLiteral(keyword) + "%";
         for (String fieldName : fields) {
             QueryField field = requireField(fieldName, "quick search field");
             if (!field.quickSearch()) {
                 throw new IllegalArgumentException("quick search field is not supported by "
                         + descriptor.scopeName() + ": " + fieldName);
             }
-            quick.orLike(fieldName, keyword);
+            quick.orLike(fieldName, pattern);
         }
         target.andGroup(quick.getRoot());
+    }
+
+    private String escapeLikeLiteral(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private void appendExternalCriteria(Criteria target, Map<String, Object> externalValues) {

@@ -104,6 +104,21 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void shouldAllowIanaZoneIdsOnlyForThePlatformTimeZoneDictionary() {
+        categoryService.insert(category("platform", PlatformTimeZoneDictionaryInitialDataDeclarationProvider.CATEGORY_ALIAS,
+                DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String itemId = itemService.insert(item("platform", PlatformTimeZoneDictionaryInitialDataDeclarationProvider.CATEGORY_ALIAS,
+                "Asia/Shanghai", TreeAbility.ROOT_ID));
+
+        assertThat(itemService.resolveItem("platform", PlatformTimeZoneDictionaryInitialDataDeclarationProvider.CATEGORY_ALIAS,
+                "Asia/Shanghai").getId()).isEqualTo(itemId);
+        categoryService.insert(category("crm", "region", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        assertThatThrownBy(() -> itemService.insert(item("crm", "region", "Asia/Shanghai", TreeAbility.ROOT_ID)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionaryItemCode");
+    }
+
+    @Test
     void shouldResolveOnlyEnabledDictionaryItemForWriteValidation() {
         String categoryId = categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
         String activeId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));

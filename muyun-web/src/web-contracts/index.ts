@@ -102,6 +102,40 @@ export interface WebTreeNode<T> {
   children: WebTreeNode<T>[];
 }
 
+/**
+ * A semantic inline action rendered beside a record in an explorer or tree.
+ *
+ * The icon names are platform presentation tokens. Individual UI adapters map
+ * them to their own icon implementations.
+ */
+export interface RecordInlineAction {
+  key: string;
+  title: string;
+  iconName?: RecordInlineActionIconName;
+  showLabel?: boolean;
+  disabled?: boolean;
+  danger?: boolean;
+}
+
+export type RecordInlineActionIconName =
+  | 'app'
+  | 'check'
+  | 'close'
+  | 'delete'
+  | 'down'
+  | 'edit'
+  | 'export'
+  | 'filter'
+  | 'help'
+  | 'lock'
+  | 'notification'
+  | 'plus'
+  | 'power'
+  | 'reload'
+  | 'save'
+  | 'search'
+  | 'settings';
+
 export interface CurrentUser {
   userId: string;
   username?: string;
@@ -437,6 +471,17 @@ export type ModuleUiClientType = 'WEB';
 
 export interface UiRule<T> {
   constant?: T;
+  formula?: UiFormula;
+  disabledHint?: string;
+}
+
+/**
+ * A platform-owned portable Boolean predicate evaluated against the current record draft.
+ * The current grammar supports `PRESENT({fieldName})`, `!()` negation, and `&&` conjunction of PRESENT terms.
+ * It is deliberately smaller than the server FormulaEngine because this contract must run in every Web client.
+ */
+export interface UiFormula {
+  expression: string;
 }
 
 export interface ViewFieldRef {
@@ -452,10 +497,36 @@ export interface ViewFieldDefinition {
   required?: UiRule<boolean>;
   readOnly?: UiRule<boolean>;
   uiType?: string;
+  valuePresentation?: FieldValuePresentation;
   width?: string;
+  columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
+  booleanStatus?: BooleanStatusPresentation;
 }
+
+export interface BooleanStatusPresentation {
+  trueLabel: string;
+  falseLabel: string;
+  trueTone?: BooleanStatusTone;
+  falseTone?: BooleanStatusTone;
+}
+
+export type BooleanStatusTone = 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
+
+export type FieldValuePresentation = 'FILE_SIZE';
+
+export type ViewFieldValueType =
+  | 'STRING'
+  | 'TEXT'
+  | 'INTEGER'
+  | 'LONG'
+  | 'BOOLEAN'
+  | 'TIMESTAMP'
+  | 'ZONED_TIMESTAMP'
+  | 'DATE'
+  | 'DECIMAL'
+  | 'JSON';
 
 export interface ResolvedViewFieldDescriptor {
   fieldRef: ViewFieldRef;
@@ -464,10 +535,31 @@ export interface ResolvedViewFieldDescriptor {
   required?: UiRule<boolean>;
   readOnly?: UiRule<boolean>;
   uiType?: string;
+  valueType?: ViewFieldValueType;
+  valuePresentation?: FieldValuePresentation;
   width?: string;
+  columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
+  booleanStatus?: BooleanStatusPresentation;
   option?: ResolvedOptionFieldDescriptor;
+  reference?: ResolvedReferenceFieldDescriptor;
+  referenceSummary?: ResolvedReferenceSummaryFieldDescriptor;
+}
+
+/** Structured summary facts resolved from a reference projection. Every item also contains `id`. */
+export interface ResolvedReferenceSummaryFieldDescriptor {
+  sourceField: string;
+  targetModuleAlias: string;
+  cardinality: 'ONE' | 'MANY';
+  fields: string[];
+}
+
+export interface ResolvedReferenceFieldDescriptor {
+  targetModuleAlias: string;
+  cardinality: 'ONE' | 'MANY';
+  /** Read-side title projection for this scalar reference, when supplied by the server. */
+  titleField?: string;
 }
 
 export interface OptionBindingDescriptor {
@@ -503,6 +595,9 @@ export interface ResolvedViewDescriptor {
   clientType?: ModuleUiClientType;
   title?: string;
   fields: ResolvedViewFieldDescriptor[];
+  /** Dynamic-page provenance used to select the view configured by a menu entry. */
+  sourceUiConfigId?: string;
+  scopedListWorkspace?: ResolvedScopedListWorkspaceDescriptor;
 }
 
 export interface ResolvedUiActionConfirmationDescriptor {
@@ -513,6 +608,18 @@ export interface ResolvedUiActionConfirmationDescriptor {
 export interface ResolvedUiActionDescriptor {
   actionCode: string;
   confirmation?: ResolvedUiActionConfirmationDescriptor;
+}
+
+export interface ResolvedScopedListWorkspaceDescriptor {
+  scopeModuleAlias: string;
+  scopeField: string;
+  queryCriteriaKey: string;
+  scopeTitle: string;
+  scopeSearchPlaceholder: string;
+  /** Scope list items only show a secondary label when the descriptor explicitly enables it. */
+  showScopeItemSubtitle: boolean;
+  createPolicy: 'REQUIRE_SCOPE' | 'ALLOW_UNSCOPED';
+  manageScopeTree?: boolean;
 }
 
 export interface ModuleUiDefinition {

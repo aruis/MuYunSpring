@@ -13,8 +13,41 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DynamicModuleUiDefinitionAdapterTest {
+    @Test
+    void shouldRejectDynamicBooleanStatusWithoutPresentationMetadata() {
+        PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
+        PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "客户列表", true, 10);
+        PlatformResolvedPageConfig resolved = new PlatformResolvedPageConfig(
+                List.of(resolvedField("ui-list-web", "field-online", null, "online", "在线状态",
+                        "booleanStatus", true, false, null, null, null, null)),
+                List.of());
+
+        assertThatThrownBy(() -> DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.customer", List.of(listSet), List.of(listConfig), List.of(),
+                        List.of(), List.of()), resolved))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot use uiType booleanStatus until dynamic UI configuration declares its presentation");
+    }
+
+    @Test
+    void shouldRejectDynamicFileTransferUntilItCanUseTheUnifiedFileReferenceLifecycle() {
+        PlatformUiSet formSet = uiSet("set-form", "crm.document", "document_form", PlatformUiSetType.FORM);
+        PlatformUiConfig formConfig = uiConfig("ui-form-web", "set-form", "文档", true, 10);
+        PlatformResolvedPageConfig resolved = new PlatformResolvedPageConfig(
+                List.of(resolvedField("ui-form-web", "field-file", null, "fileId", "文件",
+                        "fileTransfer", true, false, null, null, null, null)),
+                List.of());
+
+        assertThatThrownBy(() -> DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.document", List.of(formSet), List.of(formConfig), List.of(),
+                        List.of(), List.of()), resolved))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot use file transfer until the unified file-reference lifecycle is available");
+    }
+
     @Test
     void shouldConvertPublishedDynamicSnapshotToModuleUiDefinition() {
         PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
@@ -76,6 +109,55 @@ class DynamicModuleUiDefinitionAdapterTest {
         assertThat(formView.fields()).hasSize(1);
         assertThat(formView.fields().get(0).required().constant()).isTrue();
         assertThat(formView.fields().get(0).readOnly().constant()).isFalse();
+    }
+
+    @Test
+    void shouldMapPublishedDynamicListWorkspaceToTheSourceNeutralDescriptor() {
+        PlatformUiSet listSet = uiSet("set-list", "crm.task", "task_list", PlatformUiSetType.LIST);
+        PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "任务列表", true, 10);
+        listConfig.setScopeModuleAlias("crm.project");
+        listConfig.setScopeField("projectId");
+        listConfig.setScopeQueryCriteriaKey("projectId");
+        listConfig.setScopeTitle("项目");
+        listConfig.setScopeSearchPlaceholder("搜索项目");
+        listConfig.setScopeShowItemSubtitle(Boolean.FALSE);
+        listConfig.setScopeCreatePolicy("REQUIRE_SCOPE");
+
+        ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.task", List.of(listSet), List.of(listConfig), List.of(),
+                        List.of(), List.of()),
+                PlatformResolvedPageConfig.empty());
+
+        assertThat(definition.views()).singleElement().satisfies(view -> {
+            assertThat(view.sourceUiConfigId()).isEqualTo("ui-list-web");
+            ResolvedScopedListWorkspaceDescriptor workspace = ResolvedScopedListWorkspaceDescriptor.from(
+                    view.scopedListWorkspace());
+            assertThat(workspace.scopeModuleAlias()).isEqualTo("crm.project");
+            assertThat(workspace.scopeField()).isEqualTo("projectId");
+            assertThat(workspace.queryCriteriaKey()).isEqualTo("projectId");
+            assertThat(workspace.showScopeItemSubtitle()).isFalse();
+            assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE);
+        });
+    }
+
+    @Test
+    void shouldKeepScopedWorkspaceBoundToItsOwnDynamicListConfig() {
+        PlatformUiSet projectList = uiSet("set-project", "crm.task", "project_tasks", PlatformUiSetType.LIST);
+        PlatformUiSet allList = uiSet("set-all", "crm.task", "all_tasks", PlatformUiSetType.LIST);
+        PlatformUiConfig scopedConfig = uiConfig("ui-project", "set-project", "项目任务", true, 10);
+        scopedConfig.setScopeModuleAlias("crm.project");
+        scopedConfig.setScopeField("projectId");
+        PlatformUiConfig plainConfig = uiConfig("ui-all", "set-all", "全部任务", true, 20);
+
+        ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.task", List.of(projectList, allList),
+                        List.of(scopedConfig, plainConfig), List.of(), List.of(), List.of()),
+                PlatformResolvedPageConfig.empty());
+
+        assertThat(definition.views()).filteredOn(view -> "ui-project".equals(view.sourceUiConfigId()))
+                .singleElement().satisfies(view -> assertThat(view.scopedListWorkspace()).isNotNull());
+        assertThat(definition.views()).filteredOn(view -> "ui-all".equals(view.sourceUiConfigId()))
+                .singleElement().satisfies(view -> assertThat(view.scopedListWorkspace()).isNull());
     }
 
     private PlatformUiSet uiSet(String id, String moduleAlias, String alias, PlatformUiSetType setType) {

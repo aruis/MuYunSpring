@@ -46,6 +46,19 @@ private String employeeId;
 private transient String employeeTitle;
 ```
 
+多值引用需要向页面交付结构化摘要时，在 transient 输出字段上使用 `@ReferenceSummary`。每个摘要项稳定包含
+`id`，`fields` 指定额外带出的目标字段；只传 `id`（或留空）可形成 id-only 摘要，不触发目标读取。
+
+```java
+@ReferenceSummary(source = "tagIds", fields = {"title", "color"})
+private transient List<Map<String, Object>> tagSummaries;
+```
+
+该声明先编译为来源无关的 reference-summary descriptor，再由统一引用投影批量解析，页面不应根据原始 ID
+自行查询或拼接结构。当前标准 `tagList` UI 只在 LIST 视图交付，只能绑定 `MANY` 的 reference summary，
+且必须带出 `title`；`color` 是可选展示字段。当前 `ReferenceSummary` 仅有静态 Java 注解入口，动态元数据
+尚不能声明该摘要事实，因此动态页面配置不能使用 `tagList`，这是阶段限制而非动静一体的完成形态。
+
 `@ReferencedBy` 则表达只读反向关联。它从 `List` 的泛型来源模型中寻找唯一指向当前模型的
 `@ReferenceTo`；多条引用时以 `sourceField` 消歧。平台启动时按来源模型自动解析唯一的 CRUD service，
 读取目标记录后按该外键装配列表；缺少或重复来源 service 会在启动期失败。该注解不属于聚合、不会写入

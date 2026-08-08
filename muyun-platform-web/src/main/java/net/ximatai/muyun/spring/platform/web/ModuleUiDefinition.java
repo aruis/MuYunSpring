@@ -41,6 +41,15 @@ public record ModuleUiDefinition(String moduleAlias,
             return this;
         }
 
+        public Builder listView(String viewCode, Consumer<ViewDefinition.Builder> customizer) {
+            ViewDefinition.Builder builder = ViewDefinition.list(viewCode);
+            if (customizer != null) {
+                customizer.accept(builder);
+            }
+            views.add(builder.build());
+            return this;
+        }
+
         public Builder formView(Consumer<ViewDefinition.Builder> customizer) {
             ViewDefinition.Builder builder = ViewDefinition.form();
             if (customizer != null) {

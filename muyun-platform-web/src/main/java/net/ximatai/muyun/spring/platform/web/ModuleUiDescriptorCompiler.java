@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.web;
 import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
@@ -10,6 +11,7 @@ import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceSummaryPlan;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -22,14 +24,19 @@ import java.util.Map;
 import java.util.Set;
 
 public final class ModuleUiDescriptorCompiler {
-    private static final Set<String> PLATFORM_FIELD_NAMES = Set.of(
-            PlatformAbilityFields.TITLE_FIELD,
-            PlatformAbilityFields.ENABLED_FIELD,
-            PlatformAbilityFields.TREE_PARENT_FIELD,
-            PlatformAbilityFields.SORT_FIELD
-    );
+    private static final Set<String> PLATFORM_FIELD_NAMES = platformFieldNames();
+    private static final Map<String, FieldValueType> STANDARD_FIELD_TYPES = standardFieldTypes();
 
     private ModuleUiDescriptorCompiler() {
+    }
+
+    private static Set<String> platformFieldNames() {
+        LinkedHashSet<String> fields = new LinkedHashSet<>(StandardEntitySchema.fieldNames());
+        fields.add(PlatformAbilityFields.TITLE_FIELD);
+        fields.add(PlatformAbilityFields.ENABLED_FIELD);
+        fields.add(PlatformAbilityFields.TREE_PARENT_FIELD);
+        fields.add(PlatformAbilityFields.SORT_FIELD);
+        return Set.copyOf(fields);
     }
 
     public static ResolvedModuleUiDescriptor compile(StaticModuleDefinition definition) {
@@ -45,9 +52,13 @@ public final class ModuleUiDescriptorCompiler {
                 ? new ModuleUiDefinition(definition.moduleAlias(), List.of(), List.of())
                 : definition.uiDefinition();
         validateFields(uiDefinition, definition.entities(), definition.moduleAlias(), readOutputFields(definition));
+        Map<String, ResolvedReferenceFieldDescriptor> referenceFields = staticReferenceFields(definition.modelClass());
+        Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields =
+                staticReferenceSummaryFields(definition.modelClass());
         return new ModuleUiCompilationResult(
-                compile(uiDefinition, ModuleKind.STATIC, definition.title(),
-                        staticOptionFields(definition.modelClass()), staticRecordLabelField(definition)),
+                compileResolved(uiDefinition, ModuleKind.STATIC, definition.title(),
+                        staticOptionFields(definition.modelClass()), referenceFields, referenceSummaryFields,
+                        staticRecordLabelField(definition), fieldTypes(definition.entities())),
                 readModel(definition, uiDefinition)
         );
     }
@@ -56,13 +67,13 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compile(definition, null, null, Map.of(), null);
+        return compileResolved(definition, null, null, Map.of(), Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
                                                      ModuleKind moduleKind,
                                                      String title) {
-        return compile(definition, moduleKind, title, Map.of(), null);
+        return compileResolved(definition, moduleKind, title, Map.of(), Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -72,7 +83,7 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compile(definition, moduleKind, title, optionFields, null);
+        return compileResolved(definition, moduleKind, title, optionFields, Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -82,27 +93,80 @@ public final class ModuleUiDescriptorCompiler {
                                                      String defaultRecordLabelField) {
         if (definition == null) return null;
         return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields,
-                defaultRecordLabelField);
+                Map.of(), Map.of(), defaultRecordLabelField, Map.of());
+    }
+
+    /**
+     * Compiles a source-neutral descriptor with both option and reference field metadata.
+     * Static and dynamic modules use this same resolved projection.
+     */
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                     Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                     String defaultRecordLabelField) {
+        if (definition == null) return null;
+        return compileResolved(definition, moduleKind, title,
+                optionFields == null ? Map.of() : optionFields,
+                referenceFields == null ? Map.of() : referenceFields,
+                Map.of(), defaultRecordLabelField, Map.of());
+    }
+
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                     Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                     String defaultRecordLabelField,
+                                                     Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        if (definition == null) return null;
+        return compileResolved(definition, moduleKind, title,
+                optionFields == null ? Map.of() : optionFields,
+                referenceFields == null ? Map.of() : referenceFields,
+                Map.of(), defaultRecordLabelField, fieldTypes == null ? Map.of() : fieldTypes);
     }
 
     private static ResolvedModuleUiDescriptor compileResolved(ModuleUiDefinition definition,
                                                               ModuleKind moduleKind,
                                                               String title,
                                                               Map<String, ResolvedOptionFieldDescriptor> optionFields,
-                                                              String defaultRecordLabelField) {
+                                                              Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                              Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
+                                                              String defaultRecordLabelField,
+                                                              Map<ViewFieldRef, FieldValueType> fieldTypes) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
                 moduleKind,
                 title,
                 definition.views().stream()
-                        .map(view -> compileView(view, optionFields))
+                        .map(view -> compileView(view, optionFields, referenceFields, referenceSummaryFields, fieldTypes))
                         .toList(),
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
                         .toList(),
                 defaultRecordLabelField
         );
+    }
+
+    private static void validateScopedListWorkspace(ScopedListWorkspaceDefinition workspace,
+                                                    Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                    String moduleAlias) {
+        if (workspace == null) return;
+        ResolvedReferenceFieldDescriptor reference = referenceFields.get(workspace.scopeField());
+        if (reference == null) {
+            throw new IllegalArgumentException("scoped list workspace field must be a reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (reference.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE) {
+            throw new IllegalArgumentException("scoped list workspace field must be a single reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (!workspace.scopeModuleAlias().equals(reference.targetModuleAlias())) {
+            throw new IllegalArgumentException("scoped list workspace reference target must match scope module: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
     }
 
     private static ResolvedUiActionDescriptor compileAction(UiActionDefinition action) {
@@ -123,20 +187,37 @@ public final class ModuleUiDescriptorCompiler {
     }
 
     private static ResolvedViewDescriptor compileView(ViewDefinition view,
-                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields) {
+                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                      Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                      Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
+                                                      Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        validateScopedListWorkspace(view.scopedListWorkspace(), referenceFields, view.viewCode());
         return new ResolvedViewDescriptor(
                 view.viewCode(),
                 view.viewKind(),
                 view.clientType(),
                 view.title(),
                 view.fields().stream()
-                        .map(field -> compileField(field, optionFields))
-                        .toList()
+                        .map(field -> compileField(view.viewKind(), field, optionFields, referenceFields,
+                                referenceSummaryFields, fieldTypes))
+                        .toList(),
+                view.sourceUiConfigId(),
+                ResolvedScopedListWorkspaceDescriptor.from(view.scopedListWorkspace())
         );
     }
 
-    private static ResolvedViewFieldDescriptor compileField(ViewFieldDefinition field,
-                                                            Map<String, ResolvedOptionFieldDescriptor> optionFields) {
+    private static ResolvedViewFieldDescriptor compileField(ModuleViewKind viewKind,
+                                                            ViewFieldDefinition field,
+                                                            Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                            Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                            Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
+                                                            Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        ResolvedReferenceSummaryFieldDescriptor referenceSummary = field.fieldRef().relationCode() == null
+                ? referenceSummaryFields.get(field.fieldRef().fieldName()) : null;
+        FieldValueType resolvedValueType = valueType(field.fieldRef(), fieldTypes);
+        validateBooleanStatus(viewKind, field);
+        validateTagList(viewKind, field, referenceSummary);
+        validateValuePresentation(viewKind, field, resolvedValueType);
         return new ResolvedViewFieldDescriptor(
                 field.fieldRef(),
                 field.label(),
@@ -144,11 +225,158 @@ public final class ModuleUiDescriptorCompiler {
                 field.required(),
                 field.readOnly(),
                 field.uiType(),
+                resolvedValueType,
+                field.valuePresentation(),
                 field.width(),
+                field.columnSpan(),
                 field.align(),
                 field.fixed(),
-                field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null
+                field.booleanStatus(),
+                field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null,
+                field.fieldRef().relationCode() == null ? referenceFields.get(field.fieldRef().fieldName()) : null,
+                referenceSummary
         );
+    }
+
+    private static void validateValuePresentation(ModuleViewKind viewKind,
+                                                  ViewFieldDefinition field,
+                                                  FieldValueType valueType) {
+        if (field.valuePresentation() != FieldValuePresentation.FILE_SIZE) {
+            return;
+        }
+        if (valueType != null && valueType != FieldValueType.LONG) {
+            throw new IllegalArgumentException("file size presentation requires LONG field: "
+                    + field.fieldRef().fieldName());
+        }
+        if (viewKind == ModuleViewKind.FORM && !Boolean.TRUE.equals(field.readOnly().constant())) {
+            throw new IllegalArgumentException("file size presentation must be read-only in FORM views: "
+                    + field.fieldRef().fieldName());
+        }
+    }
+
+    private static FieldValueType valueType(ViewFieldRef fieldRef,
+                                            Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        FieldValueType direct = fieldTypes.get(fieldRef);
+        if (direct != null) {
+            return direct;
+        }
+        return fieldTypes.entrySet().stream()
+                .filter(entry -> java.util.Objects.equals(entry.getKey().relationCode(), fieldRef.relationCode()))
+                .filter(entry -> entry.getKey().fieldName().equals(fieldRef.fieldName()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseGet(() -> STANDARD_FIELD_TYPES.get(fieldRef.fieldName()));
+    }
+
+    private static Map<ViewFieldRef, FieldValueType> fieldTypes(List<EntityDefinition> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashMap<ViewFieldRef, FieldValueType> types = new LinkedHashMap<>();
+        for (int index = 0; index < entities.size(); index++) {
+            EntityDefinition entity = entities.get(index);
+            String relationCode = index == 0 ? null : entity.alias();
+            for (FieldDefinition field : entity.fields()) {
+                types.put(fieldRef(relationCode, field.fieldName()), FieldValueType.from(field.type()));
+            }
+            STANDARD_FIELD_TYPES.forEach((fieldName, fieldType) ->
+                    types.putIfAbsent(fieldRef(relationCode, fieldName), fieldType));
+        }
+        return Map.copyOf(types);
+    }
+
+    private static ViewFieldRef fieldRef(String relationCode, String fieldName) {
+        return relationCode == null ? ViewFieldRef.main(fieldName) : ViewFieldRef.relation(relationCode, fieldName);
+    }
+
+    private static Map<String, FieldValueType> standardFieldTypes() {
+        return Map.ofEntries(
+                Map.entry(StandardEntitySchema.ID_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.TENANT_ID_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.VERSION_FIELD, FieldValueType.INTEGER),
+                Map.entry(StandardEntitySchema.DELETED_FIELD, FieldValueType.BOOLEAN),
+                Map.entry(StandardEntitySchema.DELETED_AT_FIELD, FieldValueType.TIMESTAMP),
+                Map.entry(StandardEntitySchema.DELETED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.CREATED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.CREATED_AT_FIELD, FieldValueType.TIMESTAMP),
+                Map.entry(StandardEntitySchema.UPDATED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.UPDATED_AT_FIELD, FieldValueType.TIMESTAMP)
+        );
+    }
+
+    private static void validateBooleanStatus(ModuleViewKind viewKind, ViewFieldDefinition field) {
+        if (!"booleanStatus".equals(field.uiType()) || viewKind != ModuleViewKind.FORM) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(field.readOnly().constant())) {
+            throw new IllegalArgumentException("booleanStatus UI field must be read-only in FORM views: "
+                    + field.fieldRef().fieldName());
+        }
+    }
+
+    private static void validateTagList(ModuleViewKind viewKind,
+                                        ViewFieldDefinition field,
+                                        ResolvedReferenceSummaryFieldDescriptor referenceSummary) {
+        if (!"tagList".equals(field.uiType())) {
+            return;
+        }
+        if (viewKind != ModuleViewKind.LIST) {
+            throw new IllegalArgumentException("tagList UI field is only supported in LIST views: "
+                    + field.fieldRef().fieldName());
+        }
+        if (referenceSummary == null) {
+            throw new IllegalArgumentException("tagList UI field must be a structured reference summary: "
+                    + field.fieldRef().fieldName());
+        }
+        if (referenceSummary.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY) {
+            throw new IllegalArgumentException("tagList UI field must use a MANY reference summary: "
+                    + field.fieldRef().fieldName());
+        }
+        if (!referenceSummary.includes("title")) {
+            throw new IllegalArgumentException("tagList reference summary must include title: "
+                    + field.fieldRef().fieldName());
+        }
+    }
+
+    private static Map<String, ResolvedReferenceFieldDescriptor> staticReferenceFields(Class<?> modelClass) {
+        if (modelClass == null) {
+            return Map.of();
+        }
+        return StaticReferenceResolver.rules(modelClass).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        rule -> rule.plan().sourceField(),
+                        rule -> new ResolvedReferenceFieldDescriptor(rule.target().qualifiedName(), rule.cardinality(),
+                                referenceTitleField(modelClass, rule.plan().sourceField())),
+                        (left, right) -> left
+                ));
+    }
+
+    /**
+     * A direct {@code @ReferenceLoad(source = "…", field = "title")} is the canonical
+     * read-side label for a scalar reference. Deliver its output field so detail views
+     * can render the resolved label without a second client request.
+     */
+    private static String referenceTitleField(Class<?> modelClass, String sourceField) {
+        return StaticReferenceResolver.rules(modelClass).stream()
+                .filter(rule -> rule.plan().sourceField().equals(sourceField))
+                .flatMap(rule -> rule.plan().projections().stream())
+                .filter(projection -> "title".equals(projection.targetField()))
+                .map(ReferenceProjection::outputField)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static Map<String, ResolvedReferenceSummaryFieldDescriptor> staticReferenceSummaryFields(Class<?> modelClass) {
+        if (modelClass == null) {
+            return Map.of();
+        }
+        return StaticReferenceResolver.summaryPlans(modelClass).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        ReferenceSummaryPlan::outputField,
+                        summary -> new ResolvedReferenceSummaryFieldDescriptor(summary.sourceField(),
+                                summary.target().qualifiedName(), summary.cardinality(), summary.fields()),
+                        (left, right) -> left
+                ));
     }
 
     private static Map<String, ResolvedOptionFieldDescriptor> staticOptionFields(Class<?> modelClass) {
@@ -374,6 +602,10 @@ public final class ModuleUiDescriptorCompiler {
         for (net.ximatai.muyun.spring.ability.reference.ReferenceLoadPath path
                 : StaticReferenceResolver.loadPaths(definition.modelClass())) {
             fields.put(path.outputField(), Boolean.TRUE);
+        }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceSummaryPlan summary
+                : StaticReferenceResolver.summaryPlans(definition.modelClass())) {
+            fields.put(summary.outputField(), Boolean.TRUE);
         }
         return java.util.Collections.unmodifiableSet(new LinkedHashSet<>(fields.keySet()));
     }

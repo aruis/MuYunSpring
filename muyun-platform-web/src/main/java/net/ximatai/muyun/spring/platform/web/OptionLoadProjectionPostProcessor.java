@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.platform.web;
 
-import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.OptionLoadDefinition;
 import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
+import net.ximatai.muyun.spring.common.option.OptionValueCodeResolver;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -53,7 +53,7 @@ final class OptionLoadProjectionPostProcessor {
         for (Map<String, Object> record : records) {
             LinkedHashMap<String, Object> output = new LinkedHashMap<>(record);
             for (OptionLoadDefinition definition : definitions) {
-                if (!output.containsKey(definition.sourceField()) || output.containsKey(definition.outputField())) {
+                if (!output.containsKey(definition.sourceField()) || output.get(definition.outputField()) != null) {
                     continue;
                 }
                 output.put(definition.outputField(), loadedValue(definition, output.get(definition.sourceField()),
@@ -71,23 +71,29 @@ final class OptionLoadProjectionPostProcessor {
                 .options(OptionQuery.all()).stream()
                 .collect(Collectors.toMap(OptionItem::code, item -> item, (left, right) -> left));
         return definition.sourceDefinition().selectionMode() == OptionSelectionMode.MULTIPLE
-                ? multipleValues(value, definition.optionItemField(), options)
-                : singleValue(value, definition.optionItemField(), options);
+                ? multipleValues(definition, value, definition.optionItemField(), options)
+                : singleValue(definition, value, definition.optionItemField(), options);
     }
 
-    private static Object singleValue(Object value, String itemField, Map<String, OptionItem> options) {
-        String code = code(value);
+    private static Object singleValue(OptionLoadDefinition definition,
+                                      Object value,
+                                      String itemField,
+                                      Map<String, OptionItem> options) {
+        String code = OptionValueCodeResolver.resolve(definition.sourceDefinition().binding(), value);
         OptionItem item = code == null ? null : options.get(code);
         return item == null ? null : optionItemValue(item, itemField);
     }
 
-    private static List<Object> multipleValues(Object value, String itemField, Map<String, OptionItem> options) {
+    private static List<Object> multipleValues(OptionLoadDefinition definition,
+                                               Object value,
+                                               String itemField,
+                                               Map<String, OptionItem> options) {
         if (value == null) {
             return null;
         }
         List<Object> resolved = new ArrayList<>();
         for (Object item : toValues(value)) {
-            Object loaded = singleValue(item, itemField, options);
+            Object loaded = singleValue(definition, item, itemField, options);
             if (loaded != null) {
                 resolved.add(loaded);
             }
@@ -104,20 +110,6 @@ final class OptionLoadProjectionPostProcessor {
             case "parentCode" -> item.parentCode();
             default -> throw new IllegalArgumentException("unknown option item field: " + fieldName);
         };
-    }
-
-    private static String code(Object value) {
-        if (value instanceof CodeTitleEnum codeTitleEnum) {
-            return codeTitleEnum.getCode();
-        }
-        if (value instanceof String text) {
-            String trimmed = text.trim();
-            return trimmed.isBlank() ? null : trimmed;
-        }
-        if (value instanceof Enum<?> enumValue) {
-            return enumValue.name();
-        }
-        return null;
     }
 
     private static List<?> toValues(Object value) {

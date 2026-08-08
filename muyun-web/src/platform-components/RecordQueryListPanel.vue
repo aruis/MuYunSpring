@@ -20,6 +20,7 @@ import type {
   QuerySchema,
   QuerySchemaField,
   ResolvedViewDescriptor,
+  ResolvedViewFieldDescriptor,
   WebQueryCondition,
   WebQueryRequest,
   WebSort,
@@ -33,9 +34,12 @@ import {
 } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 import DateTimeText from './DateTimeText.vue';
+import FileSizeText from './FileSizeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
 import RecycleBinModeButton from './RecycleBinModeButton.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
+import RecordTagList from './RecordTagList.vue';
+import { resolveRecordBooleanStatusValue } from './recordFormFieldModel';
 import {
   mergeRecordActions,
   resolveRecordActions,
@@ -52,7 +56,8 @@ export type RecordQueryListMode = 'normal' | 'recycleBin';
 export interface RecordQueryListColumn {
   key: string;
   title: string;
-  type?: 'text' | 'enabledStatus' | 'datetime';
+  type?: 'text' | 'enabledStatus' | 'booleanStatus' | 'tagList' | 'datetime' | 'fileSize' | 'colorPicker';
+  booleanStatus?: ResolvedViewFieldDescriptor['booleanStatus'];
   width?: string;
   align?: 'left' | 'center' | 'right';
   titleField?: string;
@@ -102,6 +107,8 @@ const props = withDefaults(
     queryTemplateId?: string;
     ready?: boolean;
     externalQueryValues?: Record<string, unknown>;
+    /** Descriptor-owned external criteria that must be exposed by the query schema. */
+    requiredExternalCriteriaKeys?: string[];
     quickSearchPlaceholder?: string;
     emptyDescription?: string;
     waitingDescription?: string;
@@ -127,6 +134,7 @@ const props = withDefaults(
     queryTemplateId: undefined,
     ready: true,
     externalQueryValues: undefined,
+    requiredExternalCriteriaKeys: () => [],
     quickSearchPlaceholder: '搜索',
     emptyDescription: '暂无记录',
     waitingDescription: '请选择查询范围',
@@ -221,7 +229,7 @@ const tableColumns = computed<RecordQueryListColumn[]>(() => {
   if (props.columns && props.columns.length > 0) {
     return recycleBinColumns(props.columns);
   }
-  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value));
+  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value, props.uiConfigId));
 });
 const dataTableColumns = computed<UiDataTableColumn[]>(() =>
   tableColumns.value.map((column) => ({
@@ -301,11 +309,23 @@ async function loadSchemaAndRecords() {
     runtimeViews.value = await loadRuntimeViews();
     const nextSchema = await props.context.crud.querySchema({
       uiConfigId: props.uiConfigId,
+      queryTemplateId: props.queryTemplateId,
     });
     if (requestSeq !== schemaRequestSeq) {
       return;
     }
     schema.value = nextSchema;
+    if (
+      props.requiredExternalCriteriaKeys.some(
+        (key) => !nextSchema.externalCriteria.some((criteria) => criteria.key === key),
+      )
+    ) {
+      descriptorLoadError.value = true;
+      records.value = [];
+      total.value = 0;
+      emit('loaded', []);
+      return;
+    }
     activeConditions.value = [];
     conditionsExpanded.value = false;
     resetConditionDrafts();
@@ -316,6 +336,13 @@ async function loadSchemaAndRecords() {
     }
     if (isUnsupportedQuerySchemaError(cause)) {
       schema.value = emptyQuerySchema(props.context.moduleAlias);
+      if (props.requiredExternalCriteriaKeys.length > 0) {
+        descriptorLoadError.value = true;
+        records.value = [];
+        total.value = 0;
+        emit('loaded', []);
+        return;
+      }
       activeConditions.value = [];
       conditionsExpanded.value = false;
       resetConditionDrafts();
@@ -799,6 +826,14 @@ function dateTimeCellValue(record: QueryListRecord, column: RecordQueryListColum
   return String(value);
 }
 
+function fileSizeCellValue(record: QueryListRecord, column: RecordQueryListColumn) {
+  const value: unknown =
+    column.render?.(record) ?? props.cellRenderers[column.key]?.(record) ?? record[column.key];
+  return typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint'
+    ? value
+    : undefined;
+}
+
 function displayRecordFieldValue(record: QueryListRecord, fieldName: string, titleField?: string) {
   const titleValue = record[titleField ?? `${fieldName}Title`];
   if (typeof titleValue === 'string' && titleValue.trim()) {
@@ -811,8 +846,19 @@ function displayRecordFieldValue(record: QueryListRecord, fieldName: string, tit
   return String(value ?? '');
 }
 
-function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined): RecordQueryListColumn[] {
+function statusCellValue(record: QueryListRecord, column: RecordQueryListColumn | undefined) {
+  if (column?.type === 'booleanStatus') {
+    return resolveRecordBooleanStatusValue(record[column.key]);
+  }
+  return record[column?.key ?? ''] !== false;
+}
+
+function columnsFromRuntimeListView(
+  views: ResolvedViewDescriptor[] | undefined,
+  uiConfigId?: string,
+): RecordQueryListColumn[] {
   const view =
+    views?.find((item) => item.viewKind === 'LIST' && item.sourceUiConfigId === uiConfigId) ??
     views?.find((item) => item.viewKind === 'LIST' && item.viewCode === 'default_list') ??
     views?.find((item) => item.viewKind === 'LIST');
   if (!view) {
@@ -820,19 +866,35 @@ function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined)
   }
   return view.fields
     .filter((field) => field.visible?.constant !== false)
-    .map((field) => ({
-      key: field.fieldRef.fieldName,
-      title: field.label ?? field.fieldRef.fieldName,
-      type:
-        field.uiType === 'enabledStatus'
-          ? 'enabledStatus'
-          : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
-            ? 'datetime'
-            : 'text',
-      width: field.width,
-      align: columnAlign(field.align),
-      titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
-    }));
+    .map((field) => {
+      const queryField = fieldByName(field.fieldRef.fieldName);
+      return {
+        key: field.fieldRef.fieldName,
+        title: field.label ?? field.fieldRef.fieldName,
+        type:
+          field.uiType === 'enabledStatus'
+            ? 'enabledStatus'
+            : field.uiType === 'booleanStatus' && field.booleanStatus
+              ? 'booleanStatus'
+              : field.uiType === 'tagList'
+                ? 'tagList'
+                : field.uiType === 'colorPicker'
+                  ? 'colorPicker'
+                  : field.valuePresentation === 'FILE_SIZE'
+                    ? 'fileSize'
+                    : isDateTimeValueType(field.valueType ?? queryField?.valueType)
+                      ? 'datetime'
+                      : 'text',
+        width: field.width,
+        align: columnAlign(field.align),
+        titleField: field.option?.titleField ?? queryField?.optionTitleField,
+        booleanStatus: field.booleanStatus,
+      };
+    });
+}
+
+function isDateTimeValueType(valueType: string | undefined) {
+  return valueType === 'TIMESTAMP' || valueType === 'ZONED_TIMESTAMP' || valueType === 'INSTANT';
 }
 
 function columnAlign(align: string | undefined): RecordQueryListColumn['align'] {
@@ -970,8 +1032,25 @@ defineExpose({ refresh });
       >
         <template #cell="{ column, record }">
           <RecordStatusTag
-            v-if="tableColumns.find((item) => item.key === column.key)?.type === 'enabledStatus'"
-            :enabled="(record as QueryListRow).record[column.key] !== false"
+            v-if="
+              ['enabledStatus', 'booleanStatus'].includes(
+                tableColumns.find((item) => item.key === column.key)?.type ?? '',
+              )
+            "
+            :enabled="
+              statusCellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key),
+              )
+            "
+            :enabled-label="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.trueLabel"
+            :disabled-label="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.falseLabel"
+            :enabled-tone="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.trueTone"
+            :disabled-tone="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.falseTone"
+          />
+          <RecordTagList
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'tagList'"
+            :items="(record as QueryListRow).record[column.key]"
           />
           <DateTimeText
             v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'datetime'"
@@ -982,6 +1061,30 @@ defineExpose({ refresh });
               )
             "
           />
+          <FileSizeText
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'fileSize'"
+            :value="
+              fileSizeCellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            "
+          />
+          <span
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'colorPicker'"
+            class="record-query-list-color"
+          >
+            <i
+              :style="{ backgroundColor: String((record as QueryListRow).record[column.key] ?? '') }"
+              aria-hidden="true"
+            />
+            {{
+              cellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            }}
+          </span>
           <template v-else>
             {{
               cellValue(
@@ -1198,6 +1301,19 @@ defineExpose({ refresh });
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.record-query-list-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-query-list-color i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(15 23 42 / 18%);
+  border-radius: 50%;
 }
 
 .record-query-list-row-actions {

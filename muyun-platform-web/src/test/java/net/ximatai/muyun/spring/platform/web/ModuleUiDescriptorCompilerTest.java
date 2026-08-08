@@ -5,18 +5,22 @@ import net.ximatai.muyun.spring.common.option.DictionaryField;
 import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceSummary;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModuleUiDescriptorCompilerTest {
@@ -26,11 +30,12 @@ class ModuleUiDescriptorCompilerTest {
                 .listView(list -> list
                         .title("职员列表")
                         .field("employeeNo", field -> field.label("职员编号").width("160px"))
-                        .field("enabled", field -> field.label("状态").uiType("enabledStatus").align("center")))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus").align("center"))
+                        .field("online", field -> field.label("在线状态").booleanStatus("在线", "离线")))
                 .formView(form -> form
                         .title("职员档案")
                         .field("organizationId", field -> field.label("所属机构").required().readOnly())
-                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker")))
+                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker").columnSpan(2)))
                 .build();
 
         ResolvedModuleUiDescriptor descriptor = ModuleUiDescriptorCompiler.compile(definition);
@@ -43,12 +48,17 @@ class ModuleUiDescriptorCompilerTest {
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                     assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                            .containsExactly("employeeNo", "enabled");
-                    assertThat(view.fields()).last()
+                            .containsExactly("employeeNo", "enabled", "online");
+                    assertThat(view.fields()).element(1)
                             .satisfies(field -> {
                                 assertThat(field.uiType()).isEqualTo("enabledStatus");
                                 assertThat(field.align()).isEqualTo("center");
                             });
+                    assertThat(view.fields()).last().satisfies(field -> {
+                        assertThat(field.uiType()).isEqualTo("booleanStatus");
+                        assertThat(field.booleanStatus().trueLabel()).isEqualTo("在线");
+                        assertThat(field.booleanStatus().falseLabel()).isEqualTo("离线");
+                    });
                 });
         assertThat(descriptor.views()).filteredOn(view -> view.viewCode().equals("default_form"))
                 .singleElement()
@@ -61,8 +71,43 @@ class ModuleUiDescriptorCompilerTest {
                                 assertThat(field.readOnly().constant()).isTrue();
                             });
                     assertThat(view.fields()).last()
-                            .satisfies(field -> assertThat(field.uiType()).isEqualTo("recordPicker"));
+                            .satisfies(field -> {
+                                assertThat(field.uiType()).isEqualTo("recordPicker");
+                                assertThat(field.columnSpan()).isEqualTo(2);
+                            });
                 });
+    }
+
+    @Test
+    void shouldRequireBusinessBooleanPresentationForItsUiType() {
+        assertThatThrownBy(() -> ViewFieldDefinition.field("online").uiType("booleanStatus").build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("uiType booleanStatus requires boolean status presentation");
+        assertThatCode(() -> ViewFieldDefinition.field("online").booleanStatus("在线", "离线").build())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldRejectFileTransferUntilTheUnifiedFileReferenceLifecycleExists() {
+        assertThatThrownBy(() -> ViewFieldDefinition.field("fileId").uiType("fileTransfer").build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("file transfer requires the unified file-reference lifecycle");
+    }
+
+    @Test
+    void shouldRequireBooleanStatusToBeReadOnlyInFormViews() {
+        ModuleUiDefinition writableDefinition = ModuleUiDefinition.builder("iam.employee")
+                .formView(form -> form.field("online", field -> field.booleanStatus("在线", "离线")))
+                .build();
+        ModuleUiDefinition readOnlyDefinition = ModuleUiDefinition.builder("iam.employee")
+                .formView(form -> form.field("online", field -> field.booleanStatus("在线", "离线").readOnly()))
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(writableDefinition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("booleanStatus UI field must be read-only in FORM views: online");
+        assertThatCode(() -> ModuleUiDescriptorCompiler.compile(readOnlyDefinition))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -81,6 +126,61 @@ class ModuleUiDescriptorCompilerTest {
         assertThat(descriptor.views()).singleElement()
                 .satisfies(view -> assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                         .containsExactly("employeeNo", "title", "enabled"));
+    }
+
+    @Test
+    void shouldPublishStaticAuditFieldTypeWithoutRequiringQueryCapability() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.employee")
+                .listView(list -> list.field("createdAt", field -> field.label("创建时间")))
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(staticDefinition(uiDefinition))
+                .views().getFirst().fields().getFirst();
+
+        assertThat(field.valueType()).isEqualTo(FieldValueType.TIMESTAMP);
+    }
+
+    @Test
+    void shouldCompileFileSizeAsTypedPresentationWithoutChangingLongValueType() {
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("mr", "mr.knowledge_file", "知识文件")
+                .entities(List.of(new EntityDefinition("knowledge_file", "mr_knowledge_file", "Knowledge File",
+                        List.of(FieldDefinition.longInteger("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("mr.knowledge_file")
+                        .listView(list -> list.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(definition)
+                .views().getFirst().fields().getFirst();
+
+        assertThat(field.valueType()).isEqualTo(FieldValueType.LONG);
+        assertThat(field.valuePresentation()).isEqualTo(FieldValuePresentation.FILE_SIZE);
+        assertThat(field.uiType()).isNull();
+    }
+
+    @Test
+    void shouldRejectFileSizePresentationForNonLongOrWritableFormFields() {
+        StaticModuleDefinition wrongType = StaticModuleDefinition.builder("demo", "demo.asset", "资产")
+                .entities(List.of(new EntityDefinition("asset", "demo_asset", "Asset",
+                        List.of(FieldDefinition.string("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("demo.asset")
+                        .listView(list -> list.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+        StaticModuleDefinition writableForm = StaticModuleDefinition.builder("demo", "demo.asset", "资产")
+                .entities(List.of(new EntityDefinition("asset", "demo_asset", "Asset",
+                        List.of(FieldDefinition.longInteger("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("demo.asset")
+                        .formView(form -> form.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(wrongType))
+                .hasMessage("file size presentation requires LONG field: fileSize");
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(writableForm))
+                .hasMessage("file size presentation must be read-only in FORM views: fileSize");
+        assertThatThrownBy(() -> ViewFieldDefinition.field("fileSize").uiType("fileSize").build())
+                .hasMessage("file size must use value presentation instead of uiType");
     }
 
     @Test
@@ -169,10 +269,131 @@ class ModuleUiDescriptorCompilerTest {
         ModuleUiCompilationResult result = ModuleUiDescriptorCompiler.compileModule(definition);
 
         assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
-                .containsExactly("orderNo", "customerId", "customerTitle", "customerLevel");
+                .containsExactly("orderNo", "customerId", "customerTitle", "customerLevel", "tagSummaries");
         assertThat(result.readModel().fields()).filteredOn(ResolvedModuleReadField::platformManaged)
                 .extracting(ResolvedModuleReadField::fieldName)
-                .containsExactly("customerTitle", "customerLevel");
+                .containsExactly("customerTitle", "customerLevel", "tagSummaries");
+    }
+
+    @Test
+    void shouldPublishTheCompleteModuleAliasForStaticReferenceFields() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .formView(form -> form
+                        .field("customerId", field -> field.label("客户"))
+                        .field("tagIds", field -> field.label("标签")))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "客户"),
+                                FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        List<ResolvedViewFieldDescriptor> fields = ModuleUiDescriptorCompiler.compile(definition).views().getFirst()
+                .fields();
+
+        assertThat(fields.getFirst().reference())
+                .satisfies(reference -> {
+                    assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
+                    assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+                    assertThat(reference.titleField()).isEqualTo("customerTitle");
+                });
+        assertThat(fields.get(1).reference())
+                .satisfies(reference -> {
+                    assertThat(reference.targetModuleAlias()).isEqualTo("crm.tag");
+                    assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.MANY);
+                });
+    }
+
+    @Test
+    void shouldCompileScopedListWorkspaceOnlyForItsSingleReferenceField() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("orderNo")
+                        .scopedListWorkspace("crm.customer", "customerId", "customerId", "项目", "搜索项目", false,
+                                ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("orderNo", "订单号"),
+                                FieldDefinition.string("customerId", "项目")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        ResolvedScopedListWorkspaceDescriptor workspace = ModuleUiDescriptorCompiler.compile(definition)
+                .views().getFirst().scopedListWorkspace();
+
+        assertThat(workspace.scopeModuleAlias()).isEqualTo("crm.customer");
+        assertThat(workspace.scopeField()).isEqualTo("customerId");
+        assertThat(workspace.queryCriteriaKey()).isEqualTo("customerId");
+        assertThat(workspace.showScopeItemSubtitle()).isFalse();
+        assertThat(workspace.manageScopeTree()).isFalse();
+        assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE);
+    }
+
+    @Test
+    void shouldPublishManageableTreeScopeOnlyWhenExplicitlyEnabled() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("customerId")
+                        .scopedListWorkspace("crm.customer", "customerId", "项目", "搜索项目")
+                        .manageableScopedTree())
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "项目")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().scopedListWorkspace()
+                .manageScopeTree()).isTrue();
+    }
+
+    @Test
+    void shouldRejectManageableTreeScopeWithoutWorkspace() {
+        assertThatThrownBy(() -> ModuleUiDefinition.builder("sales.order")
+                .listView(ViewDefinition.Builder::manageableScopedTree))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("scopedListWorkspace must be configured before manageableScopedTree");
+    }
+
+    @Test
+    void shouldRejectScopedListWorkspaceWithWrongReferenceTargetOrCardinality() {
+        ModuleUiDefinition wrongTarget = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.scopedListWorkspace("crm.tag", "customerId", "标签", null))
+                .build();
+        ModuleUiDefinition multipleReference = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.scopedListWorkspace("crm.tag", "tagIds", "标签", null))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "项目"), FieldDefinition.string("tagIds", "标签")))))
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition.toBuilder()
+                .uiDefinition(wrongTarget).build()))
+                .hasMessageContaining("reference target must match scope module");
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition.toBuilder()
+                .uiDefinition(multipleReference).build()))
+                .hasMessageContaining("must be a single reference");
+    }
+
+    @Test
+    void shouldAllowUnscopedCreationByDefaultForListViewWorkspaceDsl() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.scopedListWorkspace("crm.customer", "customerId", "项目", "搜索项目"))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "项目")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().scopedListWorkspace().createPolicy())
+                .isEqualTo(ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);
     }
 
     @Test
@@ -192,6 +413,104 @@ class ModuleUiDescriptorCompilerTest {
 
         assertThat(result.readModel().fields()).extracting(ResolvedModuleReadField::fieldName)
                 .containsExactly("orderNo", "classroomId", "assistantTitle");
+    }
+
+    @Test
+    void shouldCompileTagListOnlyFromAManyTitleReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.label("标签").tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(definition).views().getFirst()
+                .fields().getFirst();
+
+        assertThat(field.referenceSummary()).satisfies(summary -> {
+            assertThat(summary.sourceField()).isEqualTo("tagIds");
+            assertThat(summary.targetModuleAlias()).isEqualTo("crm.tag");
+            assertThat(summary.cardinality()).isEqualTo(ReferenceCardinality.MANY);
+            assertThat(summary.fields()).containsExactly("title", "color");
+        });
+    }
+
+    @Test
+    void shouldRejectTagListWithoutATitleReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(IdOnlySummaryOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList reference summary must include title");
+    }
+
+    @Test
+    void shouldRejectTagListBoundToARawReferenceField() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagIds", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList UI field must be a structured reference summary");
+    }
+
+    @Test
+    void shouldRejectTagListOutsideListViewsUntilOtherRunnersSupportIt() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .formView(form -> form.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(definition))
+                .hasMessageContaining("tagList UI field is only supported in LIST views");
+    }
+
+    @Test
+    void shouldAllowTagListWithTitleOnlyReferenceSummary() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(TitleOnlySummaryOrder.class)
+                .build();
+
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().fields().getFirst()
+                .referenceSummary().fields()).containsExactly("title");
+    }
+
+    @Test
+    void shouldRejectTagListForDynamicDescriptorUntilDynamicReferenceSummariesExist() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .listView(list -> list.field("tagSummaries", field -> field.tagList()))
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(uiDefinition, ModuleKind.DYNAMIC, "订单",
+                java.util.Map.of(), java.util.Map.of(), null))
+                .hasMessageContaining("tagList UI field must be a structured reference summary");
     }
 
     @Test
@@ -290,11 +609,33 @@ class ModuleUiDescriptorCompilerTest {
         @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
 
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
+
         @ReferenceLoad(source = "customerId", field = "title")
         private transient String customerTitle;
 
         @ReferenceLoad(source = "customerId", field = "level")
         private transient String customerLevel;
+
+        @ReferenceSummary(source = "tagIds", fields = {"title", "color"})
+        private transient List<java.util.Map<String, Object>> tagSummaries;
+    }
+
+    private static final class IdOnlySummaryOrder {
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = {"id"})
+        private transient List<java.util.Map<String, Object>> tagSummaries;
+    }
+
+    private static final class TitleOnlySummaryOrder {
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
+
+        @ReferenceSummary(source = "tagIds", fields = "title")
+        private transient List<java.util.Map<String, Object>> tagSummaries;
     }
 
     private static final class MultiHopReferenceOrder {

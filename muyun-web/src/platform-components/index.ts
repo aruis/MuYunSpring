@@ -4,6 +4,14 @@ export { confirmAction } from '@muyun/vue-ui-antdv';
 export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue';
 export { default as DrawerOperationBar } from './DrawerOperationBar.vue';
 export { default as DateTimeText } from './DateTimeText.vue';
+export { default as FileSizeText } from './FileSizeText.vue';
+export { default as FileTransferUploader } from './FileTransferUploader.vue';
+export { createBrowserFileTransferUpload, unwrapResponsePayload } from './fileTransferUpload';
+export type {
+  FileTransferUploadAccess,
+  FileTransferUploadReceipt,
+  FileTransferUploadTask,
+} from './fileTransferUpload';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as ManagementWorkspace } from './ManagementWorkspace.vue';
@@ -15,6 +23,8 @@ export type { DrawerPromotion } from './drawerPromotion';
 export { default as RecordExternalChangeNotice } from './RecordExternalChangeNotice.vue';
 export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
+export { default as RecordPanelButton } from './RecordPanelButton.vue';
+export { default as RecordPanelState } from './RecordPanelState.vue';
 export { default as RecordExpandedSubtable } from './RecordExpandedSubtable.vue';
 export { default as UserSessionExpandedSubtable } from './UserSessionExpandedSubtable.vue';
 export {
@@ -30,6 +40,7 @@ export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
 export { default as RecordModeDrawer } from './RecordModeDrawer.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
+export { default as RecordMultiPicker } from './RecordMultiPicker.vue';
 export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecycleBinModeButton } from './RecycleBinModeButton.vue';
 export {
@@ -40,6 +51,7 @@ export {
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
 export { default as RecordTreeSelector } from './RecordTreeSelector.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
+export { default as RecordTagList } from './RecordTagList.vue';
 export { useRecycleBinState } from './recycleBinState';
 export type { RecycleBinStateOptions } from './recycleBinState';
 export {
@@ -98,6 +110,8 @@ export { resolveRecordActions } from './recordActionBarModel';
 export { normalizeRecordDraft } from './recordDraftNormalizer';
 export { resolveRecordDetailDisplayValue } from './recordDetailFieldModel';
 export { formatPlatformDateTime, resolveBrowserTimeZone } from './platformDateTime';
+export { formatPlatformFileSize } from './platformFileSize';
+export type { PlatformFileSizeDisplay, PlatformFileSizeOptions } from './platformFileSize';
 export { providePlatformTimeZoneContext, usePlatformTimeZoneContext } from './platformTimeZoneContext';
 export type {
   PlatformDateTimeDisplay,

@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.platform.option;
 
 import net.ximatai.muyun.spring.ability.option.StaticOptionLoadPopulator;
-import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionLoadDefinition;
 import net.ximatai.muyun.spring.common.option.OptionLoadResolver;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
+import net.ximatai.muyun.spring.common.option.OptionValueCodeResolver;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Array;
@@ -61,24 +61,30 @@ public class OptionSourceStaticOptionLoadPopulator implements StaticOptionLoadPo
         }
         Object sourceValue = readField(modelClass, entity, definition.sourceField());
         Object loaded = definition.sourceDefinition().selectionMode() == OptionSelectionMode.MULTIPLE
-                ? multipleValues(sourceValue, definition.optionItemField(), options)
-                : singleValue(sourceValue, definition.optionItemField(), options);
+                ? multipleValues(definition, sourceValue, definition.optionItemField(), options)
+                : singleValue(definition, sourceValue, definition.optionItemField(), options);
         writeField(modelClass, entity, definition.outputField(), loaded);
     }
 
-    private Object singleValue(Object value, String itemField, Map<String, OptionItem> options) {
-        String code = code(value);
+    private Object singleValue(OptionLoadDefinition definition,
+                               Object value,
+                               String itemField,
+                               Map<String, OptionItem> options) {
+        String code = OptionValueCodeResolver.resolve(definition.sourceDefinition().binding(), value);
         OptionItem item = code == null ? null : options.get(code);
         return item == null ? null : optionItemValue(item, itemField);
     }
 
-    private List<Object> multipleValues(Object value, String itemField, Map<String, OptionItem> options) {
+    private List<Object> multipleValues(OptionLoadDefinition definition,
+                                        Object value,
+                                        String itemField,
+                                        Map<String, OptionItem> options) {
         if (value == null) {
             return null;
         }
         List<Object> resolved = new ArrayList<>();
         for (Object item : toValues(value)) {
-            Object loaded = singleValue(item, itemField, options);
+            Object loaded = singleValue(definition, item, itemField, options);
             if (loaded != null) {
                 resolved.add(loaded);
             }
@@ -97,17 +103,6 @@ public class OptionSourceStaticOptionLoadPopulator implements StaticOptionLoadPo
             }
         }
         throw new IllegalArgumentException("unknown option item field: " + fieldName);
-    }
-
-    private String code(Object value) {
-        if (value instanceof CodeTitleEnum codeTitleEnum) {
-            return codeTitleEnum.getCode();
-        }
-        if (value instanceof String text) {
-            String trimmed = text.trim();
-            return trimmed.isBlank() ? null : trimmed;
-        }
-        return null;
     }
 
     private List<?> toValues(Object value) {

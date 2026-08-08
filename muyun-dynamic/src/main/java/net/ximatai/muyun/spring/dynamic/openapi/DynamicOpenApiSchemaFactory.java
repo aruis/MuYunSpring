@@ -256,6 +256,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("temporalSemantics", stringProperty(false));
         properties.put("title", stringProperty(false));
         properties.put("required", booleanProperty(false));
+        properties.put("columnSpan", integerProperty(false));
         properties.put("unique", booleanProperty(false));
         properties.put("indexed", booleanProperty(false));
         properties.put("sortable", booleanProperty(false));

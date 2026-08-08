@@ -56,6 +56,21 @@ test('record detail display resolves record picker object with configured title'
   );
 });
 
+test('record detail display prefers the server-projected reference title for a scalar picker id', () => {
+  const field = formField('directoryId', {
+    controlType: 'recordPicker',
+    referenceTitleField: 'directoryTitle',
+  });
+
+  assert.equal(
+    resolveRecordDetailDisplayValue(field, {
+      directoryId: 'mr_demo_knowledge_earthwork',
+      directoryTitle: '土石方施工',
+    }),
+    '土石方施工',
+  );
+});
+
 function formField(fieldName: string, options: Partial<RecordFormFieldState> = {}): RecordFormFieldState {
   return {
     fieldName,

@@ -116,6 +116,12 @@ StaticModuleDefinition
 
 `ModuleUiDefinition` 是静态和动态共同的 UI 声明目标。静态 `StaticModuleDefinition.forService(...)` 是构造它的一种源码 DSL；动态 UI 配置发布后也应先转换为它，再进入统一编译链路。
 
+标准“范围选择 + 右侧查询列表”也属于这个来源无关声明，但它归属具体 LIST view/config，而非整个模块。`scopedListWorkspace` 声明 scope 模块、消费者的单值引用字段和外部查询 key；编译期必须证明该字段引用 scope 模块。运行器按当前页面的 UI config 选择对应 workspace，并由静态、动态 CRUD 将该外部 key 直接编译为范围字段过滤；查询模板只能叠加其他过滤，不承载范围工作区的正确性。scope 模块有树能力时，左栏自动使用树浏览器；否则使用微列表，两种形态共享选择、取消选择、范围预填和右侧标准 CRUD。默认不显示次标题，重复点击已选项会取消范围并恢复全量列表；默认 `ALLOW_UNSCOPED`，只有显式声明 `REQUIRE_SCOPE` 才会禁止未选范围时的新建。scope 只是页面入口约束；真正的数据归属仍由模型字段必填、引用校验和数据权限在统一 CRUD 链路中保证。
+
+静态 LIST view 可用 `manageableScopedTree` 显式允许在范围栏内通过目标模块的标准 CRUD、动作权限和
+乐观锁维护树节点；未声明时范围栏保持只读选择。动态页面配置当前尚无对应来源字段，适配时固定为关闭，
+这是阶段限制，不表示动态范围工作区已经具备内嵌维护配置能力。
+
 ## 静态 UI 声明
 
 静态 UI 声明归属模块定义，不归属 model，也不归属 service。
@@ -187,7 +193,13 @@ class EmployeeService implements FormAbility<Employee> {
 | `uiType` | 平台 UI 类型提示，不绑定具体前端组件库 |
 | `width` / `align` / `fixed` | 列表展示的轻量提示 |
 
-当前已落地的 `uiType` 先保持小集合：`enabledStatus` 表达启停布尔控件，`recordPicker` 表达引用选择控件。`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、作用域、标题函数和刷新 key 由页面组合层提供，避免 descriptor 绑定前端运行态对象。
+当前已落地的 `uiType` 先保持小集合：`enabledStatus` 表达启停布尔控件，`booleanStatus` 表达带显式
+true/false 标签和语义色的业务布尔展示，`recordPicker` 表达引用选择控件。业务布尔值保留 unknown 状态，
+不能复用启停字段“非 false 即启用”的默认语义。动态 UI 配置当前还不能声明 `booleanStatus` presentation，
+遇到该控件类型会在适配期失败，不静默降级。`booleanStatus` 是展示类型；在 FORM 中必须显式 `.readOnly()`，
+不能伪装为可编辑布尔控件。需要编辑业务布尔值时，声明通用 `switch` 或在后续建立其独立的可编辑语义。
+`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、
+作用域、标题函数和刷新 key 由页面组合层提供，避免 descriptor 绑定前端运行态对象。
 
 `fieldRef` 是源无关字段锚点，后续可承载动态字段和子关系定位：
 
@@ -220,6 +232,17 @@ UiRule<T>
 6. 复杂布局、联动、表达式可见性、子表和客户端差异。
 
 这些事实应从 model、注解、Ability、动态元数据、字段配置或后续页面配置专题中编译得到。静态 DSL 和动态配置都应先归一为 `ModuleUiDefinition`，再与字段事实合并。
+
+编译后的 `ResolvedViewFieldDescriptor.valueType` 是来源无关的字段事实，不是查询能力声明。静态模块从实体模型和
+`StandardEntity` 标准字段推导，动态模块从运行态字段 descriptor 推导。列表渲染应优先消费该字段事实；旧模块
+缺少该字段时才兼容回退到 query schema。`QueryDescriptor` 继续只决定可过滤、可排序等查询能力，不能成为日期时间
+是否正确展示的前置条件。
+
+`valuePresentation` 是与 `valueType` 正交的受控展示语义，不改变 API、存储、查询或排序使用的原始值。文件字节数
+使用 `FILE_SIZE`：字段仍为 `LONG` bytes，静态 DSL 通过 `.fileSize()` 声明，动态配置的 `file_size` 控件别名在
+适配期归一为同一 resolved presentation。平台统一按 1024 进位展示 B/KB/MB/GB、最多一位小数、空值显示 `-`，
+并以 tooltip 保留精确 bytes。该语义不包含上传、MIME、配额、存储或文件生命周期能力；FORM 中只能用于只读字段。
+业务模块不得把格式化文本写回数据值，也不应自行实现另一套文件大小格式。
 
 ## Service 接入
 
@@ -287,10 +310,10 @@ contributor 仍然贡献模块 UI 定义，不改变 service 的运行能力面�
 
 1. 校验 `StaticModuleDefinition` 引用的 service 存在。
 2. 校验视图字段存在于模型字段、平台标准字段或能力字段中。
-3. 合并字段类型、标题、选项、引用、单位、金额、保护、虚拟字段等字段事实。
+3. 合并字段类型、标题、选项、引用、单位、金额、保护、虚拟字段等字段事实；当前 resolved view field 已交付基础值类型。
 4. 校验 UI 声明与字段事实冲突，例如虚拟字段不应声明为普通可输入字段。
 5. 生成前端可消费的 resolved 视图结构。
-6. 生成后端读计划需要的模块级 `ResolvedModuleReadModel`。当前最小实现只包含逻辑字段事实，后续再合并字段类型、选项、保护、引用和存储形态等事实。
+6. 生成后端读计划需要的模块级 `ResolvedModuleReadModel`。当前最小实现只包含逻辑字段事实；字段值类型已在 resolved view field 交付，读模型后续再按 SQL 规划需要合并选项、保护、引用和存储形态等事实。
 7. 不把物理列写入对外 descriptor。
 
 `required` 和 `readOnly` 需要区分来源：

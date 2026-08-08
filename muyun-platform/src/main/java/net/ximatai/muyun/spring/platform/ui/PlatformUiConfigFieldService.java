@@ -61,7 +61,7 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfigField.class, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiControlAlias", "visible", "readOnly", "requiredOverride", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfigField.class, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiControlAlias", "visible", "readOnly", "requiredOverride", "columnSpan", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
@@ -120,6 +120,12 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         }
         if (field.getReadOnly() == null) {
             field.setReadOnly(Boolean.FALSE);
+        }
+        if (field.getColumnSpan() == null) {
+            field.setColumnSpan(1);
+        }
+        if (field.getColumnSpan() < 1 || field.getColumnSpan() > 2) {
+            throw new PlatformException("UI config field columnSpan must be between 1 and 2");
         }
         if (field.getTitle() == null || field.getTitle().isBlank()) {
             field.setTitle(moduleField.fieldTitle());

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -210,6 +211,19 @@ class PlatformWebExceptionHandlerTest {
                 .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 
+    @Test
+    void shouldTranslateWrappedDatabaseNotNullViolationToUsableValidationError() throws Exception {
+        MockMvc mvc = mvc(new DemoController());
+
+        mvc.perform(get("/demo/database-not-null"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("字段为必填，请补充后重试"))
+                .andExpect(jsonPath("$.actionMessage.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.actionMessage.type").value("WARNING"));
+    }
+
     private MockMvc mvc(Object controller) {
         return MockMvcBuilders.standaloneSetup(controller)
                 .addFilters(new RequestTraceWebFilter())
@@ -282,6 +296,12 @@ class PlatformWebExceptionHandlerTest {
         @GetMapping("/demo/unexpected")
         String unexpected() {
             throw new IllegalStateException("database password leaked");
+        }
+
+        @GetMapping("/demo/database-not-null")
+        String databaseNotNull() {
+            throw new IllegalStateException("persistence failed",
+                    new SQLException("driver detail must not reach the client", "23502"));
         }
 
         private record DemoRequest(String name) { }

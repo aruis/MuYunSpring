@@ -2,14 +2,28 @@
 defineOptions({ name: 'RecordStatusTag' });
 
 defineProps<{
-  enabled?: boolean;
+  enabled?: boolean | null;
+  enabledLabel?: string;
+  disabledLabel?: string;
+  unknownLabel?: string;
+  enabledTone?: 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
+  disabledTone?: 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
 }>();
 </script>
 
 <template>
-  <span class="record-status-tag" :class="{ 'record-status-tag-disabled': enabled === false }">
+  <span
+    class="record-status-tag"
+    :class="`record-status-tag--${enabled === true ? (enabledTone ?? 'SUCCESS').toLowerCase() : enabled === false ? (disabledTone ?? 'NEUTRAL').toLowerCase() : 'neutral'}`"
+  >
     <span class="record-status-tag-dot" />
-    <span>{{ enabled === false ? '停用' : '启用' }}</span>
+    <span>{{
+      enabled === true
+        ? (enabledLabel ?? '启用')
+        : enabled === false
+          ? (disabledLabel ?? '停用')
+          : (unknownLabel ?? '-')
+    }}</span>
   </span>
 </template>
 
@@ -32,11 +46,24 @@ defineProps<{
   background: #22a06b;
 }
 
-.record-status-tag-disabled {
+.record-status-tag--neutral {
   color: #697588;
 }
 
-.record-status-tag-disabled .record-status-tag-dot {
+.record-status-tag--neutral .record-status-tag-dot {
   background: #94a3b8;
+}
+
+.record-status-tag--warning {
+  color: #9a6700;
+}
+.record-status-tag--warning .record-status-tag-dot {
+  background: #d97706;
+}
+.record-status-tag--danger {
+  color: #b42318;
+}
+.record-status-tag--danger .record-status-tag-dot {
+  background: #d92d20;
 }
 </style>

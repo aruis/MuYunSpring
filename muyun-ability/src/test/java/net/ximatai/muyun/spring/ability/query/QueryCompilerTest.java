@@ -41,11 +41,23 @@ class QueryCompilerTest {
 
         assertThat(containsCondition(criteria, "enabled", true)).isTrue();
         assertThat(containsCondition(criteria, "departmentId", "dept-1")).isTrue();
-        assertThat(containsCondition(criteria, "code", "alice")).isTrue();
-        assertThat(containsCondition(criteria, "title", "alice")).isTrue();
+        assertThat(containsCondition(criteria, "code", "%alice%")).isTrue();
+        assertThat(containsCondition(criteria, "title", "%alice%")).isTrue();
         assertThat(sorts).hasSize(1);
         assertThat(sorts[0].getField()).isEqualTo("code");
         assertThat(sorts[0].getDirection()).isEqualTo(SortDirection.DESC);
+    }
+
+    @Test
+    void shouldTreatQuickSearchWildcardsAsLiterals() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(List.of(), null, Map.of(), List.of(), null, null,
+                Map.of(), "a%b_c\\d", List.of(), false, null);
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(containsCondition(criteria, "code", "%a\\%b\\_c\\\\d%")).isTrue();
+        assertThat(containsCondition(criteria, "title", "%a\\%b\\_c\\\\d%")).isTrue();
     }
 
     @Test

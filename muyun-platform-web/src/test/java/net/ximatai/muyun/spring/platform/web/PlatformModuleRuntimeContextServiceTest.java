@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
@@ -330,7 +331,13 @@ class PlatformModuleRuntimeContextServiceTest {
                 "客户",
                 "customer",
                 List.of(dynamicAction(PlatformAction.QUERY), dynamicAction(PlatformAction.CREATE)),
-                List.of(dynamicEntity("customer", "CRUD")),
+                List.of(dynamicEntity("customer", List.of(
+                        DynamicFieldDescriptor.from(FieldDefinition.string("name", "客户名称")),
+                        DynamicFieldDescriptor.from(FieldDefinition.bool("enabled", "启用状态")),
+                        DynamicFieldDescriptor.from(FieldDefinition.timestamp("createdAt", "创建时间")),
+                        DynamicFieldDescriptor.from(FieldDefinition.longInteger("storageBytes", "存储大小")),
+                        DynamicFieldDescriptor.from(FieldDefinition.string("organizationId", "所属机构"),
+                                dynamicReference("customer", "organizationId"))), "CRUD")),
                 List.of(),
                 List.of(),
                 List.of()
@@ -338,6 +345,9 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
         PlatformUiSet formSet = uiSet("set-form", "crm.customer", "customer_form", PlatformUiSetType.FORM);
         PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "客户列表");
+        listConfig.setScopeModuleAlias("base.product");
+        listConfig.setScopeField("organizationId");
+        listConfig.setScopeQueryCriteriaKey("organizationId");
         PlatformUiConfig formConfig = uiConfig("ui-form-web", "set-form", "客户表单");
         PlatformPageConfigSnapshot snapshot = new PlatformPageConfigSnapshot(
                 "crm.customer",
@@ -350,7 +360,11 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformResolvedPageConfig resolvedConfig = new PlatformResolvedPageConfig(List.of(
                 resolvedField("ui-list-web", "field-name", null, "name", "客户名称", "160", "left"),
                 resolvedField("ui-list-web", "field-enabled", null, "enabled", "启用状态", "120", "center"),
-                resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null)
+                resolvedField("ui-list-web", "field-created-at", null, "createdAt", "创建时间", "180", "left"),
+                resolvedField("ui-list-web", "field-storage-bytes", null, "storageBytes", "存储大小", "120", "right",
+                        "file_size"),
+                resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null),
+                resolvedField("ui-form-web", "field-organization", null, "organizationId", "所属机构", null, null)
         ), List.of());
         when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot);
         when(bootstrapService.resolveConfig(snapshot, PlatformUiClientType.WEB)).thenReturn(resolvedConfig);
@@ -369,6 +383,13 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.uiDescriptor()).isNotNull();
         assertThat(context.uiDescriptor().moduleKind()).isEqualTo(ModuleKind.DYNAMIC);
         assertThat(context.uiDescriptor().moduleAlias()).isEqualTo("crm.customer");
+        assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_list"))
+                .singleElement().satisfies(view -> {
+            ResolvedScopedListWorkspaceDescriptor workspace = view.scopedListWorkspace();
+            assertThat(workspace.scopeModuleAlias()).isEqualTo("base.product");
+            assertThat(workspace.scopeField()).isEqualTo("organizationId");
+            assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);
+        });
         assertThat(context.uiDescriptor().views()).extracting(ResolvedViewDescriptor::viewCode)
                 .containsExactly("customer_list", "customer_form");
         assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_list"))
@@ -376,14 +397,27 @@ class PlatformModuleRuntimeContextServiceTest {
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                     assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                            .containsExactly("name", "enabled");
+                            .containsExactly("name", "enabled", "createdAt", "storageBytes");
+                    assertThat(view.fields()).extracting(ResolvedViewFieldDescriptor::valueType)
+                            .containsExactly(FieldValueType.STRING, FieldValueType.BOOLEAN, FieldValueType.TIMESTAMP,
+                                    FieldValueType.LONG);
+                    assertThat(view.fields()).last().satisfies(field -> {
+                        assertThat(field.valuePresentation()).isEqualTo(FieldValuePresentation.FILE_SIZE);
+                        assertThat(field.uiType()).isNull();
+                    });
                 });
         assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_form"))
                 .singleElement()
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
-                    assertThat(view.fields()).singleElement()
-                            .satisfies(field -> assertThat(field.fieldRef().fieldId()).isEqualTo("field-name"));
+                    assertThat(view.fields()).extracting(field -> field.fieldRef().fieldId())
+                            .containsExactly("field-name", "field-organization");
+                    assertThat(view.fields()).last()
+                            .satisfies(field -> assertThat(field.reference())
+                                    .satisfies(reference -> {
+                                        assertThat(reference.targetModuleAlias()).isEqualTo("base.product");
+                                        assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+                                    }));
                 });
     }
 
@@ -782,11 +816,17 @@ class PlatformModuleRuntimeContextServiceTest {
     }
 
     private DynamicEntityDescriptor dynamicEntity(String entityAlias, String... capabilities) {
+        return dynamicEntity(entityAlias, List.of(), capabilities);
+    }
+
+    private DynamicEntityDescriptor dynamicEntity(String entityAlias,
+                                                  List<DynamicFieldDescriptor> fields,
+                                                  String... capabilities) {
         return new DynamicEntityDescriptor(
                 entityAlias,
                 entityAlias,
                 Set.of(capabilities),
-                List.of(),
+                fields,
                 List.of(),
                 List.of(),
                 List.of(),
@@ -834,6 +874,17 @@ class PlatformModuleRuntimeContextServiceTest {
                                                   String title,
                                                   String width,
                                                   String align) {
+        return resolvedField(uiConfigId, fieldId, relationAlias, fieldName, title, width, align, null);
+    }
+
+    private PlatformResolvedUiField resolvedField(String uiConfigId,
+                                                  String fieldId,
+                                                  String relationAlias,
+                                                  String fieldName,
+                                                  String title,
+                                                  String width,
+                                                  String align,
+                                                  String uiControlAlias) {
         return new PlatformResolvedUiField(
                 uiConfigId,
                 fieldId,
@@ -844,7 +895,7 @@ class PlatformModuleRuntimeContextServiceTest {
                 title,
                 "string",
                 "STORED",
-                null,
+                uiControlAlias,
                 true,
                 false,
                 false,

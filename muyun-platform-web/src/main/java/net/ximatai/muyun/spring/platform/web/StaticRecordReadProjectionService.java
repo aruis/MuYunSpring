@@ -187,12 +187,8 @@ public class StaticRecordReadProjectionService {
             return Optional.empty();
         }
         Class<?> modelClass = modelClass(moduleAlias, recordService);
-        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
-                RecordReadProjectionPostProcessor.applyStaticOutput(
-                modelClass,
-                projection,
-                page.getRecords(),
-                optionSourceRegistry), outputFieldNames(projection, modelClass));
+        List<Map<String, Object>> records = postProcessStaticOutput(
+                modelClass, projection, page.getRecords());
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -249,12 +245,8 @@ public class StaticRecordReadProjectionService {
             return Optional.empty();
         }
         Class<?> modelClass = modelClass(moduleAlias, recordService);
-        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
-                RecordReadProjectionPostProcessor.applyStaticOutput(
-                modelClass,
-                projection,
-                page.getRecords(),
-                optionSourceRegistry), outputFieldNames(projection, modelClass));
+        List<Map<String, Object>> records = postProcessStaticOutput(
+                modelClass, projection, page.getRecords());
         WebPageResponse<Map<String, Object>> response = new WebPageResponse<>(
                 records,
                 page.getTotal(),
@@ -381,6 +373,12 @@ public class StaticRecordReadProjectionService {
                 internal.add(path.sourceField());
             }
         }
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceSummaryPlan summary
+                : StaticReferenceResolver.summaryPlans(modelClass)) {
+            if (output.contains(summary.outputField()) && !output.contains(summary.sourceField())) {
+                internal.add(summary.sourceField());
+            }
+        }
         for (net.ximatai.muyun.spring.common.option.OptionLoadDefinition load
                 : OptionLoadResolver.resolve(modelClass)) {
             if (output.contains(load.outputField()) && !output.contains(load.sourceField())) {
@@ -400,9 +398,8 @@ public class StaticRecordReadProjectionService {
     private <T> WebPageResponse<T> projectResponse(WebPageResponse<T> response,
                                                    RecordReadProjection projection,
                                                    Class<?> modelClass) {
-        List<Map<String, Object>> records = ReferenceReadProjectionPostProcessor.apply(modelClass,
-                RecordReadProjectionProjector.projectWithInternalFields(response.records(), projection),
-                outputFieldNames(projection, modelClass));
+        List<Map<String, Object>> records = postProcessStaticOutput(modelClass, projection,
+                RecordReadProjectionProjector.projectWithInternalFields(response.records(), projection));
         return new WebPageResponse(
                 records,
                 response.total(),
@@ -412,5 +409,17 @@ public class StaticRecordReadProjectionService {
                 response.totalKnown(),
                 response.navigation()
         );
+    }
+
+    private List<Map<String, Object>> postProcessStaticOutput(Class<?> modelClass,
+                                                              RecordReadProjection projection,
+                                                              List<Map<String, Object>> records) {
+        return ReferenceReadProjectionPostProcessor.apply(modelClass,
+                RecordReadProjectionPostProcessor.applyStaticOutput(
+                        modelClass,
+                        projection,
+                        records,
+                        optionSourceRegistry),
+                outputFieldNames(projection, modelClass));
     }
 }
