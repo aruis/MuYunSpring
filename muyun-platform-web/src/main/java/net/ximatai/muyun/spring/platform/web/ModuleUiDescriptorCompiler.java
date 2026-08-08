@@ -45,9 +45,10 @@ public final class ModuleUiDescriptorCompiler {
                 ? new ModuleUiDefinition(definition.moduleAlias(), List.of(), List.of())
                 : definition.uiDefinition();
         validateFields(uiDefinition, definition.entities(), definition.moduleAlias(), readOutputFields(definition));
+        Map<String, ResolvedReferenceFieldDescriptor> referenceFields = staticReferenceFields(definition.modelClass());
         return new ModuleUiCompilationResult(
                 compileResolved(uiDefinition, ModuleKind.STATIC, definition.title(),
-                        staticOptionFields(definition.modelClass()), staticReferenceFields(definition.modelClass()),
+                        staticOptionFields(definition.modelClass()), referenceFields,
                         staticRecordLabelField(definition)),
                 readModel(definition, uiDefinition)
         );
@@ -109,6 +110,7 @@ public final class ModuleUiDescriptorCompiler {
                                                               Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                               Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
                                                               String defaultRecordLabelField) {
+        validateScopedListWorkspace(definition.scopedListWorkspace(), referenceFields, definition.moduleAlias());
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
@@ -120,8 +122,28 @@ public final class ModuleUiDescriptorCompiler {
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
                         .toList(),
-                defaultRecordLabelField
+                defaultRecordLabelField,
+                ResolvedScopedListWorkspaceDescriptor.from(definition.scopedListWorkspace())
         );
+    }
+
+    private static void validateScopedListWorkspace(ScopedListWorkspaceDefinition workspace,
+                                                    Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                    String moduleAlias) {
+        if (workspace == null) return;
+        ResolvedReferenceFieldDescriptor reference = referenceFields.get(workspace.scopeField());
+        if (reference == null) {
+            throw new IllegalArgumentException("scoped list workspace field must be a reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (reference.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE) {
+            throw new IllegalArgumentException("scoped list workspace field must be a single reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (!workspace.scopeModuleAlias().equals(reference.targetModuleAlias())) {
+            throw new IllegalArgumentException("scoped list workspace reference target must match scope module: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
     }
 
     private static ResolvedUiActionDescriptor compileAction(UiActionDefinition action) {

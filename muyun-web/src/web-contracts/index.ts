@@ -523,6 +523,17 @@ export interface ResolvedUiActionDescriptor {
   confirmation?: ResolvedUiActionConfirmationDescriptor;
 }
 
+export interface ResolvedScopedListWorkspaceDescriptor {
+  scopeModuleAlias: string;
+  scopeField: string;
+  queryCriteriaKey: string;
+  scopeTitle: string;
+  scopeSearchPlaceholder: string;
+  /** Scope list items only show a secondary label when the descriptor explicitly enables it. */
+  showScopeItemSubtitle: boolean;
+  createPolicy: 'REQUIRE_SCOPE' | 'ALLOW_UNSCOPED';
+}
+
 export interface ModuleUiDefinition {
   moduleAlias: string;
   views: ViewDefinition[];
@@ -536,6 +547,7 @@ export interface ResolvedModuleUiDescriptor {
   views: ResolvedViewDescriptor[];
   actions?: ResolvedUiActionDescriptor[];
   recordLabelField?: string;
+  scopedListWorkspace?: ResolvedScopedListWorkspaceDescriptor;
 }
 
 export interface StandardEntity {

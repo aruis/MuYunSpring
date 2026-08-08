@@ -49,7 +49,32 @@ public final class DynamicModuleUiDefinitionAdapter {
                     }
                     views.add(view(config, uiSet, viewKind, fieldsByConfig.get(config.getId())));
                 });
-        return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of());
+        return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of(), scopedListWorkspace(snapshot, uiSets));
+    }
+
+    private static ScopedListWorkspaceDefinition scopedListWorkspace(PlatformPageConfigSnapshot snapshot,
+                                                                      Map<String, PlatformUiSet> uiSets) {
+        List<PlatformUiConfig> configured = snapshot.uiConfigs().stream()
+                .filter(config -> Boolean.TRUE.equals(config.getPublished()))
+                .filter(config -> !Boolean.FALSE.equals(config.getEnabled()))
+                .filter(config -> config.getClientType() == PlatformUiClientType.WEB)
+                .filter(config -> uiSets.get(config.getUiSetId()) != null)
+                .filter(config -> uiSets.get(config.getUiSetId()).getSetType() == PlatformUiSetType.LIST)
+                .filter(config -> config.getScopeModuleAlias() != null && !config.getScopeModuleAlias().isBlank())
+                .toList();
+        if (configured.isEmpty()) return null;
+        if (configured.size() > 1) {
+            throw new IllegalArgumentException("dynamic module has multiple scoped list workspace declarations: "
+                    + snapshot.moduleAlias());
+        }
+        PlatformUiConfig config = configured.getFirst();
+        String createPolicy = config.getScopeCreatePolicy();
+        return new ScopedListWorkspaceDefinition(config.getScopeModuleAlias(), config.getScopeField(),
+                config.getScopeQueryCriteriaKey(), config.getScopeTitle(), config.getScopeSearchPlaceholder(),
+                Boolean.TRUE.equals(config.getScopeShowItemSubtitle()),
+                createPolicy == null || createPolicy.isBlank()
+                        ? ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED
+                        : ScopedListWorkspaceCreatePolicy.valueOf(createPolicy));
     }
 
     private static ViewDefinition view(PlatformUiConfig config,

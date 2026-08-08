@@ -102,6 +102,8 @@ const props = withDefaults(
     queryTemplateId?: string;
     ready?: boolean;
     externalQueryValues?: Record<string, unknown>;
+    /** Descriptor-owned external criteria that must be exposed by the query schema. */
+    requiredExternalCriteriaKeys?: string[];
     quickSearchPlaceholder?: string;
     emptyDescription?: string;
     waitingDescription?: string;
@@ -127,6 +129,7 @@ const props = withDefaults(
     queryTemplateId: undefined,
     ready: true,
     externalQueryValues: undefined,
+    requiredExternalCriteriaKeys: () => [],
     quickSearchPlaceholder: '搜索',
     emptyDescription: '暂无记录',
     waitingDescription: '请选择查询范围',
@@ -306,6 +309,17 @@ async function loadSchemaAndRecords() {
       return;
     }
     schema.value = nextSchema;
+    if (
+      props.requiredExternalCriteriaKeys.some(
+        (key) => !nextSchema.externalCriteria.some((criteria) => criteria.key === key),
+      )
+    ) {
+      descriptorLoadError.value = true;
+      records.value = [];
+      total.value = 0;
+      emit('loaded', []);
+      return;
+    }
     activeConditions.value = [];
     conditionsExpanded.value = false;
     resetConditionDrafts();

@@ -341,6 +341,9 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
         PlatformUiSet formSet = uiSet("set-form", "crm.customer", "customer_form", PlatformUiSetType.FORM);
         PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "客户列表");
+        listConfig.setScopeModuleAlias("base.product");
+        listConfig.setScopeField("organizationId");
+        listConfig.setScopeQueryCriteriaKey("organizationId");
         PlatformUiConfig formConfig = uiConfig("ui-form-web", "set-form", "客户表单");
         PlatformPageConfigSnapshot snapshot = new PlatformPageConfigSnapshot(
                 "crm.customer",
@@ -373,6 +376,11 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.uiDescriptor()).isNotNull();
         assertThat(context.uiDescriptor().moduleKind()).isEqualTo(ModuleKind.DYNAMIC);
         assertThat(context.uiDescriptor().moduleAlias()).isEqualTo("crm.customer");
+        assertThat(context.uiDescriptor().scopedListWorkspace()).satisfies(workspace -> {
+            assertThat(workspace.scopeModuleAlias()).isEqualTo("base.product");
+            assertThat(workspace.scopeField()).isEqualTo("organizationId");
+            assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);
+        });
         assertThat(context.uiDescriptor().views()).extracting(ResolvedViewDescriptor::viewCode)
                 .containsExactly("customer_list", "customer_form");
         assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_list"))

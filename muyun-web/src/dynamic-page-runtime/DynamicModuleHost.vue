@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import {
   ManagementExplorerColumn,
   ManagementWorkspace,
+  CrudRecordListExplorer,
   ModuleActionButton,
   RecordDetailPanel,
   RecordDetailFields,
@@ -20,11 +21,17 @@ import {
   providePageLayout,
   resolveRecordFormFields,
   type RecordFormFieldPickerConfig,
+  type RecordActionItem,
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
-import { createModuleContext, useModuleContext } from '@muyun/web-core';
+import type {
+  DynamicModulePageDescriptor,
+  MenuPageMode,
+  ResolvedScopedListWorkspaceDescriptor,
+  ResolvedViewDescriptor,
+} from '@muyun/web-contracts';
+import { createModuleContext, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import {
   canMutateDynamicModuleDetail,
   shouldCommitDynamicModuleDetailRequest,
@@ -56,6 +63,10 @@ const treeReloadKey = ref(0);
 const selectedTreeRecord = ref<QueryListRecord>();
 const treeSearchKeyword = ref('');
 const treeModule = ref(false);
+const scopedListWorkspace = ref<ResolvedScopedListWorkspaceDescriptor>();
+const selectedScopeRecord = ref<QueryListRecord>();
+const scopeSearchKeyword = ref('');
+const scopeReloadKey = ref(0);
 const saving = ref(false);
 const togglingEnabled = ref(false);
 const detailLoading = ref(false);
@@ -78,7 +89,33 @@ const unsupportedPageModeText = computed(() => `动态${pageMode.value}入口暂
 // Tree modules are discovered from runtime metadata. Once discovered, their
 // explorer/detail panes own the constrained work area instead of extending the
 // workbench tab's document flow.
-providePageLayout(computed(() => (treeModule.value ? 'workspace' : props.descriptor.layout)));
+providePageLayout(
+  computed(() => (treeModule.value || scopedListWorkspace.value ? 'workspace' : props.descriptor.layout)),
+);
+const scopeContext = computed<ModuleContext<QueryListRecord> | undefined>(() => {
+  const workspace = scopedListWorkspace.value;
+  return workspace
+    ? createModuleContext({ http: context.http, moduleAlias: workspace.scopeModuleAlias })
+    : undefined;
+});
+const scopeSelectionRequired = computed(() => scopedListWorkspace.value?.createPolicy === 'REQUIRE_SCOPE');
+const canCreateRecord = computed(
+  () => !scopeSelectionRequired.value || selectedScopeRecord.value?.id != null,
+);
+const scopedExternalQueryValues = computed<Record<string, unknown> | undefined>(() => {
+  const workspace = scopedListWorkspace.value;
+  const id = selectedScopeRecord.value?.id;
+  return workspace && id != null ? { [workspace.queryCriteriaKey]: id } : undefined;
+});
+const scopedListActions = computed<RecordActionItem[]>(() => [
+  {
+    key: 'create',
+    actionCode: 'create',
+    title: '新建',
+    primary: true,
+    disabled: !canCreateRecord.value,
+  },
+]);
 const canToggleEnabled = computed(() => {
   const record = selectedRecord.value;
   if (
@@ -132,6 +169,7 @@ async function loadRuntimeForm() {
   }
   const runtimeContext = await context.runtime.ready;
   treeModule.value = context.abilities.hasTree() === true;
+  scopedListWorkspace.value = runtimeContext.uiDescriptor?.scopedListWorkspace;
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
   formFields.value = resolveRecordFormFields(runtimeContext.uiDescriptor, view?.viewCode);
 }
@@ -152,6 +190,14 @@ function handleLoaded(records: QueryListRecord[]) {
 
 function selectRecord(record: QueryListRecord) {
   selectedRecord.value = record;
+}
+
+function selectScopeRecord(record: { id?: string }) {
+  if (selectedScopeRecord.value?.id === record.id) {
+    selectedScopeRecord.value = undefined;
+    return;
+  }
+  selectedScopeRecord.value = record as QueryListRecord;
 }
 
 function selectTreeRecord(record: unknown) {
@@ -213,10 +259,16 @@ function updateDraftField(
 }
 
 function createRecord(parentId?: string) {
+  if (scopeSelectionRequired.value && selectedScopeRecord.value?.id == null) return;
   detailLoadSequence += 1;
   detailLoading.value = false;
   detailLoadFailed.value = false;
-  editingRecord.value = parentId ? { parentId } : {};
+  const workspace = scopedListWorkspace.value;
+  editingRecord.value = parentId
+    ? { parentId }
+    : workspace && selectedScopeRecord.value?.id != null
+      ? { [workspace.scopeField]: selectedScopeRecord.value.id }
+      : {};
   editorMode.value = 'create';
   detailOpen.value = true;
 }
@@ -362,7 +414,50 @@ function recordTitle(record: QueryListRecord | undefined) {
     class="dynamic-module-workspace"
     :class="{ 'dynamic-module-workspace--tree': treeModule }"
   >
-    <ManagementWorkspace v-if="treeModule" class="dynamic-tree-workspace">
+    <ManagementWorkspace v-if="scopedListWorkspace && scopeContext" class="dynamic-tree-workspace">
+      <ManagementExplorerColumn>
+        <RecordExplorerPanel
+          :title="scopedListWorkspace.scopeTitle"
+          :refresh-title="`刷新${scopedListWorkspace.scopeTitle}列表`"
+          :search-keyword="scopeSearchKeyword"
+          :search-placeholder="scopedListWorkspace.scopeSearchPlaceholder"
+          @update:search-keyword="scopeSearchKeyword = $event"
+          @refresh="scopeReloadKey += 1"
+        >
+          <CrudRecordListExplorer
+            :context="scopeContext"
+            :selected-id="selectedScopeRecord?.id == null ? undefined : String(selectedScopeRecord.id)"
+            :reload-key="scopeReloadKey"
+            :keyword="scopeSearchKeyword"
+            :empty-description="`暂无${scopedListWorkspace.scopeTitle}`"
+            :subtitle-of="scopedListWorkspace.showScopeItemSubtitle ? undefined : () => undefined"
+            @select="selectScopeRecord"
+          />
+        </RecordExplorerPanel>
+      </ManagementExplorerColumn>
+      <RecordQueryListPanel
+        class="dynamic-list"
+        :context="context"
+        :title="title"
+        :selected-key="selectedRecord?.id"
+        :reload-key="reloadKey"
+        :actions="scopedListActions"
+        :standard-crud-row-actions="true"
+        :ui-config-id="listUiConfigId"
+        :query-template-id="descriptor.target.defaultQueryTemplateId"
+        :external-query-values="scopedExternalQueryValues"
+        :required-external-criteria-keys="[scopedListWorkspace.queryCriteriaKey]"
+        quick-search-placeholder="搜索动态记录"
+        empty-description="暂无动态记录"
+        @loaded="handleLoaded"
+        @select="selectRecord"
+        @row-dblclick="(record) => openRecord(record, 'view')"
+        @action="handleListAction"
+        @row-action="handleRowAction"
+      />
+    </ManagementWorkspace>
+
+    <ManagementWorkspace v-else-if="treeModule" class="dynamic-tree-workspace">
       <ManagementExplorerColumn>
         <RecordExplorerPanel
           :title="`${title}树`"

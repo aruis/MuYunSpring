@@ -1633,7 +1633,14 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
   assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);
   assert.match(hostSource, /treeModule\.value = context\.abilities\.hasTree\(\) === true/);
-  assert.match(hostSource, /<ManagementWorkspace v-if="treeModule"/);
+  assert.match(hostSource, /<ManagementWorkspace v-if="scopedListWorkspace && scopeContext"/);
+  assert.match(hostSource, /<ManagementWorkspace v-else-if="treeModule"/);
+  assert.match(hostSource, /<CrudRecordListExplorer/);
+  assert.match(hostSource, /:external-query-values="scopedExternalQueryValues"/);
+  assert.match(hostSource, /:required-external-criteria-keys="\[scopedListWorkspace\.queryCriteriaKey\]"/);
+  assert.match(hostSource, /selectedScopeRecord\.value\?\.id === record\.id/);
+  assert.match(hostSource, /disabled: !canCreateRecord\.value/);
+  assert.match(hostSource, /\[workspace\.scopeField\]: selectedScopeRecord\.value\.id/);
   assert.match(hostSource, /<TreeRecordExplorer/);
   assert.match(hostSource, /<RecordDetailPanel/);
   assert.match(hostSource, /<RecordMetaSection/);

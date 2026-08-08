@@ -8,7 +8,8 @@ import java.util.function.Consumer;
 
 public record ModuleUiDefinition(String moduleAlias,
                                  List<ViewDefinition> views,
-                                 List<UiActionDefinition> actions) {
+                                 List<UiActionDefinition> actions,
+                                 ScopedListWorkspaceDefinition scopedListWorkspace) {
     public ModuleUiDefinition {
         moduleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         views = views == null ? List.of() : List.copyOf(views);
@@ -16,7 +17,11 @@ public record ModuleUiDefinition(String moduleAlias,
     }
 
     public ModuleUiDefinition(String moduleAlias, List<ViewDefinition> views) {
-        this(moduleAlias, views, List.of());
+        this(moduleAlias, views, List.of(), null);
+    }
+
+    public ModuleUiDefinition(String moduleAlias, List<ViewDefinition> views, List<UiActionDefinition> actions) {
+        this(moduleAlias, views, actions, null);
     }
 
     public static Builder builder(String moduleAlias) {
@@ -27,6 +32,7 @@ public record ModuleUiDefinition(String moduleAlias,
         private final String moduleAlias;
         private final List<ViewDefinition> views = new ArrayList<>();
         private final List<UiActionDefinition> actions = new ArrayList<>();
+        private ScopedListWorkspaceDefinition scopedListWorkspace;
 
         private Builder(String moduleAlias) {
             this.moduleAlias = moduleAlias;
@@ -64,8 +70,25 @@ public record ModuleUiDefinition(String moduleAlias,
             return this;
         }
 
+        /** Uses {@code scopeField} as the standard external-query key. */
+        public Builder scopedListWorkspace(String scopeModuleAlias, String scopeField,
+                                           String scopeTitle, String scopeSearchPlaceholder) {
+            scopedListWorkspace = new ScopedListWorkspaceDefinition(scopeModuleAlias, scopeField,
+                    scopeTitle, scopeSearchPlaceholder);
+            return this;
+        }
+
+        public Builder scopedListWorkspace(String scopeModuleAlias, String scopeField, String queryCriteriaKey,
+                                           String scopeTitle, String scopeSearchPlaceholder,
+                                           boolean showScopeItemSubtitle,
+                                           ScopedListWorkspaceCreatePolicy createPolicy) {
+            scopedListWorkspace = new ScopedListWorkspaceDefinition(scopeModuleAlias, scopeField, queryCriteriaKey,
+                    scopeTitle, scopeSearchPlaceholder, showScopeItemSubtitle, createPolicy);
+            return this;
+        }
+
         public ModuleUiDefinition build() {
-            return new ModuleUiDefinition(moduleAlias, views, actions);
+            return new ModuleUiDefinition(moduleAlias, views, actions, scopedListWorkspace);
         }
     }
 }
