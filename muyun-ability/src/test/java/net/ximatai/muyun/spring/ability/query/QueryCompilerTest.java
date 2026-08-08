@@ -41,8 +41,8 @@ class QueryCompilerTest {
 
         assertThat(containsCondition(criteria, "enabled", true)).isTrue();
         assertThat(containsCondition(criteria, "departmentId", "dept-1")).isTrue();
-        assertThat(containsCondition(criteria, "code", "alice")).isTrue();
-        assertThat(containsCondition(criteria, "title", "alice")).isTrue();
+        assertThat(containsCondition(criteria, "code", "%alice%")).isTrue();
+        assertThat(containsCondition(criteria, "title", "%alice%")).isTrue();
         assertThat(sorts).hasSize(1);
         assertThat(sorts[0].getField()).isEqualTo("code");
         assertThat(sorts[0].getDirection()).isEqualTo(SortDirection.DESC);

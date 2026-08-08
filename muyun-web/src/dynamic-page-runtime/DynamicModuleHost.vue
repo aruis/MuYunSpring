@@ -1,17 +1,36 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
+  ManagementExplorerColumn,
+  ManagementWorkspace,
+  CrudRecordListExplorer,
+  ModuleActionButton,
+  RecordDetailPanel,
   RecordDetailFields,
+  RecordExplorerPanel,
   RecordFormFields,
+  RecordMetaSection,
   RecordModeDrawer,
+  RecordPanelButton,
+  RecordPanelState,
   RecordQueryListPanel,
+  RecordStatusSwitch,
+  TreeRecordExplorer,
   confirmAction,
+  parentRecordConstraints,
+  providePageLayout,
   resolveRecordFormFields,
+  type RecordFormFieldPickerConfig,
   type QueryListRecord,
   type RecordFormRecord,
 } from '@muyun/platform-components';
-import type { DynamicModulePageDescriptor, MenuPageMode, ResolvedViewDescriptor } from '@muyun/web-contracts';
-import { useModuleContext } from '@muyun/web-core';
+import type {
+  DynamicModulePageDescriptor,
+  MenuPageMode,
+  ResolvedViewDescriptor,
+  ScopedListWorkspaceDefinition,
+} from '@muyun/web-contracts';
+import { createModuleContext, useModuleContext, type ModuleContext } from '@muyun/web-core';
 import {
   canMutateDynamicModuleDetail,
   shouldCommitDynamicModuleDetailRequest,
@@ -37,10 +56,24 @@ const selectedRecord = ref<QueryListRecord>();
 const editingRecord = ref<QueryListRecord>();
 const editorMode = ref<'create' | 'edit' | 'view'>('view');
 const detailOpen = ref(false);
-const formViewCode = ref<string>();
 const formFields = ref(resolveRecordFormFields(undefined));
 const reloadKey = ref(0);
+const treeReloadKey = ref(0);
+const selectedTreeRecord = ref<QueryListRecord>();
+const treeSearchKeyword = ref('');
+const treeModule = ref(false);
+const scopedListWorkspace = ref<ScopedListWorkspaceDefinition>();
+const selectedScopeRecord = ref<QueryListRecord>();
+const scopeSearchKeyword = ref('');
+const scopeReloadKey = ref(0);
+const scopeContext = computed<ModuleContext<QueryListRecord> | undefined>(() => {
+  const definition = scopedListWorkspace.value;
+  return definition
+    ? createModuleContext({ http: context.http, moduleAlias: definition.scopeModuleAlias })
+    : undefined;
+});
 const saving = ref(false);
+const togglingEnabled = ref(false);
 const detailLoading = ref(false);
 const detailLoadFailed = ref(false);
 let detailLoadSequence = 0;
@@ -58,6 +91,56 @@ const listUiConfigId = computed(() =>
   isListPage.value ? props.descriptor.target.defaultUiConfigId : undefined,
 );
 const unsupportedPageModeText = computed(() => `动态${pageMode.value}入口暂未接入运行器`);
+// Tree modules are discovered from runtime metadata. Once discovered, their
+// explorer/detail panes own the constrained work area instead of extending the
+// workbench tab's document flow.
+providePageLayout(
+  computed(() => (treeModule.value || scopedListWorkspace.value ? 'workspace' : props.descriptor.layout)),
+);
+const canToggleEnabled = computed(() => {
+  const record = selectedRecord.value;
+  if (
+    !record?.id ||
+    editorMode.value !== 'view' ||
+    detailLoading.value ||
+    detailLoadFailed.value ||
+    togglingEnabled.value
+  ) {
+    return false;
+  }
+  return context.can(record.enabled === false ? 'enable' : 'disable') === true;
+});
+const treeParentPickerConfigs = computed<Record<string, RecordFormFieldPickerConfig>>(() => {
+  if (!treeModule.value || !formFields.value.has('parentId')) {
+    return {} as Record<string, RecordFormFieldPickerConfig>;
+  }
+  return {
+    parentId: {
+      context,
+      mode: 'tree',
+      placeholder: '根标签留空',
+      allowClear: true,
+      constraints: parentRecordConstraints(
+        editingRecord.value?.id == null ? undefined : String(editingRecord.value.id),
+      ),
+    },
+  };
+});
+const referencePickerConfigs = computed<Record<string, RecordFormFieldPickerConfig>>(() => {
+  const configs: Record<string, RecordFormFieldPickerConfig> = { ...treeParentPickerConfigs.value };
+  for (const field of formFields.value.values()) {
+    const reference = field.reference;
+    if (!reference || (field.uiType !== 'recordPicker' && field.uiType !== 'recordMultiPicker')) {
+      continue;
+    }
+    configs[field.fieldRef.fieldName] = {
+      context: createModuleContext({ http: context.http, moduleAlias: reference.targetModuleAlias }),
+      mode: 'tree',
+      allowClear: !field.required?.constant,
+    };
+  }
+  return configs;
+});
 
 onMounted(loadRuntimeForm);
 
@@ -66,8 +149,9 @@ async function loadRuntimeForm() {
     return;
   }
   const runtimeContext = await context.runtime.ready;
+  treeModule.value = context.abilities.hasTree() === true;
+  scopedListWorkspace.value = runtimeContext.uiDescriptor?.scopedListWorkspace;
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
-  formViewCode.value = view?.viewCode;
   formFields.value = resolveRecordFormFields(runtimeContext.uiDescriptor, view?.viewCode);
 }
 
@@ -87,6 +171,17 @@ function handleLoaded(records: QueryListRecord[]) {
 
 function selectRecord(record: QueryListRecord) {
   selectedRecord.value = record;
+}
+
+function selectTreeRecord(record: unknown) {
+  selectedTreeRecord.value = record as QueryListRecord;
+  void openRecord(selectedTreeRecord.value, 'view');
+}
+
+function handleTreeLoaded(records: unknown[]) {
+  if (selectedTreeRecord.value || editorMode.value !== 'view') return;
+  const firstRecord = records.at(0);
+  if (firstRecord) selectTreeRecord(firstRecord);
 }
 
 async function openRecord(record: QueryListRecord, mode: 'edit' | 'view') {
@@ -136,13 +231,32 @@ function updateDraftField(
   };
 }
 
-function createRecord() {
+function createRecord(parentId?: string) {
+  if (scopedListWorkspace.value && !selectedScopeRecord.value?.id) return;
   detailLoadSequence += 1;
   detailLoading.value = false;
   detailLoadFailed.value = false;
-  editingRecord.value = {};
+  const scope = scopedListWorkspace.value;
+  editingRecord.value = parentId
+    ? { parentId }
+    : scope && selectedScopeRecord.value?.id
+      ? { [scope.scopeField]: selectedScopeRecord.value.id }
+      : {};
   editorMode.value = 'create';
   detailOpen.value = true;
+}
+
+function createRootRecord() {
+  createRecord();
+}
+
+function createChildRecord() {
+  const parentId = selectedRecord.value?.id == null ? undefined : String(selectedRecord.value.id);
+  if (parentId) createRecord(parentId);
+}
+
+function selectScopeRecord(record: unknown) {
+  selectedScopeRecord.value = record as QueryListRecord;
 }
 
 async function editRecord(record: QueryListRecord) {
@@ -170,9 +284,13 @@ async function saveRecord() {
         ? await context.crud.update(id, record)
         : await context.crud.insert(record);
     selectedRecord.value = result.record;
+    if (treeModule.value) {
+      selectedTreeRecord.value = result.record;
+    }
     editingRecord.value = result.record;
     editorMode.value = 'view';
     reloadKey.value += 1;
+    treeReloadKey.value += 1;
   } finally {
     saving.value = false;
   }
@@ -196,8 +314,33 @@ async function deleteRecord(record: QueryListRecord) {
   if (selectedRecord.value?.id === id) {
     selectedRecord.value = undefined;
     editingRecord.value = undefined;
+    selectedTreeRecord.value = undefined;
   }
   reloadKey.value += 1;
+  treeReloadKey.value += 1;
+}
+
+async function toggleEnabled() {
+  const record = selectedRecord.value;
+  const id = record?.id == null ? undefined : String(record.id);
+  const version = typeof record?.version === 'number' ? record.version : undefined;
+  if (!record || !id || version === undefined || !canToggleEnabled.value) return;
+
+  togglingEnabled.value = true;
+  try {
+    if (record.enabled === false) {
+      await context.crud.enable(id, { version });
+    } else {
+      await context.crud.disable(id, { version });
+    }
+    const refreshed = await context.crud.view(id);
+    selectedRecord.value = refreshed;
+    editingRecord.value = refreshed;
+    reloadKey.value += 1;
+    treeReloadKey.value += 1;
+  } finally {
+    togglingEnabled.value = false;
+  }
 }
 
 function handleListAction(action: { key?: string }) {
@@ -220,6 +363,16 @@ function closeDetail() {
   editingRecord.value = selectedRecord.value;
 }
 
+function closeTreeCardEditor() {
+  if (saving.value) return;
+  detailLoadSequence += 1;
+  detailLoading.value = false;
+  detailLoadFailed.value = false;
+  detailOpen.value = false;
+  editorMode.value = 'view';
+  editingRecord.value = selectedRecord.value;
+}
+
 function retryLoadDetail() {
   const record = selectedRecord.value;
   if (!record || editorMode.value === 'create') return;
@@ -233,8 +386,175 @@ function recordTitle(record: QueryListRecord | undefined) {
 </script>
 
 <template>
-  <section v-if="isListPage" class="dynamic-module-workspace">
+  <section
+    v-if="isListPage"
+    class="dynamic-module-workspace"
+    :class="{ 'dynamic-module-workspace--tree': treeModule }"
+  >
+    <ManagementWorkspace v-if="scopedListWorkspace && scopeContext" class="dynamic-tree-workspace">
+      <ManagementExplorerColumn>
+        <RecordExplorerPanel
+          :title="scopedListWorkspace.scopeTitle"
+          :refresh-title="`刷新${scopedListWorkspace.scopeTitle}列表`"
+          :search-keyword="scopeSearchKeyword"
+          :search-placeholder="scopedListWorkspace.scopeSearchPlaceholder"
+          @update:search-keyword="scopeSearchKeyword = $event"
+          @refresh="scopeReloadKey += 1"
+        >
+          <CrudRecordListExplorer
+            :context="scopeContext"
+            :selected-id="selectedScopeRecord?.id == null ? undefined : String(selectedScopeRecord.id)"
+            :reload-key="scopeReloadKey"
+            :keyword="scopeSearchKeyword"
+            :empty-description="`暂无${scopedListWorkspace.scopeTitle}`"
+            @select="selectScopeRecord"
+          />
+        </RecordExplorerPanel>
+      </ManagementExplorerColumn>
+      <RecordQueryListPanel
+        class="dynamic-list"
+        :context="context"
+        :title="title"
+        :selected-key="selectedRecord?.id"
+        :reload-key="reloadKey"
+        :ready="Boolean(selectedScopeRecord?.id)"
+        :external-query-values="{ [scopedListWorkspace.scopeField]: selectedScopeRecord?.id }"
+        :standard-crud-actions="true"
+        :standard-crud-row-actions="true"
+        :ui-config-id="listUiConfigId"
+        :query-template-id="descriptor.target.defaultQueryTemplateId"
+        quick-search-placeholder="搜索设备编码"
+        :empty-description="`当前${scopedListWorkspace.scopeTitle}暂无记录`"
+        :waiting-description="`请先选择${scopedListWorkspace.scopeTitle}`"
+        @loaded="handleLoaded"
+        @select="selectRecord"
+        @row-dblclick="(record) => openRecord(record, 'view')"
+        @action="handleListAction"
+        @row-action="handleRowAction"
+      />
+    </ManagementWorkspace>
+
+    <ManagementWorkspace v-else-if="treeModule" class="dynamic-tree-workspace">
+      <ManagementExplorerColumn>
+        <RecordExplorerPanel
+          :title="`${title}树`"
+          :refresh-title="`刷新${title}树`"
+          :search-keyword="treeSearchKeyword"
+          search-placeholder="搜索树节点"
+          @update:search-keyword="treeSearchKeyword = $event"
+          @refresh="treeReloadKey += 1"
+        >
+          <template #actions>
+            <ModuleActionButton
+              class="record-panel-create-button"
+              :context="context"
+              action-code="create"
+              icon-only
+              title="新建根节点"
+              @click="createRootRecord"
+            />
+          </template>
+          <TreeRecordExplorer
+            :context="context"
+            :selected-id="selectedTreeRecord?.id == null ? undefined : String(selectedTreeRecord.id)"
+            :reload-key="treeReloadKey"
+            :keyword="treeSearchKeyword"
+            search-mode="none"
+            search-trigger="external"
+            empty-description="暂无记录"
+            @select="selectTreeRecord"
+            @loaded="handleTreeLoaded"
+          />
+        </RecordExplorerPanel>
+      </ManagementExplorerColumn>
+
+      <RecordDetailPanel class="dynamic-tree-card" :title="detailTitle">
+        <template #actions>
+          <template v-if="editorMode !== 'view'">
+            <RecordPanelButton :disabled="saving" @click="closeTreeCardEditor">取消</RecordPanelButton>
+            <RecordPanelButton
+              type="primary"
+              :loading="saving"
+              :disabled="
+                detailLoading ||
+                detailLoadFailed ||
+                context.can(editorMode === 'create' ? 'create' : 'update') !== true
+              "
+              @click="saveRecord"
+            >
+              {{ saving ? '保存中' : '保存' }}
+            </RecordPanelButton>
+          </template>
+          <template v-else>
+            <ModuleActionButton
+              :context="context"
+              action-code="create"
+              :disabled="!selectedRecord"
+              @click="createChildRecord"
+            >
+              新建子项
+            </ModuleActionButton>
+            <ModuleActionButton
+              :context="context"
+              action-code="update"
+              :disabled="!selectedRecord"
+              @click="selectedRecord && editRecord(selectedRecord)"
+            >
+              编辑
+            </ModuleActionButton>
+            <ModuleActionButton
+              :context="context"
+              action-code="delete"
+              :loading="saving"
+              danger
+              :disabled="!selectedRecord"
+              @click="selectedRecord && deleteRecord(selectedRecord)"
+            >
+              删除
+            </ModuleActionButton>
+          </template>
+        </template>
+        <template #status>
+          <RecordStatusSwitch
+            v-if="editorMode === 'view' && selectedRecord"
+            :enabled="selectedRecord.enabled !== false"
+            :disabled="!canToggleEnabled"
+            :loading="togglingEnabled"
+            :show-label="false"
+            @change="toggleEnabled"
+          />
+        </template>
+
+        <RecordPanelState
+          v-if="!selectedRecord && editorMode === 'view'"
+          description="请选择标签，或新建根标签"
+        />
+        <RecordPanelState v-else-if="detailLoading" loading loading-tip="加载记录详情" description="" />
+        <RecordPanelState v-else-if="detailLoadFailed" description="详情加载失败，请重新选择标签" />
+        <template v-else-if="editingRecord">
+          <RecordDetailFields
+            v-if="editorMode === 'view'"
+            :record="editingRecord as RecordFormRecord"
+            :fields="formFields"
+            :exclude-field-names="['enabled']"
+          />
+          <RecordFormFields
+            v-else
+            class="dynamic-form"
+            :record="editingRecord as RecordFormRecord"
+            :fields="formFields"
+            :option-context="context"
+            :picker-configs="referencePickerConfigs"
+            :exclude-field-names="['enabled']"
+            @update:field="updateDraftField"
+          />
+          <RecordMetaSection v-if="editorMode !== 'create'" :record="editingRecord" show-sort-order />
+        </template>
+      </RecordDetailPanel>
+    </ManagementWorkspace>
+
     <RecordQueryListPanel
+      v-else
       class="dynamic-list"
       :context="context"
       :title="title"
@@ -254,9 +574,9 @@ function recordTitle(record: QueryListRecord | undefined) {
     />
 
     <RecordModeDrawer
+      v-if="!treeModule"
       :open="detailOpen"
       :title="detailTitle"
-      :subtitle="formViewCode"
       :mode="editorMode"
       :loading="detailLoading"
       :load-failed="detailLoadFailed"
@@ -270,11 +590,22 @@ function recordTitle(record: QueryListRecord | undefined) {
       @edit="selectedRecord && editRecord(selectedRecord)"
       @save="saveRecord"
     >
+      <template #status>
+        <RecordStatusSwitch
+          v-if="editorMode === 'view' && selectedRecord"
+          :enabled="selectedRecord.enabled !== false"
+          :disabled="!canToggleEnabled"
+          :loading="togglingEnabled"
+          :show-label="false"
+          @change="toggleEnabled"
+        />
+      </template>
       <template #view>
         <RecordDetailFields
           v-if="editingRecord"
           :record="editingRecord as RecordFormRecord"
           :fields="formFields"
+          :exclude-field-names="['enabled']"
         />
       </template>
       <template #form>
@@ -284,6 +615,8 @@ function recordTitle(record: QueryListRecord | undefined) {
           :record="editingRecord as RecordFormRecord"
           :fields="formFields"
           :option-context="context"
+          :picker-configs="referencePickerConfigs"
+          :exclude-field-names="['enabled']"
           @update:field="updateDraftField"
         />
       </template>
@@ -301,8 +634,34 @@ function recordTitle(record: QueryListRecord | undefined) {
   min-height: calc(100vh - 116px);
 }
 
+/*
+ * Tree metadata is loaded at runtime, so this boundary cannot be declared by
+ * the menu descriptor. Keep the workbench tab fixed and let the explorer and
+ * detail panels manage their own vertical scroll areas.
+ */
+.dynamic-module-workspace--tree {
+  height: 100%;
+  min-height: 0;
+}
+
 .dynamic-list {
   min-width: 0;
+}
+
+.dynamic-tree-workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.dynamic-tree-card {
+  min-width: 0;
+}
+
+.dynamic-tree-workspace :deep(.record-panel-create-button) {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
 }
 
 .dynamic-form {
@@ -333,6 +692,16 @@ function recordTitle(record: QueryListRecord | undefined) {
 }
 
 @media (max-width: 720px) {
+  .dynamic-module-workspace--tree {
+    height: auto;
+    min-height: calc(100vh - 116px);
+  }
+
+  .dynamic-tree-workspace {
+    height: auto;
+    min-height: 0;
+  }
+
   .dynamic-form {
     grid-template-columns: 1fr;
   }

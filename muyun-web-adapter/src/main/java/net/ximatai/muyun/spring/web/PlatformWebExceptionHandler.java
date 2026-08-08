@@ -138,6 +138,13 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<PlatformWebError> handleUnexpected(Exception exception) {
+        var databaseViolation = DatabaseConstraintViolationResolver.resolve(exception);
+        if (databaseViolation.isPresent()) {
+            var violation = databaseViolation.get();
+            log.warn("Database constraint violation, traceId={}, endpointId={}",
+                    MDC.get("traceId"), MDC.get("endpointId"));
+            return badRequest(violation.message(), violation.targets());
+        }
         PlatformWebError error = PlatformWebError.of(PlatformErrorCodes.INTERNAL_ERROR, 500,
                 "系统暂时不可用，请稍后重试");
         log.error("Unhandled platform web exception, traceId={}, endpointId={}",

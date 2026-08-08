@@ -75,7 +75,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataViewField.class, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiControlAlias", "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataViewField.class, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiControlAlias", "readOnly", "requiredOverride", "columnSpan", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
@@ -117,7 +117,8 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                 viewField.getControlType(),
                 viewField.getFieldUiControlAlias(),
                 viewField.getReadOnly(),
-                viewField.getRequiredOverride()
+                viewField.getRequiredOverride(),
+                normalizedColumnSpan(viewField.getColumnSpan())
         );
     }
 
@@ -140,6 +141,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         if (viewField.getReadOnly() == null) {
             viewField.setReadOnly(Boolean.FALSE);
         }
+        viewField.setColumnSpan(normalizedColumnSpan(viewField.getColumnSpan()));
         if (viewField.getFieldUiControlAlias() != null && !viewField.getFieldUiControlAlias().isBlank()) {
             viewField.setFieldUiControlAlias(PlatformNameRules.requireIdentifier(
                     viewField.getFieldUiControlAlias(), "fieldUiControlAlias"));
@@ -158,6 +160,14 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                         .eq("viewId", viewField.getViewId())
                         .eq("metadataFieldId", viewField.getMetadataFieldId()),
                 "metadata view field must be unique in view: " + viewField.getMetadataFieldId());
+    }
+
+    private int normalizedColumnSpan(Integer value) {
+        int columnSpan = value == null ? 1 : value;
+        if (columnSpan < 1 || columnSpan > 2) {
+            throw new PlatformException("Metadata view field columnSpan must be between 1 and 2");
+        }
+        return columnSpan;
     }
 
     private void validateUiTypeCompatibility(MetadataField field, FieldUiControl fieldUiType) {

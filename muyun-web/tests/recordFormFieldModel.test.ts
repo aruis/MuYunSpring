@@ -57,6 +57,7 @@ test('record form field state resolves descriptor facts with fallback control me
     readOnly: false,
     visible: true,
     controlType: 'input',
+    columnSpan: 1,
     hasOption: false,
     pickerConfig: undefined,
     placeholder: '请输入名称',
@@ -86,6 +87,7 @@ test('record form field state resolves select options from fallback metadata', (
     readOnly: false,
     visible: true,
     controlType: 'select',
+    columnSpan: 1,
     hasOption: false,
     pickerConfig: undefined,
     placeholder: undefined,
@@ -102,6 +104,30 @@ test('record form field state preserves a descriptor switch as a generic boolean
   ]);
 
   assert.equal(resolveRecordFormFieldState('completed', { fields }).controlType, 'switch');
+});
+
+test('record form field state renders a textarea descriptor as a text area', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['remark', field('备注', { uiType: 'textarea' })],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('remark', { fields }).controlType, 'textarea');
+});
+
+test('record form field state renders a color picker descriptor with the shared color control', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['color', field('颜色', { uiType: 'colorPicker' })],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('color', { fields }).controlType, 'colorPicker');
+});
+
+test('record form field state exposes a full-row layout span from its descriptor', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['remark', { ...field('备注', { uiType: 'textarea' }), columnSpan: 2 }],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('remark', { fields }).columnSpan, 2);
 });
 
 test('record form field state makes resolved option fields into selects without page fallback metadata', () => {
@@ -126,6 +152,7 @@ test('record form field state makes resolved option fields into selects without 
     readOnly: false,
     visible: true,
     controlType: 'select',
+    columnSpan: 1,
     hasOption: true,
     optionSelectionMode: 'SINGLE',
     optionTitleField: 'genderTitle',

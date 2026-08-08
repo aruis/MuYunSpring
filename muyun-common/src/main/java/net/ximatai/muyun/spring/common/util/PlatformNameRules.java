@@ -5,7 +5,8 @@ public final class PlatformNameRules {
     public static final int MODULE_ALIAS_MAX_LENGTH = 128;
 
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
-    private static final String CODE_PATTERN = "[A-Za-z0-9][A-Za-z0-9_\\-]{0,62}";
+    /** Codes may be hierarchical (for example {@code Asia/Shanghai}) while remaining URL-safe. */
+    private static final String CODE_PATTERN = "[A-Za-z0-9][A-Za-z0-9_\\-/]{0,62}";
     private static final String FIELD_NAME_PATTERN = "[a-z][A-Za-z0-9]{0,62}";
     private static final String MODULE_ALIAS_SEGMENT_PATTERN = IDENTIFIER_PATTERN;
     private static final String MODULE_ALIAS_PATTERN = MODULE_ALIAS_SEGMENT_PATTERN

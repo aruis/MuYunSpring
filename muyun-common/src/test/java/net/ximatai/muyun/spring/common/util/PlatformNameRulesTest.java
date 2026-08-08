@@ -29,6 +29,8 @@ class PlatformNameRulesTest {
         assertThat(PlatformNameRules.requireCode("active", "dictionaryItemCode")).isEqualTo("active");
         assertThat(PlatformNameRules.requireCode("1", "dictionaryItemCode")).isEqualTo("1");
         assertThat(PlatformNameRules.requireCode("A-01", "measureUnitCode")).isEqualTo("A-01");
+        assertThat(PlatformNameRules.requireCode("Asia/Shanghai", "dictionaryItemCode"))
+                .isEqualTo("Asia/Shanghai");
         assertThat(PlatformNameRules.requireActionCode("item_create", "actionCode")).isEqualTo("item_create");
         assertThat(PlatformNameRules.requireDatabaseName("crm_customer", "tableName")).isEqualTo("crm_customer");
 

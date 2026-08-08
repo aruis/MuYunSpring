@@ -5,8 +5,9 @@ import net.ximatai.muyun.spring.common.option.DictionaryField;
 import net.ximatai.muyun.spring.common.option.OptionLoad;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
-import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceHop;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLoad;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -30,7 +31,7 @@ class ModuleUiDescriptorCompilerTest {
                 .formView(form -> form
                         .title("职员档案")
                         .field("organizationId", field -> field.label("所属机构").required().readOnly())
-                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker")))
+                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker").columnSpan(2)))
                 .build();
 
         ResolvedModuleUiDescriptor descriptor = ModuleUiDescriptorCompiler.compile(definition);
@@ -61,7 +62,10 @@ class ModuleUiDescriptorCompilerTest {
                                 assertThat(field.readOnly().constant()).isTrue();
                             });
                     assertThat(view.fields()).last()
-                            .satisfies(field -> assertThat(field.uiType()).isEqualTo("recordPicker"));
+                            .satisfies(field -> {
+                                assertThat(field.uiType()).isEqualTo("recordPicker");
+                                assertThat(field.columnSpan()).isEqualTo(2);
+                            });
                 });
     }
 
@@ -173,6 +177,36 @@ class ModuleUiDescriptorCompilerTest {
         assertThat(result.readModel().fields()).filteredOn(ResolvedModuleReadField::platformManaged)
                 .extracting(ResolvedModuleReadField::fieldName)
                 .containsExactly("customerTitle", "customerLevel");
+    }
+
+    @Test
+    void shouldPublishTheCompleteModuleAliasForStaticReferenceFields() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
+                .formView(form -> form
+                        .field("customerId", field -> field.label("客户"))
+                        .field("tagIds", field -> field.label("标签")))
+                .build();
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
+                .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
+                        List.of(FieldDefinition.string("customerId", "客户"),
+                                FieldDefinition.string("tagIds", "标签")))))
+                .uiDefinition(uiDefinition)
+                .modelClass(ReferenceOrder.class)
+                .build();
+
+        List<ResolvedViewFieldDescriptor> fields = ModuleUiDescriptorCompiler.compile(definition).views().getFirst()
+                .fields();
+
+        assertThat(fields.getFirst().reference())
+                .satisfies(reference -> {
+                    assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
+                    assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+                });
+        assertThat(fields.get(1).reference())
+                .satisfies(reference -> {
+                    assertThat(reference.targetModuleAlias()).isEqualTo("crm.tag");
+                    assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.MANY);
+                });
     }
 
     @Test
@@ -289,6 +323,9 @@ class ModuleUiDescriptorCompilerTest {
     private static final class ReferenceOrder {
         @ReferenceTo(moduleAlias = "crm", entityAlias = "customer")
         private String customerId;
+
+        @ReferenceTo(moduleAlias = "crm", entityAlias = "tag", cardinality = ReferenceCardinality.MANY)
+        private Set<String> tagIds;
 
         @ReferenceLoad(source = "customerId", field = "title")
         private transient String customerTitle;

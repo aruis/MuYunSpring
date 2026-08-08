@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.dictionary.PlatformTimeZoneDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
@@ -85,6 +86,14 @@ public class MuYunSpringBootstrapConfiguration {
     DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations(DictionaryCategoryService categoryService,
                                                                         DictionaryItemService itemService) {
         return new DictionaryInitialDataDeclarations(categoryService, itemService);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(PlatformTimeZoneDictionaryInitialDataDeclarationProvider.class)
+    /** Registers the IANA time-zone baseline as platform data shared by every application. */
+    PlatformTimeZoneDictionaryInitialDataDeclarationProvider platformTimeZoneDictionaryInitialDataDeclarationProvider(
+            DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations) {
+        return new PlatformTimeZoneDictionaryInitialDataDeclarationProvider(dictionaryInitialDataDeclarations);
     }
 
     @Bean

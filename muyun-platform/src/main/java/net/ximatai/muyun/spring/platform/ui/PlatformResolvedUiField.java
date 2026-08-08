@@ -17,7 +17,31 @@ public record PlatformResolvedUiField(
         String placeholder,
         String defaultValue,
         Integer width,
+        Integer columnSpan,
         String align,
         PlatformUiFixedPosition fixedPosition
 ) {
+    /** Source-compatible constructor for UI projections created before column spans were introduced. */
+    public PlatformResolvedUiField(String uiConfigId,
+                                   String moduleMetadataFieldId,
+                                   String relationAlias,
+                                   String metadataAlias,
+                                   String fieldName,
+                                   String columnName,
+                                   String fieldTitle,
+                                   String fieldSpecAlias,
+                                   String fieldForm,
+                                   String fieldUiControlAlias,
+                                   Boolean visible,
+                                   Boolean readOnly,
+                                   Boolean requiredOverride,
+                                   String placeholder,
+                                   String defaultValue,
+                                   Integer width,
+                                   String align,
+                                   PlatformUiFixedPosition fixedPosition) {
+        this(uiConfigId, moduleMetadataFieldId, relationAlias, metadataAlias, fieldName, columnName, fieldTitle,
+                fieldSpecAlias, fieldForm, fieldUiControlAlias, visible, readOnly, requiredOverride, placeholder,
+                defaultValue, width, 1, align, fixedPosition);
+    }
 }

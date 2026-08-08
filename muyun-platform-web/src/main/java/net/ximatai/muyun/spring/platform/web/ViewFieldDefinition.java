@@ -7,6 +7,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
                                   UiRule<Boolean> readOnly,
                                   String uiType,
                                   String width,
+                                  Integer columnSpan,
                                   String align,
                                   Boolean fixed) {
     public ViewFieldDefinition {
@@ -19,6 +20,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         readOnly = readOnly == null ? UiRule.constant(Boolean.FALSE) : readOnly;
         uiType = uiType == null || uiType.isBlank() ? null : uiType.trim();
         width = width == null || width.isBlank() ? null : width.trim();
+        columnSpan = columnSpan == null ? 1 : requireColumnSpan(columnSpan);
         align = align == null || align.isBlank() ? null : align.trim();
     }
 
@@ -38,6 +40,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         private UiRule<Boolean> readOnly = UiRule.constant(Boolean.FALSE);
         private String uiType;
         private String width;
+        private Integer columnSpan = 1;
         private String align;
         private Boolean fixed;
 
@@ -80,6 +83,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
             return this;
         }
 
+        /** Sets the field's span in the standard two-column form and detail grid. */
+        public Builder columnSpan(int columnSpan) {
+            this.columnSpan = columnSpan;
+            return this;
+        }
+
         public Builder align(String align) {
             this.align = align;
             return this;
@@ -92,7 +101,14 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public ViewFieldDefinition build() {
             return new ViewFieldDefinition(fieldRef, label, visible, required, readOnly,
-                    uiType, width, align, fixed);
+                    uiType, width, columnSpan, align, fixed);
         }
+    }
+
+    private static int requireColumnSpan(int value) {
+        if (value < 1 || value > 2) {
+            throw new IllegalArgumentException("columnSpan must be between 1 and 2");
+        }
+        return value;
     }
 }

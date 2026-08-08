@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
@@ -330,7 +331,9 @@ class PlatformModuleRuntimeContextServiceTest {
                 "客户",
                 "customer",
                 List.of(dynamicAction(PlatformAction.QUERY), dynamicAction(PlatformAction.CREATE)),
-                List.of(dynamicEntity("customer", "CRUD")),
+                List.of(dynamicEntity("customer", List.of(
+                        DynamicFieldDescriptor.from(FieldDefinition.string("organizationId", "所属机构"),
+                                dynamicReference("customer", "organizationId"))), "CRUD")),
                 List.of(),
                 List.of(),
                 List.of()
@@ -350,7 +353,8 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformResolvedPageConfig resolvedConfig = new PlatformResolvedPageConfig(List.of(
                 resolvedField("ui-list-web", "field-name", null, "name", "客户名称", "160", "left"),
                 resolvedField("ui-list-web", "field-enabled", null, "enabled", "启用状态", "120", "center"),
-                resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null)
+                resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null),
+                resolvedField("ui-form-web", "field-organization", null, "organizationId", "所属机构", null, null)
         ), List.of());
         when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot);
         when(bootstrapService.resolveConfig(snapshot, PlatformUiClientType.WEB)).thenReturn(resolvedConfig);
@@ -382,8 +386,14 @@ class PlatformModuleRuntimeContextServiceTest {
                 .singleElement()
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
-                    assertThat(view.fields()).singleElement()
-                            .satisfies(field -> assertThat(field.fieldRef().fieldId()).isEqualTo("field-name"));
+                    assertThat(view.fields()).extracting(field -> field.fieldRef().fieldId())
+                            .containsExactly("field-name", "field-organization");
+                    assertThat(view.fields()).last()
+                            .satisfies(field -> assertThat(field.reference())
+                                    .satisfies(reference -> {
+                                        assertThat(reference.targetModuleAlias()).isEqualTo("base.product");
+                                        assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+                                    }));
                 });
     }
 
@@ -782,11 +792,17 @@ class PlatformModuleRuntimeContextServiceTest {
     }
 
     private DynamicEntityDescriptor dynamicEntity(String entityAlias, String... capabilities) {
+        return dynamicEntity(entityAlias, List.of(), capabilities);
+    }
+
+    private DynamicEntityDescriptor dynamicEntity(String entityAlias,
+                                                  List<DynamicFieldDescriptor> fields,
+                                                  String... capabilities) {
         return new DynamicEntityDescriptor(
                 entityAlias,
                 entityAlias,
                 Set.of(capabilities),
-                List.of(),
+                fields,
                 List.of(),
                 List.of(),
                 List.of(),

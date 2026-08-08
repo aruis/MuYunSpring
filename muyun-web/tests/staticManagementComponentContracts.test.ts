@@ -736,6 +736,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(indexSource, /resolveRecordFormFieldNames/);
   assert.match(indexSource, /resolveRecordFormFieldState/);
   assert.match(formFieldsSource, /RecordStatusSwitch/);
+  assert.match(formFieldsSource, /record-form-field-full-row/);
   assert.match(formFieldsSource, /RecordPicker/);
   assert.match(formFieldsSource, /pickerConfigs\?: Record<string, RecordFormFieldPickerConfig>/);
   assert.match(formFieldsSource, /fieldNames\?: string\[\]/);
@@ -1620,16 +1621,40 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /:edit-available/);
   assert.match(hostSource, /:save-available/);
   assert.match(hostSource, /<RecordFormFields/);
+  assert.match(hostSource, /RecordStatusSwitch/);
+  assert.match(hostSource, /<template #status>/);
+  assert.match(hostSource, /context\.crud\.enable\(id, \{ version \}\)/);
+  assert.match(hostSource, /context\.crud\.disable\(id, \{ version \}\)/);
+  assert.match(hostSource, /:exclude-field-names="\['enabled'\]"/);
   assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
   assert.match(hostSource, /isListPage/);
   assert.match(hostSource, /listUiConfigId/);
   assert.match(hostSource, /:ui-config-id="listUiConfigId"/);
   assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
   assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);
-  assert.doesNotMatch(hostSource, /<RecordDetailPanel/);
+  assert.match(hostSource, /treeModule\.value = context\.abilities\.hasTree\(\) === true/);
+  assert.match(hostSource, /<ManagementWorkspace v-else-if="treeModule"/);
+  assert.match(hostSource, /<CrudRecordListExplorer/);
+  assert.match(hostSource, /scopedListWorkspace/);
+  assert.match(hostSource, /<TreeRecordExplorer/);
+  assert.match(hostSource, /<RecordDetailPanel/);
+  assert.match(hostSource, /<RecordMetaSection/);
+  assert.match(hostSource, /<ModuleActionButton/);
+  assert.match(hostSource, /<RecordPanelState/);
+  assert.match(hostSource, /v-if="!treeModule"/);
+  assert.doesNotMatch(hostSource, /formViewCode/);
+  assert.doesNotMatch(hostSource, /:subtitle=/);
   assert.doesNotMatch(hostSource, /<button/);
   assert.doesNotMatch(hostSource, /@muyun\/vue-ui-antdv/);
   assert.doesNotMatch(hostSource, /等待接入页面 bootstrap 与列表查询/);
+});
+
+test('color picker prevents every mutation path while disabled', () => {
+  const colorPickerSource = readSource('src/vue-ui-antdv/components/UiColorPicker.vue');
+
+  assert.match(colorPickerSource, /if \(props\.disabled\) \{[\s\S]*return;/);
+  assert.match(colorPickerSource, /:trigger="props\.disabled \? \[\] : 'click'"/);
+  assert.match(colorPickerSource, /:disabled="props\.disabled"/);
 });
 
 test('consumer surface exposes basic adapter controls for business App composition', () => {
