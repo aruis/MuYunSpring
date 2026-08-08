@@ -203,6 +203,52 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldResolveLayoutBlocksOnlyFromTheEntrySelectedUiConfig() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String primarySetId = uiSetService.insert(uiSet("crm.customer", "primary", PlatformUiSetType.LIST, true));
+        String alternateSetId = uiSetService.insert(uiSet("crm.customer", "alternate", PlatformUiSetType.LIST, false));
+        String primaryConfigId = uiConfigService.insert(uiConfig(primarySetId, PlatformUiClientType.WEB, false));
+        String alternateConfigId = uiConfigService.insert(uiConfig(alternateSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(primaryConfigId, customerNameField, "text"));
+        uiConfigFieldService.insert(uiField(alternateConfigId, customerNameField, "text"));
+
+        PlatformUiConfig primaryConfig = uiConfigService.select(primaryConfigId);
+        primaryConfig.setLayoutJson("""
+                {"blocks":[{"type":"action","key":"primary","actionCode":"primaryAction"}]}
+                """);
+        uiConfigService.update(primaryConfig);
+        PlatformUiConfig alternateConfig = uiConfigService.select(alternateConfigId);
+        alternateConfig.setLayoutJson("""
+                {"blocks":[{"type":"action","key":"alternate","actionCode":"alternateAction"}]}
+                """);
+        uiConfigService.update(alternateConfig);
+        publishService.publishUiConfig(primaryConfigId);
+        publishService.publishUiConfig(alternateConfigId);
+
+        Menu menu = new Menu();
+        menu.setId("menu-alternate");
+        menu.setTitle("Alternate customers");
+        menu.setOpenMode(MenuOpenMode.TAB);
+        menu.setModuleAlias("crm.customer");
+        menu.setPageMode(MenuPageMode.LIST);
+        menu.setDefaultUiConfigId(alternateConfigId);
+        MenuService menuService = org.mockito.Mockito.mock(MenuService.class);
+        org.mockito.Mockito.when(menuService.currentUserVisibleMenu("menu-alternate")).thenReturn(menu);
+        PlatformPageBootstrapService bootstrapService = new PlatformPageBootstrapService(
+                menuService, snapshotService, moduleFieldService, fieldUiTypeService, fieldUiTypeAttributeService,
+                fieldUiTypeFieldMappingService);
+
+        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu("menu-alternate", PlatformUiClientType.WEB);
+
+        assertThat(bootstrap.entry().defaultUiConfigId()).isEqualTo(alternateConfigId);
+        assertThat(bootstrap.resolvedConfig().actionBlocks())
+                .extracting(PlatformActionBlock::uiConfigId)
+                .containsExactly(alternateConfigId);
+    }
+
+    @Test
     void shouldExposeVirtualFieldFormInPageBootstrap() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");
