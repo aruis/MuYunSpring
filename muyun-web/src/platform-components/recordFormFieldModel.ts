@@ -7,6 +7,8 @@ import type {
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
   FieldValuePresentation,
+  UiFormula,
+  UiRule,
   ViewFieldDefinition,
 } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
@@ -28,6 +30,7 @@ export type RecordFormFieldControlType =
   | 'enabledStatus'
   | 'booleanStatus'
   | 'switch'
+  | 'fileTransfer'
   | 'recordPicker'
   | 'recordMultiPicker';
 
@@ -38,6 +41,7 @@ export interface RecordFormFieldFallback {
   visible?: boolean;
   controlType?: RecordFormFieldControlType;
   placeholder?: string;
+  disabledHint?: string;
   options?: Option[];
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
 }
@@ -65,9 +69,11 @@ export interface RecordFormFieldState {
   hasOption: boolean;
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
   optionTitleField?: string;
+  referenceTitleField?: string;
   pickerConfig?: RecordFormFieldPickerConfig;
   booleanStatus?: BooleanStatusPresentation;
   valuePresentation?: FieldValuePresentation;
+  disabledHint?: string;
   placeholder?: string;
   options?: Option[];
 }
@@ -123,14 +129,15 @@ export function resolveRecordFormFieldState(
     fallback?: Record<string, RecordFormFieldFallback>;
     pickerConfigs?: Record<string, RecordFormFieldPickerConfig>;
     placeholderOf?: (fieldName: string, field: RecordFormFieldState) => string | undefined;
+    record?: RecordFormRecord;
   } = {},
 ): RecordFormFieldState {
   const field = options.fields?.get(fieldName);
   const fallback = options.fallback?.[fieldName];
   const label = field?.label ?? fallback?.label ?? fieldName;
-  const required = field?.required?.constant ?? fallback?.required ?? false;
-  const readOnly = field?.readOnly?.constant ?? fallback?.readOnly ?? false;
-  const visible = field?.visible?.constant ?? fallback?.visible ?? true;
+  const required = evaluateUiRule(field?.required, options.record, fallback?.required ?? false);
+  const readOnly = evaluateUiRule(field?.readOnly, options.record, fallback?.readOnly ?? false);
+  const visible = evaluateUiRule(field?.visible, options.record, fallback?.visible ?? true);
   const controlType = controlTypeOf(field, fallback);
   const booleanStatus = controlType === 'booleanStatus' ? field?.booleanStatus : undefined;
   const hasOption = field?.option != null;
@@ -150,6 +157,9 @@ export function resolveRecordFormFieldState(
     pickerConfig,
     ...(booleanStatus ? { booleanStatus } : {}),
     ...(field?.valuePresentation ? { valuePresentation: field.valuePresentation } : {}),
+    ...((field?.readOnly?.disabledHint ?? fallback?.disabledHint)
+      ? { disabledHint: field?.readOnly?.disabledHint ?? fallback?.disabledHint }
+      : {}),
   };
   return {
     ...baseState,
@@ -159,10 +169,41 @@ export function resolveRecordFormFieldState(
           ...(field.option.titleField ? { optionTitleField: field.option.titleField } : {}),
         }
       : {}),
+    ...(field?.reference?.titleField ? { referenceTitleField: field.reference.titleField } : {}),
     ...(fallback?.options ? { options: fallback.options } : {}),
     placeholder:
       options.placeholderOf?.(fieldName, baseState) ?? fallback?.placeholder ?? pickerConfig?.placeholder,
   };
+}
+
+function evaluateUiRule(
+  rule: UiRule<boolean> | undefined,
+  record: RecordFormRecord | undefined,
+  fallback: boolean,
+) {
+  if (!rule) return fallback;
+  if (typeof rule.constant === 'boolean') return rule.constant;
+  return rule.formula ? evaluateUiFormula(rule.formula, record ?? {}) : fallback;
+}
+
+export function evaluateUiFormula(formula: UiFormula, record: RecordFormRecord): boolean {
+  const expression = formula.expression.replaceAll(/\s/g, '');
+  if (expression.startsWith('!(') && expression.endsWith(')')) {
+    return !evaluateUiFormula({ expression: expression.slice(2, -1) }, record);
+  }
+  const conjunction = expression.split('&&');
+  if (conjunction.length > 1) {
+    return conjunction.every((term) => evaluateUiFormula({ expression: term }, record));
+  }
+  const present = /^PRESENT\(\{([A-Za-z][A-Za-z0-9_]*)\}\)$/i.exec(expression);
+  if (present) {
+    const value = record[present[1]];
+    return value !== null && value !== undefined && value !== '';
+  }
+  // Descriptors produced by the platform are validated against the portable UI grammar.  Keep this safe fallback
+  // for hand-written or stale remote descriptors instead of silently treating an unsupported server formula as
+  // a browser capability.
+  return false;
 }
 
 /**
@@ -195,6 +236,9 @@ function controlTypeOf(
   }
   if (field?.uiType === 'colorPicker') {
     return 'colorPicker';
+  }
+  if (field?.uiType === 'fileTransfer') {
+    return 'fileTransfer';
   }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';

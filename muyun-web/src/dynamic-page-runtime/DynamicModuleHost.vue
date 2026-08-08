@@ -254,9 +254,10 @@ function handleLoaded(records: QueryListRecord[]) {
   if (selectedRecord.value) {
     selectedRecord.value =
       records.find((record) => record.id === selectedRecord.value?.id) ?? selectedRecord.value;
-    if (detailOpen.value && !detailLoading.value && editorMode.value === 'view') {
-      editingRecord.value = selectedRecord.value;
-    }
+    // The list is intentionally a compact projection. Do not overwrite an open
+    // detail snapshot with it after a refresh (for example, enable/disable), or
+    // form-only/read-side fields disappear from the drawer. `openRecord` and
+    // `toggleEnabled` refresh the authoritative detail through CRUD view.
   }
 }
 

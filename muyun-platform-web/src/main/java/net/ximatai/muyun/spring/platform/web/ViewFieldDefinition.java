@@ -105,6 +105,23 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
             return this;
         }
 
+        /**
+         * Enables this editor only when the formula evaluates to true for the current draft.
+         * It is presentation-only; mutation endpoints must still enforce their business invariants.
+         */
+        public Builder enabledWhen(UiFormula formula) {
+            if (formula == null) {
+                throw new IllegalArgumentException("enabled formula must not be null");
+            }
+            this.readOnly = UiRule.formula(formula.negated());
+            return this;
+        }
+
+        public Builder disabledHint(String hint) {
+            this.readOnly = new UiRule<>(readOnly.constant(), readOnly.formula(), hint);
+            return this;
+        }
+
         public Builder uiType(String uiType) {
             this.uiType = uiType;
             return this;

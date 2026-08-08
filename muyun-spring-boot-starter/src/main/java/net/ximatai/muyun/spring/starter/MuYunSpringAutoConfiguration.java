@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunReposito
 import net.ximatai.muyun.spring.starter.bootstrap.MuYunSpringBootstrapConfiguration;
 import net.ximatai.muyun.spring.starter.configuration.database.MuYunSpringDatabaseConfiguration;
 import net.ximatai.muyun.spring.starter.configuration.dynamic.MuYunSpringDynamicRuntimeConfiguration;
+import net.ximatai.muyun.spring.starter.configuration.filetransfer.MuYunFileServerTransferConfiguration;
 import net.ximatai.muyun.spring.starter.configuration.iam.MuYunSpringIdentityConfiguration;
 import net.ximatai.muyun.spring.starter.configuration.iam.MuYunSpringIdentityWebConfiguration;
 import net.ximatai.muyun.spring.starter.configuration.platform.MuYunSpringDeletionConfiguration;
@@ -46,6 +47,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Import({
         MuYunSpringDatabaseConfiguration.class,
         MuYunSpringDynamicRuntimeConfiguration.class,
+        MuYunFileServerTransferConfiguration.class,
         MuYunSpringIdentityConfiguration.class,
         MuYunSpringIdentityWebConfiguration.class,
         MuYunSpringDeletionConfiguration.class,

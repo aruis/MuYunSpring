@@ -15,5 +15,25 @@ export * from '../platform-admin-runtime/index';
 // The standard module runner and its list/drawer/form components are shipped
 // behind PlatformAdminOutlet.  Keeping them out of this entry preserves their
 // freedom to evolve without making each implementation detail an App contract.
-export { UiButton, UiInput, UiSwitch } from '../vue-ui-antdv/index';
+export {
+  UiButton,
+  UiDataTable,
+  UiInput,
+  UiSidePanel,
+  UiSwitch,
+  UiTextArea,
+  UiTree,
+} from '../vue-ui-antdv/index';
 export { default as PlatformAdminOutlet } from './PlatformAdminOutlet.vue';
+export { default as DateTimeText } from '../platform-components/DateTimeText.vue';
+export { default as FileSizeText } from '../platform-components/FileSizeText.vue';
+export { default as FileTransferUploader } from '../platform-components/FileTransferUploader.vue';
+export {
+  createBrowserFileTransferUpload,
+  unwrapResponsePayload,
+} from '../platform-components/fileTransferUpload';
+export type {
+  FileTransferUploadAccess,
+  FileTransferUploadReceipt,
+  FileTransferUploadTask,
+} from '../platform-components/fileTransferUpload';

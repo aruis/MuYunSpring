@@ -260,6 +260,70 @@ test('child resource default form view code follows platform naming rules', () =
   assert.throws(() => childResourceDefaultFormViewCode(''), /invalid child resource code/);
 });
 
+test('record form field state evaluates platform Boolean formulas against the current draft', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('上传文件', { uiType: 'fileTransfer' }),
+        readOnly: {
+          formula: { expression: '!(PRESENT({directoryId}))' },
+        },
+      },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileId', { fields, record: {} }).readOnly, true);
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1' } }).readOnly,
+    false,
+  );
+});
+
+test('record form field state evaluates portable formula conjunctions for create-only editors', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('上传文件', { uiType: 'fileTransfer' }),
+        readOnly: { formula: { expression: '!(PRESENT({directoryId}) && !(PRESENT({id})))' } },
+      },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileId', { fields, record: {} }).readOnly, true);
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1' } }).readOnly,
+    false,
+  );
+  assert.equal(
+    resolveRecordFormFieldState('fileId', { fields, record: { directoryId: 'directory-1', id: 'file-1' } })
+      .readOnly,
+    true,
+  );
+});
+
+test('record form field state retains a fallback disabled hint when its descriptor has none', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'fileId',
+      {
+        ...field('上传文件', { uiType: 'fileTransfer' }),
+        readOnly: { formula: { expression: '!(PRESENT({directoryId}))' } },
+      },
+    ],
+  ]);
+
+  assert.equal(
+    resolveRecordFormFieldState('fileId', {
+      fields,
+      fallback: { fileId: { label: '上传文件', disabledHint: '请先选择归属目录' } },
+      record: {},
+    }).disabledHint,
+    '请先选择归属目录',
+  );
+});
+
 function field(
   label: string,
   options: { required?: boolean; readOnly?: boolean; visible?: boolean; uiType?: string } = {},

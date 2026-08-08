@@ -16,6 +16,7 @@ import RecordStatusTag from './RecordStatusTag.vue';
 import RecordPicker from './RecordPicker.vue';
 import RecordMultiPicker from './RecordMultiPicker.vue';
 import FileSizeText from './FileSizeText.vue';
+import RecordFormFileTransfer from './RecordFormFileTransfer.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
@@ -92,6 +93,7 @@ function fieldState(fieldName: string): RecordFormFieldState {
     fallback: props.fallback,
     pickerConfigs: props.pickerConfigs,
     placeholderOf: props.placeholderOf,
+    record: props.record,
   });
 }
 
@@ -227,7 +229,7 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
 </script>
 
 <template>
-  <label
+  <div
     v-for="field in fieldStates"
     :key="field.fieldName"
     class="record-form-field"
@@ -327,6 +329,14 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       v-else-if="field.valuePresentation === 'FILE_SIZE'"
       :value="fileSizeValue(field.fieldName)"
     />
+    <RecordFormFileTransfer
+      v-else-if="field.controlType === 'fileTransfer'"
+      :context="optionContext"
+      :record="record"
+      :disabled="fieldDisabled(field)"
+      :disabled-hint="field.disabledHint"
+      @uploaded="updateField(field.fieldName, $event)"
+    />
     <UiInput
       v-else
       :value="scalarFieldValue(field.fieldName)"
@@ -340,7 +350,7 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
         重试
       </UiButton>
     </div>
-  </label>
+  </div>
 </template>
 
 <style scoped>

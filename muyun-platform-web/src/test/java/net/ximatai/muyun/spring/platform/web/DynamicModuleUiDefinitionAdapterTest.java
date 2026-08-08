@@ -33,6 +33,22 @@ class DynamicModuleUiDefinitionAdapterTest {
     }
 
     @Test
+    void shouldRejectDynamicFileTransferUntilItCanUseTheUnifiedFileReferenceLifecycle() {
+        PlatformUiSet formSet = uiSet("set-form", "crm.document", "document_form", PlatformUiSetType.FORM);
+        PlatformUiConfig formConfig = uiConfig("ui-form-web", "set-form", "文档", true, 10);
+        PlatformResolvedPageConfig resolved = new PlatformResolvedPageConfig(
+                List.of(resolvedField("ui-form-web", "field-file", null, "fileId", "文件",
+                        "fileTransfer", true, false, null, null, null, null)),
+                List.of());
+
+        assertThatThrownBy(() -> DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.document", List.of(formSet), List.of(formConfig), List.of(),
+                        List.of(), List.of()), resolved))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot use file transfer until the unified file-reference lifecycle is available");
+    }
+
+    @Test
     void shouldConvertPublishedDynamicSnapshotToModuleUiDefinition() {
         PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
         PlatformUiSet formSet = uiSet("set-form", "crm.customer", "customer_form", PlatformUiSetType.FORM);

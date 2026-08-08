@@ -1736,7 +1736,8 @@ test('color picker prevents every mutation path while disabled', () => {
 test('consumer surface exposes basic adapter controls for business App composition', () => {
   const consumerSource = readSource('src/consumer/index.ts');
 
-  assert.match(consumerSource, /export \{ UiButton, UiInput, UiSwitch \} from '\.\.\/vue-ui-antdv\/index';/);
+  assert.match(consumerSource, /UiButton,[\s\S]*UiDataTable,[\s\S]*UiSidePanel,[\s\S]*UiTree,/);
+  assert.match(consumerSource, /export \{ default as FileTransferUploader \}/);
   assert.doesNotMatch(consumerSource, /export \* from '\.\.\/platform-components\/index';/);
   assert.doesNotMatch(consumerSource, /export \* from '\.\.\/dynamic-page-runtime\/index';/);
 });

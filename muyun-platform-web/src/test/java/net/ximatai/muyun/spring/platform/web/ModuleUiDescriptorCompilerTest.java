@@ -290,6 +290,7 @@ class ModuleUiDescriptorCompilerTest {
                 .satisfies(reference -> {
                     assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
                     assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+                    assertThat(reference.titleField()).isEqualTo("customerTitle");
                 });
         assertThat(fields.get(1).reference())
                 .satisfies(reference -> {

@@ -97,6 +97,11 @@ public final class DynamicModuleUiDefinitionAdapter {
             throw new IllegalArgumentException("dynamic field " + field.fieldName()
                     + " cannot use uiType booleanStatus until dynamic UI configuration declares its presentation");
         }
+        if ("fileTransfer".equals(field.fieldUiControlAlias())
+                || "file_transfer".equals(field.fieldUiControlAlias())) {
+            throw new IllegalArgumentException("dynamic field " + field.fieldName()
+                    + " cannot use file transfer until the unified file-reference lifecycle is available");
+        }
         return new ViewFieldDefinition(
                 new ViewFieldRef(field.relationAlias(), field.fieldName(), field.moduleMetadataFieldId()),
                 field.fieldTitle(),

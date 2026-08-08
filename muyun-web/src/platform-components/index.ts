@@ -5,6 +5,13 @@ export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue'
 export { default as DrawerOperationBar } from './DrawerOperationBar.vue';
 export { default as DateTimeText } from './DateTimeText.vue';
 export { default as FileSizeText } from './FileSizeText.vue';
+export { default as FileTransferUploader } from './FileTransferUploader.vue';
+export { createBrowserFileTransferUpload, unwrapResponsePayload } from './fileTransferUpload';
+export type {
+  FileTransferUploadAccess,
+  FileTransferUploadReceipt,
+  FileTransferUploadTask,
+} from './fileTransferUpload';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as ManagementWorkspace } from './ManagementWorkspace.vue';
@@ -29,6 +36,7 @@ export {
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export type { RecordExplorerItemDescriptor } from './recordExplorerItemModel';
 export { default as RecordFormFields } from './RecordFormFields.vue';
+export { default as RecordFormFileTransfer } from './RecordFormFileTransfer.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
 export { default as RecordModeDrawer } from './RecordModeDrawer.vue';
