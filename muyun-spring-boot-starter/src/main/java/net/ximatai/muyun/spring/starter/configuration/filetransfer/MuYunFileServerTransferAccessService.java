@@ -153,9 +153,8 @@ public final class MuYunFileServerTransferAccessService
     }
 
     /**
-     * Browser uploads always start as temporary objects.  The FileServer must enforce the same
-     * invariant from its upload token; this field keeps the current multipart protocol safe while
-     * that server-side guarantee is rolled out.
+     * Browser uploads always start as temporary objects. The FileServer enforces this from the
+     * upload token; preserve the multipart field as an explicit defence-in-depth protocol fact.
      */
     private Map<String, String> uploadFormFields(FileTransferOperation operation) {
         return operation == FileTransferOperation.UPLOAD ? Map.of("temporary", "true") : Map.of();
