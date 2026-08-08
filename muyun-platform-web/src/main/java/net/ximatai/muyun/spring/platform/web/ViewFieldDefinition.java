@@ -24,6 +24,9 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         if ("fileSize".equals(uiType) || "file_size".equals(uiType)) {
             throw new IllegalArgumentException("file size must use value presentation instead of uiType");
         }
+        if ("fileTransfer".equals(uiType) || "file_transfer".equals(uiType)) {
+            throw new IllegalArgumentException("file transfer requires the unified file-reference lifecycle");
+        }
         if (valuePresentation == FieldValuePresentation.FILE_SIZE && uiType != null) {
             throw new IllegalArgumentException("file size presentation cannot declare an input uiType");
         }

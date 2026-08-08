@@ -88,6 +88,13 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldRejectFileTransferUntilTheUnifiedFileReferenceLifecycleExists() {
+        assertThatThrownBy(() -> ViewFieldDefinition.field("fileId").uiType("fileTransfer").build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("file transfer requires the unified file-reference lifecycle");
+    }
+
+    @Test
     void shouldRequireBooleanStatusToBeReadOnlyInFormViews() {
         ModuleUiDefinition writableDefinition = ModuleUiDefinition.builder("iam.employee")
                 .formView(form -> form.field("online", field -> field.booleanStatus("在线", "离线")))

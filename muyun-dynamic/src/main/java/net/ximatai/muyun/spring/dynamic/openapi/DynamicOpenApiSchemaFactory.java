@@ -777,6 +777,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("url", stringProperty(true));
         properties.put("expiresAt", new DynamicOpenApiDocument.Property("string", "date-time", false, true,
                 false, null, null, null, null, null, List.of()));
+        properties.put("formFields", objectProperty("object"));
         properties.put("metadata", objectProperty("object"));
         return new DynamicOpenApiDocument.Schema("RecordAttachmentAccess", "object", null,
                 List.of("mode"), properties, null);

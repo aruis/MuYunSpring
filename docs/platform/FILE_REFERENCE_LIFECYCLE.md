@@ -28,6 +28,6 @@ MuYunSpring 与 FileServer 没有跨服务事务。转正、业务持久化、�
 
 ## 当前接入边界
 
-当前 `FileTransferAccessService`、`FileTransferClient` 和标准上传组件提供 MuYunFileServer 传输底座。静态业务模块可以在独立 Web 动作中完成业务前置校验，再让 Service 在标准 CRUD 保存 hook 中确认并转正文件。
+当前 `FileTransferAccessService`、`FileTransferClient` 和可由业务显式注入回调的上传组件提供 MuYunFileServer 传输底座。静态业务模块可以在独立 Web 动作中完成业务前置校验，再让 Service 在标准 CRUD 保存 hook 中确认并转正文件。
 
-这不是动态文件字段已经完成的声明。动态元数据在具备同一套保存确认、替换治理和标准动作前，不应配置 `fileTransfer` 控件。后续正式能力应将静态声明和动态元数据编译为同一份文件引用字段 descriptor，由页面运行器消费该 descriptor，而不是让控件推断业务 URL。
+这不是静态或动态文件字段已经完成的声明。在具备同一套保存确认、替换治理和标准动作前，任何标准模块表单都不应配置 `fileTransfer` 控件。后续正式能力应将静态声明和动态元数据编译为同一份文件引用字段 descriptor，由页面运行器消费该 descriptor，而不是让控件推断业务 URL。

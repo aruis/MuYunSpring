@@ -265,7 +265,7 @@ test('record form field state evaluates platform Boolean formulas against the cu
     [
       'fileId',
       {
-        ...field('上传文件', { uiType: 'fileTransfer' }),
+        ...field('文件标识'),
         readOnly: {
           formula: { expression: '!(PRESENT({directoryId}))' },
         },
@@ -285,7 +285,7 @@ test('record form field state evaluates portable formula conjunctions for create
     [
       'fileId',
       {
-        ...field('上传文件', { uiType: 'fileTransfer' }),
+        ...field('文件标识'),
         readOnly: { formula: { expression: '!(PRESENT({directoryId}) && !(PRESENT({id})))' } },
       },
     ],
@@ -308,7 +308,7 @@ test('record form field state retains a fallback disabled hint when its descript
     [
       'fileId',
       {
-        ...field('上传文件', { uiType: 'fileTransfer' }),
+        ...field('文件标识'),
         readOnly: { formula: { expression: '!(PRESENT({directoryId}))' } },
       },
     ],

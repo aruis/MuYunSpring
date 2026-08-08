@@ -163,7 +163,7 @@ public final class MuYunFileServerTransferAccessService
 
     private RecordAttachmentAccess attachmentAccess(String mode, FileTransferAccess access) {
         return new RecordAttachmentAccess(mode, access.fileId(), access.accessToken(), access.url(),
-                access.expiresAt().toString(), Map.of());
+                access.expiresAt().toString(), access.formFields(), Map.of());
     }
 
     private String fileServerPurpose(FileTransferOperation operation) {

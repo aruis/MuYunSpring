@@ -30,7 +30,6 @@ export type RecordFormFieldControlType =
   | 'enabledStatus'
   | 'booleanStatus'
   | 'switch'
-  | 'fileTransfer'
   | 'recordPicker'
   | 'recordMultiPicker';
 
@@ -236,9 +235,6 @@ function controlTypeOf(
   }
   if (field?.uiType === 'colorPicker') {
     return 'colorPicker';
-  }
-  if (field?.uiType === 'fileTransfer') {
-    return 'fileTransfer';
   }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';
