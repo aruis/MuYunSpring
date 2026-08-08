@@ -791,7 +791,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(uiTableSource, /Table as ATable/);
   assert.match(panelSource, /<UiDataTable/);
   assert.doesNotMatch(panelSource, /<table/);
-  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
+  assert.match(
+    panelSource,
+    /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*queryTemplateId: props\.queryTemplateId,\s*\}\)/,
+  );
   assert.match(panelSource, /emptyQuerySchema/);
   assert.match(panelSource, /isUnsupportedQuerySchemaError/);
   assert.match(panelSource, /query schema is not supported by/);
@@ -1613,6 +1616,7 @@ test('business views use page realtime lifecycle wrappers only', () => {
 
 test('dynamic module host uses shared descriptor driven list and form runners', () => {
   const hostSource = readSource('src/dynamic-page-runtime/DynamicModuleHost.vue');
+  const listPanelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
 
   assert.match(hostSource, /useModuleContext<QueryListRecord>/);
   assert.match(hostSource, /<RecordQueryListPanel/);
@@ -1643,6 +1647,9 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /:required-external-criteria-keys="\[scopedListWorkspace\.queryCriteriaKey\]"/);
   assert.match(hostSource, /selectedScopeRecord\.value\?\.id === record\.id/);
   assert.match(hostSource, /disabled: !canCreateRecord\.value/);
+  assert.match(listPanelSource, /queryTemplateId: props\.queryTemplateId/);
+  assert.match(listPanelSource, /item\.sourceUiConfigId === uiConfigId/);
+  assert.match(listPanelSource, /props\.requiredExternalCriteriaKeys\.length > 0/);
   assert.match(hostSource, /\[workspace\.scopeField\]: selectedScopeRecord\.value\.id/);
   assert.match(hostSource, /<TreeRecordExplorer/);
   assert.match(hostSource, /<RecordDetailPanel/);
@@ -1692,7 +1699,10 @@ test('record query list panel forwards dynamic ui config and query template ids'
 
   assert.match(panelSource, /uiConfigId\?: string/);
   assert.match(panelSource, /queryTemplateId\?: string/);
-  assert.match(panelSource, /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*\}\)/);
+  assert.match(
+    panelSource,
+    /querySchema\(\{\s*uiConfigId: props\.uiConfigId,\s*queryTemplateId: props\.queryTemplateId,\s*\}\)/,
+  );
   assert.match(panelSource, /request\.uiConfigId = props\.uiConfigId/);
   assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
 });

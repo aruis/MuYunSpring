@@ -407,6 +407,33 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldRejectScopedListWorkspaceWithoutMatchingReferenceBeforePublish() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "project_list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setScopeModuleAlias("crm.project");
+        config.setScopeField("projectId");
+        uiConfigService.update(config);
+        DynamicRecordService recordService = org.mockito.Mockito.mock(DynamicRecordService.class);
+        org.mockito.Mockito.when(recordService.describe("crm.customer")).thenReturn(new DynamicModuleDescriptor(
+                "crm.customer", "Customer", "customer", List.of(),
+                List.of(new net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor(
+                        "customer", "Customer", Set.of(), List.of(), List.of(), List.of(), List.of(), List.of())),
+                List.of(), List.of(), List.of()));
+        PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
+                uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
+                recordService);
+
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("field must be a reference");
+    }
+
+    @Test
     void shouldRejectScopedListWorkspaceOutsideListUiConfig() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");

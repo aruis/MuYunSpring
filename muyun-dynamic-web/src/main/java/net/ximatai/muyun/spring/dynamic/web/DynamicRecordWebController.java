@@ -187,8 +187,17 @@ public class DynamicRecordWebController implements
     @GetMapping("/query/schema")
     @ActionEndpoint(PlatformAction.QUERY)
     public QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
-        return webScope(() -> DynamicQuerySchemas.from(DynamicWebRequest.moduleAlias(),
-                service().describe(), quickSearchFieldsForSchema(uiConfigId)));
+        return webScope(() -> {
+            String queryTemplateId = DynamicWebRequest.queryParameter("queryTemplateId");
+            if (hasText(queryTemplateId)) {
+                validateQueryTemplateBelongsToModule(DynamicWebRequest.moduleAlias(), queryTemplateId);
+            }
+            return DynamicQuerySchemas.from(DynamicWebRequest.moduleAlias(),
+                    service().describe(), quickSearchFieldsForSchema(uiConfigId),
+                    queryItemService == null || !hasText(queryTemplateId)
+                            ? List.of()
+                            : queryItemService.externalValueKeys(queryTemplateId));
+        });
     }
 
     @Override

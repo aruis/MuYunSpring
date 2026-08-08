@@ -224,7 +224,7 @@ const tableColumns = computed<RecordQueryListColumn[]>(() => {
   if (props.columns && props.columns.length > 0) {
     return recycleBinColumns(props.columns);
   }
-  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value));
+  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value, props.uiConfigId));
 });
 const dataTableColumns = computed<UiDataTableColumn[]>(() =>
   tableColumns.value.map((column) => ({
@@ -304,6 +304,7 @@ async function loadSchemaAndRecords() {
     runtimeViews.value = await loadRuntimeViews();
     const nextSchema = await props.context.crud.querySchema({
       uiConfigId: props.uiConfigId,
+      queryTemplateId: props.queryTemplateId,
     });
     if (requestSeq !== schemaRequestSeq) {
       return;
@@ -330,6 +331,13 @@ async function loadSchemaAndRecords() {
     }
     if (isUnsupportedQuerySchemaError(cause)) {
       schema.value = emptyQuerySchema(props.context.moduleAlias);
+      if (props.requiredExternalCriteriaKeys.length > 0) {
+        descriptorLoadError.value = true;
+        records.value = [];
+        total.value = 0;
+        emit('loaded', []);
+        return;
+      }
       activeConditions.value = [];
       conditionsExpanded.value = false;
       resetConditionDrafts();
@@ -825,8 +833,12 @@ function displayRecordFieldValue(record: QueryListRecord, fieldName: string, tit
   return String(value ?? '');
 }
 
-function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined): RecordQueryListColumn[] {
+function columnsFromRuntimeListView(
+  views: ResolvedViewDescriptor[] | undefined,
+  uiConfigId?: string,
+): RecordQueryListColumn[] {
   const view =
+    views?.find((item) => item.viewKind === 'LIST' && item.sourceUiConfigId === uiConfigId) ??
     views?.find((item) => item.viewKind === 'LIST' && item.viewCode === 'default_list') ??
     views?.find((item) => item.viewKind === 'LIST');
   if (!view) {

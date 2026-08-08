@@ -7,12 +7,23 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DynamicQuerySchemasTest {
+    @Test
+    void shouldExposeDeclaredExternalCriteriaKeys() {
+        QuerySchema schema = DynamicQuerySchemas.from("iam.employee", new DynamicEntityDescriptor(
+                "employee", "职员", Set.of(), List.of(), List.of(), List.of(), List.of(), List.of()),
+                List.of(), Arrays.asList("projectId", "projectId", " ", null));
+
+        assertThat(schema.externalCriteria()).extracting(QuerySchema.ExternalCriteria::key)
+                .containsExactly("projectId");
+    }
+
     @Test
     void shouldMapDynamicFieldQueryDefinitionsToStandardQuerySchema() {
         DynamicEntityDescriptor descriptor = new DynamicEntityDescriptor(

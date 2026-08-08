@@ -14,6 +14,13 @@ public final class DynamicQuerySchemas {
     }
 
     public static QuerySchema from(String moduleAlias, DynamicEntityDescriptor descriptor, List<String> quickSearchFields) {
+        return from(moduleAlias, descriptor, quickSearchFields, List.of());
+    }
+
+    public static QuerySchema from(String moduleAlias,
+                                   DynamicEntityDescriptor descriptor,
+                                   List<String> quickSearchFields,
+                                   List<String> externalCriteriaKeys) {
         Set<String> quickSearchFieldSet = quickSearchFields == null
                 ? Set.of()
                 : new LinkedHashSet<>(quickSearchFields);
@@ -34,7 +41,11 @@ public final class DynamicQuerySchemas {
                         quickSearchFieldSchemas
                 ),
                 fields,
-                List.of(),
+                externalCriteriaKeys == null ? List.of() : externalCriteriaKeys.stream()
+                        .filter(key -> key != null && !key.isBlank())
+                        .distinct()
+                        .map(key -> new QuerySchema.ExternalCriteria(key, "OBJECT", "PAGE_CONTEXT"))
+                        .toList(),
                 List.of()
         );
     }
