@@ -11,8 +11,7 @@ public record ResolvedModuleUiDescriptor(String schemaVersion,
                                          String title,
                                          List<ResolvedViewDescriptor> views,
                                          List<ResolvedUiActionDescriptor> actions,
-                                         String recordLabelField,
-                                         ScopedListWorkspaceDefinition scopedListWorkspace) {
+                                         String recordLabelField) {
     public static final String SCHEMA_VERSION = "module-ui.v2";
 
     public ResolvedModuleUiDescriptor {
@@ -26,12 +25,7 @@ public record ResolvedModuleUiDescriptor(String schemaVersion,
 
     public ResolvedModuleUiDescriptor(String moduleAlias,
                                       List<ResolvedViewDescriptor> views) {
-        this(SCHEMA_VERSION, moduleAlias, null, null, views, List.of(), null, null);
+        this(SCHEMA_VERSION, moduleAlias, null, null, views, List.of(), null);
     }
 
-    public ResolvedModuleUiDescriptor(String schemaVersion, String moduleAlias, ModuleKind moduleKind,
-                                      String title, List<ResolvedViewDescriptor> views,
-                                      List<ResolvedUiActionDescriptor> actions, String recordLabelField) {
-        this(schemaVersion, moduleAlias, moduleKind, title, views, actions, recordLabelField, null);
-    }
 }

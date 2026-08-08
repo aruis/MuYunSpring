@@ -536,14 +536,6 @@ export interface ResolvedModuleUiDescriptor {
   views: ResolvedViewDescriptor[];
   actions?: ResolvedUiActionDescriptor[];
   recordLabelField?: string;
-  scopedListWorkspace?: ScopedListWorkspaceDefinition;
-}
-
-export interface ScopedListWorkspaceDefinition {
-  scopeModuleAlias: string;
-  scopeField: string;
-  scopeTitle: string;
-  scopeSearchPlaceholder: string;
 }
 
 export interface StandardEntity {

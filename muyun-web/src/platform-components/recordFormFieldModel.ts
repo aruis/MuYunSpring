@@ -159,6 +159,10 @@ function controlTypeOf(
   field: RecordFormFieldDescriptor | undefined,
   fallback: RecordFormFieldFallback | undefined,
 ): RecordFormFieldControlType {
+  const referenceControlType = referenceControlTypeOf(field?.reference, field?.uiType);
+  if (referenceControlType) {
+    return referenceControlType;
+  }
   if (field?.uiType === 'enabledStatus') {
     return 'enabledStatus';
   }
@@ -184,4 +188,15 @@ function controlTypeOf(
     return 'select';
   }
   return fallback?.controlType ?? 'input';
+}
+
+/** References are semantic fields: their cardinality determines the default editor when metadata has no explicit picker. */
+function referenceControlTypeOf(
+  reference: ResolvedReferenceFieldDescriptor | undefined,
+  uiType: string | undefined,
+): Extract<RecordFormFieldControlType, 'recordPicker' | 'recordMultiPicker'> | undefined {
+  if (!reference || (uiType != null && uiType !== 'text')) {
+    return undefined;
+  }
+  return reference.cardinality === 'MANY' ? 'recordMultiPicker' : 'recordPicker';
 }

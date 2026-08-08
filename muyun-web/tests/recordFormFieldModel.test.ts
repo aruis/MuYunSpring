@@ -122,6 +122,22 @@ test('record form field state renders a color picker descriptor with the shared 
   assert.equal(resolveRecordFormFieldState('color', { fields }).controlType, 'colorPicker');
 });
 
+test('record form field state infers reference picker cardinality without a UI override', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    [
+      'organizationId',
+      { ...field('所属机构'), reference: { targetModuleAlias: 'iam.organization', cardinality: 'ONE' } },
+    ],
+    [
+      'tagIds',
+      { ...field('标签'), uiType: 'text', reference: { targetModuleAlias: 'crm.tag', cardinality: 'MANY' } },
+    ],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('organizationId', { fields }).controlType, 'recordPicker');
+  assert.equal(resolveRecordFormFieldState('tagIds', { fields }).controlType, 'recordMultiPicker');
+});
+
 test('record form field state exposes a full-row layout span from its descriptor', () => {
   const fields = new Map<string, RecordFormFieldDescriptor>([
     ['remark', { ...field('备注', { uiType: 'textarea' }), columnSpan: 2 }],

@@ -8,8 +8,7 @@ import java.util.function.Consumer;
 
 public record ModuleUiDefinition(String moduleAlias,
                                  List<ViewDefinition> views,
-                                 List<UiActionDefinition> actions,
-                                 ScopedListWorkspaceDefinition scopedListWorkspace) {
+                                 List<UiActionDefinition> actions) {
     public ModuleUiDefinition {
         moduleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         views = views == null ? List.of() : List.copyOf(views);
@@ -17,11 +16,7 @@ public record ModuleUiDefinition(String moduleAlias,
     }
 
     public ModuleUiDefinition(String moduleAlias, List<ViewDefinition> views) {
-        this(moduleAlias, views, List.of(), null);
-    }
-
-    public ModuleUiDefinition(String moduleAlias, List<ViewDefinition> views, List<UiActionDefinition> actions) {
-        this(moduleAlias, views, actions, null);
+        this(moduleAlias, views, List.of());
     }
 
     public static Builder builder(String moduleAlias) {
@@ -32,7 +27,6 @@ public record ModuleUiDefinition(String moduleAlias,
         private final String moduleAlias;
         private final List<ViewDefinition> views = new ArrayList<>();
         private final List<UiActionDefinition> actions = new ArrayList<>();
-        private ScopedListWorkspaceDefinition scopedListWorkspace;
 
         private Builder(String moduleAlias) {
             this.moduleAlias = moduleAlias;
@@ -70,15 +64,8 @@ public record ModuleUiDefinition(String moduleAlias,
             return this;
         }
 
-        public Builder scopedListWorkspace(String scopeModuleAlias, String scopeField,
-                                           String scopeTitle, String scopeSearchPlaceholder) {
-            scopedListWorkspace = new ScopedListWorkspaceDefinition(scopeModuleAlias, scopeField,
-                    scopeTitle, scopeSearchPlaceholder);
-            return this;
-        }
-
         public ModuleUiDefinition build() {
-            return new ModuleUiDefinition(moduleAlias, views, actions, scopedListWorkspace);
+            return new ModuleUiDefinition(moduleAlias, views, actions);
         }
     }
 }

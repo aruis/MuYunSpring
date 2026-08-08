@@ -49,6 +49,18 @@ class QueryCompilerTest {
     }
 
     @Test
+    void shouldTreatQuickSearchWildcardsAsLiterals() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(List.of(), null, Map.of(), List.of(), null, null,
+                Map.of(), "a%b_c\\d", List.of(), false, null);
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(containsCondition(criteria, "code", "%a\\%b\\_c\\\\d%")).isTrue();
+        assertThat(containsCondition(criteria, "title", "%a\\%b\\_c\\\\d%")).isTrue();
+    }
+
+    @Test
     void shouldUseFieldDefaultOperatorAndNormalizeValuesByFieldType() {
         QueryCompiler compiler = new QueryCompiler(descriptor());
         QueryRequest request = new QueryRequest(

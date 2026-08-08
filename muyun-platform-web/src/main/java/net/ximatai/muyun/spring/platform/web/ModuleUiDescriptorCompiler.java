@@ -120,8 +120,7 @@ public final class ModuleUiDescriptorCompiler {
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
                         .toList(),
-                defaultRecordLabelField,
-                definition.scopedListWorkspace()
+                defaultRecordLabelField
         );
     }
 
