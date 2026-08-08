@@ -116,7 +116,7 @@ StaticModuleDefinition
 
 `ModuleUiDefinition` 是静态和动态共同的 UI 声明目标。静态 `StaticModuleDefinition.forService(...)` 是构造它的一种源码 DSL；动态 UI 配置发布后也应先转换为它，再进入统一编译链路。
 
-标准“范围微列表 + 右侧查询列表”也属于这个来源无关声明，但它归属具体 LIST view/config，而非整个模块。`scopedListWorkspace` 声明 scope 模块、消费者的单值引用字段和外部查询 key；编译期必须证明该字段引用 scope 模块，运行器按当前页面的 UI config 选择对应 workspace，再以 query schema 验证外部 key。默认微列表不显示次标题，重复点击已选项会取消范围并恢复全量列表；默认 `ALLOW_UNSCOPED`，只有显式声明 `REQUIRE_SCOPE` 才会禁止未选范围时的新建。scope 只是页面入口约束；真正的数据归属仍由模型字段必填、引用校验和数据权限在统一 CRUD 链路中保证。
+标准“范围选择 + 右侧查询列表”也属于这个来源无关声明，但它归属具体 LIST view/config，而非整个模块。`scopedListWorkspace` 声明 scope 模块、消费者的单值引用字段和外部查询 key；编译期必须证明该字段引用 scope 模块，运行器按当前页面的 UI config 选择对应 workspace，再以 query schema 验证外部 key。scope 模块有树能力时，左栏自动使用树浏览器；否则使用微列表，两种形态共享选择、取消选择、范围预填和右侧标准 CRUD。默认不显示次标题，重复点击已选项会取消范围并恢复全量列表；默认 `ALLOW_UNSCOPED`，只有显式声明 `REQUIRE_SCOPE` 才会禁止未选范围时的新建。scope 只是页面入口约束；真正的数据归属仍由模型字段必填、引用校验和数据权限在统一 CRUD 链路中保证。
 
 ## 静态 UI 声明
 

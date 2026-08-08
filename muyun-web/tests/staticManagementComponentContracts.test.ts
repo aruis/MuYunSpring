@@ -1643,6 +1643,10 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /<ManagementWorkspace v-if="scopedListWorkspace && scopeContext"/);
   assert.match(hostSource, /<ManagementWorkspace v-else-if="treeModule"/);
   assert.match(hostSource, /<CrudRecordListExplorer/);
+  assert.match(hostSource, /<TreeRecordExplorer[\s\S]*v-if="scopeTree"/);
+  assert.match(hostSource, /await scopeContext\.value\.runtime\.ready/);
+  assert.match(hostSource, /scopeTree\.value = scopeContext\.value\.abilities\.hasTree\(\) === true/);
+  assert.match(hostSource, /search-mode="none"/);
   assert.match(hostSource, /:external-query-values="scopedExternalQueryValues"/);
   assert.match(hostSource, /:required-external-criteria-keys="\[scopedListWorkspace\.queryCriteriaKey\]"/);
   assert.match(hostSource, /selectedScopeRecord\.value\?\.id === record\.id/);

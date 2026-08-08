@@ -67,6 +67,7 @@ const scopedListWorkspace = ref<ResolvedScopedListWorkspaceDescriptor>();
 const selectedScopeRecord = ref<QueryListRecord>();
 const scopeSearchKeyword = ref('');
 const scopeReloadKey = ref(0);
+const scopeTree = ref(false);
 const saving = ref(false);
 const togglingEnabled = ref(false);
 const detailLoading = ref(false);
@@ -170,6 +171,11 @@ async function loadRuntimeForm() {
   const runtimeContext = await context.runtime.ready;
   treeModule.value = context.abilities.hasTree() === true;
   scopedListWorkspace.value = scopedListWorkspaceFor(runtimeContext.uiDescriptor?.views ?? []);
+  scopeTree.value = false;
+  if (scopeContext.value) {
+    await scopeContext.value.runtime.ready;
+    scopeTree.value = scopeContext.value.abilities.hasTree() === true;
+  }
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
   formFields.value = resolveRecordFormFields(runtimeContext.uiDescriptor, view?.viewCode);
 }
@@ -434,13 +440,25 @@ function recordTitle(record: QueryListRecord | undefined) {
       <ManagementExplorerColumn>
         <RecordExplorerPanel
           :title="scopedListWorkspace.scopeTitle"
-          :refresh-title="`刷新${scopedListWorkspace.scopeTitle}列表`"
+          :refresh-title="`刷新${scopedListWorkspace.scopeTitle}${scopeTree ? '树' : '列表'}`"
           :search-keyword="scopeSearchKeyword"
           :search-placeholder="scopedListWorkspace.scopeSearchPlaceholder"
           @update:search-keyword="scopeSearchKeyword = $event"
           @refresh="scopeReloadKey += 1"
         >
+          <TreeRecordExplorer
+            v-if="scopeTree"
+            :context="scopeContext"
+            :selected-id="selectedScopeRecord?.id == null ? undefined : String(selectedScopeRecord.id)"
+            :reload-key="scopeReloadKey"
+            :keyword="scopeSearchKeyword"
+            search-mode="none"
+            :empty-description="`暂无${scopedListWorkspace.scopeTitle}`"
+            :secondary-of="scopedListWorkspace.showScopeItemSubtitle ? undefined : () => undefined"
+            @select="selectScopeRecord"
+          />
           <CrudRecordListExplorer
+            v-else
             :context="scopeContext"
             :selected-id="selectedScopeRecord?.id == null ? undefined : String(selectedScopeRecord.id)"
             :reload-key="scopeReloadKey"
