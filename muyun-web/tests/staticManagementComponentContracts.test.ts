@@ -1171,6 +1171,8 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(contractsSource, /export type FieldValuePresentation = 'FILE_SIZE'/);
   assert.match(contractsSource, /valuePresentation\?: FieldValuePresentation/);
   assert.match(panelSource, /field\.valuePresentation === 'FILE_SIZE'/);
+  assert.match(formFieldsSource, /field\.valuePresentation === 'FILE_SIZE'/);
+  assert.match(formFieldsSource, /<FileSizeText/);
   assert.match(panelSource, /field\.valueType \?\? queryField\?\.valueType/);
   assert.match(
     panelSource,
