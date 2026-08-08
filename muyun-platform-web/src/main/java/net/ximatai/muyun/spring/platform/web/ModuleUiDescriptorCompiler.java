@@ -191,6 +191,7 @@ public final class ModuleUiDescriptorCompiler {
                                                             Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields) {
         ResolvedReferenceSummaryFieldDescriptor referenceSummary = field.fieldRef().relationCode() == null
                 ? referenceSummaryFields.get(field.fieldRef().fieldName()) : null;
+        validateBooleanStatus(viewKind, field);
         validateTagList(viewKind, field, referenceSummary);
         return new ResolvedViewFieldDescriptor(
                 field.fieldRef(),
@@ -208,6 +209,16 @@ public final class ModuleUiDescriptorCompiler {
                 field.fieldRef().relationCode() == null ? referenceFields.get(field.fieldRef().fieldName()) : null,
                 referenceSummary
         );
+    }
+
+    private static void validateBooleanStatus(ModuleViewKind viewKind, ViewFieldDefinition field) {
+        if (!"booleanStatus".equals(field.uiType()) || viewKind != ModuleViewKind.FORM) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(field.readOnly().constant())) {
+            throw new IllegalArgumentException("booleanStatus UI field must be read-only in FORM views: "
+                    + field.fieldRef().fieldName());
+        }
     }
 
     private static void validateTagList(ModuleViewKind viewKind,

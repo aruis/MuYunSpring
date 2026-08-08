@@ -88,6 +88,22 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldRequireBooleanStatusToBeReadOnlyInFormViews() {
+        ModuleUiDefinition writableDefinition = ModuleUiDefinition.builder("iam.employee")
+                .formView(form -> form.field("online", field -> field.booleanStatus("在线", "离线")))
+                .build();
+        ModuleUiDefinition readOnlyDefinition = ModuleUiDefinition.builder("iam.employee")
+                .formView(form -> form.field("online", field -> field.booleanStatus("在线", "离线").readOnly()))
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(writableDefinition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("booleanStatus UI field must be read-only in FORM views: online");
+        assertThatCode(() -> ModuleUiDescriptorCompiler.compile(readOnlyDefinition))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void shouldCompileStaticDefinitionWhenUiFieldsExistInModelFacts() {
         ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.employee")
                 .listView(list -> list

@@ -62,6 +62,23 @@ test('record explorer panel uses a single title contract', () => {
   assert.doesNotMatch(layoutSource, /groupTitle/);
 });
 
+test('reference summary tags keep visual rendering inside the UI adapter', () => {
+  const tagListSource = readSource('src/platform-components/RecordTagList.vue');
+  const adapterSource = readSource('src/vue-ui-antdv/components/UiTagList.vue');
+  const adapterIndexSource = readSource('src/vue-ui-antdv/index.ts');
+
+  assert.match(tagListSource, /import \{ UiTagList, type UiTagListItem \} from '@muyun\/vue-ui-antdv'/);
+  assert.match(tagListSource, /<UiTagList :items="tags" :max-visible="maxVisible" \/>/);
+  assert.doesNotMatch(tagListSource, /<style/);
+  assert.doesNotMatch(tagListSource, /backgroundColor/);
+  assert.match(adapterSource, /defineOptions\(\{ name: 'UiTagList', inheritAttrs: false \}\)/);
+  assert.match(adapterSource, /import \{ Tag as ATag, Tooltip as ATooltip \} from 'ant-design-vue'/);
+  assert.match(adapterSource, /<ATag v-for="item in visibleItems"/);
+  assert.match(adapterSource, /<ATooltip v-if="overflowItems.length"/);
+  assert.match(adapterSource, /Math\.max\(0, Math\.floor\(props\.maxVisible\)\)/);
+  assert.match(adapterIndexSource, /export \{ default as UiTagList \}/);
+});
+
 test('workbench keeps the sidebar separator when the mega menu opens', () => {
   const workbenchMenuSource = readSource('src/platform-workbench/WorkbenchMenu.vue');
 
@@ -278,6 +295,17 @@ test('manageable scoped tree keeps action permission and editor behavior in the 
   assert.match(hostSource, /scopeContext\.value\.can\('update'\) === true/);
   assert.match(hostSource, /scopeContext\.value\.can\('delete'\) === true/);
   assert.match(hostSource, /:actions-of="scopeTreeActions"/);
+  assert.match(
+    hostSource,
+    /presentPlatformError\(cause, \{ source: 'scoped-tree-editor', phase: 'load' \}\)/,
+  );
+  assert.match(
+    hostSource,
+    /presentPlatformError\(cause, \{ source: 'scoped-tree-editor', phase: 'action' \}\)/,
+  );
+  assert.match(hostSource, /async function editScopeRecord[\s\S]*catch \(cause\)/);
+  assert.match(hostSource, /async function saveScopeRecord[\s\S]*catch \(cause\)/);
+  assert.match(hostSource, /async function deleteScopeRecord[\s\S]*catch \(cause\)/);
   assert.match(
     hostSource,
     /v-if="\s*scopedListWorkspace\.manageScopeTree && scopeTree && scopeEditingRecord && scopeEditorOpen\s*"/,

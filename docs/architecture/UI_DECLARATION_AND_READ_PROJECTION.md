@@ -196,7 +196,9 @@ class EmployeeService implements FormAbility<Employee> {
 当前已落地的 `uiType` 先保持小集合：`enabledStatus` 表达启停布尔控件，`booleanStatus` 表达带显式
 true/false 标签和语义色的业务布尔展示，`recordPicker` 表达引用选择控件。业务布尔值保留 unknown 状态，
 不能复用启停字段“非 false 即启用”的默认语义。动态 UI 配置当前还不能声明 `booleanStatus` presentation，
-遇到该控件类型会在适配期失败，不静默降级。`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、
+遇到该控件类型会在适配期失败，不静默降级。`booleanStatus` 是展示类型；在 FORM 中必须显式 `.readOnly()`，
+不能伪装为可编辑布尔控件。需要编辑业务布尔值时，声明通用 `switch` 或在后续建立其独立的可编辑语义。
+`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、
 作用域、标题函数和刷新 key 由页面组合层提供，避免 descriptor 绑定前端运行态对象。
 
 `fieldRef` 是源无关字段锚点，后续可承载动态字段和子关系定位：

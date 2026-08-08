@@ -18,6 +18,7 @@ import {
   TreeRecordExplorer,
   confirmAction,
   parentRecordConstraints,
+  presentPlatformError,
   providePageLayout,
   resolveRecordFormFields,
   type RecordFormFieldPickerConfig,
@@ -296,8 +297,12 @@ function openScopeEditor(mode: 'create' | 'edit', record?: QueryListRecord) {
 
 async function editScopeRecord(record: QueryListRecord) {
   if (!scopeContext.value?.crud || record.id == null) return;
-  const detail = await scopeContext.value.crud.view(String(record.id));
-  openScopeEditor('edit', detail as QueryListRecord);
+  try {
+    const detail = await scopeContext.value.crud.view(String(record.id));
+    openScopeEditor('edit', detail as QueryListRecord);
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'scoped-tree-editor', phase: 'load' });
+  }
 }
 
 async function saveScopeRecord() {
@@ -313,6 +318,8 @@ async function saveScopeRecord() {
     selectedScopeRecord.value = result.record as QueryListRecord;
     scopeEditorOpen.value = false;
     scopeReloadKey.value += 1;
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'scoped-tree-editor', phase: 'action' });
   } finally {
     scopeSaving.value = false;
   }
@@ -323,18 +330,22 @@ async function deleteScopeRecord(record: QueryListRecord) {
   const id = record.id == null ? undefined : String(record.id);
   const version = typeof record.version === 'number' ? record.version : undefined;
   if (!scope || !id || version === undefined) return;
-  if (
-    !(await confirmAction({
-      title: `删除${scopedListWorkspace.value?.scopeTitle ?? '目录'}`,
-      content: `确认删除「${recordTitle(record) ?? id}」？`,
-      okText: '删除',
-      danger: true,
-    }))
-  )
-    return;
-  await scope.crud.delete(id, { version });
-  if (selectedScopeRecord.value?.id === id) selectedScopeRecord.value = undefined;
-  scopeReloadKey.value += 1;
+  try {
+    if (
+      !(await confirmAction({
+        title: `删除${scopedListWorkspace.value?.scopeTitle ?? '目录'}`,
+        content: `确认删除「${recordTitle(record) ?? id}」？`,
+        okText: '删除',
+        danger: true,
+      }))
+    )
+      return;
+    await scope.crud.delete(id, { version });
+    if (selectedScopeRecord.value?.id === id) selectedScopeRecord.value = undefined;
+    scopeReloadKey.value += 1;
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'scoped-tree-editor', phase: 'action' });
+  }
 }
 
 function handleScopeTreeAction(action: RecordInlineAction, record: unknown) {
