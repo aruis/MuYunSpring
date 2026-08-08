@@ -27,4 +27,5 @@ public record ResolvedModuleUiDescriptor(String schemaVersion,
                                       List<ResolvedViewDescriptor> views) {
         this(SCHEMA_VERSION, moduleAlias, null, null, views, List.of(), null);
     }
+
 }

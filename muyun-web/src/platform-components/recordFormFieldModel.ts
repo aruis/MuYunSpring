@@ -1,6 +1,7 @@
 import type {
   Option,
   OptionValueList,
+  ResolvedReferenceFieldDescriptor,
   ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
@@ -11,10 +12,19 @@ import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstra
 
 export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewFieldDescriptor) & {
   option?: ResolvedOptionFieldDescriptor;
+  reference?: ResolvedReferenceFieldDescriptor;
 };
 export type RecordFormRecord = Record<string, unknown>;
-export type RecordFormFieldValue = string | number | boolean | OptionValueList | undefined;
-export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'switch' | 'recordPicker';
+export type RecordFormFieldValue = string | number | boolean | OptionValueList | string[] | undefined;
+export type RecordFormFieldControlType =
+  | 'input'
+  | 'textarea'
+  | 'colorPicker'
+  | 'select'
+  | 'enabledStatus'
+  | 'switch'
+  | 'recordPicker'
+  | 'recordMultiPicker';
 
 export interface RecordFormFieldFallback {
   label: string;
@@ -46,6 +56,7 @@ export interface RecordFormFieldState {
   readOnly: boolean;
   visible: boolean;
   controlType: RecordFormFieldControlType;
+  columnSpan: number;
   hasOption: boolean;
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
   optionTitleField?: string;
@@ -115,7 +126,10 @@ export function resolveRecordFormFieldState(
   const visible = field?.visible?.constant ?? fallback?.visible ?? true;
   const controlType = controlTypeOf(field, fallback);
   const hasOption = field?.option != null;
-  const pickerConfig = controlType === 'recordPicker' ? options.pickerConfigs?.[fieldName] : undefined;
+  const pickerConfig =
+    controlType === 'recordPicker' || controlType === 'recordMultiPicker'
+      ? options.pickerConfigs?.[fieldName]
+      : undefined;
   const baseState: RecordFormFieldState = {
     fieldName,
     label,
@@ -123,6 +137,7 @@ export function resolveRecordFormFieldState(
     readOnly,
     visible,
     controlType,
+    columnSpan: field?.columnSpan === 2 ? 2 : 1,
     hasOption,
     pickerConfig,
   };
@@ -144,14 +159,27 @@ function controlTypeOf(
   field: RecordFormFieldDescriptor | undefined,
   fallback: RecordFormFieldFallback | undefined,
 ): RecordFormFieldControlType {
+  const referenceControlType = referenceControlTypeOf(field?.reference, field?.uiType);
+  if (referenceControlType) {
+    return referenceControlType;
+  }
   if (field?.uiType === 'enabledStatus') {
     return 'enabledStatus';
   }
   if (field?.uiType === 'switch') {
     return 'switch';
   }
+  if (field?.uiType === 'textarea') {
+    return 'textarea';
+  }
+  if (field?.uiType === 'colorPicker') {
+    return 'colorPicker';
+  }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';
+  }
+  if (field?.uiType === 'recordMultiPicker') {
+    return 'recordMultiPicker';
   }
   if (field?.uiType === 'select') {
     return 'select';
@@ -160,4 +188,15 @@ function controlTypeOf(
     return 'select';
   }
   return fallback?.controlType ?? 'input';
+}
+
+/** References are semantic fields: their cardinality determines the default editor when metadata has no explicit picker. */
+function referenceControlTypeOf(
+  reference: ResolvedReferenceFieldDescriptor | undefined,
+  uiType: string | undefined,
+): Extract<RecordFormFieldControlType, 'recordPicker' | 'recordMultiPicker'> | undefined {
+  if (!reference || (uiType != null && uiType !== 'text')) {
+    return undefined;
+  }
+  return reference.cardinality === 'MANY' ? 'recordMultiPicker' : 'recordPicker';
 }

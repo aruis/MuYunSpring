@@ -13,6 +13,8 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.List;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
@@ -93,7 +95,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
 
     public DictionaryItem resolveItem(String categoryId, String code) {
         DictionaryCategory category = categoryService.requireDictionaryCategory(categoryId);
-        String validCode = requireCode(code, "dictionaryItemCode");
+        String validCode = requireCode(category, code, "dictionaryItemCode");
         return findOne(Criteria.of()
                         .eq("categoryId", category.getId())
                         .eq("code", validCode));
@@ -109,7 +111,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
         if (!Boolean.TRUE.equals(category.getEnabled())) {
             throw new PlatformException("Dictionary category is disabled: " + category.getAlias());
         }
-        String validCode = requireCode(code, "dictionaryItemCode");
+        String validCode = requireCode(category, code, "dictionaryItemCode");
         return findOne(Criteria.of()
                 .eq("categoryId", category.getId())
                 .eq("code", validCode)
@@ -137,7 +139,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
 
     private void normalizeAndValidate(DictionaryItem item) {
         DictionaryCategory category = category(item);
-        String code = requireCode(item.getCode(), "dictionaryItemCode");
+        String code = requireCode(category, item.getCode(), "dictionaryItemCode");
         item.setCategoryId(category.getId());
         item.setCategoryAlias(category.getAlias());
         item.setCode(code);
@@ -159,8 +161,20 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
         throw new PlatformException("Dictionary item requires categoryId");
     }
 
-    private String requireCode(String value, String name) {
+    private String requireCode(DictionaryCategory category, String value, String name) {
+        if (PlatformTimeZoneDictionaryInitialDataDeclarationProvider.CATEGORY_ALIAS.equals(category.getAlias())) {
+            return requireTimeZoneCode(value, name);
+        }
         return PlatformNameRules.requireCode(value, name);
+    }
+
+    private String requireTimeZoneCode(String value, String name) {
+        try {
+            ZoneId.of(value);
+            return value;
+        } catch (DateTimeException exception) {
+            throw new IllegalArgumentException("invalid " + name + ": " + value, exception);
+        }
     }
 
     private void validateParentCategory(DictionaryItem item) {

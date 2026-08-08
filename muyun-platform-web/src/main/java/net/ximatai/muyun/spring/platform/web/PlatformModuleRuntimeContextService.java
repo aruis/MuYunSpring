@@ -153,7 +153,8 @@ public class PlatformModuleRuntimeContextService {
         ModuleUiDefinition definition = DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(snapshot,
                 resolvedConfig);
         return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title,
-                dynamicOptionFields(dynamicDescriptor), dynamicRecordLabelField(dynamicDescriptor));
+                dynamicOptionFields(dynamicDescriptor), dynamicReferenceFields(dynamicDescriptor),
+                dynamicRecordLabelField(dynamicDescriptor));
     }
 
     private java.util.Map<String, ResolvedOptionFieldDescriptor> dynamicOptionFields(
@@ -171,6 +172,24 @@ public class PlatformModuleRuntimeContextService {
                                 field -> new ResolvedOptionFieldDescriptor(field.optionBinding(),
                                         field.selectionMode() == null ? OptionSelectionMode.SINGLE : field.selectionMode(),
                                         null),
+                                (left, right) -> left)))
+                .orElseGet(java.util.Map::of);
+    }
+
+    private java.util.Map<String, ResolvedReferenceFieldDescriptor> dynamicReferenceFields(
+            DynamicModuleDescriptor dynamicDescriptor) {
+        if (dynamicDescriptor == null) {
+            return java.util.Map.of();
+        }
+        return dynamicDescriptor.entities().stream()
+                .filter(entity -> entity.entityAlias().equals(dynamicDescriptor.mainEntityAlias()))
+                .findFirst()
+                .map(entity -> entity.fields().stream()
+                        .filter(field -> field.reference() != null)
+                        .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                                field -> field.fieldName(),
+                                field -> new ResolvedReferenceFieldDescriptor(
+                                        field.reference().targetModuleAlias(), field.reference().cardinality()),
                                 (left, right) -> left)))
                 .orElseGet(java.util.Map::of);
     }

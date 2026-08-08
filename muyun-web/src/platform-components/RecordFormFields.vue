@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiButton, UiInput, UiSelect, UiSwitch, UiTreeSelect } from '@muyun/vue-ui-antdv';
+import {
+  UiButton,
+  UiColorPicker,
+  UiInput,
+  UiSelect,
+  UiSwitch,
+  UiTextArea,
+  UiTreeSelect,
+} from '@muyun/vue-ui-antdv';
 import type { OptionItemDescriptor, OptionValue, OptionValueList } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordPicker from './RecordPicker.vue';
+import RecordMultiPicker from './RecordMultiPicker.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
@@ -62,8 +71,17 @@ const optionItems = ref<Record<string, OptionItemDescriptor[]>>({});
 const loadingOptionFields = ref(new Set<string>());
 const optionFieldErrors = ref<Record<string, string>>({});
 
-onMounted(loadOptionFields);
-watch(() => props.fields, loadOptionFields);
+onMounted(() => {
+  void loadOptionFields();
+  initializeRequiredColorFields();
+});
+watch(
+  () => props.fields,
+  () => {
+    void loadOptionFields();
+    initializeRequiredColorFields();
+  },
+);
 
 function fieldState(fieldName: string): RecordFormFieldState {
   return resolveRecordFormFieldState(fieldName, {
@@ -85,6 +103,11 @@ function optionFieldValue(fieldName: string) {
 function scalarFieldValue(fieldName: string) {
   const value = props.record[fieldName];
   return value === undefined || value === null ? undefined : String(value);
+}
+
+function stringArrayFieldValue(fieldName: string) {
+  const value = props.record[fieldName];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
 function optionFieldItems(field: RecordFormFieldState) {
@@ -170,6 +193,16 @@ function updateField(fieldName: string, value: RecordFormFieldValue) {
   emit('update:field', fieldName, value);
 }
 
+/** Required color fields must persist the same default color that the picker presents. */
+function initializeRequiredColorFields() {
+  for (const field of fieldStates.value) {
+    const value = scalarFieldValue(field.fieldName);
+    if (field.controlType === 'colorPicker' && field.required && (!value || !value.trim())) {
+      emit('update:field', field.fieldName, '#1677FF');
+    }
+  }
+}
+
 function updateSelectField(field: RecordFormFieldState, value: OptionValue | OptionValueList | null) {
   if (Array.isArray(value)) {
     emit('update:field', field.fieldName, value);
@@ -180,7 +213,12 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
 </script>
 
 <template>
-  <label v-for="field in fieldStates" :key="field.fieldName" class="record-form-field">
+  <label
+    v-for="field in fieldStates"
+    :key="field.fieldName"
+    class="record-form-field"
+    :class="{ 'record-form-field-full-row': field.columnSpan === 2 }"
+  >
     <span class="record-form-field-label">
       {{ field.label }}
       <strong v-if="field.required" aria-hidden="true">*</strong>
@@ -201,6 +239,21 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
     <RecordPicker
       v-else-if="field.controlType === 'recordPicker' && field.pickerConfig"
       :value="scalarFieldValue(field.fieldName)"
+      :context="field.pickerConfig.context"
+      :reload-key="field.pickerConfig.reloadKey"
+      :mode="field.pickerConfig.mode"
+      :placeholder="field.placeholder"
+      :disabled="fieldDisabled(field)"
+      :allow-clear="field.pickerConfig.allowClear"
+      :constraints="field.pickerConfig.constraints"
+      :title-of="field.pickerConfig.titleOf"
+      :description-of="field.pickerConfig.descriptionOf"
+      :filter-option="field.pickerConfig.filterOption"
+      @update:value="updateField(field.fieldName, $event)"
+    />
+    <RecordMultiPicker
+      v-else-if="field.controlType === 'recordMultiPicker' && field.pickerConfig"
+      :value="stringArrayFieldValue(field.fieldName)"
       :context="field.pickerConfig.context"
       :reload-key="field.pickerConfig.reloadKey"
       :mode="field.pickerConfig.mode"
@@ -235,6 +288,19 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       :loading="optionFieldLoading(field)"
       @update:value="updateSelectField(field, $event)"
     />
+    <UiTextArea
+      v-else-if="field.controlType === 'textarea'"
+      :value="scalarFieldValue(field.fieldName)"
+      :disabled="fieldDisabled(field)"
+      :placeholder="field.placeholder"
+      @update:value="updateField(field.fieldName, $event)"
+    />
+    <UiColorPicker
+      v-else-if="field.controlType === 'colorPicker'"
+      :value="scalarFieldValue(field.fieldName)"
+      :disabled="fieldDisabled(field)"
+      @update:value="updateField(field.fieldName, $event)"
+    />
     <UiInput
       v-else
       :value="scalarFieldValue(field.fieldName)"
@@ -257,6 +323,10 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
   gap: 6px;
   color: var(--muyun-text-muted);
   font-size: 13px;
+}
+
+.record-form-field-full-row {
+  grid-column: 1 / -1;
 }
 
 .record-form-field-label {

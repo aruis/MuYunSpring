@@ -65,11 +65,21 @@ function displayValue(field: RecordFormFieldState) {
     emptyText: props.emptyText,
   });
 }
+
+function colorValue(field: RecordFormFieldState) {
+  const value = props.record[field.fieldName];
+  return typeof value === 'string' && /^#[0-9A-F]{6}$/i.test(value) ? value : undefined;
+}
 </script>
 
 <template>
   <dl class="record-detail-fields">
-    <div v-for="field in fieldStates" :key="field.fieldName" class="record-detail-field">
+    <div
+      v-for="field in fieldStates"
+      :key="field.fieldName"
+      class="record-detail-field"
+      :class="{ 'record-detail-field-full-row': field.columnSpan === 2 }"
+    >
       <dt>{{ field.label }}</dt>
       <dd>
         <RecordStatusTag
@@ -81,6 +91,10 @@ function displayValue(field: RecordFormFieldState) {
           :checked="booleanFieldValue(field.fieldName)"
           disabled
         />
+        <span v-else-if="field.controlType === 'colorPicker'" class="record-color-value">
+          <i :style="{ backgroundColor: colorValue(field) }" aria-hidden="true" />
+          {{ displayValue(field) }}
+        </span>
         <span v-else>{{ displayValue(field) }}</span>
       </dd>
     </div>
@@ -99,6 +113,10 @@ function displayValue(field: RecordFormFieldState) {
   min-width: 0;
 }
 
+.record-detail-field-full-row {
+  grid-column: 1 / -1;
+}
+
 dt {
   color: #64748b;
   font-size: 12px;
@@ -110,6 +128,19 @@ dd {
   color: #243447;
   font-size: 13px;
   line-height: 20px;
+}
+
+.record-color-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-color-value i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(15 23 42 / 18%);
+  border-radius: 50%;
 }
 
 @media (max-width: 900px) {

@@ -39,4 +39,8 @@ public class MetadataViewField extends StandardEnabledSortableEntity {
 
     @Column(name = "required_override", type = ColumnType.BOOLEAN, comment = "Required override")
     private Boolean requiredOverride;
+
+    @Column(name = "column_span", type = ColumnType.INT, nullable = false, comment = "Form/detail column span",
+            defaultVal = @Default(number = 1))
+    private Integer columnSpan = 1;
 }

@@ -46,8 +46,9 @@ public final class ModuleUiDescriptorCompiler {
                 : definition.uiDefinition();
         validateFields(uiDefinition, definition.entities(), definition.moduleAlias(), readOutputFields(definition));
         return new ModuleUiCompilationResult(
-                compile(uiDefinition, ModuleKind.STATIC, definition.title(),
-                        staticOptionFields(definition.modelClass()), staticRecordLabelField(definition)),
+                compileResolved(uiDefinition, ModuleKind.STATIC, definition.title(),
+                        staticOptionFields(definition.modelClass()), staticReferenceFields(definition.modelClass()),
+                        staticRecordLabelField(definition)),
                 readModel(definition, uiDefinition)
         );
     }
@@ -56,13 +57,13 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compile(definition, null, null, Map.of(), null);
+        return compileResolved(definition, null, null, Map.of(), Map.of(), null);
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
                                                      ModuleKind moduleKind,
                                                      String title) {
-        return compile(definition, moduleKind, title, Map.of(), null);
+        return compileResolved(definition, moduleKind, title, Map.of(), Map.of(), null);
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -72,7 +73,7 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compile(definition, moduleKind, title, optionFields, null);
+        return compileResolved(definition, moduleKind, title, optionFields, Map.of(), null);
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -81,7 +82,24 @@ public final class ModuleUiDescriptorCompiler {
                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                      String defaultRecordLabelField) {
         if (definition == null) return null;
-        return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields,
+        return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields, Map.of(),
+                defaultRecordLabelField);
+    }
+
+    /**
+     * Compiles a source-neutral descriptor with both option and reference field metadata.
+     * Static and dynamic modules use this same resolved projection.
+     */
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                     Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                     String defaultRecordLabelField) {
+        if (definition == null) return null;
+        return compileResolved(definition, moduleKind, title,
+                optionFields == null ? Map.of() : optionFields,
+                referenceFields == null ? Map.of() : referenceFields,
                 defaultRecordLabelField);
     }
 
@@ -89,6 +107,7 @@ public final class ModuleUiDescriptorCompiler {
                                                               ModuleKind moduleKind,
                                                               String title,
                                                               Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                              Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
                                                               String defaultRecordLabelField) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
@@ -96,7 +115,7 @@ public final class ModuleUiDescriptorCompiler {
                 moduleKind,
                 title,
                 definition.views().stream()
-                        .map(view -> compileView(view, optionFields))
+                        .map(view -> compileView(view, optionFields, referenceFields))
                         .toList(),
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
@@ -123,20 +142,22 @@ public final class ModuleUiDescriptorCompiler {
     }
 
     private static ResolvedViewDescriptor compileView(ViewDefinition view,
-                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields) {
+                                                      Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                      Map<String, ResolvedReferenceFieldDescriptor> referenceFields) {
         return new ResolvedViewDescriptor(
                 view.viewCode(),
                 view.viewKind(),
                 view.clientType(),
                 view.title(),
                 view.fields().stream()
-                        .map(field -> compileField(field, optionFields))
+                        .map(field -> compileField(field, optionFields, referenceFields))
                         .toList()
         );
     }
 
     private static ResolvedViewFieldDescriptor compileField(ViewFieldDefinition field,
-                                                            Map<String, ResolvedOptionFieldDescriptor> optionFields) {
+                                                            Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                            Map<String, ResolvedReferenceFieldDescriptor> referenceFields) {
         return new ResolvedViewFieldDescriptor(
                 field.fieldRef(),
                 field.label(),
@@ -145,10 +166,24 @@ public final class ModuleUiDescriptorCompiler {
                 field.readOnly(),
                 field.uiType(),
                 field.width(),
+                field.columnSpan(),
                 field.align(),
                 field.fixed(),
-                field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null
+                field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null,
+                field.fieldRef().relationCode() == null ? referenceFields.get(field.fieldRef().fieldName()) : null
         );
+    }
+
+    private static Map<String, ResolvedReferenceFieldDescriptor> staticReferenceFields(Class<?> modelClass) {
+        if (modelClass == null) {
+            return Map.of();
+        }
+        return StaticReferenceResolver.rules(modelClass).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        rule -> rule.plan().sourceField(),
+                        rule -> new ResolvedReferenceFieldDescriptor(rule.target().qualifiedName(), rule.cardinality()),
+                        (left, right) -> left
+                ));
     }
 
     private static Map<String, ResolvedOptionFieldDescriptor> staticOptionFields(Class<?> modelClass) {

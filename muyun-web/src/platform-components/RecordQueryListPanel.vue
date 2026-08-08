@@ -52,7 +52,7 @@ export type RecordQueryListMode = 'normal' | 'recycleBin';
 export interface RecordQueryListColumn {
   key: string;
   title: string;
-  type?: 'text' | 'enabledStatus' | 'datetime';
+  type?: 'text' | 'enabledStatus' | 'datetime' | 'colorPicker';
   width?: string;
   align?: 'left' | 'center' | 'right';
   titleField?: string;
@@ -826,9 +826,11 @@ function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined)
       type:
         field.uiType === 'enabledStatus'
           ? 'enabledStatus'
-          : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
-            ? 'datetime'
-            : 'text',
+          : field.uiType === 'colorPicker'
+            ? 'colorPicker'
+            : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
+              ? 'datetime'
+              : 'text',
       width: field.width,
       align: columnAlign(field.align),
       titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
@@ -982,6 +984,21 @@ defineExpose({ refresh });
               )
             "
           />
+          <span
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'colorPicker'"
+            class="record-query-list-color"
+          >
+            <i
+              :style="{ backgroundColor: String((record as QueryListRow).record[column.key] ?? '') }"
+              aria-hidden="true"
+            />
+            {{
+              cellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            }}
+          </span>
           <template v-else>
             {{
               cellValue(
@@ -1198,6 +1215,19 @@ defineExpose({ refresh });
   border: 1px solid var(--muyun-border-subtle);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.record-query-list-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-query-list-color i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(15 23 42 / 18%);
+  border-radius: 50%;
 }
 
 .record-query-list-row-actions {

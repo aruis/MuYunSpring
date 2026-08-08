@@ -15,6 +15,8 @@ export type { DrawerPromotion } from './drawerPromotion';
 export { default as RecordExternalChangeNotice } from './RecordExternalChangeNotice.vue';
 export { default as RecordDetailFields } from './RecordDetailFields.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
+export { default as RecordPanelButton } from './RecordPanelButton.vue';
+export { default as RecordPanelState } from './RecordPanelState.vue';
 export { default as RecordExpandedSubtable } from './RecordExpandedSubtable.vue';
 export { default as UserSessionExpandedSubtable } from './UserSessionExpandedSubtable.vue';
 export {
@@ -30,6 +32,7 @@ export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
 export { default as RecordModeDrawer } from './RecordModeDrawer.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
+export { default as RecordMultiPicker } from './RecordMultiPicker.vue';
 export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecycleBinModeButton } from './RecycleBinModeButton.vue';
 export {

@@ -453,6 +453,7 @@ export interface ViewFieldDefinition {
   readOnly?: UiRule<boolean>;
   uiType?: string;
   width?: string;
+  columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
 }
@@ -465,9 +466,16 @@ export interface ResolvedViewFieldDescriptor {
   readOnly?: UiRule<boolean>;
   uiType?: string;
   width?: string;
+  columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
   fixed?: boolean;
   option?: ResolvedOptionFieldDescriptor;
+  reference?: ResolvedReferenceFieldDescriptor;
+}
+
+export interface ResolvedReferenceFieldDescriptor {
+  targetModuleAlias: string;
+  cardinality: 'ONE' | 'MANY';
 }
 
 export interface OptionBindingDescriptor {

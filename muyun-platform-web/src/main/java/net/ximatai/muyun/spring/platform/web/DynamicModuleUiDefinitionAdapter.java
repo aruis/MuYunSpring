@@ -84,6 +84,7 @@ public final class DynamicModuleUiDefinitionAdapter {
                 UiRule.constant(field.readOnly() == null ? Boolean.FALSE : field.readOnly()),
                 field.fieldUiControlAlias(),
                 width(field),
+                field.columnSpan(),
                 field.align(),
                 field.fixedPosition() == null ? null : Boolean.TRUE
         );

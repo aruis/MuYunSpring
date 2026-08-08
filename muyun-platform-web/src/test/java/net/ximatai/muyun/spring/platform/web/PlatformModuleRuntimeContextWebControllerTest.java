@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -107,6 +108,23 @@ class PlatformModuleRuntimeContextWebControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.ACCESS_DENIED))
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void shouldAuthorizeRuntimeContextAgainstTheCompleteDottedModuleAlias() throws Exception {
+        PlatformModuleRuntimeContextService service = mock(PlatformModuleRuntimeContextService.class);
+        AtomicReference<String> authorizedModuleAlias = new AtomicReference<>();
+        ActionExecutionPolicyService policy = context -> authorizedModuleAlias.set(context.moduleAlias());
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new PlatformModuleRuntimeContextWebController(service))
+                .addInterceptors(new ActionEndpointInterceptor(policy, new ActionEndpointContextResolver()))
+                .addFilters(new RequestTraceWebFilter())
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .build();
+
+        mvc.perform(get("/platform.module/mr.device/context"))
+                .andExpect(status().isOk());
+
+        assertThat(authorizedModuleAlias).hasValue("mr.device");
     }
 
     private MockMvc mvc(PlatformModuleRuntimeContextService service) {
