@@ -131,6 +131,14 @@ test('record form field state renders a color picker descriptor with the shared 
   assert.equal(resolveRecordFormFieldState('color', { fields }).controlType, 'colorPicker');
 });
 
+test('record form field state preserves typed file size presentation for read-only details', () => {
+  const fields = new Map<string, RecordFormFieldDescriptor>([
+    ['fileSize', { ...field('文件大小', { readOnly: true }), valuePresentation: 'FILE_SIZE' }],
+  ]);
+
+  assert.equal(resolveRecordFormFieldState('fileSize', { fields }).valuePresentation, 'FILE_SIZE');
+});
+
 test('record form field state infers reference picker cardinality without a UI override', () => {
   const fields = new Map<string, RecordFormFieldDescriptor>([
     [

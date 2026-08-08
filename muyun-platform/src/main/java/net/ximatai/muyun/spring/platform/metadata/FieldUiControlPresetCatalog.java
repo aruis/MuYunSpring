@@ -16,6 +16,7 @@ public final class FieldUiControlPresetCatalog {
                 fieldUiType("textarea", "文本域", "text", FieldUiControlValueShape.SCALAR, ViewControlType.TEXTAREA),
                 fieldUiType("number", "数字", "decimal", FieldUiControlValueShape.SCALAR, ViewControlType.DECIMAL),
                 fieldUiType("integer", "整数", "integer", FieldUiControlValueShape.SCALAR, ViewControlType.NUMBER),
+                fieldUiType("file_size", "文件大小", "long", FieldUiControlValueShape.SCALAR, ViewControlType.NUMBER),
                 fieldUiType("amount", "金额", "decimal", FieldUiControlValueShape.SCALAR, ViewControlType.DECIMAL),
                 fieldUiType("percentage", "百分比", "decimal", FieldUiControlValueShape.SCALAR, ViewControlType.DECIMAL),
                 fieldUiType("switch", "开关", "boolean", FieldUiControlValueShape.SCALAR, ViewControlType.SWITCH),

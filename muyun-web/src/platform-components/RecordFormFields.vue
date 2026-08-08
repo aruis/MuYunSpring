@@ -15,6 +15,7 @@ import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 import RecordPicker from './RecordPicker.vue';
 import RecordMultiPicker from './RecordMultiPicker.vue';
+import FileSizeText from './FileSizeText.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
@@ -105,6 +106,13 @@ function optionFieldValue(fieldName: string) {
 function scalarFieldValue(fieldName: string) {
   const value = props.record[fieldName];
   return value === undefined || value === null ? undefined : String(value);
+}
+
+function fileSizeValue(fieldName: string) {
+  const value = props.record[fieldName];
+  return typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint'
+    ? value
+    : undefined;
 }
 
 function stringArrayFieldValue(fieldName: string) {
@@ -314,6 +322,10 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       :value="scalarFieldValue(field.fieldName)"
       :disabled="fieldDisabled(field)"
       @update:value="updateField(field.fieldName, $event)"
+    />
+    <FileSizeText
+      v-else-if="field.valuePresentation === 'FILE_SIZE'"
+      :value="fileSizeValue(field.fieldName)"
     />
     <UiInput
       v-else

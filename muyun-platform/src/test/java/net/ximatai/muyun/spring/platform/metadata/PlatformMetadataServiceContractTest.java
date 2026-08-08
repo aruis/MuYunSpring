@@ -668,7 +668,15 @@ class PlatformMetadataServiceContractTest {
     void shouldExposePresetFieldUiControlBusinessGranularity() {
         assertThat(FieldUiControlPresetCatalog.fieldUiControls())
                 .extracting(FieldUiControl::getAlias)
-                .contains("text", "textarea", "amount", "select", "multi_select", "date_time_with_time_zone");
+                .contains("text", "textarea", "file_size", "amount", "select", "multi_select",
+                        "date_time_with_time_zone");
+        assertThat(FieldUiControlPresetCatalog.fieldUiControls())
+                .filteredOn(control -> "file_size".equals(control.getAlias()))
+                .singleElement()
+                .satisfies(control -> {
+                    assertThat(control.getDefaultFieldSpecAlias()).isEqualTo("long");
+                    assertThat(control.getValueShape()).isEqualTo(FieldUiControlValueShape.SCALAR);
+                });
         assertThat(FieldUiControlPresetCatalog.fieldUiControls())
                 .filteredOn(control -> "multi_select".equals(control.getAlias()))
                 .extracting(FieldUiControl::getValueShape)

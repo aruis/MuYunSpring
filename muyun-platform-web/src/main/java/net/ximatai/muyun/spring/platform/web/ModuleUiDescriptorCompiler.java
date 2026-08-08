@@ -214,8 +214,10 @@ public final class ModuleUiDescriptorCompiler {
                                                             Map<ViewFieldRef, FieldValueType> fieldTypes) {
         ResolvedReferenceSummaryFieldDescriptor referenceSummary = field.fieldRef().relationCode() == null
                 ? referenceSummaryFields.get(field.fieldRef().fieldName()) : null;
+        FieldValueType resolvedValueType = valueType(field.fieldRef(), fieldTypes);
         validateBooleanStatus(viewKind, field);
         validateTagList(viewKind, field, referenceSummary);
+        validateValuePresentation(viewKind, field, resolvedValueType);
         return new ResolvedViewFieldDescriptor(
                 field.fieldRef(),
                 field.label(),
@@ -223,7 +225,8 @@ public final class ModuleUiDescriptorCompiler {
                 field.required(),
                 field.readOnly(),
                 field.uiType(),
-                valueType(field.fieldRef(), fieldTypes),
+                resolvedValueType,
+                field.valuePresentation(),
                 field.width(),
                 field.columnSpan(),
                 field.align(),
@@ -233,6 +236,22 @@ public final class ModuleUiDescriptorCompiler {
                 field.fieldRef().relationCode() == null ? referenceFields.get(field.fieldRef().fieldName()) : null,
                 referenceSummary
         );
+    }
+
+    private static void validateValuePresentation(ModuleViewKind viewKind,
+                                                  ViewFieldDefinition field,
+                                                  FieldValueType valueType) {
+        if (field.valuePresentation() != FieldValuePresentation.FILE_SIZE) {
+            return;
+        }
+        if (valueType != null && valueType != FieldValueType.LONG) {
+            throw new IllegalArgumentException("file size presentation requires LONG field: "
+                    + field.fieldRef().fieldName());
+        }
+        if (viewKind == ModuleViewKind.FORM && !Boolean.TRUE.equals(field.readOnly().constant())) {
+            throw new IllegalArgumentException("file size presentation must be read-only in FORM views: "
+                    + field.fieldRef().fieldName());
+        }
     }
 
     private static FieldValueType valueType(ViewFieldRef fieldRef,
