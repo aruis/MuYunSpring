@@ -194,9 +194,7 @@ public class DynamicRecordWebController implements
             }
             return DynamicQuerySchemas.from(DynamicWebRequest.moduleAlias(),
                     service().describe(), quickSearchFieldsForSchema(uiConfigId),
-                    queryItemService == null || !hasText(queryTemplateId)
-                            ? List.of()
-                            : queryItemService.externalValueKeys(queryTemplateId));
+                    querySchemaExternalCriteriaKeys(DynamicWebRequest.moduleAlias(), uiConfigId, queryTemplateId));
         });
     }
 
@@ -223,7 +221,50 @@ public class DynamicRecordWebController implements
                 request, pageConfigSnapshotService, moduleMetadataFieldService, fieldUiControlService,
                 fieldUiControlBindingService, service()::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(DynamicWebRequest.moduleAlias(), request);
-        return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
+        Criteria workspaceCriteria = scopedListWorkspaceCriteria(DynamicWebRequest.moduleAlias(), request);
+        return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria, workspaceCriteria);
+    }
+
+    private List<String> querySchemaExternalCriteriaKeys(String moduleAlias, String uiConfigId,
+                                                          String queryTemplateId) {
+        java.util.LinkedHashSet<String> keys = new java.util.LinkedHashSet<>();
+        scopedListWorkspaceCriteriaKey(moduleAlias, uiConfigId).ifPresent(keys::add);
+        if (queryItemService != null && hasText(queryTemplateId)) {
+            keys.addAll(queryItemService.externalValueKeys(queryTemplateId));
+        }
+        return List.copyOf(keys);
+    }
+
+    private Criteria scopedListWorkspaceCriteria(String moduleAlias, WebQueryRequest request) {
+        if (request == null || !hasText(request.uiConfigId()) || request.externalQueryValues() == null) {
+            return Criteria.of();
+        }
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
+        String criteriaKey = scopedListWorkspaceCriteriaKey(uiConfig);
+        if (criteriaKey == null || !request.externalQueryValues().containsKey(criteriaKey)) {
+            return Criteria.of();
+        }
+        Object scopeValue = request.externalQueryValues().get(criteriaKey);
+        return scopeValue == null ? Criteria.of() : Criteria.of().eq(uiConfig.getScopeField(), scopeValue);
+    }
+
+    private java.util.Optional<String> scopedListWorkspaceCriteriaKey(String moduleAlias, String uiConfigId) {
+        if (!hasText(uiConfigId) || pageConfigSnapshotService == null) {
+            return java.util.Optional.empty();
+        }
+        PlatformUiConfig uiConfig = publishedUiConfig(pageConfigSnapshotService.snapshot(moduleAlias), uiConfigId);
+        return java.util.Optional.ofNullable(scopedListWorkspaceCriteriaKey(uiConfig));
+    }
+
+    private String scopedListWorkspaceCriteriaKey(PlatformUiConfig uiConfig) {
+        if (uiConfig.getScopeModuleAlias() == null || uiConfig.getScopeModuleAlias().isBlank()
+                || uiConfig.getScopeField() == null || uiConfig.getScopeField().isBlank()) {
+            return null;
+        }
+        return hasText(uiConfig.getScopeQueryCriteriaKey())
+                ? uiConfig.getScopeQueryCriteriaKey()
+                : uiConfig.getScopeField();
     }
 
     private Criteria andCriteria(Criteria... criteriaList) {

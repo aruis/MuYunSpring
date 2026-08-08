@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -86,9 +87,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     }
 
     default Criteria queryCriteria(WebQueryRequest request) {
+        Criteria workspaceCriteria = scopedListWorkspaceCriteria(request);
         if (service() instanceof QueryAbility<?> queryAbility) {
             Criteria criteria = queryAbility.queryCriteria(WebQueryRequests.from(request));
-            return criteria == null ? Criteria.of() : criteria;
+            return andCriteria(criteria, workspaceCriteria);
         }
         if (request != null && !request.conditions().isEmpty()) {
             throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
@@ -96,7 +98,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
             throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
         }
-        return Criteria.of();
+        return workspaceCriteria;
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
@@ -121,13 +123,62 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             if (projectionService != null && this instanceof StaticModuleUiContributor contributor
                     && isCurrentModuleUiDefinition(contributor)
                     && projectionService.hasModuleDefinition(contributor.moduleUiDefinition().moduleAlias())) {
-                return projectionService.querySchema(contributor.moduleUiDefinition().moduleAlias(), service());
+                return withScopedListWorkspaceCriteria(
+                        projectionService.querySchema(contributor.moduleUiDefinition().moduleAlias(), service()), uiConfigId);
             }
             if (service() instanceof QueryAbility<?> queryAbility) {
-                return queryAbility.querySchema();
+                return withScopedListWorkspaceCriteria(queryAbility.querySchema(), uiConfigId);
             }
             throw new IllegalArgumentException("query schema is not supported by " + webScopeName());
         });
+    }
+
+    private Criteria scopedListWorkspaceCriteria(WebQueryRequest request) {
+        ScopedListWorkspaceDefinition workspace = scopedListWorkspace(request == null ? null : request.uiConfigId());
+        if (workspace == null || request == null || request.externalQueryValues() == null
+                || !request.externalQueryValues().containsKey(workspace.queryCriteriaKey())) {
+            return Criteria.of();
+        }
+        Object scopeValue = request.externalQueryValues().get(workspace.queryCriteriaKey());
+        return scopeValue == null ? Criteria.of() : Criteria.of().eq(workspace.scopeField(), scopeValue);
+    }
+
+    private QuerySchema withScopedListWorkspaceCriteria(QuerySchema schema, String uiConfigId) {
+        ScopedListWorkspaceDefinition workspace = scopedListWorkspace(uiConfigId);
+        if (workspace == null || schema.externalCriteria().stream()
+                .anyMatch(criteria -> workspace.queryCriteriaKey().equals(criteria.key()))) {
+            return schema;
+        }
+        List<QuerySchema.ExternalCriteria> externalCriteria = new ArrayList<>(schema.externalCriteria());
+        externalCriteria.add(new QuerySchema.ExternalCriteria(workspace.queryCriteriaKey(), "OBJECT", "PAGE_CONTEXT"));
+        return new QuerySchema(schema.scopeName(), schema.entityAlias(), schema.quickSearch(), schema.fields(),
+                externalCriteria, schema.defaultSorts());
+    }
+
+    private ScopedListWorkspaceDefinition scopedListWorkspace(String uiConfigId) {
+        if (!(this instanceof StaticModuleUiContributor contributor) || !isCurrentModuleUiDefinition(contributor)) {
+            return null;
+        }
+        List<ViewDefinition> listViews = contributor.moduleUiDefinition().views().stream()
+                .filter(view -> view.viewKind() == ModuleViewKind.LIST)
+                .toList();
+        if (uiConfigId != null && !uiConfigId.isBlank()) {
+            return listViews.stream()
+                    .filter(view -> uiConfigId.equals(view.sourceUiConfigId()))
+                    .map(ViewDefinition::scopedListWorkspace)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return listViews.size() == 1 ? listViews.getFirst().scopedListWorkspace() : null;
+    }
+
+    private Criteria andCriteria(Criteria first, Criteria second) {
+        if (first == null || first.isEmpty()) return second == null ? Criteria.of() : second;
+        if (second == null || second.isEmpty()) return first;
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(first.getRoot());
+        criteria.andGroup(second.getRoot());
+        return criteria;
     }
 
     @GetMapping("/form/schema")
