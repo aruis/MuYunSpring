@@ -11,6 +11,15 @@ Typical examples:
 - workflow action panels
 - query tables and child tables
 
+## File transfers
+
+`FileTransferUploader` is the common browser-to-MuYunFileServer interaction
+component. It deliberately does not know an application record. An application
+supplies two callbacks: `requestUploadAccess(file)` authorizes the file and
+returns a short-lived multipart target; `confirmUpload(receipt)` turns the
+FileServer result into an application fact. The component owns selection,
+multipart upload, progress, cancellation, retry and standard feedback.
+
 This layer may compose `vue-ui-antdv`, `web-core`, `dynamic-page-runtime`, and `web-contracts`, but should only accept business semantics that are stable across multiple business projects.
 
 ## Management State Helpers

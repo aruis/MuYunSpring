@@ -162,6 +162,16 @@ public class ActionEndpointContextResolver {
         if (staticModule != null && !staticModule.alias().isBlank()) {
             return staticModule.alias();
         }
+        PlatformStaticActionScope actionScope = handlerMethod.getBeanType()
+                .getAnnotation(PlatformStaticActionScope.class);
+        if (actionScope != null && !actionScope.module().isBlank()) {
+            return actionScope.module();
+        }
+        PlatformStaticWebProjection projection = handlerMethod.getBeanType()
+                .getAnnotation(PlatformStaticWebProjection.class);
+        if (projection != null && !projection.module().isBlank()) {
+            return projection.module();
+        }
         String pathModuleAlias = pathVariable(request, MODULE_ALIAS_PATH_KEY);
         if (pathModuleAlias != null && !pathModuleAlias.isBlank()) {
             return pathModuleAlias;

@@ -24,6 +24,9 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         if ("fileSize".equals(uiType) || "file_size".equals(uiType)) {
             throw new IllegalArgumentException("file size must use value presentation instead of uiType");
         }
+        if ("fileTransfer".equals(uiType) || "file_transfer".equals(uiType)) {
+            throw new IllegalArgumentException("file transfer requires the unified file-reference lifecycle");
+        }
         if (valuePresentation == FieldValuePresentation.FILE_SIZE && uiType != null) {
             throw new IllegalArgumentException("file size presentation cannot declare an input uiType");
         }
@@ -102,6 +105,23 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public Builder readOnly() {
             this.readOnly = UiRule.constant(Boolean.TRUE);
+            return this;
+        }
+
+        /**
+         * Enables this editor only when the formula evaluates to true for the current draft.
+         * It is presentation-only; mutation endpoints must still enforce their business invariants.
+         */
+        public Builder enabledWhen(UiFormula formula) {
+            if (formula == null) {
+                throw new IllegalArgumentException("enabled formula must not be null");
+            }
+            this.readOnly = UiRule.formula(formula.negated());
+            return this;
+        }
+
+        public Builder disabledHint(String hint) {
+            this.readOnly = new UiRule<>(readOnly.constant(), readOnly.formula(), hint);
             return this;
         }
 

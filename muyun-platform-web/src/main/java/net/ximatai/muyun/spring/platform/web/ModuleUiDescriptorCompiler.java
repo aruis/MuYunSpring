@@ -345,9 +345,25 @@ public final class ModuleUiDescriptorCompiler {
         return StaticReferenceResolver.rules(modelClass).stream()
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(
                         rule -> rule.plan().sourceField(),
-                        rule -> new ResolvedReferenceFieldDescriptor(rule.target().qualifiedName(), rule.cardinality()),
+                        rule -> new ResolvedReferenceFieldDescriptor(rule.target().qualifiedName(), rule.cardinality(),
+                                referenceTitleField(modelClass, rule.plan().sourceField())),
                         (left, right) -> left
                 ));
+    }
+
+    /**
+     * A direct {@code @ReferenceLoad(source = "…", field = "title")} is the canonical
+     * read-side label for a scalar reference. Deliver its output field so detail views
+     * can render the resolved label without a second client request.
+     */
+    private static String referenceTitleField(Class<?> modelClass, String sourceField) {
+        return StaticReferenceResolver.rules(modelClass).stream()
+                .filter(rule -> rule.plan().sourceField().equals(sourceField))
+                .flatMap(rule -> rule.plan().projections().stream())
+                .filter(projection -> "title".equals(projection.targetField()))
+                .map(ReferenceProjection::outputField)
+                .findFirst()
+                .orElse(null);
     }
 
     private static Map<String, ResolvedReferenceSummaryFieldDescriptor> staticReferenceSummaryFields(Class<?> modelClass) {

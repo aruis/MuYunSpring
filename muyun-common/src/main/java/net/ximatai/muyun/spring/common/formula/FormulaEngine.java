@@ -487,6 +487,10 @@ public class FormulaEngine {
                 Object value = argNullable(args, 0);
                 yield value == null || "".equals(value);
             }
+            case "PRESENT" -> {
+                Object value = argNullable(args, 0);
+                yield value != null && !"".equals(value);
+            }
             case "WHERE", "FILTER" -> throw new FormulaEvaluationException(
                     "FORMULA_AGGREGATE_CONDITION_ONLY",
                     name + " only supports aggregate condition"

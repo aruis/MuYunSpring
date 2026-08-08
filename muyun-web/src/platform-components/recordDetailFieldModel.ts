@@ -34,6 +34,10 @@ export function resolveRecordDetailDisplayValue(
       return option.label;
     }
   }
+  const referenceTitle = field.referenceTitleField ? record[field.referenceTitleField] : undefined;
+  if (isPresent(referenceTitle)) {
+    return String(referenceTitle);
+  }
   if (field.controlType === 'recordPicker' && isRecordPickerRecord(value)) {
     return field.pickerConfig?.titleOf?.(value) ?? value.title ?? value.code ?? value.id ?? emptyText;
   }

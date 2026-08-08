@@ -471,6 +471,17 @@ export type ModuleUiClientType = 'WEB';
 
 export interface UiRule<T> {
   constant?: T;
+  formula?: UiFormula;
+  disabledHint?: string;
+}
+
+/**
+ * A platform-owned portable Boolean predicate evaluated against the current record draft.
+ * The current grammar supports `PRESENT({fieldName})`, `!()` negation, and `&&` conjunction of PRESENT terms.
+ * It is deliberately smaller than the server FormulaEngine because this contract must run in every Web client.
+ */
+export interface UiFormula {
+  expression: string;
 }
 
 export interface ViewFieldRef {
@@ -547,6 +558,8 @@ export interface ResolvedReferenceSummaryFieldDescriptor {
 export interface ResolvedReferenceFieldDescriptor {
   targetModuleAlias: string;
   cardinality: 'ONE' | 'MANY';
+  /** Read-side title projection for this scalar reference, when supplied by the server. */
+  titleField?: string;
 }
 
 export interface OptionBindingDescriptor {

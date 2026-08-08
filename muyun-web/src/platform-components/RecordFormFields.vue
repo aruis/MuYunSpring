@@ -92,6 +92,7 @@ function fieldState(fieldName: string): RecordFormFieldState {
     fallback: props.fallback,
     pickerConfigs: props.pickerConfigs,
     placeholderOf: props.placeholderOf,
+    record: props.record,
   });
 }
 
