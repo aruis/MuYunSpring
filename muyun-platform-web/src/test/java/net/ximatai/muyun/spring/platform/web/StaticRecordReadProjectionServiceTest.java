@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
+import net.ximatai.muyun.spring.iam.user.PasswordStatus;
 import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -135,6 +136,35 @@ class StaticRecordReadProjectionServiceTest {
         assertThat(projected.total()).isEqualTo(response.total());
         assertThat(projected.pageNum()).isEqualTo(response.pageNum());
         assertThat(projected.pageSize()).isEqualTo(response.pageSize());
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void shouldPopulateOptionTitleForProjectedStaticResponse() {
+        StaticRecordReadProjectionService service = new StaticRecordReadProjectionService(
+                new StaticModuleDefinitionCatalog(List.of(userRelationDefinitionWithPasswordStatusColumn())),
+                null,
+                new RelationProjectionDatabaseTypeProvider(),
+                new OptionSourceRegistry(List.of(new CodeTitleEnumOptionSourceProvider()))
+        );
+        CrudAbility recordService = mock(CrudAbility.class);
+        when(recordService.modelClass()).thenReturn(UserAccount.class);
+        UserAccount record = new UserAccount();
+        record.setId("user-1");
+        record.setUsername("alice");
+        record.setPasswordStatus(PasswordStatus.NORMAL);
+
+        WebPageResponse<?> projected = service.projectDefaultList(
+                "iam.user",
+                WebPageResponse.fromList(List.of(record)),
+                recordService
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> output = (Map<String, Object>) projected.records().getFirst();
+        assertThat(output)
+                .containsEntry("passwordStatus", PasswordStatus.NORMAL)
+                .containsEntry("passwordStatusTitle", "正常");
     }
 
     @Test
@@ -291,14 +321,15 @@ class StaticRecordReadProjectionServiceTest {
         @SuppressWarnings("rawtypes")
         CrudAbility recordService = mock(CrudAbility.class);
         when(recordService.modelClass()).thenReturn(UserAccount.class);
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("id", "user-1");
+        row.put("username", "alice");
+        row.put("passwordStatus", "NORMAL");
+        row.put("passwordStatusTitle", null);
+        row.put("employeeNo", "E001");
+        row.put("employeeTitle", "Alice");
         when(jdbcOperations.queryForList(any(String.class), any(Map.class)))
-                .thenReturn(List.of(Map.of(
-                        "id", "user-1",
-                        "username", "alice",
-                        "passwordStatus", "normal",
-                        "employeeNo", "E001",
-                        "employeeTitle", "Alice"
-                )));
+                .thenReturn(List.of(row));
         when(jdbcOperations.queryForObject(any(String.class), any(Map.class), eq(Long.class)))
                 .thenReturn(1L);
 
@@ -312,7 +343,7 @@ class StaticRecordReadProjectionServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> output = (Map<String, Object>) response.records().getFirst();
         assertThat(output)
-                .containsEntry("passwordStatus", "normal")
+                .containsEntry("passwordStatus", "NORMAL")
                 .containsEntry("passwordStatusTitle", "正常")
                 .containsEntry("employeeNo", "E001")
                 .containsEntry("employeeTitle", "Alice");
@@ -559,4 +590,5 @@ class StaticRecordReadProjectionServiceTest {
             this.mobile = mobile;
         }
     }
+
 }
