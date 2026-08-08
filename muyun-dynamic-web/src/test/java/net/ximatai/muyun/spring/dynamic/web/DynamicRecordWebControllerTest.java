@@ -1297,7 +1297,7 @@ class DynamicRecordWebControllerTest {
         assertThat(externalValues.getValue()).containsEntry("owner", "user-1");
         assertThat(externalValues.getValue()).containsEntry("optional", null);
         verify(mainEntity).queryCriteria(any());
-        verify(snapshotService, times(2)).snapshot(MODULE);
+        verify(snapshotService, times(3)).snapshot(MODULE);
     }
 
     @Test

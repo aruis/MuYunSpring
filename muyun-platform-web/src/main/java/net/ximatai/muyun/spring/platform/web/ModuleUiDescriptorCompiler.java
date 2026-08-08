@@ -45,9 +45,10 @@ public final class ModuleUiDescriptorCompiler {
                 ? new ModuleUiDefinition(definition.moduleAlias(), List.of(), List.of())
                 : definition.uiDefinition();
         validateFields(uiDefinition, definition.entities(), definition.moduleAlias(), readOutputFields(definition));
+        Map<String, ResolvedReferenceFieldDescriptor> referenceFields = staticReferenceFields(definition.modelClass());
         return new ModuleUiCompilationResult(
                 compileResolved(uiDefinition, ModuleKind.STATIC, definition.title(),
-                        staticOptionFields(definition.modelClass()), staticReferenceFields(definition.modelClass()),
+                        staticOptionFields(definition.modelClass()), referenceFields,
                         staticRecordLabelField(definition)),
                 readModel(definition, uiDefinition)
         );
@@ -124,6 +125,25 @@ public final class ModuleUiDescriptorCompiler {
         );
     }
 
+    private static void validateScopedListWorkspace(ScopedListWorkspaceDefinition workspace,
+                                                    Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                    String moduleAlias) {
+        if (workspace == null) return;
+        ResolvedReferenceFieldDescriptor reference = referenceFields.get(workspace.scopeField());
+        if (reference == null) {
+            throw new IllegalArgumentException("scoped list workspace field must be a reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (reference.cardinality() != net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE) {
+            throw new IllegalArgumentException("scoped list workspace field must be a single reference: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+        if (!workspace.scopeModuleAlias().equals(reference.targetModuleAlias())) {
+            throw new IllegalArgumentException("scoped list workspace reference target must match scope module: "
+                    + moduleAlias + "." + workspace.scopeField());
+        }
+    }
+
     private static ResolvedUiActionDescriptor compileAction(UiActionDefinition action) {
         UiActionConfirmationDefinition confirmation = action.confirmation();
         return new ResolvedUiActionDescriptor(
@@ -144,6 +164,7 @@ public final class ModuleUiDescriptorCompiler {
     private static ResolvedViewDescriptor compileView(ViewDefinition view,
                                                       Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                       Map<String, ResolvedReferenceFieldDescriptor> referenceFields) {
+        validateScopedListWorkspace(view.scopedListWorkspace(), referenceFields, view.viewCode());
         return new ResolvedViewDescriptor(
                 view.viewCode(),
                 view.viewKind(),
@@ -151,7 +172,9 @@ public final class ModuleUiDescriptorCompiler {
                 view.title(),
                 view.fields().stream()
                         .map(field -> compileField(field, optionFields, referenceFields))
-                        .toList()
+                        .toList(),
+                view.sourceUiConfigId(),
+                ResolvedScopedListWorkspaceDescriptor.from(view.scopedListWorkspace())
         );
     }
 

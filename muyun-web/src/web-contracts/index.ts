@@ -511,6 +511,9 @@ export interface ResolvedViewDescriptor {
   clientType?: ModuleUiClientType;
   title?: string;
   fields: ResolvedViewFieldDescriptor[];
+  /** Dynamic-page provenance used to select the view configured by a menu entry. */
+  sourceUiConfigId?: string;
+  scopedListWorkspace?: ResolvedScopedListWorkspaceDescriptor;
 }
 
 export interface ResolvedUiActionConfirmationDescriptor {
@@ -521,6 +524,17 @@ export interface ResolvedUiActionConfirmationDescriptor {
 export interface ResolvedUiActionDescriptor {
   actionCode: string;
   confirmation?: ResolvedUiActionConfirmationDescriptor;
+}
+
+export interface ResolvedScopedListWorkspaceDescriptor {
+  scopeModuleAlias: string;
+  scopeField: string;
+  queryCriteriaKey: string;
+  scopeTitle: string;
+  scopeSearchPlaceholder: string;
+  /** Scope list items only show a secondary label when the descriptor explicitly enables it. */
+  showScopeItemSubtitle: boolean;
+  createPolicy: 'REQUIRE_SCOPE' | 'ALLOW_UNSCOPED';
 }
 
 export interface ModuleUiDefinition {

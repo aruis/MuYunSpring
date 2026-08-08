@@ -76,16 +76,7 @@ public class PlatformPageBootstrapService {
         if (!isModuleEntryMenu(menu)) {
             throw new PlatformException("Page bootstrap requires module entry menu: " + menuId);
         }
-        PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(menu.getModuleAlias());
-        MenuPageMode pageMode = menu.getPageMode() == null ? MenuPageMode.LIST : menu.getPageMode();
-        return new PlatformPageBootstrap(
-                PlatformPageEntryContext.from(menu,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
-                        resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
-                requestedClientType,
-                resolveConfig(snapshot, requestedClientType,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType))
-        );
+        return bootstrap(menu, requestedClientType);
     }
 
     public PlatformPageBootstrap bootstrapByModule(String moduleAlias) {
@@ -99,15 +90,19 @@ public class PlatformPageBootstrapService {
         if (menu == null) {
             throw new PlatformException("Module menu is not visible or does not exist: " + validAlias);
         }
-        PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(validAlias);
+        return bootstrap(menu, requestedClientType);
+    }
+
+    private PlatformPageBootstrap bootstrap(Menu menu, PlatformUiClientType clientType) {
+        PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(menu.getModuleAlias());
         MenuPageMode pageMode = menu.getPageMode() == null ? MenuPageMode.LIST : menu.getPageMode();
+        String defaultUiConfigId = resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, clientType);
         return new PlatformPageBootstrap(
                 PlatformPageEntryContext.from(menu,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
+                        defaultUiConfigId,
                         resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
-                requestedClientType,
-                resolveConfig(snapshot, requestedClientType,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType))
+                clientType,
+                resolveConfig(snapshot, clientType, selectedUiConfig(snapshot, clientType, defaultUiConfigId))
         );
     }
 
@@ -191,7 +186,7 @@ public class PlatformPageBootstrapService {
 
     private PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot,
                                                      PlatformUiClientType clientType,
-                                                     String defaultUiConfigId) {
+                                                     PlatformUiConfig selectedUiConfig) {
         if (moduleFieldService == null) {
             return PlatformResolvedPageConfig.empty();
         }
@@ -207,25 +202,25 @@ public class PlatformPageBootstrapService {
                 .map(this::resolvedQueryItem)
                 .toList();
         return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiControls(uiFields),
-                associationBlocks(snapshot, clientType, defaultUiConfigId),
-                actionBlocks(snapshot, clientType, defaultUiConfigId),
-                taskBlocks(snapshot, clientType, defaultUiConfigId));
+                associationBlocks(snapshot.moduleAlias(), selectedUiConfig),
+                actionBlocks(snapshot.moduleAlias(), selectedUiConfig),
+                taskBlocks(selectedUiConfig));
     }
 
-    private List<PlatformAssociationBlock> associationBlocks(PlatformPageConfigSnapshot snapshot,
-                                                             PlatformUiClientType clientType,
-                                                             String defaultUiConfigId) {
-        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
-            return List.of();
-        }
+    private PlatformUiConfig selectedUiConfig(PlatformPageConfigSnapshot snapshot,
+                                              PlatformUiClientType clientType,
+                                              String uiConfigId) {
+        if (uiConfigId == null || uiConfigId.isBlank()) return null;
         return snapshot.uiConfigs().stream()
                 .filter(config -> config.getClientType() == clientType)
-                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
-                .flatMap(config -> associationBlocks(snapshot.moduleAlias(), config).stream())
-                .toList();
+                .filter(config -> Objects.equals(config.getId(), uiConfigId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Default UI config is not published in module snapshot: "
+                        + uiConfigId));
     }
 
     private List<PlatformAssociationBlock> associationBlocks(String moduleAlias, PlatformUiConfig config) {
+        if (config == null) return List.of();
         String layoutJson = config.getLayoutJson();
         if (layoutJson == null || layoutJson.isBlank()) {
             return List.of();
@@ -262,20 +257,8 @@ public class PlatformPageBootstrapService {
         return resolved;
     }
 
-    private List<PlatformActionBlock> actionBlocks(PlatformPageConfigSnapshot snapshot,
-                                                   PlatformUiClientType clientType,
-                                                   String defaultUiConfigId) {
-        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
-            return List.of();
-        }
-        return snapshot.uiConfigs().stream()
-                .filter(config -> config.getClientType() == clientType)
-                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
-                .flatMap(config -> actionBlocks(snapshot.moduleAlias(), config).stream())
-                .toList();
-    }
-
     private List<PlatformActionBlock> actionBlocks(String moduleAlias, PlatformUiConfig config) {
+        if (config == null) return List.of();
         String layoutJson = config.getLayoutJson();
         if (layoutJson == null || layoutJson.isBlank()) {
             return List.of();
@@ -359,17 +342,8 @@ public class PlatformPageBootstrapService {
         );
     }
 
-    private List<PlatformTaskBlock> taskBlocks(PlatformPageConfigSnapshot snapshot,
-                                               PlatformUiClientType clientType,
-                                               String defaultUiConfigId) {
-        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
-            return List.of();
-        }
-        return snapshot.uiConfigs().stream()
-                .filter(config -> config.getClientType() == clientType)
-                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
-                .flatMap(config -> PlatformTaskBlockLayoutResolver.resolve(config).stream())
-                .toList();
+    private List<PlatformTaskBlock> taskBlocks(PlatformUiConfig config) {
+        return config == null ? List.of() : PlatformTaskBlockLayoutResolver.resolve(config);
     }
 
     private String text(JsonNode node, String field) {

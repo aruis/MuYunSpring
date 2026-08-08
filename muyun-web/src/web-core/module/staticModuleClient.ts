@@ -22,6 +22,7 @@ export interface RecordActionRequest {
 
 export interface QuerySchemaRequestOptions {
   uiConfigId?: string;
+  queryTemplateId?: string;
 }
 
 export interface StaticModuleCrudClient<TRecord> {
@@ -65,6 +66,7 @@ export function createStaticResourceCrudClient<TRecord>(
         path: `${modulePath}/query/schema`,
         query: {
           uiConfigId: options?.uiConfigId,
+          queryTemplateId: options?.queryTemplateId,
         },
       }),
     query: (request) =>

@@ -52,6 +52,21 @@ public final class DynamicModuleUiDefinitionAdapter {
         return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of());
     }
 
+    private static ScopedListWorkspaceDefinition scopedListWorkspace(PlatformUiConfig config,
+                                                                      ModuleViewKind viewKind) {
+        if (viewKind != ModuleViewKind.LIST || config.getScopeModuleAlias() == null
+                || config.getScopeModuleAlias().isBlank()) {
+            return null;
+        }
+        String createPolicy = config.getScopeCreatePolicy();
+        return new ScopedListWorkspaceDefinition(config.getScopeModuleAlias(), config.getScopeField(),
+                config.getScopeQueryCriteriaKey(), config.getScopeTitle(), config.getScopeSearchPlaceholder(),
+                Boolean.TRUE.equals(config.getScopeShowItemSubtitle()),
+                createPolicy == null || createPolicy.isBlank()
+                        ? ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED
+                        : ScopedListWorkspaceCreatePolicy.valueOf(createPolicy));
+    }
+
     private static ViewDefinition view(PlatformUiConfig config,
                                        PlatformUiSet uiSet,
                                        ModuleViewKind viewKind,
@@ -61,7 +76,9 @@ public final class DynamicModuleUiDefinitionAdapter {
                 viewKind,
                 ModuleUiClientType.WEB,
                 viewTitle(config, uiSet),
-                fields(fields)
+                fields(fields),
+                config.getId(),
+                scopedListWorkspace(config, viewKind)
         );
     }
 

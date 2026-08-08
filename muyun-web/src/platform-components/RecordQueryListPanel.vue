@@ -102,6 +102,8 @@ const props = withDefaults(
     queryTemplateId?: string;
     ready?: boolean;
     externalQueryValues?: Record<string, unknown>;
+    /** Descriptor-owned external criteria that must be exposed by the query schema. */
+    requiredExternalCriteriaKeys?: string[];
     quickSearchPlaceholder?: string;
     emptyDescription?: string;
     waitingDescription?: string;
@@ -127,6 +129,7 @@ const props = withDefaults(
     queryTemplateId: undefined,
     ready: true,
     externalQueryValues: undefined,
+    requiredExternalCriteriaKeys: () => [],
     quickSearchPlaceholder: '搜索',
     emptyDescription: '暂无记录',
     waitingDescription: '请选择查询范围',
@@ -221,7 +224,7 @@ const tableColumns = computed<RecordQueryListColumn[]>(() => {
   if (props.columns && props.columns.length > 0) {
     return recycleBinColumns(props.columns);
   }
-  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value));
+  return recycleBinColumns(columnsFromRuntimeListView(runtimeViews.value, props.uiConfigId));
 });
 const dataTableColumns = computed<UiDataTableColumn[]>(() =>
   tableColumns.value.map((column) => ({
@@ -301,11 +304,23 @@ async function loadSchemaAndRecords() {
     runtimeViews.value = await loadRuntimeViews();
     const nextSchema = await props.context.crud.querySchema({
       uiConfigId: props.uiConfigId,
+      queryTemplateId: props.queryTemplateId,
     });
     if (requestSeq !== schemaRequestSeq) {
       return;
     }
     schema.value = nextSchema;
+    if (
+      props.requiredExternalCriteriaKeys.some(
+        (key) => !nextSchema.externalCriteria.some((criteria) => criteria.key === key),
+      )
+    ) {
+      descriptorLoadError.value = true;
+      records.value = [];
+      total.value = 0;
+      emit('loaded', []);
+      return;
+    }
     activeConditions.value = [];
     conditionsExpanded.value = false;
     resetConditionDrafts();
@@ -316,6 +331,13 @@ async function loadSchemaAndRecords() {
     }
     if (isUnsupportedQuerySchemaError(cause)) {
       schema.value = emptyQuerySchema(props.context.moduleAlias);
+      if (props.requiredExternalCriteriaKeys.length > 0) {
+        descriptorLoadError.value = true;
+        records.value = [];
+        total.value = 0;
+        emit('loaded', []);
+        return;
+      }
       activeConditions.value = [];
       conditionsExpanded.value = false;
       resetConditionDrafts();
@@ -811,8 +833,12 @@ function displayRecordFieldValue(record: QueryListRecord, fieldName: string, tit
   return String(value ?? '');
 }
 
-function columnsFromRuntimeListView(views: ResolvedViewDescriptor[] | undefined): RecordQueryListColumn[] {
+function columnsFromRuntimeListView(
+  views: ResolvedViewDescriptor[] | undefined,
+  uiConfigId?: string,
+): RecordQueryListColumn[] {
   const view =
+    views?.find((item) => item.viewKind === 'LIST' && item.sourceUiConfigId === uiConfigId) ??
     views?.find((item) => item.viewKind === 'LIST' && item.viewCode === 'default_list') ??
     views?.find((item) => item.viewKind === 'LIST');
   if (!view) {

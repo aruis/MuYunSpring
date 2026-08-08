@@ -132,6 +132,19 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
                 ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
+    public List<String> externalValueKeys(String queryTemplateId) {
+        if (queryTemplateId == null || queryTemplateId.isBlank()) {
+            return List.of();
+        }
+        return list(enabledCriteria(Criteria.of().eq("queryTemplateId", queryTemplateId)), ALL,
+                Sort.asc(PlatformAbilityFields.SORT_FIELD)).stream()
+                .filter(item -> Boolean.TRUE.equals(item.getAllowExternalValue()))
+                .map(PlatformQueryItem::getExternalValueKey)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+    }
+
     public Criteria compile(String queryTemplateId) {
         return compile(queryTemplateId, Map.of());
     }

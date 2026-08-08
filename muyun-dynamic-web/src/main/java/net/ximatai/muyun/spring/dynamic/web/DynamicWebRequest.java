@@ -22,6 +22,10 @@ final class DynamicWebRequest {
         return Preconditions.requireText(firstPathSegment(requestPath(request)), "moduleAlias");
     }
 
+    static String queryParameter(String name) {
+        return currentRequest().getParameter(name);
+    }
+
     private static HttpServletRequest currentRequest() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
             return attributes.getRequest();
