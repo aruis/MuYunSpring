@@ -332,6 +332,9 @@ class PlatformModuleRuntimeContextServiceTest {
                 "customer",
                 List.of(dynamicAction(PlatformAction.QUERY), dynamicAction(PlatformAction.CREATE)),
                 List.of(dynamicEntity("customer", List.of(
+                        DynamicFieldDescriptor.from(FieldDefinition.string("name", "客户名称")),
+                        DynamicFieldDescriptor.from(FieldDefinition.bool("enabled", "启用状态")),
+                        DynamicFieldDescriptor.from(FieldDefinition.timestamp("createdAt", "创建时间")),
                         DynamicFieldDescriptor.from(FieldDefinition.string("organizationId", "所属机构"),
                                 dynamicReference("customer", "organizationId"))), "CRUD")),
                 List.of(),
@@ -356,6 +359,7 @@ class PlatformModuleRuntimeContextServiceTest {
         PlatformResolvedPageConfig resolvedConfig = new PlatformResolvedPageConfig(List.of(
                 resolvedField("ui-list-web", "field-name", null, "name", "客户名称", "160", "left"),
                 resolvedField("ui-list-web", "field-enabled", null, "enabled", "启用状态", "120", "center"),
+                resolvedField("ui-list-web", "field-created-at", null, "createdAt", "创建时间", "180", "left"),
                 resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null),
                 resolvedField("ui-form-web", "field-organization", null, "organizationId", "所属机构", null, null)
         ), List.of());
@@ -390,7 +394,9 @@ class PlatformModuleRuntimeContextServiceTest {
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                     assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                            .containsExactly("name", "enabled");
+                            .containsExactly("name", "enabled", "createdAt");
+                    assertThat(view.fields()).extracting(ResolvedViewFieldDescriptor::valueType)
+                            .containsExactly(FieldValueType.STRING, FieldValueType.BOOLEAN, FieldValueType.TIMESTAMP);
                 });
         assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_form"))
                 .singleElement()

@@ -502,6 +502,18 @@ export interface BooleanStatusPresentation {
 
 export type BooleanStatusTone = 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
 
+export type ViewFieldValueType =
+  | 'STRING'
+  | 'TEXT'
+  | 'INTEGER'
+  | 'LONG'
+  | 'BOOLEAN'
+  | 'TIMESTAMP'
+  | 'ZONED_TIMESTAMP'
+  | 'DATE'
+  | 'DECIMAL'
+  | 'JSON';
+
 export interface ResolvedViewFieldDescriptor {
   fieldRef: ViewFieldRef;
   label?: string;
@@ -509,6 +521,7 @@ export interface ResolvedViewFieldDescriptor {
   required?: UiRule<boolean>;
   readOnly?: UiRule<boolean>;
   uiType?: string;
+  valueType?: ViewFieldValueType;
   width?: string;
   columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;

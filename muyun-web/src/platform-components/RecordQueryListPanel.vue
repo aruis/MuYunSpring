@@ -857,26 +857,33 @@ function columnsFromRuntimeListView(
   }
   return view.fields
     .filter((field) => field.visible?.constant !== false)
-    .map((field) => ({
-      key: field.fieldRef.fieldName,
-      title: field.label ?? field.fieldRef.fieldName,
-      type:
-        field.uiType === 'enabledStatus'
-          ? 'enabledStatus'
-          : field.uiType === 'booleanStatus' && field.booleanStatus
-            ? 'booleanStatus'
-            : field.uiType === 'tagList'
-              ? 'tagList'
-              : field.uiType === 'colorPicker'
-                ? 'colorPicker'
-                : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
-                  ? 'datetime'
-                  : 'text',
-      width: field.width,
-      align: columnAlign(field.align),
-      titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
-      booleanStatus: field.booleanStatus,
-    }));
+    .map((field) => {
+      const queryField = fieldByName(field.fieldRef.fieldName);
+      return {
+        key: field.fieldRef.fieldName,
+        title: field.label ?? field.fieldRef.fieldName,
+        type:
+          field.uiType === 'enabledStatus'
+            ? 'enabledStatus'
+            : field.uiType === 'booleanStatus' && field.booleanStatus
+              ? 'booleanStatus'
+              : field.uiType === 'tagList'
+                ? 'tagList'
+                : field.uiType === 'colorPicker'
+                  ? 'colorPicker'
+                  : isDateTimeValueType(field.valueType ?? queryField?.valueType)
+                    ? 'datetime'
+                    : 'text',
+        width: field.width,
+        align: columnAlign(field.align),
+        titleField: field.option?.titleField ?? queryField?.optionTitleField,
+        booleanStatus: field.booleanStatus,
+      };
+    });
+}
+
+function isDateTimeValueType(valueType: string | undefined) {
+  return valueType === 'TIMESTAMP' || valueType === 'ZONED_TIMESTAMP' || valueType === 'INSTANT';
 }
 
 function columnAlign(align: string | undefined): RecordQueryListColumn['align'] {

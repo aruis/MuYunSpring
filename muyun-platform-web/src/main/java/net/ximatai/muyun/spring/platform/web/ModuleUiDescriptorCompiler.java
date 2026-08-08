@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.web;
 import net.ximatai.muyun.spring.platform.module.StaticModuleReadProjectionDefinition;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.model.title.RecordLabelResolver;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
@@ -23,14 +24,19 @@ import java.util.Map;
 import java.util.Set;
 
 public final class ModuleUiDescriptorCompiler {
-    private static final Set<String> PLATFORM_FIELD_NAMES = Set.of(
-            PlatformAbilityFields.TITLE_FIELD,
-            PlatformAbilityFields.ENABLED_FIELD,
-            PlatformAbilityFields.TREE_PARENT_FIELD,
-            PlatformAbilityFields.SORT_FIELD
-    );
+    private static final Set<String> PLATFORM_FIELD_NAMES = platformFieldNames();
+    private static final Map<String, FieldValueType> STANDARD_FIELD_TYPES = standardFieldTypes();
 
     private ModuleUiDescriptorCompiler() {
+    }
+
+    private static Set<String> platformFieldNames() {
+        LinkedHashSet<String> fields = new LinkedHashSet<>(StandardEntitySchema.fieldNames());
+        fields.add(PlatformAbilityFields.TITLE_FIELD);
+        fields.add(PlatformAbilityFields.ENABLED_FIELD);
+        fields.add(PlatformAbilityFields.TREE_PARENT_FIELD);
+        fields.add(PlatformAbilityFields.SORT_FIELD);
+        return Set.copyOf(fields);
     }
 
     public static ResolvedModuleUiDescriptor compile(StaticModuleDefinition definition) {
@@ -52,7 +58,7 @@ public final class ModuleUiDescriptorCompiler {
         return new ModuleUiCompilationResult(
                 compileResolved(uiDefinition, ModuleKind.STATIC, definition.title(),
                         staticOptionFields(definition.modelClass()), referenceFields, referenceSummaryFields,
-                        staticRecordLabelField(definition)),
+                        staticRecordLabelField(definition), fieldTypes(definition.entities())),
                 readModel(definition, uiDefinition)
         );
     }
@@ -61,13 +67,13 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compileResolved(definition, null, null, Map.of(), Map.of(), Map.of(), null);
+        return compileResolved(definition, null, null, Map.of(), Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
                                                      ModuleKind moduleKind,
                                                      String title) {
-        return compileResolved(definition, moduleKind, title, Map.of(), Map.of(), Map.of(), null);
+        return compileResolved(definition, moduleKind, title, Map.of(), Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -77,7 +83,7 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
-        return compileResolved(definition, moduleKind, title, optionFields, Map.of(), Map.of(), null);
+        return compileResolved(definition, moduleKind, title, optionFields, Map.of(), Map.of(), null, Map.of());
     }
 
     public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
@@ -87,7 +93,7 @@ public final class ModuleUiDescriptorCompiler {
                                                      String defaultRecordLabelField) {
         if (definition == null) return null;
         return compileResolved(definition, moduleKind, title, optionFields == null ? Map.of() : optionFields,
-                Map.of(), Map.of(), defaultRecordLabelField);
+                Map.of(), Map.of(), defaultRecordLabelField, Map.of());
     }
 
     /**
@@ -104,7 +110,21 @@ public final class ModuleUiDescriptorCompiler {
         return compileResolved(definition, moduleKind, title,
                 optionFields == null ? Map.of() : optionFields,
                 referenceFields == null ? Map.of() : referenceFields,
-                Map.of(), defaultRecordLabelField);
+                Map.of(), defaultRecordLabelField, Map.of());
+    }
+
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title,
+                                                     Map<String, ResolvedOptionFieldDescriptor> optionFields,
+                                                     Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
+                                                     String defaultRecordLabelField,
+                                                     Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        if (definition == null) return null;
+        return compileResolved(definition, moduleKind, title,
+                optionFields == null ? Map.of() : optionFields,
+                referenceFields == null ? Map.of() : referenceFields,
+                Map.of(), defaultRecordLabelField, fieldTypes == null ? Map.of() : fieldTypes);
     }
 
     private static ResolvedModuleUiDescriptor compileResolved(ModuleUiDefinition definition,
@@ -113,14 +133,15 @@ public final class ModuleUiDescriptorCompiler {
                                                               Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                               Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
                                                               Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
-                                                              String defaultRecordLabelField) {
+                                                              String defaultRecordLabelField,
+                                                              Map<ViewFieldRef, FieldValueType> fieldTypes) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
                 moduleKind,
                 title,
                 definition.views().stream()
-                        .map(view -> compileView(view, optionFields, referenceFields, referenceSummaryFields))
+                        .map(view -> compileView(view, optionFields, referenceFields, referenceSummaryFields, fieldTypes))
                         .toList(),
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
@@ -168,7 +189,8 @@ public final class ModuleUiDescriptorCompiler {
     private static ResolvedViewDescriptor compileView(ViewDefinition view,
                                                       Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                       Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
-                                                      Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields) {
+                                                      Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
+                                                      Map<ViewFieldRef, FieldValueType> fieldTypes) {
         validateScopedListWorkspace(view.scopedListWorkspace(), referenceFields, view.viewCode());
         return new ResolvedViewDescriptor(
                 view.viewCode(),
@@ -177,7 +199,7 @@ public final class ModuleUiDescriptorCompiler {
                 view.title(),
                 view.fields().stream()
                         .map(field -> compileField(view.viewKind(), field, optionFields, referenceFields,
-                                referenceSummaryFields))
+                                referenceSummaryFields, fieldTypes))
                         .toList(),
                 view.sourceUiConfigId(),
                 ResolvedScopedListWorkspaceDescriptor.from(view.scopedListWorkspace())
@@ -188,7 +210,8 @@ public final class ModuleUiDescriptorCompiler {
                                                             ViewFieldDefinition field,
                                                             Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                             Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
-                                                            Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields) {
+                                                            Map<String, ResolvedReferenceSummaryFieldDescriptor> referenceSummaryFields,
+                                                            Map<ViewFieldRef, FieldValueType> fieldTypes) {
         ResolvedReferenceSummaryFieldDescriptor referenceSummary = field.fieldRef().relationCode() == null
                 ? referenceSummaryFields.get(field.fieldRef().fieldName()) : null;
         validateBooleanStatus(viewKind, field);
@@ -200,6 +223,7 @@ public final class ModuleUiDescriptorCompiler {
                 field.required(),
                 field.readOnly(),
                 field.uiType(),
+                valueType(field.fieldRef(), fieldTypes),
                 field.width(),
                 field.columnSpan(),
                 field.align(),
@@ -208,6 +232,56 @@ public final class ModuleUiDescriptorCompiler {
                 field.fieldRef().relationCode() == null ? optionFields.get(field.fieldRef().fieldName()) : null,
                 field.fieldRef().relationCode() == null ? referenceFields.get(field.fieldRef().fieldName()) : null,
                 referenceSummary
+        );
+    }
+
+    private static FieldValueType valueType(ViewFieldRef fieldRef,
+                                            Map<ViewFieldRef, FieldValueType> fieldTypes) {
+        FieldValueType direct = fieldTypes.get(fieldRef);
+        if (direct != null) {
+            return direct;
+        }
+        return fieldTypes.entrySet().stream()
+                .filter(entry -> java.util.Objects.equals(entry.getKey().relationCode(), fieldRef.relationCode()))
+                .filter(entry -> entry.getKey().fieldName().equals(fieldRef.fieldName()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseGet(() -> STANDARD_FIELD_TYPES.get(fieldRef.fieldName()));
+    }
+
+    private static Map<ViewFieldRef, FieldValueType> fieldTypes(List<EntityDefinition> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashMap<ViewFieldRef, FieldValueType> types = new LinkedHashMap<>();
+        for (int index = 0; index < entities.size(); index++) {
+            EntityDefinition entity = entities.get(index);
+            String relationCode = index == 0 ? null : entity.alias();
+            for (FieldDefinition field : entity.fields()) {
+                types.put(fieldRef(relationCode, field.fieldName()), FieldValueType.from(field.type()));
+            }
+            STANDARD_FIELD_TYPES.forEach((fieldName, fieldType) ->
+                    types.putIfAbsent(fieldRef(relationCode, fieldName), fieldType));
+        }
+        return Map.copyOf(types);
+    }
+
+    private static ViewFieldRef fieldRef(String relationCode, String fieldName) {
+        return relationCode == null ? ViewFieldRef.main(fieldName) : ViewFieldRef.relation(relationCode, fieldName);
+    }
+
+    private static Map<String, FieldValueType> standardFieldTypes() {
+        return Map.ofEntries(
+                Map.entry(StandardEntitySchema.ID_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.TENANT_ID_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.VERSION_FIELD, FieldValueType.INTEGER),
+                Map.entry(StandardEntitySchema.DELETED_FIELD, FieldValueType.BOOLEAN),
+                Map.entry(StandardEntitySchema.DELETED_AT_FIELD, FieldValueType.TIMESTAMP),
+                Map.entry(StandardEntitySchema.DELETED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.CREATED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.CREATED_AT_FIELD, FieldValueType.TIMESTAMP),
+                Map.entry(StandardEntitySchema.UPDATED_BY_FIELD, FieldValueType.STRING),
+                Map.entry(StandardEntitySchema.UPDATED_AT_FIELD, FieldValueType.TIMESTAMP)
         );
     }
 

@@ -919,7 +919,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
   assert.match(contractsSource, /optionTitleField\?: string/);
   assert.match(panelSource, /titleField\?: string/);
-  assert.match(panelSource, /titleField: fieldByName\(field\.fieldRef\.fieldName\)\?\.optionTitleField/);
+  assert.match(panelSource, /titleField: field\.option\?\.titleField \?\? queryField\?\.optionTitleField/);
   assert.match(panelSource, /record\[titleField \?\? `\$\{fieldName\}Title`\]/);
   assert.match(panelSource, /return value \? '是' : '否'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
@@ -1166,6 +1166,13 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(contractsSource, /export interface ModuleUiDefinition/);
   assert.match(contractsSource, /export interface ViewDefinition/);
   assert.match(contractsSource, /export interface ViewFieldDefinition/);
+  assert.match(contractsSource, /export type ViewFieldValueType/);
+  assert.match(contractsSource, /valueType\?: ViewFieldValueType/);
+  assert.match(panelSource, /field\.valueType \?\? queryField\?\.valueType/);
+  assert.match(
+    panelSource,
+    /valueType === 'TIMESTAMP' \|\| valueType === 'ZONED_TIMESTAMP' \|\| valueType === 'INSTANT'/,
+  );
   assert.match(contractsSource, /gender\?: string/);
   assert.match(contractsSource, /schemaVersion: string/);
   assert.doesNotMatch(runtimeContextSource, /uiDefinition\?:/);
