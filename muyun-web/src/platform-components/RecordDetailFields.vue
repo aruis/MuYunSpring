@@ -5,6 +5,7 @@ import RecordStatusTag from './RecordStatusTag.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
+  resolveRecordBooleanStatusValue,
   type RecordFormFieldDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
@@ -55,8 +56,9 @@ function fieldState(fieldName: string): RecordFormFieldState {
   });
 }
 
-function booleanFieldValue(fieldName: string) {
-  return props.record[fieldName] !== false;
+function statusFieldValue(field: RecordFormFieldState) {
+  const value = props.record[field.fieldName];
+  return field.controlType === 'booleanStatus' ? resolveRecordBooleanStatusValue(value) : value !== false;
 }
 
 function displayValue(field: RecordFormFieldState) {
@@ -83,12 +85,16 @@ function colorValue(field: RecordFormFieldState) {
       <dt>{{ field.label }}</dt>
       <dd>
         <RecordStatusTag
-          v-if="field.controlType === 'enabledStatus'"
-          :enabled="booleanFieldValue(field.fieldName)"
+          v-if="field.controlType === 'enabledStatus' || field.controlType === 'booleanStatus'"
+          :enabled="statusFieldValue(field)"
+          :enabled-label="field.booleanStatus?.trueLabel"
+          :disabled-label="field.booleanStatus?.falseLabel"
+          :enabled-tone="field.booleanStatus?.trueTone"
+          :disabled-tone="field.booleanStatus?.falseTone"
         />
         <UiSwitch
           v-else-if="field.controlType === 'switch'"
-          :checked="booleanFieldValue(field.fieldName)"
+          :checked="props.record[field.fieldName] !== false"
           disabled
         />
         <span v-else-if="field.controlType === 'colorPicker'" class="record-color-value">

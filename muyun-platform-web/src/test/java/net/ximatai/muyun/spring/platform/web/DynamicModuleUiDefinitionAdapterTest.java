@@ -13,8 +13,25 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DynamicModuleUiDefinitionAdapterTest {
+    @Test
+    void shouldRejectDynamicBooleanStatusWithoutPresentationMetadata() {
+        PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);
+        PlatformUiConfig listConfig = uiConfig("ui-list-web", "set-list", "客户列表", true, 10);
+        PlatformResolvedPageConfig resolved = new PlatformResolvedPageConfig(
+                List.of(resolvedField("ui-list-web", "field-online", null, "online", "在线状态",
+                        "booleanStatus", true, false, null, null, null, null)),
+                List.of());
+
+        assertThatThrownBy(() -> DynamicModuleUiDefinitionAdapter.fromPublishedSnapshot(
+                new PlatformPageConfigSnapshot("crm.customer", List.of(listSet), List.of(listConfig), List.of(),
+                        List.of(), List.of()), resolved))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot use uiType booleanStatus until dynamic UI configuration declares its presentation");
+    }
+
     @Test
     void shouldConvertPublishedDynamicSnapshotToModuleUiDefinition() {
         PlatformUiSet listSet = uiSet("set-list", "crm.customer", "customer_list", PlatformUiSetType.LIST);

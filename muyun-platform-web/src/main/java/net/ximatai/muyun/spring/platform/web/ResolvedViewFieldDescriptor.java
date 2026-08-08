@@ -10,8 +10,10 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                           Integer columnSpan,
                                           String align,
                                           Boolean fixed,
+                                          BooleanStatusPresentation booleanStatus,
                                           ResolvedOptionFieldDescriptor option,
-                                          ResolvedReferenceFieldDescriptor reference) {
+                                          ResolvedReferenceFieldDescriptor reference,
+                                          ResolvedReferenceSummaryFieldDescriptor referenceSummary) {
     public ResolvedViewFieldDescriptor {
         if (fieldRef == null) {
             throw new IllegalArgumentException("resolved view field ref must not be null");
@@ -24,6 +26,12 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
         width = width == null || width.isBlank() ? null : width.trim();
         columnSpan = columnSpan == null ? 1 : requireColumnSpan(columnSpan);
         align = align == null || align.isBlank() ? null : align.trim();
+        if (booleanStatus != null && !"booleanStatus".equals(uiType)) {
+            throw new IllegalArgumentException("boolean status presentation requires uiType booleanStatus");
+        }
+        if ("booleanStatus".equals(uiType) && booleanStatus == null) {
+            throw new IllegalArgumentException("uiType booleanStatus requires boolean status presentation");
+        }
     }
 
     public ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
@@ -36,7 +44,8 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        Integer columnSpan,
                                        String align,
                                        Boolean fixed) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed, null, null);
+        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+                null, null, null, null);
     }
 
     /** Source-compatible constructor for descriptors with option metadata only. */
@@ -51,7 +60,8 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        String align,
                                        Boolean fixed,
                                        ResolvedOptionFieldDescriptor option) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed, option, null);
+        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+                null, option, null, null);
     }
 
     /** Source-compatible constructor for descriptors created before column spans were introduced. */
@@ -64,7 +74,24 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        String width,
                                        String align,
                                        Boolean fixed) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, 1, align, fixed, null, null);
+        this(fieldRef, label, visible, required, readOnly, uiType, width, 1, align, fixed,
+                null, null, null, null);
+    }
+
+    /** Source-compatible constructor with a boolean status presentation. */
+    public ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
+                                       String label,
+                                       UiRule<Boolean> visible,
+                                       UiRule<Boolean> required,
+                                       UiRule<Boolean> readOnly,
+                                       String uiType,
+                                       String width,
+                                       Integer columnSpan,
+                                       String align,
+                                       Boolean fixed,
+                                       BooleanStatusPresentation booleanStatus) {
+        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+                booleanStatus, null, null, null);
     }
 
     private static int requireColumnSpan(int value) {

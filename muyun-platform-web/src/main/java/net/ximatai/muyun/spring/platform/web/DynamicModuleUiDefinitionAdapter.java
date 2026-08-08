@@ -93,6 +93,10 @@ public final class DynamicModuleUiDefinitionAdapter {
     }
 
     private static ViewFieldDefinition field(PlatformResolvedUiField field) {
+        if ("booleanStatus".equals(field.fieldUiControlAlias())) {
+            throw new IllegalArgumentException("dynamic field " + field.fieldName()
+                    + " cannot use uiType booleanStatus until dynamic UI configuration declares its presentation");
+        }
         return new ViewFieldDefinition(
                 new ViewFieldRef(field.relationAlias(), field.fieldName(), field.moduleMetadataFieldId()),
                 field.fieldTitle(),
@@ -103,7 +107,8 @@ public final class DynamicModuleUiDefinitionAdapter {
                 width(field),
                 field.columnSpan(),
                 field.align(),
-                field.fixedPosition() == null ? null : Boolean.TRUE
+                field.fixedPosition() == null ? null : Boolean.TRUE,
+                null
         );
     }
 

@@ -1,4 +1,4 @@
-import type { UiIconName } from './components/UiIcon.vue';
+import type { RecordInlineAction } from '@muyun/web-contracts';
 
 export type UiDataTableKey = string | number;
 export type UiDataTableRecord = Record<string, unknown>;
@@ -44,14 +44,8 @@ export interface UiDropdownItem {
   danger?: boolean;
 }
 
-export interface UiRecordInlineAction {
-  key: string;
-  title: string;
-  iconName?: UiIconName;
-  showLabel?: boolean;
-  disabled?: boolean;
-  danger?: boolean;
-}
+/** @deprecated Use the adapter-neutral RecordInlineAction contract. */
+export type UiRecordInlineAction = RecordInlineAction;
 
 export type UiTreeNodeAction = UiRecordInlineAction;
 

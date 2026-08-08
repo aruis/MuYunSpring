@@ -2,6 +2,7 @@ import type {
   Option,
   OptionValueList,
   ResolvedReferenceFieldDescriptor,
+  BooleanStatusPresentation,
   ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
@@ -16,12 +17,15 @@ export type RecordFormFieldDescriptor = (ViewFieldDefinition | ResolvedViewField
 };
 export type RecordFormRecord = Record<string, unknown>;
 export type RecordFormFieldValue = string | number | boolean | OptionValueList | string[] | undefined;
+/** A business boolean does not inherit the lifecycle field's implicit enabled default. */
+export type RecordBooleanStatusValue = boolean | undefined;
 export type RecordFormFieldControlType =
   | 'input'
   | 'textarea'
   | 'colorPicker'
   | 'select'
   | 'enabledStatus'
+  | 'booleanStatus'
   | 'switch'
   | 'recordPicker'
   | 'recordMultiPicker';
@@ -61,6 +65,7 @@ export interface RecordFormFieldState {
   optionSelectionMode?: 'SINGLE' | 'MULTIPLE';
   optionTitleField?: string;
   pickerConfig?: RecordFormFieldPickerConfig;
+  booleanStatus?: BooleanStatusPresentation;
   placeholder?: string;
   options?: Option[];
 }
@@ -125,6 +130,7 @@ export function resolveRecordFormFieldState(
   const readOnly = field?.readOnly?.constant ?? fallback?.readOnly ?? false;
   const visible = field?.visible?.constant ?? fallback?.visible ?? true;
   const controlType = controlTypeOf(field, fallback);
+  const booleanStatus = controlType === 'booleanStatus' ? field?.booleanStatus : undefined;
   const hasOption = field?.option != null;
   const pickerConfig =
     controlType === 'recordPicker' || controlType === 'recordMultiPicker'
@@ -140,6 +146,7 @@ export function resolveRecordFormFieldState(
     columnSpan: field?.columnSpan === 2 ? 2 : 1,
     hasOption,
     pickerConfig,
+    ...(booleanStatus ? { booleanStatus } : {}),
   };
   return {
     ...baseState,
@@ -155,6 +162,14 @@ export function resolveRecordFormFieldState(
   };
 }
 
+/**
+ * Preserves an absent business value as unknown instead of treating it as true.
+ * `enabledStatus` deliberately retains its separate lifecycle default semantics.
+ */
+export function resolveRecordBooleanStatusValue(value: unknown): RecordBooleanStatusValue {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function controlTypeOf(
   field: RecordFormFieldDescriptor | undefined,
   fallback: RecordFormFieldFallback | undefined,
@@ -165,6 +180,9 @@ function controlTypeOf(
   }
   if (field?.uiType === 'enabledStatus') {
     return 'enabledStatus';
+  }
+  if (field?.uiType === 'booleanStatus' && field.booleanStatus) {
+    return 'booleanStatus';
   }
   if (field?.uiType === 'switch') {
     return 'switch';

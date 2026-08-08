@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   childResourceDefaultFormViewCode,
   resolveRecordFormFields,
+  resolveRecordBooleanStatusValue,
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
   type RecordFormFieldDescriptor,
@@ -104,6 +105,14 @@ test('record form field state preserves a descriptor switch as a generic boolean
   ]);
 
   assert.equal(resolveRecordFormFieldState('completed', { fields }).controlType, 'switch');
+});
+
+test('business boolean status preserves false and unknown values instead of defaulting to enabled', () => {
+  assert.equal(resolveRecordBooleanStatusValue(true), true);
+  assert.equal(resolveRecordBooleanStatusValue(false), false);
+  assert.equal(resolveRecordBooleanStatusValue(null), undefined);
+  assert.equal(resolveRecordBooleanStatusValue(undefined), undefined);
+  assert.equal(resolveRecordBooleanStatusValue('true'), undefined);
 });
 
 test('record form field state renders a textarea descriptor as a text area', () => {

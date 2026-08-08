@@ -118,6 +118,10 @@ StaticModuleDefinition
 
 标准“范围选择 + 右侧查询列表”也属于这个来源无关声明，但它归属具体 LIST view/config，而非整个模块。`scopedListWorkspace` 声明 scope 模块、消费者的单值引用字段和外部查询 key；编译期必须证明该字段引用 scope 模块。运行器按当前页面的 UI config 选择对应 workspace，并由静态、动态 CRUD 将该外部 key 直接编译为范围字段过滤；查询模板只能叠加其他过滤，不承载范围工作区的正确性。scope 模块有树能力时，左栏自动使用树浏览器；否则使用微列表，两种形态共享选择、取消选择、范围预填和右侧标准 CRUD。默认不显示次标题，重复点击已选项会取消范围并恢复全量列表；默认 `ALLOW_UNSCOPED`，只有显式声明 `REQUIRE_SCOPE` 才会禁止未选范围时的新建。scope 只是页面入口约束；真正的数据归属仍由模型字段必填、引用校验和数据权限在统一 CRUD 链路中保证。
 
+静态 LIST view 可用 `manageableScopedTree` 显式允许在范围栏内通过目标模块的标准 CRUD、动作权限和
+乐观锁维护树节点；未声明时范围栏保持只读选择。动态页面配置当前尚无对应来源字段，适配时固定为关闭，
+这是阶段限制，不表示动态范围工作区已经具备内嵌维护配置能力。
+
 ## 静态 UI 声明
 
 静态 UI 声明归属模块定义，不归属 model，也不归属 service。
@@ -189,7 +193,13 @@ class EmployeeService implements FormAbility<Employee> {
 | `uiType` | 平台 UI 类型提示，不绑定具体前端组件库 |
 | `width` / `align` / `fixed` | 列表展示的轻量提示 |
 
-当前已落地的 `uiType` 先保持小集合：`enabledStatus` 表达启停布尔控件，`recordPicker` 表达引用选择控件。`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、作用域、标题函数和刷新 key 由页面组合层提供，避免 descriptor 绑定前端运行态对象。
+当前已落地的 `uiType` 先保持小集合：`enabledStatus` 表达启停布尔控件，`booleanStatus` 表达带显式
+true/false 标签和语义色的业务布尔展示，`recordPicker` 表达引用选择控件。业务布尔值保留 unknown 状态，
+不能复用启停字段“非 false 即启用”的默认语义。动态 UI 配置当前还不能声明 `booleanStatus` presentation，
+遇到该控件类型会在适配期失败，不静默降级。`booleanStatus` 是展示类型；在 FORM 中必须显式 `.readOnly()`，
+不能伪装为可编辑布尔控件。需要编辑业务布尔值时，声明通用 `switch` 或在后续建立其独立的可编辑语义。
+`recordPicker` 只声明字段应由引用选择控件承接，具体候选来源、
+作用域、标题函数和刷新 key 由页面组合层提供，避免 descriptor 绑定前端运行态对象。
 
 `fieldRef` 是源无关字段锚点，后续可承载动态字段和子关系定位：
 

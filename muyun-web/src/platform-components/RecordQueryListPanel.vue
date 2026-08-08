@@ -20,6 +20,7 @@ import type {
   QuerySchema,
   QuerySchemaField,
   ResolvedViewDescriptor,
+  ResolvedViewFieldDescriptor,
   WebQueryCondition,
   WebQueryRequest,
   WebSort,
@@ -36,6 +37,8 @@ import DateTimeText from './DateTimeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
 import RecycleBinModeButton from './RecycleBinModeButton.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
+import RecordTagList from './RecordTagList.vue';
+import { resolveRecordBooleanStatusValue } from './recordFormFieldModel';
 import {
   mergeRecordActions,
   resolveRecordActions,
@@ -52,7 +55,8 @@ export type RecordQueryListMode = 'normal' | 'recycleBin';
 export interface RecordQueryListColumn {
   key: string;
   title: string;
-  type?: 'text' | 'enabledStatus' | 'datetime' | 'colorPicker';
+  type?: 'text' | 'enabledStatus' | 'booleanStatus' | 'tagList' | 'datetime' | 'colorPicker';
+  booleanStatus?: ResolvedViewFieldDescriptor['booleanStatus'];
   width?: string;
   align?: 'left' | 'center' | 'right';
   titleField?: string;
@@ -833,6 +837,13 @@ function displayRecordFieldValue(record: QueryListRecord, fieldName: string, tit
   return String(value ?? '');
 }
 
+function statusCellValue(record: QueryListRecord, column: RecordQueryListColumn | undefined) {
+  if (column?.type === 'booleanStatus') {
+    return resolveRecordBooleanStatusValue(record[column.key]);
+  }
+  return record[column?.key ?? ''] !== false;
+}
+
 function columnsFromRuntimeListView(
   views: ResolvedViewDescriptor[] | undefined,
   uiConfigId?: string,
@@ -852,14 +863,19 @@ function columnsFromRuntimeListView(
       type:
         field.uiType === 'enabledStatus'
           ? 'enabledStatus'
-          : field.uiType === 'colorPicker'
-            ? 'colorPicker'
-            : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
-              ? 'datetime'
-              : 'text',
+          : field.uiType === 'booleanStatus' && field.booleanStatus
+            ? 'booleanStatus'
+            : field.uiType === 'tagList'
+              ? 'tagList'
+              : field.uiType === 'colorPicker'
+                ? 'colorPicker'
+                : fieldByName(field.fieldRef.fieldName)?.valueType === 'INSTANT'
+                  ? 'datetime'
+                  : 'text',
       width: field.width,
       align: columnAlign(field.align),
       titleField: fieldByName(field.fieldRef.fieldName)?.optionTitleField,
+      booleanStatus: field.booleanStatus,
     }));
 }
 
@@ -998,8 +1014,25 @@ defineExpose({ refresh });
       >
         <template #cell="{ column, record }">
           <RecordStatusTag
-            v-if="tableColumns.find((item) => item.key === column.key)?.type === 'enabledStatus'"
-            :enabled="(record as QueryListRow).record[column.key] !== false"
+            v-if="
+              ['enabledStatus', 'booleanStatus'].includes(
+                tableColumns.find((item) => item.key === column.key)?.type ?? '',
+              )
+            "
+            :enabled="
+              statusCellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key),
+              )
+            "
+            :enabled-label="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.trueLabel"
+            :disabled-label="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.falseLabel"
+            :enabled-tone="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.trueTone"
+            :disabled-tone="tableColumns.find((item) => item.key === column.key)?.booleanStatus?.falseTone"
+          />
+          <RecordTagList
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'tagList'"
+            :items="(record as QueryListRow).record[column.key]"
           />
           <DateTimeText
             v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'datetime'"

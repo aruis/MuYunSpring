@@ -16,7 +16,8 @@ public record ScopedListWorkspaceDefinition(String scopeModuleAlias,
                                             String scopeTitle,
                                             String scopeSearchPlaceholder,
                                             boolean showScopeItemSubtitle,
-                                            ScopedListWorkspaceCreatePolicy createPolicy) {
+                                            ScopedListWorkspaceCreatePolicy createPolicy,
+                                            boolean manageScopeTree) {
     public ScopedListWorkspaceDefinition {
         scopeModuleAlias = PlatformNameRules.requireModuleAlias(scopeModuleAlias);
         scopeField = PlatformNameRules.requireFieldName(scopeField, "scopeField");
@@ -32,6 +33,14 @@ public record ScopedListWorkspaceDefinition(String scopeModuleAlias,
     public ScopedListWorkspaceDefinition(String scopeModuleAlias, String scopeField,
                                          String scopeTitle, String scopeSearchPlaceholder) {
         this(scopeModuleAlias, scopeField, scopeField, scopeTitle, scopeSearchPlaceholder, false,
-                ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);
+                ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED, false);
+    }
+
+    public ScopedListWorkspaceDefinition(String scopeModuleAlias, String scopeField, String queryCriteriaKey,
+                                         String scopeTitle, String scopeSearchPlaceholder,
+                                         boolean showScopeItemSubtitle,
+                                         ScopedListWorkspaceCreatePolicy createPolicy) {
+        this(scopeModuleAlias, scopeField, queryCriteriaKey, scopeTitle, scopeSearchPlaceholder,
+                showScopeItemSubtitle, createPolicy, false);
     }
 }

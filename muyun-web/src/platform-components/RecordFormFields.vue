@@ -12,11 +12,13 @@ import {
 import type { OptionItemDescriptor, OptionValue, OptionValueList } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
+import RecordStatusTag from './RecordStatusTag.vue';
 import RecordPicker from './RecordPicker.vue';
 import RecordMultiPicker from './RecordMultiPicker.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
+  resolveRecordBooleanStatusValue,
   type RecordFormFieldDescriptor,
   type RecordFormFieldFallback,
   type RecordFormFieldPickerConfig,
@@ -185,6 +187,10 @@ function booleanFieldValue(fieldName: string) {
   return props.record[fieldName] !== false;
 }
 
+function businessBooleanStatusValue(fieldName: string) {
+  return resolveRecordBooleanStatusValue(props.record[fieldName]);
+}
+
 function fieldDisabled(field: RecordFormFieldState) {
   return props.disabled || field.readOnly || props.disabledOf?.(field.fieldName, field) === true;
 }
@@ -229,6 +235,14 @@ function updateSelectField(field: RecordFormFieldState, value: OptionValue | Opt
       :disabled="fieldDisabled(field)"
       :show-label="false"
       @change="updateField(field.fieldName, $event)"
+    />
+    <RecordStatusTag
+      v-else-if="field.controlType === 'booleanStatus'"
+      :enabled="businessBooleanStatusValue(field.fieldName)"
+      :enabled-label="field.booleanStatus?.trueLabel"
+      :disabled-label="field.booleanStatus?.falseLabel"
+      :enabled-tone="field.booleanStatus?.trueTone"
+      :disabled-tone="field.booleanStatus?.falseTone"
     />
     <UiSwitch
       v-else-if="field.controlType === 'switch'"
