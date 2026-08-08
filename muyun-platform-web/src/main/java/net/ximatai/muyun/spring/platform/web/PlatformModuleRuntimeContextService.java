@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.platform.module.StaticModuleActionDefinition;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -154,7 +155,36 @@ public class PlatformModuleRuntimeContextService {
                 resolvedConfig);
         return ModuleUiDescriptorCompiler.compile(definition, ModuleKind.DYNAMIC, title,
                 dynamicOptionFields(dynamicDescriptor), dynamicReferenceFields(dynamicDescriptor),
-                dynamicRecordLabelField(dynamicDescriptor));
+                dynamicRecordLabelField(dynamicDescriptor), dynamicFieldTypes(dynamicDescriptor, resolvedConfig));
+    }
+
+    private java.util.Map<ViewFieldRef, FieldValueType> dynamicFieldTypes(
+            DynamicModuleDescriptor dynamicDescriptor,
+            PlatformResolvedPageConfig resolvedConfig) {
+        if (dynamicDescriptor == null || resolvedConfig == null) {
+            return java.util.Map.of();
+        }
+        java.util.Map<String, java.util.Map<String, FieldValueType>> typesByEntity = dynamicDescriptor.entities().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        DynamicEntityDescriptor::entityAlias,
+                        entity -> entity.fields().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                                DynamicFieldDescriptor::fieldName,
+                                field -> FieldValueType.from(field.type()),
+                                (left, right) -> left)),
+                        (left, right) -> left));
+        java.util.LinkedHashMap<ViewFieldRef, FieldValueType> resolved = new java.util.LinkedHashMap<>();
+        for (net.ximatai.muyun.spring.platform.ui.PlatformResolvedUiField field : resolvedConfig.uiFields()) {
+            FieldValueType type = typesByEntity.getOrDefault(field.metadataAlias(), java.util.Map.of())
+                    .get(field.fieldName());
+            if (type == null) {
+                continue;
+            }
+            ViewFieldRef fieldRef = field.relationAlias() == null || field.relationAlias().isBlank()
+                    ? ViewFieldRef.main(field.fieldName())
+                    : ViewFieldRef.relation(field.relationAlias(), field.fieldName());
+            resolved.putIfAbsent(fieldRef, type);
+        }
+        return java.util.Map.copyOf(resolved);
     }
 
     private java.util.Map<String, ResolvedOptionFieldDescriptor> dynamicOptionFields(

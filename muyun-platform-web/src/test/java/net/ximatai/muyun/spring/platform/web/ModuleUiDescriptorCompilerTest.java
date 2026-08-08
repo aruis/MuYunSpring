@@ -122,6 +122,18 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldPublishStaticAuditFieldTypeWithoutRequiringQueryCapability() {
+        ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("iam.employee")
+                .listView(list -> list.field("createdAt", field -> field.label("创建时间")))
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(staticDefinition(uiDefinition))
+                .views().getFirst().fields().getFirst();
+
+        assertThat(field.valueType()).isEqualTo(FieldValueType.TIMESTAMP);
+    }
+
+    @Test
     void shouldPublishRecordLabelFactWithoutUiContributor() {
         StaticModuleDefinition definition = StaticModuleDefinition.builder("demo", "demo.customer", "客户管理")
                 .entities(List.of(new EntityDefinition("customer", "demo_customer", "Customer",

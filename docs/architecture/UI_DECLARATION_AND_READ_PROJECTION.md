@@ -233,6 +233,11 @@ UiRule<T>
 
 这些事实应从 model、注解、Ability、动态元数据、字段配置或后续页面配置专题中编译得到。静态 DSL 和动态配置都应先归一为 `ModuleUiDefinition`，再与字段事实合并。
 
+编译后的 `ResolvedViewFieldDescriptor.valueType` 是来源无关的字段事实，不是查询能力声明。静态模块从实体模型和
+`StandardEntity` 标准字段推导，动态模块从运行态字段 descriptor 推导。列表渲染应优先消费该字段事实；旧模块
+缺少该字段时才兼容回退到 query schema。`QueryDescriptor` 继续只决定可过滤、可排序等查询能力，不能成为日期时间
+是否正确展示的前置条件。
+
 ## Service 接入
 
 静态 UI 编译器通过 service 接驳运行事实：
@@ -299,10 +304,10 @@ contributor 仍然贡献模块 UI 定义，不改变 service 的运行能力面�
 
 1. 校验 `StaticModuleDefinition` 引用的 service 存在。
 2. 校验视图字段存在于模型字段、平台标准字段或能力字段中。
-3. 合并字段类型、标题、选项、引用、单位、金额、保护、虚拟字段等字段事实。
+3. 合并字段类型、标题、选项、引用、单位、金额、保护、虚拟字段等字段事实；当前 resolved view field 已交付基础值类型。
 4. 校验 UI 声明与字段事实冲突，例如虚拟字段不应声明为普通可输入字段。
 5. 生成前端可消费的 resolved 视图结构。
-6. 生成后端读计划需要的模块级 `ResolvedModuleReadModel`。当前最小实现只包含逻辑字段事实，后续再合并字段类型、选项、保护、引用和存储形态等事实。
+6. 生成后端读计划需要的模块级 `ResolvedModuleReadModel`。当前最小实现只包含逻辑字段事实；字段值类型已在 resolved view field 交付，读模型后续再按 SQL 规划需要合并选项、保护、引用和存储形态等事实。
 7. 不把物理列写入对外 descriptor。
 
 `required` 和 `readOnly` 需要区分来源：

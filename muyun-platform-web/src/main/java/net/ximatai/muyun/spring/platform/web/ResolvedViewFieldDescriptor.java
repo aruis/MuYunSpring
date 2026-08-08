@@ -6,6 +6,7 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                           UiRule<Boolean> required,
                                           UiRule<Boolean> readOnly,
                                           String uiType,
+                                          FieldValueType valueType,
                                           String width,
                                           Integer columnSpan,
                                           String align,
@@ -44,7 +45,7 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        Integer columnSpan,
                                        String align,
                                        Boolean fixed) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, columnSpan, align, fixed,
                 null, null, null, null);
     }
 
@@ -60,7 +61,7 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        String align,
                                        Boolean fixed,
                                        ResolvedOptionFieldDescriptor option) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, columnSpan, align, fixed,
                 null, option, null, null);
     }
 
@@ -74,7 +75,7 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        String width,
                                        String align,
                                        Boolean fixed) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, 1, align, fixed,
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, 1, align, fixed,
                 null, null, null, null);
     }
 
@@ -90,7 +91,7 @@ public record ResolvedViewFieldDescriptor(ViewFieldRef fieldRef,
                                        String align,
                                        Boolean fixed,
                                        BooleanStatusPresentation booleanStatus) {
-        this(fieldRef, label, visible, required, readOnly, uiType, width, columnSpan, align, fixed,
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, columnSpan, align, fixed,
                 booleanStatus, null, null, null);
     }
 
