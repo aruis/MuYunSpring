@@ -101,7 +101,7 @@ public final class MuYunFileServerTransferAccessService
         Instant expiresAt = issuedAt.plus(requirePositive(ttl, operation));
         String token = signToken(user, scopeId, operation, normalizedFileId, issuedAt, expiresAt);
         return new FileTransferAccess(operation, normalizedFileId, token, targetUrl(operation, normalizedFileId, token),
-                expiresAt, uploadFormFields(operation));
+                expiresAt);
     }
 
     private String signToken(CurrentUser user,
@@ -152,17 +152,9 @@ public final class MuYunFileServerTransferAccessService
         };
     }
 
-    /**
-     * Browser uploads always start as temporary objects. The FileServer enforces this from the
-     * upload token; preserve the multipart field as an explicit defence-in-depth protocol fact.
-     */
-    private Map<String, String> uploadFormFields(FileTransferOperation operation) {
-        return operation == FileTransferOperation.UPLOAD ? Map.of("temporary", "true") : Map.of();
-    }
-
     private RecordAttachmentAccess attachmentAccess(String mode, FileTransferAccess access) {
         return new RecordAttachmentAccess(mode, access.fileId(), access.accessToken(), access.url(),
-                access.expiresAt().toString(), access.formFields(), Map.of());
+                access.expiresAt().toString(), Map.of());
     }
 
     private String fileServerPurpose(FileTransferOperation operation) {

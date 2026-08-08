@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.attachment.FileTransferAccess;
 import net.ximatai.muyun.spring.platform.attachment.FileTransferOperation;
-import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccess;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,8 +40,6 @@ class MuYunFileServerTransferAccessServiceTest {
             assertThat(upload.operation()).isEqualTo(FileTransferOperation.UPLOAD);
             assertThat(upload.fileId()).isNull();
             assertThat(upload.url()).startsWith("http://files.example/api/v1/public/files?access_token=");
-            assertThat(upload.formFields()).containsExactlyEntriesOf(java.util.Map.of("temporary", "true"));
-            assertThat(metadata.formFields()).isEmpty();
             assertThat(metadata.url()).contains("/01ARZ3NDEKTSV4RRFFQ69G5FAV?access_token=");
             assertThat(promote.url()).contains("/01ARZ3NDEKTSV4RRFFQ69G5FAV/promote?access_token=");
             assertThat(preview.url()).contains("/01ARZ3NDEKTSV4RRFFQ69G5FAV/view?access_token=");
@@ -71,17 +68,6 @@ class MuYunFileServerTransferAccessServiceTest {
                 Clock.fixed(Instant.parse("2026-08-08T00:00:00Z"), ZoneOffset.UTC));
         try (CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.systemUser("admin-1", "admin"))) {
             assertThat(payload(service.issueUploadAccess()).path("tenant_id").asText()).isEqualTo("mr-system");
-        }
-    }
-
-    @Test
-    void shouldPreserveMultipartFieldsWhenItIssuesAnAttachmentUploadTicket() {
-        MuYunFileServerTransferAccessService service = service();
-        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
-                CurrentUser.tenantUser("user-1", "operator", "tenant-a"))) {
-            RecordAttachmentAccess access = service.issueUploadAccess("crm.contract", "contract-1");
-
-            assertThat(access.formFields()).containsExactlyEntriesOf(java.util.Map.of("temporary", "true"));
         }
     }
 

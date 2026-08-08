@@ -7,8 +7,6 @@
 export interface FileTransferUploadAccess {
   /** A short-lived MuYunFileServer multipart upload URL supplied by the business API. */
   uploadUrl: string;
-  /** Server-controlled multipart values, including the temporary-file intent. */
-  formFields?: Record<string, string>;
   formFieldName?: string;
 }
 
@@ -94,7 +92,6 @@ export function createBrowserFileTransferUpload(
       resolve({ file, response, payload: unwrapResponsePayload(response) });
     };
     const formData = new FormData();
-    Object.entries(access.formFields ?? {}).forEach(([name, value]) => formData.append(name, value));
     formData.append(access.formFieldName ?? 'files', file, file.name);
     request.send(formData);
   });

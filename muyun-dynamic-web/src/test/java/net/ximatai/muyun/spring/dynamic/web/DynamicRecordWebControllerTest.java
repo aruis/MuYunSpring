@@ -815,7 +815,7 @@ class DynamicRecordWebControllerTest {
         when(attachmentService.requireAttachment(MODULE, "contract-1", "att-1")).thenReturn(attachment);
         when(accessService.issueUploadAccess(MODULE, "contract-1")).thenReturn(new RecordAttachmentAccess(
                 "UPLOAD", null, "upload-token", "/api/v1/public/files?access_token=upload-token",
-                "2026-06-01T00:10:00Z", Map.of("temporary", "true"), Map.of("purpose", "upload")));
+                "2026-06-01T00:10:00Z", Map.of("purpose", "upload")));
         when(accessService.issuePreviewAccess(MODULE, "contract-1", attachment)).thenReturn(new RecordAttachmentAccess(
                 "PREVIEW", "file-1", "preview-token", "/view/public/files/file-1?access_token=preview-token",
                 "2026-06-01T00:10:00Z", Map.of()));
@@ -827,7 +827,6 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("UPLOAD"))
                 .andExpect(jsonPath("$.accessToken").value("upload-token"))
-                .andExpect(jsonPath("$.formFields.temporary").value("true"))
                 .andExpect(jsonPath("$.metadata.purpose").value("upload"));
 
         attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/{attachmentId}/preview-ticket",
