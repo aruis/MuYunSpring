@@ -4,6 +4,7 @@ export { confirmAction } from '@muyun/vue-ui-antdv';
 export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue';
 export { default as DrawerOperationBar } from './DrawerOperationBar.vue';
 export { default as DateTimeText } from './DateTimeText.vue';
+export { default as FileSizeText } from './FileSizeText.vue';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as ManagementWorkspace } from './ManagementWorkspace.vue';
@@ -102,6 +103,8 @@ export { resolveRecordActions } from './recordActionBarModel';
 export { normalizeRecordDraft } from './recordDraftNormalizer';
 export { resolveRecordDetailDisplayValue } from './recordDetailFieldModel';
 export { formatPlatformDateTime, resolveBrowserTimeZone } from './platformDateTime';
+export { formatPlatformFileSize } from './platformFileSize';
+export type { PlatformFileSizeDisplay, PlatformFileSizeOptions } from './platformFileSize';
 export { providePlatformTimeZoneContext, usePlatformTimeZoneContext } from './platformTimeZoneContext';
 export type {
   PlatformDateTimeDisplay,

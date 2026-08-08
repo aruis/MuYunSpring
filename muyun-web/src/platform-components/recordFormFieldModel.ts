@@ -6,6 +6,7 @@ import type {
   ResolvedOptionFieldDescriptor,
   ResolvedModuleUiDescriptor,
   ResolvedViewFieldDescriptor,
+  FieldValuePresentation,
   ViewFieldDefinition,
 } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
@@ -66,6 +67,7 @@ export interface RecordFormFieldState {
   optionTitleField?: string;
   pickerConfig?: RecordFormFieldPickerConfig;
   booleanStatus?: BooleanStatusPresentation;
+  valuePresentation?: FieldValuePresentation;
   placeholder?: string;
   options?: Option[];
 }
@@ -147,6 +149,7 @@ export function resolveRecordFormFieldState(
     hasOption,
     pickerConfig,
     ...(booleanStatus ? { booleanStatus } : {}),
+    ...(field?.valuePresentation ? { valuePresentation: field.valuePresentation } : {}),
   };
   return {
     ...baseState,

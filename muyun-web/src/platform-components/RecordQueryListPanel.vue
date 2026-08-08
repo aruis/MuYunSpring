@@ -34,6 +34,7 @@ import {
 } from '@muyun/web-core';
 import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 import DateTimeText from './DateTimeText.vue';
+import FileSizeText from './FileSizeText.vue';
 import RecordActionBar from './RecordActionBar.vue';
 import RecycleBinModeButton from './RecycleBinModeButton.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
@@ -55,7 +56,7 @@ export type RecordQueryListMode = 'normal' | 'recycleBin';
 export interface RecordQueryListColumn {
   key: string;
   title: string;
-  type?: 'text' | 'enabledStatus' | 'booleanStatus' | 'tagList' | 'datetime' | 'colorPicker';
+  type?: 'text' | 'enabledStatus' | 'booleanStatus' | 'tagList' | 'datetime' | 'fileSize' | 'colorPicker';
   booleanStatus?: ResolvedViewFieldDescriptor['booleanStatus'];
   width?: string;
   align?: 'left' | 'center' | 'right';
@@ -825,6 +826,14 @@ function dateTimeCellValue(record: QueryListRecord, column: RecordQueryListColum
   return String(value);
 }
 
+function fileSizeCellValue(record: QueryListRecord, column: RecordQueryListColumn) {
+  const value: unknown =
+    column.render?.(record) ?? props.cellRenderers[column.key]?.(record) ?? record[column.key];
+  return typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint'
+    ? value
+    : undefined;
+}
+
 function displayRecordFieldValue(record: QueryListRecord, fieldName: string, titleField?: string) {
   const titleValue = record[titleField ?? `${fieldName}Title`];
   if (typeof titleValue === 'string' && titleValue.trim()) {
@@ -871,9 +880,11 @@ function columnsFromRuntimeListView(
                 ? 'tagList'
                 : field.uiType === 'colorPicker'
                   ? 'colorPicker'
-                  : isDateTimeValueType(field.valueType ?? queryField?.valueType)
-                    ? 'datetime'
-                    : 'text',
+                  : field.valuePresentation === 'FILE_SIZE'
+                    ? 'fileSize'
+                    : isDateTimeValueType(field.valueType ?? queryField?.valueType)
+                      ? 'datetime'
+                      : 'text',
         width: field.width,
         align: columnAlign(field.align),
         titleField: field.option?.titleField ?? queryField?.optionTitleField,
@@ -1045,6 +1056,15 @@ defineExpose({ refresh });
             v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'datetime'"
             :value="
               dateTimeCellValue(
+                (record as QueryListRow).record,
+                tableColumns.find((item) => item.key === column.key)!,
+              )
+            "
+          />
+          <FileSizeText
+            v-else-if="tableColumns.find((item) => item.key === column.key)?.type === 'fileSize'"
+            :value="
+              fileSizeCellValue(
                 (record as QueryListRow).record,
                 tableColumns.find((item) => item.key === column.key)!,
               )

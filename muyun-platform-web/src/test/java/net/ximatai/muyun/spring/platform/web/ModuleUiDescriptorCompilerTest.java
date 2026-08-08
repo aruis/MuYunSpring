@@ -134,6 +134,49 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
+    void shouldCompileFileSizeAsTypedPresentationWithoutChangingLongValueType() {
+        StaticModuleDefinition definition = StaticModuleDefinition.builder("mr", "mr.knowledge_file", "知识文件")
+                .entities(List.of(new EntityDefinition("knowledge_file", "mr_knowledge_file", "Knowledge File",
+                        List.of(FieldDefinition.longInteger("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("mr.knowledge_file")
+                        .listView(list -> list.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+
+        ResolvedViewFieldDescriptor field = ModuleUiDescriptorCompiler.compile(definition)
+                .views().getFirst().fields().getFirst();
+
+        assertThat(field.valueType()).isEqualTo(FieldValueType.LONG);
+        assertThat(field.valuePresentation()).isEqualTo(FieldValuePresentation.FILE_SIZE);
+        assertThat(field.uiType()).isNull();
+    }
+
+    @Test
+    void shouldRejectFileSizePresentationForNonLongOrWritableFormFields() {
+        StaticModuleDefinition wrongType = StaticModuleDefinition.builder("demo", "demo.asset", "资产")
+                .entities(List.of(new EntityDefinition("asset", "demo_asset", "Asset",
+                        List.of(FieldDefinition.string("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("demo.asset")
+                        .listView(list -> list.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+        StaticModuleDefinition writableForm = StaticModuleDefinition.builder("demo", "demo.asset", "资产")
+                .entities(List.of(new EntityDefinition("asset", "demo_asset", "Asset",
+                        List.of(FieldDefinition.longInteger("fileSize", "文件大小")))))
+                .uiDefinition(ModuleUiDefinition.builder("demo.asset")
+                        .formView(form -> form.field("fileSize", ViewFieldDefinition.Builder::fileSize))
+                        .build())
+                .build();
+
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(wrongType))
+                .hasMessage("file size presentation requires LONG field: fileSize");
+        assertThatThrownBy(() -> ModuleUiDescriptorCompiler.compile(writableForm))
+                .hasMessage("file size presentation must be read-only in FORM views: fileSize");
+        assertThatThrownBy(() -> ViewFieldDefinition.field("fileSize").uiType("fileSize").build())
+                .hasMessage("file size must use value presentation instead of uiType");
+    }
+
+    @Test
     void shouldPublishRecordLabelFactWithoutUiContributor() {
         StaticModuleDefinition definition = StaticModuleDefinition.builder("demo", "demo.customer", "客户管理")
                 .entities(List.of(new EntityDefinition("customer", "demo_customer", "Customer",

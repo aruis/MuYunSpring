@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { UiSwitch } from '@muyun/vue-ui-antdv';
 import RecordStatusTag from './RecordStatusTag.vue';
+import FileSizeText from './FileSizeText.vue';
 import {
   resolveRecordFormFieldNames,
   resolveRecordFormFieldState,
@@ -72,6 +73,13 @@ function colorValue(field: RecordFormFieldState) {
   const value = props.record[field.fieldName];
   return typeof value === 'string' && /^#[0-9A-F]{6}$/i.test(value) ? value : undefined;
 }
+
+function fileSizeValue(field: RecordFormFieldState) {
+  const value = props.record[field.fieldName];
+  return typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint'
+    ? value
+    : undefined;
+}
 </script>
 
 <template>
@@ -101,6 +109,11 @@ function colorValue(field: RecordFormFieldState) {
           <i :style="{ backgroundColor: colorValue(field) }" aria-hidden="true" />
           {{ displayValue(field) }}
         </span>
+        <FileSizeText
+          v-else-if="field.valuePresentation === 'FILE_SIZE'"
+          :value="fileSizeValue(field)"
+          :empty-text="props.emptyText"
+        />
         <span v-else>{{ displayValue(field) }}</span>
       </dd>
     </div>

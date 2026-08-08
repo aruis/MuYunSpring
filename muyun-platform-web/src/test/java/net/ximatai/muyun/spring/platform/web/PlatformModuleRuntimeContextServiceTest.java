@@ -335,6 +335,7 @@ class PlatformModuleRuntimeContextServiceTest {
                         DynamicFieldDescriptor.from(FieldDefinition.string("name", "客户名称")),
                         DynamicFieldDescriptor.from(FieldDefinition.bool("enabled", "启用状态")),
                         DynamicFieldDescriptor.from(FieldDefinition.timestamp("createdAt", "创建时间")),
+                        DynamicFieldDescriptor.from(FieldDefinition.longInteger("storageBytes", "存储大小")),
                         DynamicFieldDescriptor.from(FieldDefinition.string("organizationId", "所属机构"),
                                 dynamicReference("customer", "organizationId"))), "CRUD")),
                 List.of(),
@@ -360,6 +361,8 @@ class PlatformModuleRuntimeContextServiceTest {
                 resolvedField("ui-list-web", "field-name", null, "name", "客户名称", "160", "left"),
                 resolvedField("ui-list-web", "field-enabled", null, "enabled", "启用状态", "120", "center"),
                 resolvedField("ui-list-web", "field-created-at", null, "createdAt", "创建时间", "180", "left"),
+                resolvedField("ui-list-web", "field-storage-bytes", null, "storageBytes", "存储大小", "120", "right",
+                        "file_size"),
                 resolvedField("ui-form-web", "field-name", null, "name", "客户名称", null, null),
                 resolvedField("ui-form-web", "field-organization", null, "organizationId", "所属机构", null, null)
         ), List.of());
@@ -394,9 +397,14 @@ class PlatformModuleRuntimeContextServiceTest {
                 .satisfies(view -> {
                     assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
                     assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
-                            .containsExactly("name", "enabled", "createdAt");
+                            .containsExactly("name", "enabled", "createdAt", "storageBytes");
                     assertThat(view.fields()).extracting(ResolvedViewFieldDescriptor::valueType)
-                            .containsExactly(FieldValueType.STRING, FieldValueType.BOOLEAN, FieldValueType.TIMESTAMP);
+                            .containsExactly(FieldValueType.STRING, FieldValueType.BOOLEAN, FieldValueType.TIMESTAMP,
+                                    FieldValueType.LONG);
+                    assertThat(view.fields()).last().satisfies(field -> {
+                        assertThat(field.valuePresentation()).isEqualTo(FieldValuePresentation.FILE_SIZE);
+                        assertThat(field.uiType()).isNull();
+                    });
                 });
         assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_form"))
                 .singleElement()
@@ -866,6 +874,17 @@ class PlatformModuleRuntimeContextServiceTest {
                                                   String title,
                                                   String width,
                                                   String align) {
+        return resolvedField(uiConfigId, fieldId, relationAlias, fieldName, title, width, align, null);
+    }
+
+    private PlatformResolvedUiField resolvedField(String uiConfigId,
+                                                  String fieldId,
+                                                  String relationAlias,
+                                                  String fieldName,
+                                                  String title,
+                                                  String width,
+                                                  String align,
+                                                  String uiControlAlias) {
         return new PlatformResolvedUiField(
                 uiConfigId,
                 fieldId,
@@ -876,7 +895,7 @@ class PlatformModuleRuntimeContextServiceTest {
                 title,
                 "string",
                 "STORED",
-                null,
+                uiControlAlias,
                 true,
                 false,
                 false,

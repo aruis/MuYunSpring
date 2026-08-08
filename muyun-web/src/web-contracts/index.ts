@@ -486,6 +486,7 @@ export interface ViewFieldDefinition {
   required?: UiRule<boolean>;
   readOnly?: UiRule<boolean>;
   uiType?: string;
+  valuePresentation?: FieldValuePresentation;
   width?: string;
   columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;
@@ -501,6 +502,8 @@ export interface BooleanStatusPresentation {
 }
 
 export type BooleanStatusTone = 'SUCCESS' | 'NEUTRAL' | 'WARNING' | 'DANGER';
+
+export type FieldValuePresentation = 'FILE_SIZE';
 
 export type ViewFieldValueType =
   | 'STRING'
@@ -522,6 +525,7 @@ export interface ResolvedViewFieldDescriptor {
   readOnly?: UiRule<boolean>;
   uiType?: string;
   valueType?: ViewFieldValueType;
+  valuePresentation?: FieldValuePresentation;
   width?: string;
   columnSpan?: number;
   align?: 'left' | 'center' | 'right' | string;

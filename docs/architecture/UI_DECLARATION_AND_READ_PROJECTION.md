@@ -238,6 +238,12 @@ UiRule<T>
 缺少该字段时才兼容回退到 query schema。`QueryDescriptor` 继续只决定可过滤、可排序等查询能力，不能成为日期时间
 是否正确展示的前置条件。
 
+`valuePresentation` 是与 `valueType` 正交的受控展示语义，不改变 API、存储、查询或排序使用的原始值。文件字节数
+使用 `FILE_SIZE`：字段仍为 `LONG` bytes，静态 DSL 通过 `.fileSize()` 声明，动态配置的 `file_size` 控件别名在
+适配期归一为同一 resolved presentation。平台统一按 1024 进位展示 B/KB/MB/GB、最多一位小数、空值显示 `-`，
+并以 tooltip 保留精确 bytes。该语义不包含上传、MIME、配额、存储或文件生命周期能力；FORM 中只能用于只读字段。
+业务模块不得把格式化文本写回数据值，也不应自行实现另一套文件大小格式。
+
 ## Service 接入
 
 静态 UI 编译器通过 service 接驳运行事实：

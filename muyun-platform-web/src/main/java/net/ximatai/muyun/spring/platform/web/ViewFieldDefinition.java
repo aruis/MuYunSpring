@@ -6,6 +6,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
                                   UiRule<Boolean> required,
                                   UiRule<Boolean> readOnly,
                                   String uiType,
+                                  FieldValuePresentation valuePresentation,
                                   String width,
                                   Integer columnSpan,
                                   String align,
@@ -20,6 +21,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         required = required == null ? UiRule.constant(Boolean.FALSE) : required;
         readOnly = readOnly == null ? UiRule.constant(Boolean.FALSE) : readOnly;
         uiType = uiType == null || uiType.isBlank() ? null : uiType.trim();
+        if ("fileSize".equals(uiType) || "file_size".equals(uiType)) {
+            throw new IllegalArgumentException("file size must use value presentation instead of uiType");
+        }
+        if (valuePresentation == FieldValuePresentation.FILE_SIZE && uiType != null) {
+            throw new IllegalArgumentException("file size presentation cannot declare an input uiType");
+        }
         width = width == null || width.isBlank() ? null : width.trim();
         columnSpan = columnSpan == null ? 1 : requireColumnSpan(columnSpan);
         align = align == null || align.isBlank() ? null : align.trim();
@@ -29,6 +36,22 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         if ("booleanStatus".equals(uiType) && booleanStatus == null) {
             throw new IllegalArgumentException("uiType booleanStatus requires boolean status presentation");
         }
+    }
+
+    /** Source- and binary-compatible constructor for definitions created before value presentations were introduced. */
+    public ViewFieldDefinition(ViewFieldRef fieldRef,
+                               String label,
+                               UiRule<Boolean> visible,
+                               UiRule<Boolean> required,
+                               UiRule<Boolean> readOnly,
+                               String uiType,
+                               String width,
+                               Integer columnSpan,
+                               String align,
+                               Boolean fixed,
+                               BooleanStatusPresentation booleanStatus) {
+        this(fieldRef, label, visible, required, readOnly, uiType, null, width, columnSpan, align, fixed,
+                booleanStatus);
     }
 
     public static Builder field(String fieldName) {
@@ -46,6 +69,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         private UiRule<Boolean> required = UiRule.constant(Boolean.FALSE);
         private UiRule<Boolean> readOnly = UiRule.constant(Boolean.FALSE);
         private String uiType;
+        private FieldValuePresentation valuePresentation;
         private String width;
         private Integer columnSpan = 1;
         private String align;
@@ -83,6 +107,12 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public Builder uiType(String uiType) {
             this.uiType = uiType;
+            return this;
+        }
+
+        /** Displays a raw byte count using the platform's standard binary-unit formatter. */
+        public Builder fileSize() {
+            this.valuePresentation = FieldValuePresentation.FILE_SIZE;
             return this;
         }
 
@@ -127,7 +157,7 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
 
         public ViewFieldDefinition build() {
             return new ViewFieldDefinition(fieldRef, label, visible, required, readOnly,
-                    uiType, width, columnSpan, align, fixed, booleanStatus);
+                    uiType, valuePresentation, width, columnSpan, align, fixed, booleanStatus);
         }
     }
 
