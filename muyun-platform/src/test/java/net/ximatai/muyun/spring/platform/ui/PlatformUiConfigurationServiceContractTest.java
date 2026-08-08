@@ -328,6 +328,53 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldPreserveScopedListWorkspaceConfigurationAcrossPublishTransitions() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "project_list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setScopeModuleAlias("crm.project");
+        config.setScopeField("projectId");
+        config.setScopeQueryCriteriaKey("projectId");
+        config.setScopeTitle("项目");
+        uiConfigService.update(config);
+
+        publishService.publishUiConfig(uiConfigId);
+
+        assertThat(snapshotService.snapshot("crm.customer").uiConfigs()).singleElement().satisfies(published -> {
+            assertThat(published.getScopeModuleAlias()).isEqualTo("crm.project");
+            assertThat(published.getScopeField()).isEqualTo("projectId");
+            assertThat(published.getScopeQueryCriteriaKey()).isEqualTo("projectId");
+            assertThat(published.getScopeCreatePolicy()).isEqualTo("ALLOW_UNSCOPED");
+        });
+
+        publishService.unpublishUiConfig(uiConfigId);
+
+        PlatformUiConfig unpublished = uiConfigService.select(uiConfigId);
+        assertThat(unpublished.getPublished()).isFalse();
+        assertThat(unpublished.getScopeModuleAlias()).isEqualTo("crm.project");
+        assertThat(unpublished.getScopeField()).isEqualTo("projectId");
+    }
+
+    @Test
+    void shouldRejectScopedListWorkspaceOutsideListUiConfig() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "customer_form", PlatformUiSetType.FORM, true));
+        PlatformUiConfig config = uiConfig(uiSetId, PlatformUiClientType.WEB, false);
+        config.setScopeModuleAlias("crm.project");
+        config.setScopeField("projectId");
+
+        assertThatThrownBy(() -> uiConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supported by LIST UI configs");
+    }
+
+    @Test
     void shouldRejectSemanticallyInvalidLayoutJsonBeforePublish() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");

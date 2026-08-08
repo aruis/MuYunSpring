@@ -115,7 +115,7 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
         if (uiConfig.getTitle() == null || uiConfig.getTitle().isBlank()) {
             uiConfig.setTitle(uiSet.getTitle() + "-" + uiConfig.getClientType().name());
         }
-        normalizeScopedListWorkspace(uiConfig);
+        normalizeScopedListWorkspace(uiConfig, uiSet);
         rejectDuplicate(uiConfig, Criteria.of()
                         .eq("uiSetId", uiSet.getId())
                         .eq("clientType", uiConfig.getClientType()),
@@ -147,7 +147,7 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
                 "Published UI config cannot be edited; unpublish first: " + existing.getId());
     }
 
-    private void normalizeScopedListWorkspace(PlatformUiConfig uiConfig) {
+    private void normalizeScopedListWorkspace(PlatformUiConfig uiConfig, PlatformUiSet uiSet) {
         String scopeModuleAlias = normalize(uiConfig.getScopeModuleAlias());
         String scopeField = normalize(uiConfig.getScopeField());
         if (scopeModuleAlias == null && scopeField == null) {
@@ -162,6 +162,9 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
         }
         if (scopeModuleAlias == null || scopeField == null) {
             throw new PlatformException("Scoped list workspace requires both scopeModuleAlias and scopeField");
+        }
+        if (uiSet.getSetType() != PlatformUiSetType.LIST) {
+            throw new PlatformException("Scoped list workspace is only supported by LIST UI configs: " + uiSet.getId());
         }
         uiConfig.setScopeModuleAlias(PlatformNameRules.requireModuleAlias(scopeModuleAlias));
         uiConfig.setScopeField(PlatformNameRules.requireFieldName(scopeField, "scopeField"));

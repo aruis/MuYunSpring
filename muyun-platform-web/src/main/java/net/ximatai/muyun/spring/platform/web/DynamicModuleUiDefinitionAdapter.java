@@ -49,25 +49,15 @@ public final class DynamicModuleUiDefinitionAdapter {
                     }
                     views.add(view(config, uiSet, viewKind, fieldsByConfig.get(config.getId())));
                 });
-        return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of(), scopedListWorkspace(snapshot, uiSets));
+        return new ModuleUiDefinition(snapshot.moduleAlias(), views, List.of());
     }
 
-    private static ScopedListWorkspaceDefinition scopedListWorkspace(PlatformPageConfigSnapshot snapshot,
-                                                                      Map<String, PlatformUiSet> uiSets) {
-        List<PlatformUiConfig> configured = snapshot.uiConfigs().stream()
-                .filter(config -> Boolean.TRUE.equals(config.getPublished()))
-                .filter(config -> !Boolean.FALSE.equals(config.getEnabled()))
-                .filter(config -> config.getClientType() == PlatformUiClientType.WEB)
-                .filter(config -> uiSets.get(config.getUiSetId()) != null)
-                .filter(config -> uiSets.get(config.getUiSetId()).getSetType() == PlatformUiSetType.LIST)
-                .filter(config -> config.getScopeModuleAlias() != null && !config.getScopeModuleAlias().isBlank())
-                .toList();
-        if (configured.isEmpty()) return null;
-        if (configured.size() > 1) {
-            throw new IllegalArgumentException("dynamic module has multiple scoped list workspace declarations: "
-                    + snapshot.moduleAlias());
+    private static ScopedListWorkspaceDefinition scopedListWorkspace(PlatformUiConfig config,
+                                                                      ModuleViewKind viewKind) {
+        if (viewKind != ModuleViewKind.LIST || config.getScopeModuleAlias() == null
+                || config.getScopeModuleAlias().isBlank()) {
+            return null;
         }
-        PlatformUiConfig config = configured.getFirst();
         String createPolicy = config.getScopeCreatePolicy();
         return new ScopedListWorkspaceDefinition(config.getScopeModuleAlias(), config.getScopeField(),
                 config.getScopeQueryCriteriaKey(), config.getScopeTitle(), config.getScopeSearchPlaceholder(),
@@ -86,7 +76,9 @@ public final class DynamicModuleUiDefinitionAdapter {
                 viewKind,
                 ModuleUiClientType.WEB,
                 viewTitle(config, uiSet),
-                fields(fields)
+                fields(fields),
+                config.getId(),
+                scopedListWorkspace(config, viewKind)
         );
     }
 

@@ -1629,6 +1629,9 @@ test('dynamic module host uses shared descriptor driven list and form runners', 
   assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
   assert.match(hostSource, /isListPage/);
   assert.match(hostSource, /listUiConfigId/);
+  assert.match(hostSource, /function scopedListWorkspaceFor\([\s\S]*views: ResolvedViewDescriptor\[\]/);
+  assert.match(hostSource, /view\.sourceUiConfigId === listUiConfigId\.value/);
+  assert.match(hostSource, /configuredList\.scopedListWorkspace/);
   assert.match(hostSource, /:ui-config-id="listUiConfigId"/);
   assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
   assert.match(hostSource, /动态\$\{pageMode\.value\}入口暂未接入运行器/);

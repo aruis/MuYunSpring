@@ -511,6 +511,9 @@ export interface ResolvedViewDescriptor {
   clientType?: ModuleUiClientType;
   title?: string;
   fields: ResolvedViewFieldDescriptor[];
+  /** Dynamic-page provenance used to select the view configured by a menu entry. */
+  sourceUiConfigId?: string;
+  scopedListWorkspace?: ResolvedScopedListWorkspaceDescriptor;
 }
 
 export interface ResolvedUiActionConfirmationDescriptor {
@@ -547,7 +550,6 @@ export interface ResolvedModuleUiDescriptor {
   views: ResolvedViewDescriptor[];
   actions?: ResolvedUiActionDescriptor[];
   recordLabelField?: string;
-  scopedListWorkspace?: ResolvedScopedListWorkspaceDescriptor;
 }
 
 export interface StandardEntity {

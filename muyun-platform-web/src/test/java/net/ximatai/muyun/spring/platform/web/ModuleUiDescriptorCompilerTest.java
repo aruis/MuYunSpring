@@ -212,9 +212,9 @@ class ModuleUiDescriptorCompilerTest {
     @Test
     void shouldCompileScopedListWorkspaceOnlyForItsSingleReferenceField() {
         ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
-                .listView(list -> list.field("orderNo"))
-                .scopedListWorkspace("crm.customer", "customerId", "customerId", "项目", "搜索项目", false,
-                        ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE)
+                .listView(list -> list.field("orderNo")
+                        .scopedListWorkspace("crm.customer", "customerId", "customerId", "项目", "搜索项目", false,
+                                ScopedListWorkspaceCreatePolicy.REQUIRE_SCOPE))
                 .build();
         StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
                 .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
@@ -225,7 +225,7 @@ class ModuleUiDescriptorCompilerTest {
                 .build();
 
         ResolvedScopedListWorkspaceDescriptor workspace = ModuleUiDescriptorCompiler.compile(definition)
-                .scopedListWorkspace();
+                .views().getFirst().scopedListWorkspace();
 
         assertThat(workspace.scopeModuleAlias()).isEqualTo("crm.customer");
         assertThat(workspace.scopeField()).isEqualTo("customerId");
@@ -237,10 +237,10 @@ class ModuleUiDescriptorCompilerTest {
     @Test
     void shouldRejectScopedListWorkspaceWithWrongReferenceTargetOrCardinality() {
         ModuleUiDefinition wrongTarget = ModuleUiDefinition.builder("sales.order")
-                .scopedListWorkspace("crm.tag", "customerId", "标签", null)
+                .listView(list -> list.scopedListWorkspace("crm.tag", "customerId", "标签", null))
                 .build();
         ModuleUiDefinition multipleReference = ModuleUiDefinition.builder("sales.order")
-                .scopedListWorkspace("crm.tag", "tagIds", "标签", null)
+                .listView(list -> list.scopedListWorkspace("crm.tag", "tagIds", "标签", null))
                 .build();
         StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
                 .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
@@ -257,9 +257,9 @@ class ModuleUiDescriptorCompilerTest {
     }
 
     @Test
-    void shouldAllowUnscopedCreationByDefaultForLegacyScopedListWorkspaceDsl() {
+    void shouldAllowUnscopedCreationByDefaultForListViewWorkspaceDsl() {
         ModuleUiDefinition uiDefinition = ModuleUiDefinition.builder("sales.order")
-                .scopedListWorkspace("crm.customer", "customerId", "项目", "搜索项目")
+                .listView(list -> list.scopedListWorkspace("crm.customer", "customerId", "项目", "搜索项目"))
                 .build();
         StaticModuleDefinition definition = StaticModuleDefinition.builder("sales", "sales.order", "订单")
                 .entities(List.of(new EntityDefinition("order", "sales_order", "Order",
@@ -268,7 +268,7 @@ class ModuleUiDescriptorCompilerTest {
                 .modelClass(ReferenceOrder.class)
                 .build();
 
-        assertThat(ModuleUiDescriptorCompiler.compile(definition).scopedListWorkspace().createPolicy())
+        assertThat(ModuleUiDescriptorCompiler.compile(definition).views().getFirst().scopedListWorkspace().createPolicy())
                 .isEqualTo(ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);
     }
 

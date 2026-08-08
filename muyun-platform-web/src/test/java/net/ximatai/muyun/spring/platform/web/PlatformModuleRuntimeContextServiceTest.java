@@ -376,7 +376,9 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.uiDescriptor()).isNotNull();
         assertThat(context.uiDescriptor().moduleKind()).isEqualTo(ModuleKind.DYNAMIC);
         assertThat(context.uiDescriptor().moduleAlias()).isEqualTo("crm.customer");
-        assertThat(context.uiDescriptor().scopedListWorkspace()).satisfies(workspace -> {
+        assertThat(context.uiDescriptor().views()).filteredOn(view -> view.viewCode().equals("customer_list"))
+                .singleElement().satisfies(view -> {
+            ResolvedScopedListWorkspaceDescriptor workspace = view.scopedListWorkspace();
             assertThat(workspace.scopeModuleAlias()).isEqualTo("base.product");
             assertThat(workspace.scopeField()).isEqualTo("organizationId");
             assertThat(workspace.createPolicy()).isEqualTo(ScopedListWorkspaceCreatePolicy.ALLOW_UNSCOPED);

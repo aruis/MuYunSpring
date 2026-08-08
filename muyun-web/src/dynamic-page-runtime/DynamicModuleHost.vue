@@ -169,13 +169,29 @@ async function loadRuntimeForm() {
   }
   const runtimeContext = await context.runtime.ready;
   treeModule.value = context.abilities.hasTree() === true;
-  scopedListWorkspace.value = runtimeContext.uiDescriptor?.scopedListWorkspace;
+  scopedListWorkspace.value = scopedListWorkspaceFor(runtimeContext.uiDescriptor?.views ?? []);
   const view = defaultFormView(runtimeContext.uiDescriptor?.views ?? []);
   formFields.value = resolveRecordFormFields(runtimeContext.uiDescriptor, view?.viewCode);
 }
 
 function defaultFormView(views: ResolvedViewDescriptor[]) {
   return views.find((view) => view.viewKind === 'FORM');
+}
+
+function scopedListWorkspaceFor(
+  views: ResolvedViewDescriptor[],
+): ResolvedScopedListWorkspaceDescriptor | undefined {
+  const listViews = views.filter((view) => view.viewKind === 'LIST');
+  const configuredList =
+    listUiConfigId.value == null
+      ? undefined
+      : listViews.find((view) => view.sourceUiConfigId === listUiConfigId.value);
+  if (configuredList) {
+    return configuredList.scopedListWorkspace;
+  }
+  return listUiConfigId.value == null && listViews.length === 1
+    ? listViews[0].scopedListWorkspace
+    : undefined;
 }
 
 function handleLoaded(records: QueryListRecord[]) {

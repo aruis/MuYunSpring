@@ -545,6 +545,13 @@ public class PlatformPageConfigPublishService {
         target.setUiSetId(source.getUiSetId());
         target.setClientType(source.getClientType());
         target.setLayoutJson(source.getLayoutJson());
+        target.setScopeModuleAlias(source.getScopeModuleAlias());
+        target.setScopeField(source.getScopeField());
+        target.setScopeQueryCriteriaKey(source.getScopeQueryCriteriaKey());
+        target.setScopeTitle(source.getScopeTitle());
+        target.setScopeSearchPlaceholder(source.getScopeSearchPlaceholder());
+        target.setScopeShowItemSubtitle(source.getScopeShowItemSubtitle());
+        target.setScopeCreatePolicy(source.getScopeCreatePolicy());
         target.setTitle(source.getTitle());
         target.setEnabled(source.getEnabled());
         target.setSortOrder(source.getSortOrder());

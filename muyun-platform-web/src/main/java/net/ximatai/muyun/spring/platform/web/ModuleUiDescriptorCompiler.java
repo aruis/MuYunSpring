@@ -110,7 +110,6 @@ public final class ModuleUiDescriptorCompiler {
                                                               Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                               Map<String, ResolvedReferenceFieldDescriptor> referenceFields,
                                                               String defaultRecordLabelField) {
-        validateScopedListWorkspace(definition.scopedListWorkspace(), referenceFields, definition.moduleAlias());
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
@@ -122,8 +121,7 @@ public final class ModuleUiDescriptorCompiler {
                 definition.actions().stream()
                         .map(ModuleUiDescriptorCompiler::compileAction)
                         .toList(),
-                defaultRecordLabelField,
-                ResolvedScopedListWorkspaceDescriptor.from(definition.scopedListWorkspace())
+                defaultRecordLabelField
         );
     }
 
@@ -166,6 +164,7 @@ public final class ModuleUiDescriptorCompiler {
     private static ResolvedViewDescriptor compileView(ViewDefinition view,
                                                       Map<String, ResolvedOptionFieldDescriptor> optionFields,
                                                       Map<String, ResolvedReferenceFieldDescriptor> referenceFields) {
+        validateScopedListWorkspace(view.scopedListWorkspace(), referenceFields, view.viewCode());
         return new ResolvedViewDescriptor(
                 view.viewCode(),
                 view.viewKind(),
@@ -173,7 +172,9 @@ public final class ModuleUiDescriptorCompiler {
                 view.title(),
                 view.fields().stream()
                         .map(field -> compileField(field, optionFields, referenceFields))
-                        .toList()
+                        .toList(),
+                view.sourceUiConfigId(),
+                ResolvedScopedListWorkspaceDescriptor.from(view.scopedListWorkspace())
         );
     }
 
