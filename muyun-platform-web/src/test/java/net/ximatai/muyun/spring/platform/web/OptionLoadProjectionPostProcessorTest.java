@@ -40,6 +40,24 @@ class OptionLoadProjectionPostProcessorTest {
     }
 
     @Test
+    void shouldPreferExactBusinessCodeWhenItMatchesAnotherEnumConstantName() {
+        RecordReadProjection projection = projection("statusTitle");
+        LinkedHashMap<String, Object> record = new LinkedHashMap<>();
+        record.put("status", "DRAFT");
+        record.put("statusTitle", null);
+
+        List<Map<String, Object>> projected = OptionLoadProjectionPostProcessor.apply(
+                ConflictingEnumRecord.class,
+                projection,
+                List.of(record),
+                new OptionSourceRegistry(List.of(new CodeTitleEnumOptionSourceProvider()))
+        );
+
+        assertThat(projected.getFirst()).containsEntry("status", "DRAFT")
+                .containsEntry("statusTitle", "待创建");
+    }
+
+    @Test
     void shouldKeepDictionaryCodeMatchingStrict() {
         RecordReadProjection projection = projection("statusTitle");
         LinkedHashMap<String, Object> record = new LinkedHashMap<>();
@@ -83,6 +101,14 @@ class OptionLoadProjectionPostProcessorTest {
         private String statusTitle;
     }
 
+    private static class ConflictingEnumRecord {
+        @OptionField(type = OptionSourceType.ENUM, enumType = ConflictingStatus.class)
+        private String status;
+
+        @OptionLoad(source = "status")
+        private String statusTitle;
+    }
+
     private enum ParseStatus implements CodeTitleEnum {
         PARSED("parsed", "解析完成");
 
@@ -90,6 +116,29 @@ class OptionLoadProjectionPostProcessorTest {
         private final String title;
 
         ParseStatus(String code, String title) {
+            this.code = code;
+            this.title = title;
+        }
+
+        @Override
+        public String getCode() {
+            return code;
+        }
+
+        @Override
+        public String getTitle() {
+            return title;
+        }
+    }
+
+    private enum ConflictingStatus implements CodeTitleEnum {
+        NEW("DRAFT", "待创建"),
+        DRAFT("draft", "草稿");
+
+        private final String code;
+        private final String title;
+
+        ConflictingStatus(String code, String title) {
             this.code = code;
             this.title = title;
         }

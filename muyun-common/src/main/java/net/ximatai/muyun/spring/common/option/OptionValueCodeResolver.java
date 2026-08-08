@@ -16,7 +16,7 @@ public final class OptionValueCodeResolver {
             if (trimmed.isBlank()) {
                 return null;
             }
-            return enumConstantCode(binding, trimmed);
+            return enumCode(binding, trimmed);
         }
         if (value instanceof Enum<?> enumValue) {
             return enumValue.name();
@@ -24,17 +24,23 @@ public final class OptionValueCodeResolver {
         return null;
     }
 
-    private static String enumConstantCode(OptionBinding binding, String value) {
+    private static String enumCode(OptionBinding binding, String value) {
         if (binding == null || !OptionBinding.ENUM_SOURCE.equals(binding.sourceType())) {
             return value;
         }
         Class<?> enumType = loadEnumType(binding.source());
+        for (Object constant : enumType.getEnumConstants()) {
+            CodeTitleEnum option = (CodeTitleEnum) constant;
+            if (value.equals(option.getCode())) {
+                return option.getCode();
+            }
+        }
         try {
             @SuppressWarnings({"unchecked", "rawtypes"})
             Enum<?> constant = Enum.valueOf((Class) enumType, value);
             return constant instanceof CodeTitleEnum codeTitleEnum ? codeTitleEnum.getCode() : value;
         } catch (IllegalArgumentException ignored) {
-            // The value may already be the business code. Preserve exact matching; never fold case.
+            // Preserve unknown values for exact option lookup; never fold case.
             return value;
         }
     }
